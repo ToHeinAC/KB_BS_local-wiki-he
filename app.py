@@ -13,6 +13,7 @@ import dedup
 import file_processor
 import ollama_client
 import wiki_engine
+import agent as research_agent
 
 APP_PORT = 8520
 
@@ -166,11 +167,60 @@ elif page == "Chat":
 
 
 elif page == "Research":
+    import os
+
     st.title("Research Agent")
-    st.info(
-        "The ReAct web-research agent is coming in the next iteration. "
-        "It will run Tavily web searches and compile findings into new wiki pages."
-    )
+    tavily_key = os.getenv("TAVILY_API_KEY", "")
+
+    if not tavily_key:
+        st.warning(
+            "**TAVILY_API_KEY not set.** Add it to your `.env` file to enable web research.\n\n"
+            "Get a free key at [tavily.com](https://tavily.com)."
+        )
+
+    question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
+
+    with st.expander("Include wiki context (optional)"):
+        wiki_context = st.text_area(
+            "Paste relevant wiki content or leave blank",
+            height=120,
+            label_visibility="collapsed",
+        )
+
+    auto_save = st.checkbox("Auto-save final report to wiki", value=True)
+
+    if st.button("Start research", type="primary", disabled=not (tavily_key and question)):
+        steps_container = st.container()
+        with steps_container:
+            for step in research_agent.run_research_agent(question, wiki_context or ""):
+                stype = step["type"]
+                if stype == "thought":
+                    with st.expander("Thought", expanded=False):
+                        st.markdown(step["content"])
+                elif stype == "tool_call":
+                    st.info(f"**{step['name']}** — `{step['args']}`")
+                elif stype == "tool_result":
+                    with st.expander(f"Result: {step['name']}", expanded=False):
+                        st.text(step["result"][:800])
+                elif stype == "final_answer":
+                    st.success("Research complete.")
+                    if step.get("report_path"):
+                        st.markdown(f"Report saved: `{step['report_path']}`")
+                        if auto_save:
+                            try:
+                                from pathlib import Path as _P
+                                import os as _os
+                                wiki_dir = _P(_os.getenv("WIKI_DIR", "data/wiki"))
+                                report_path = wiki_dir / "comparisons" / _P(step["report_path"].split("comparisons/")[-1])
+                                if report_path.exists():
+                                    wiki_engine.ingest(report_path.read_text(), f"Research: {question[:60]}")
+                                    st.success("Report also ingested into wiki.")
+                            except Exception as exc:
+                                st.warning(f"Auto-save to wiki failed: {exc}")
+                    else:
+                        st.markdown(step["content"])
+                elif stype == "error":
+                    st.error(step["content"])
 
 
 elif page == "Maintenance":

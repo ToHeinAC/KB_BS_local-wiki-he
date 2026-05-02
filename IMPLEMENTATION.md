@@ -21,11 +21,11 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `ollama_client.py` | **Done** |
 | `wiki_engine.py` | **Done** |
 | `app.py` (Streamlit, port 8520) | **Done** |
-| `tools.py` | Not started |
-| `agent.py` | Not started |
+| `tools.py` | **Done** |
+| `agent.py` | **Done** |
 | Test suite | Not started |
 
-Research page in the UI is a stub — depends on `tools.py` + `agent.py`.
+All planned modules are implemented. Test suite not started.
 
 ---
 
@@ -58,8 +58,8 @@ Each module is a single Python file at project root (PRD §4.4).
 | `wiki_engine.py` | `init_wiki`, `ingest`, `query`, `lint`, `list_pages`, `read_page`, `stats` | Done |
 | `app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
 | `SCHEMA.md` | Wiki schema injected into every LLM system prompt | Done |
-| `tools.py` | `tavily_search` + `report_writer` tool definitions | Not started |
-| `agent.py` | ReAct loop (max 8 iterations) | Not started |
+| `tools.py` | `tavily_search` + `report_writer` tool definitions | Done |
+| `agent.py` | ReAct loop (max 8 iterations) | Done |
 
 ---
 
@@ -124,3 +124,4 @@ uv run streamlit run app.py --server.port 8520
 |---|---|
 | 2026-05-02 | Initialised repo, documentation skeleton populated. |
 | 2026-05-02 | First mockup: implemented all core modules + Streamlit UI (Research stubbed). |
+| 2026-05-02 | Second mockup: implemented `tools.py` + `agent.py`; Research page now fully wired. |
