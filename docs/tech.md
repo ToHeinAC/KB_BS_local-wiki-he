@@ -25,10 +25,11 @@ author: Tobias Hein
 | DOCX extraction | `python-docx` | 1.1 |
 | YAML frontmatter | `python-frontmatter` | 1.1 |
 | Env variables | `python-dotenv` | 1.0 |
+| Web UI | `streamlit` | 1.35 |
 | Optional graph view | `pyvis` | 0.3 |
 | Standard library | `hashlib`, `pathlib`, `json`, `re`, `shutil` | — |
 
-Dev: `pytest ≥ 8.0`. UI dependencies are added per the implementer's framework choice (PRD §3.9).
+Dev: `pytest ≥ 8.0`.
 
 ## Forbidden
 
@@ -41,19 +42,19 @@ Dev: `pytest ≥ 8.0`. UI dependencies are added per the implementer's framework
 - **No configuration UI** — `.env` is the only config surface.
 - **No sub-packages** — every module is one Python file at project root.
 
-## Environment commands (target)
+## Environment commands
 
 ```bash
-uv sync           # create .venv, install locked deps
-uv run pytest     # run tests
-uv run python app.py   # run app (or framework-specific launcher, see ui.md)
+uv sync                                             # create .venv, install locked deps
+uv run pytest                                       # run tests
+uv run streamlit run app.py --server.port 8520      # run app
 ```
 
-`pyproject.toml` and `uv.lock` are checked in. A representative dependency block is in PRD §5.2.
+`pyproject.toml` and `uv.lock` are checked in.
 
-## Streamlit notes (if chosen)
+## Streamlit notes
 
-If Streamlit is the UI choice, follow the user's global rule: **always use ports > 8510**, and include a safe-exit button that uses `lsof -ti:<port> | xargs -r kill -9` (without killing SSH).
+Streamlit is the chosen UI framework. Port is fixed at **8520** (8511 is reserved on this host). The app includes a safe-exit button using `lsof -ti:8520 | xargs -r kill -9`.
 
 ## Licensing
 

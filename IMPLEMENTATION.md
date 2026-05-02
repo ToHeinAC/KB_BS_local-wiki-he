@@ -1,8 +1,8 @@
 # IMPLEMENTATION.md
 
-State-of-implementation reference for **LocalWiki** — a local, Python-based, Karpathy-style self-compiling knowledge wiki driven by Ollama (`gemma4:e4b`).
+State-of-implementation reference for **LocalWiki** — a local, Python-based, Karpathy-style self-compiling knowledge wiki driven by Ollama.
 
-> **Authoritative spec:** [`PRD.md`](PRD.md). This file is a navigation map and current-status tracker. It must stay under 500 lines (see CLAUDE.md §5.1).
+> **Authoritative spec:** [`PRD.md`](PRD.md). This file is a navigation map and current-status tracker. Must stay under 500 lines (CLAUDE.md §5.1).
 
 ---
 
@@ -11,14 +11,21 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | Area | State |
 |---|---|
 | Repository | Initialised; remote `ToHeinAC/KB_BS_local-wiki-he` |
-| Documentation skeleton | Populated (this commit) |
-| Source code | **Not started** |
-| Dependencies (`pyproject.toml`, `uv.lock`) | **Not created** |
-| `SCHEMA.md` | **Not created** |
-| `.env.example` | **Not created** |
-| Test suite | **Not started** |
+| Documentation skeleton | Complete |
+| `pyproject.toml` / `uv.lock` | **Done** |
+| `.env.example` | **Done** |
+| `SCHEMA.md` | **Done** |
+| `dedup.py` | **Done** |
+| `file_processor.py` | **Done** |
+| `schema_loader.py` | **Done** |
+| `ollama_client.py` | **Done** |
+| `wiki_engine.py` | **Done** |
+| `app.py` (Streamlit, port 8520) | **Done** |
+| `tools.py` | Not started |
+| `agent.py` | Not started |
+| Test suite | Not started |
 
-Nothing is implemented yet. All module references below are forward-looking.
+Research page in the UI is a stub — depends on `tools.py` + `agent.py`.
 
 ---
 
@@ -38,80 +45,75 @@ Nothing is implemented yet. All module references below are forward-looking.
 
 ---
 
-## 3. Module Inventory (planned)
+## 3. Module Inventory
 
-From PRD §2.2. Each is a single Python file at project root, no sub-packages (PRD §4.4).
+Each module is a single Python file at project root (PRD §4.4).
 
-| Module | Purpose | PRD §§ |
+| Module | Purpose | Status |
 |---|---|---|
-| `dedup.py` | SHA-256 deduplication for uploaded files | 3.1 |
-| `file_processor.py` | Extract plain text from PDF/DOCX/MD/TXT/HTML | 3.2 |
-| `ollama_client.py` | Thin wrapper around Ollama Python SDK | 3.3 |
-| `schema_loader.py` | Load `SCHEMA.md`; produce ingest/query/lint system prompts | 3.4 |
-| `wiki_engine.py` | Core ops: `ingest()`, `query()`, `lint()`, helpers | 3.6 |
-| `tools.py` | `tavily_search` + `report_writer` tool definitions | 3.7 |
-| `agent.py` | ReAct loop using Ollama native tool calling | 3.8 |
-| `app.py` | Web UI (framework not forced) | 3.9 |
-| `SCHEMA.md` | Wiki schema injected into every LLM system prompt | 3.5 |
+| `dedup.py` | SHA-256 dedup; flat `data/raw/` store + `manifest.json` | Done |
+| `file_processor.py` | Extract text from PDF/DOCX/MD/TXT/HTML; returns string | Done |
+| `ollama_client.py` | `generate()` + `chat()` wrappers; `is_available()` health check | Done |
+| `schema_loader.py` | `get_system_prompt()` — reads `SCHEMA.md` verbatim | Done |
+| `wiki_engine.py` | `init_wiki`, `ingest`, `query`, `lint`, `list_pages`, `read_page`, `stats` | Done |
+| `app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
+| `SCHEMA.md` | Wiki schema injected into every LLM system prompt | Done |
+| `tools.py` | `tavily_search` + `report_writer` tool definitions | Not started |
+| `agent.py` | ReAct loop (max 8 iterations) | Not started |
 
 ---
 
-## 4. Implementation Order
+## 4. Implementation Notes (deviations from PRD)
 
-Per PRD §9 — implement bottom-up to keep each step independently verifiable:
+The mockup simplifies a few planned details — tracked here so future iterations can align:
 
-1. `dedup.py` + tests
-2. `file_processor.py` + tests
-3. `ollama_client.py` (verify connectivity to `gemma4:e4b`)
-4. `schema_loader.py` + `SCHEMA.md`
-5. `wiki_engine.py` (ingest → query → lint)
-6. `tools.py` (`tavily_search`, `report_writer`)
-7. `agent.py` (ReAct loop)
-8. `app.py` (NYT-style UI; see `docs/ui.md`)
-9. Integration test: upload → ingest → chat → research
-10. Test-suite review against the 100-test cap and 90/10 split
+| Area | PRD intent | Current implementation |
+|---|---|---|
+| `data/raw/` layout | `uploads/` + `extracted/` subdirs + `.manifest.json` | Flat dir: files + `manifest.json` directly in `data/raw/` |
+| LLM page output format | `### FILE:` / `### INDEX_UPDATE` / `### LOG_ENTRY` blocks | `=== filename.md ===` … `=== END ===` blocks |
+| `schema_loader.py` | Separate system prompts per operation (ingest/query/lint) | Single `get_system_prompt()` returns full `SCHEMA.md` |
+| `file_processor.py` | Saves extracted text to `data/raw/extracted/` | Returns extracted text in memory; no write |
+| Query page selection | Title-heuristic + LLM ranking | LLM selects filenames from index text |
 
 ---
 
-## 5. Hard Constraints (extracted from PRD)
+## 5. Hard Constraints
 
 - **No LangChain, no vector DB, no embeddings, no cloud LLM APIs** (PRD §2.3).
-- **No async** unless the chosen UI stack requires it at boundaries (PRD §4.4).
+- **No async** unless UI stack requires it at boundaries (PRD §4.4).
 - **One file per module**, no sub-packages (PRD §4.4).
-- **`uv` only** for env + deps; no `requirements.txt` workflow (PRD §4.4, §5.3).
-- **Streamlit not required** — UI framework is implementer's choice as long as UX + style hold (PRD §3.9, §4.4).
+- **`uv` only** for env + deps (PRD §5.3).
 - **Test cap: 100 automated tests**, ≈90% core / ≈10% new features (PRD §4.5).
-- **NYT editorial UI style**, content-first, restrained palette (PRD §2.4).
-- **Apache-2.0 / MIT-compatible licensing** for everything added (CLAUDE.md §5.4).
+- **NYT editorial UI style** (PRD §2.4).
+- **Apache-2.0 / MIT-compatible licensing** (CLAUDE.md §5.4).
+- **Streamlit port: 8520** (8511 reserved for another app on this host).
 
 ---
 
-## 6. Configuration (planned, not yet present)
+## 6. Configuration
 
-Only `.env` is the user-facing config surface (PRD §4.4). Template will live in `.env.example`. Variables:
+`.env` is the only config surface (PRD §4.4). Template: `.env.example`.
 
 | Var | Default | Purpose |
 |---|---|---|
-| `TAVILY_API_KEY` | — | Web research (Research page only) |
-| `OLLAMA_MODEL` | `gemma4:e4b` | Override model |
+| `OLLAMA_MODEL` | `gemma3:4b` | Override model |
 | `OLLAMA_HOST` | `http://localhost:11434` | Override Ollama endpoint |
-| `MAX_INGEST_CHARS` | `50000` | Extract truncation threshold |
-| `MAX_CONTEXT_CHARS` | `12000` | Query-time context cap |
-| `AGENT_MAX_ITERATIONS` | `8` | ReAct safety limit |
-
-Full reference: PRD §5.1.
+| `TAVILY_API_KEY` | — | Web research (Research page, not yet implemented) |
+| `MAX_INGEST_CHARS` | `40000` | Text truncation threshold at extraction |
+| `WIKI_DIR` | `data/wiki` | Wiki page storage path |
+| `RAW_DIR` | `data/raw` | Raw source file storage path |
 
 ---
 
-## 7. Setup (target workflow)
-
-See [`README.md`](README.md). End-state developer commands (PRD §8):
+## 7. Setup
 
 ```bash
+git clone https://github.com/ToHeinAC/KB_BS_local-wiki-he
+cd KB_BS_local-wiki-he
 uv sync
-ollama pull gemma4:e4b
-cp .env.example .env  # add TAVILY_API_KEY if using Research
-uv run python app.py   # or framework-specific launcher
+ollama pull gemma3:4b          # or set OLLAMA_MODEL to any pulled model
+cp .env.example .env           # add TAVILY_API_KEY when Research is implemented
+uv run streamlit run app.py --server.port 8520
 ```
 
 ---
@@ -121,3 +123,4 @@ uv run python app.py   # or framework-specific launcher
 | Date | Change |
 |---|---|
 | 2026-05-02 | Initialised repo, documentation skeleton populated. |
+| 2026-05-02 | First mockup: implemented all core modules + Streamlit UI (Research stubbed). |

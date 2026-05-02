@@ -1,13 +1,14 @@
 ---
 name: architecture.md
 description: System architecture — three-layer Karpathy knowledge model, module boundaries, dataflows
-version: 1.0.0
+version: 1.1.0
 author: Tobias Hein
 ---
 
 # Architecture
 
 > Authoritative spec: [`PRD.md`](../PRD.md) §2 (System Architecture) and §7 (Dataflow Diagrams).
+> Implementation deviations from PRD are tracked in [`IMPLEMENTATION.md`](../IMPLEMENTATION.md) §4.
 
 ## Three-layer knowledge model
 
@@ -17,28 +18,108 @@ author: Tobias Hein
 | 2. Wiki | `data/wiki/` | LLM | LLM owns entirely (ingest/query/lint write here) |
 | 3. Schema | `SCHEMA.md` (project root) | Maintainer | Injected into every LLM system prompt |
 
-`data/raw/` splits into `uploads/` (originals), `extracted/` (plain text), and `.manifest.json` (SHA-256 dedup registry). `data/wiki/` splits into `index.md`, `log.md`, `overview.md`, plus `concepts/`, `entities/`, `sources/`, `comparisons/`. See PRD §2.1 for the full tree.
+### `data/raw/` layout (current implementation)
+
+Flat directory — no subdirectories:
+
+```
+data/raw/
+  manifest.json          # SHA-256 → {filename, added_at}
+  uploaded-file.pdf      # original upload (immutable)
+  another-doc.md
+  ...
+```
+
+> PRD planned `uploads/` + `extracted/` subdirs and `.manifest.json`. Mockup uses a flat layout. See IMPLEMENTATION.md §4.
+
+### `data/wiki/` layout
+
+```
+data/wiki/
+  index.md               # master table of contents (auto-maintained)
+  log.md                 # activity + lint log (append-only)
+  concept-name.md        # concept pages
+  entity-name.md         # entity pages
+  summary-<source>.md    # source summary pages
+```
 
 ## Module boundaries
 
-One Python file per module at project root; no sub-packages (PRD §4.4). Boundaries:
+One Python file per module at project root; no sub-packages (PRD §4.4).
 
-- **`dedup.py`** owns the manifest. Every ingest must pass through `is_duplicate()` first.
-- **`file_processor.py`** is the only writer to `data/raw/extracted/`. Originals in `uploads/` stay untouched.
-- **`ollama_client.py`** is the *only* place that imports `ollama`. All other modules consume `chat()` / `chat_text()`.
-- **`schema_loader.py`** is the *only* place that reads `SCHEMA.md`. It produces ready-made system prompts for ingest, query, and lint.
-- **`wiki_engine.py`** is the only writer to `data/wiki/`. It owns `ingest()`, `query()`, `lint()`, plus tree/stats/search helpers.
-- **`tools.py`** wraps the two ReAct tools (`tavily_search`, `report_writer`) plus their JSON schemas; `report_writer` reuses `wiki_engine`-style writes.
-- **`agent.py`** owns the ReAct loop. Hard cap: 8 iterations.
-- **`app.py`** is the UI shell. It calls `wiki_engine` and `agent`; it never writes wiki files directly.
+- **`dedup.py`** owns `manifest.json`. Every ingest must call `is_duplicate()` before `register_file()`.
+- **`file_processor.py`** extracts text from uploaded files and returns it as a string (does not write to disk).
+- **`ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
+- **`schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
+- **`wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`.
+- **`tools.py`** *(not yet implemented)* — wraps `tavily_search` and `report_writer` tool definitions for the ReAct agent.
+- **`agent.py`** *(not yet implemented)* — owns the ReAct loop (hard cap: 8 iterations).
+- **`app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine` and `agent`; never writes wiki files directly.
 
 ## Key dataflows
 
-- **Ingest:** upload → `dedup.is_duplicate` → `file_processor.extract_text` → `wiki_engine.ingest` → Ollama call (temperature 0.3) → parse `### FILE:` / `### INDEX_UPDATE` / `### LOG_ENTRY` blocks → write pages, update `index.md`, append `log.md`. Detail: PRD §3.6.1, §7.1.
-- **Query:** read `index.md` → load up to 5 most relevant pages (heuristic: title in question) → Ollama call (temperature 0.7) → optionally file response as comparison page. Total context capped ≈12 KB. Detail: PRD §3.6.2.
-- **Lint:** read all wiki pages (or fall back to index-only if >15 KB) → Ollama call → markdown health report (contradictions / orphans / missing / stale / suggestions) → append to `log.md`. Detail: PRD §3.6.3.
-- **ReAct:** alternate `ollama.chat(tools=…)` and tool execution; `tavily_search` keeps loop alive, `report_writer` ends it. Reflection prompt appended after each tool batch. Detail: PRD §3.8, §7.2.
+### Ingest
+
+```
+upload → dedup.is_duplicate()
+       → dedup.register_file()      # saves to data/raw/
+       → file_processor.extract_text()   # returns string
+       → wiki_engine.ingest(text, source_name)
+         → schema_loader.get_system_prompt()
+         → ollama_client.generate(system, prompt, temperature=0.3)
+         → parse "=== filename.md ===" blocks from LLM response
+         → write pages to data/wiki/
+         → _rebuild_index()
+         → _append_log()
+         → return {created, updated, contradictions}
+```
+
+LLM output format for ingest:
+```
+=== filename.md ===
+---
+title: "..."
+type: concept | entity | source-summary
+...
+---
+Page content.
+=== END ===
+UPDATE: existing-page.md
+CONTRADICTION: brief description
+```
+
+### Query
+
+```
+wiki_engine.query(question)
+  → read index.md
+  → ollama_client.generate(select prompt, temperature=0.1)  # pick ≤5 filenames
+  → load selected pages from data/wiki/
+  → ollama_client.generate(answer prompt, temperature=0.7)
+  → return answer string
+```
+
+### Lint
+
+```
+wiki_engine.lint()
+  → read all *.md in data/wiki/ (except index + log)
+  → ollama_client.generate(health-check prompt, temperature=0.3)
+  → append report to log.md
+  → return report string
+```
+
+### ReAct (not yet implemented)
+
+```
+agent.run(question)
+  → alternate ollama.chat(tools=[tavily_search, report_writer]) and tool execution
+  → max 8 iterations
+  → report_writer saves final report to data/wiki/
+```
+
+Detail: PRD §3.8, §7.2.
 
 ## Concurrency & state
 
-Synchronous everywhere. State is files + JSON only — no database, no cache, no async (PRD §4.4). Manifest writes are atomic (temp file + rename, PRD §3.1).
+Synchronous everywhere. State is files + JSON only — no database, no cache, no async (PRD §4.4).

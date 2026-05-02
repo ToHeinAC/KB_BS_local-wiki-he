@@ -21,7 +21,11 @@ The UI must feel like a premium digital publication, not a SaaS dashboard. Concr
 
 ## Framework choice
 
-Streamlit is **not required**. Implementer chooses Streamlit, FastAPI + frontend, NiceGUI, Reflex, or any Python-centric stack that meets the UX and the editorial style. PRD §3.9.
+**Streamlit** is the chosen UI framework. Port is fixed at **8520** (8511 reserved on this host). Run with:
+
+```bash
+uv run streamlit run app.py --server.port 8520
+```
 
 ## Pages (primary navigation)
 
@@ -30,7 +34,7 @@ Streamlit is **not required**. Implementer chooses Streamlit, FastAPI + frontend
 | **Upload** | Drag-and-drop ingest with explicit dedup confirmation; show ingest summary (created / updated / contradictions). Never auto-ingest. | 3.9.2 |
 | **Wiki Explorer** | Tree/document navigator, full-text search across pages, rendered Markdown viewer with metadata, optional graph view. | 3.9.3 |
 | **Chat** | Chatbot using the wiki as context. Supports filing the answer as a wiki page, launching web research from a question, onboarding message when wiki is empty. | 3.9.4 |
-| **Research** | Run the ReAct agent (max 8 iterations); show step-by-step progress; gate behind `TAVILY_API_KEY` with clear setup guidance; allow auto-saving the report. | 3.9.5 |
+| **Research** | *(Stubbed — next iteration)* Run the ReAct agent (max 8 iterations); show step-by-step progress; gate behind `TAVILY_API_KEY`. Requires `tools.py` + `agent.py`. | 3.9.5 |
 | **Maintenance** | Wiki stats, run lint/health check, recent activity log, guarded reset (with confirmation). | 3.9.6 |
 
 ## Top-bar / chrome
