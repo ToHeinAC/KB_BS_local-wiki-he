@@ -33,7 +33,7 @@ st.markdown(
     h1, h2, h3 { font-family: 'Libre Baskerville', Georgia, serif; font-weight: 700; }
     .block-container { max-width: 900px; padding-top: 2rem; }
     .stButton>button { border-radius: 2px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.8rem; }
-    hr { border-top: 2px solid #111; margin: 1.5rem 0; }
+    hr { border-top: 2px solid #234637; margin: 1.5rem 0; }
     </style>
     """,
     unsafe_allow_html=True,

@@ -23,9 +23,10 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `app.py` (Streamlit, port 8520) | **Done** |
 | `tools.py` | **Done** |
 | `agent.py` | **Done** |
-| Test suite | Not started |
+| Test suite | **Done** (84 tests) |
+| `.streamlit/config.toml` | **Done** |
 
-All planned modules are implemented. Test suite not started.
+All planned modules are implemented. Test suite complete (84 tests, ≤100 cap).
 
 ---
 
@@ -125,3 +126,4 @@ uv run streamlit run app.py --server.port 8520
 | 2026-05-02 | Initialised repo, documentation skeleton populated. |
 | 2026-05-02 | First mockup: implemented all core modules + Streamlit UI (Research stubbed). |
 | 2026-05-02 | Second mockup: implemented `tools.py` + `agent.py`; Research page now fully wired. |
+| 2026-05-02 | Applied crportfolioapp colour palette (`.streamlit/config.toml`); implemented 84-test suite across all modules. |
