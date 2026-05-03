@@ -43,3 +43,6 @@ tmp/
 
 # Local Claude settings (not for sharing)
 .claude/settings.local.json
+
+# Data folder
+data/
