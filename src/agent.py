@@ -5,18 +5,9 @@ from typing import Generator
 
 import ollama_client
 import tools as tool_module
+from prompts import AGENT_SYSTEM
 
 MAX_ITER = 8
-
-_SYSTEM = """You are a research agent with access to web search. Research the question thoroughly and produce a structured report.
-
-{wiki_block}
-Tools available:
-- tavily_search: search the web for information
-- report_writer: save the final report (call ONLY when all research is done)
-
-Workflow: break into sub-questions → search → reflect on results → refine if needed → when you have enough information call report_writer with a complete markdown report.
-Cite sources as [Source: URL]. Max searches: 6. Be efficient."""
 
 
 def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict, None, None]:
@@ -30,7 +21,7 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
       {"type": "error", "content": "..."}
     """
     wiki_block = f"Wiki context:\n{wiki_context}\n\n" if wiki_context else ""
-    system = _SYSTEM.format(wiki_block=wiki_block)
+    system = AGENT_SYSTEM.format(wiki_block=wiki_block)
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": question},

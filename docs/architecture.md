@@ -45,17 +45,18 @@ data/wiki/
 
 ## Module boundaries
 
-One Python file per module at project root; no sub-packages (PRD §4.4).
+All Python modules live in `src/`; one file per module, no sub-packages (PRD §4.4).
 
-- **`dedup.py`** owns `manifest.json`. Every ingest must call `is_duplicate()` before `register_file()`.
-- **`file_processor.py`** extracts text from uploaded files and returns it as a string (does not write to disk).
-- **`ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
-- **`schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
-- **`wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`.
-- **`template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
-- **`tools.py`** — wraps `tavily_search` and `report_writer` tool definitions for the ReAct agent.
-- **`agent.py`** — owns the ReAct loop (hard cap: 8 iterations).
-- **`app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine` and `agent`; never writes wiki files directly.
+- **`src/prompts.py`** is the *only* place that defines LLM prompt strings. All other modules import named constants from here (e.g. `AGENT_SYSTEM`, `INGEST_PROMPT`, `SELECT_PROMPT`, `ANSWER_PROMPT`, `LINT_PROMPT`, `TAVILY_SEARCH_DESCRIPTION`, `REPORT_WRITER_DESCRIPTION`).
+- **`src/dedup.py`** owns `manifest.json`. Every ingest must call `is_duplicate()` before `register_file()`.
+- **`src/file_processor.py`** extracts text from uploaded files and returns it as a string (does not write to disk).
+- **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
+- **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
+- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`.
+- **`src/template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
+- **`src/tools.py`** — wraps `tavily_search` and `report_writer` tool definitions for the ReAct agent. Descriptions imported from `prompts.py`.
+- **`src/agent.py`** — owns the ReAct loop (hard cap: 8 iterations).
+- **`src/app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine` and `agent`; never writes wiki files directly.
 
 ## Key dataflows
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import frontmatter
 
-_TEMPLATE_PATH = Path(__file__).parent / "templates" / "insert.md"
+_TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "insert.md"
 
 
 def load_insert_template() -> list[str]:

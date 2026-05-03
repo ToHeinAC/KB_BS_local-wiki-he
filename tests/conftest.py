@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Ensure project root is on sys.path so bare module imports work
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Ensure src/ is on sys.path so bare module imports work
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import dedup
 import wiki_engine

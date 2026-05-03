@@ -83,6 +83,10 @@ The project uses the following technology choices:
 - All implementation must be in python and the pythonic way of implementation.
 - `uv` is used for the virtual python environment setup and the running. Dependencies shall be defined in `pyproject.toml` and installed via `uv`.
 - Use python-dotenv for the environmental variable handling.
+- All domain Python modules live in `src/`. Run with `uv run streamlit run src/app.py --server.port 8520`.
+- All LLM prompt strings must live in `src/prompts.py` as named module-level constants (e.g. `AGENT_SYSTEM`, `INGEST_PROMPT`). Never embed prompt strings inline in other modules.
+
+See [docs/architecture.md](docs/architecture.md) for the full module map and dataflow diagrams.
 
 ### 5.4 Licencing
 All implementation must be under the Apache Licence 2.0 or more permissive (e.g. MIT). 

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-_SCHEMA_PATH = Path(__file__).parent / "SCHEMA.md"
+_SCHEMA_PATH = Path(__file__).parent.parent / "SCHEMA.md"
 
 
 def get_system_prompt() -> str:

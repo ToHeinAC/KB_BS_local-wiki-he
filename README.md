@@ -1,6 +1,6 @@
 # LocalWiki
 
-A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma3:4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
+A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
 > **Status:** All pages implemented — ingest (with optional metadata form) → wiki → chat → research (ReAct agent). 86-test suite.
 
@@ -24,14 +24,14 @@ A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; 
 git clone https://github.com/ToHeinAC/KB_BS_local-wiki-he
 cd KB_BS_local-wiki-he
 uv sync
-ollama pull gemma3:4b          # or any model — set OLLAMA_MODEL in .env
+ollama pull gemma4:e4b          # or any model — set OLLAMA_MODEL in .env
 cp .env.example .env
 ```
 
 ## Run
 
 ```bash
-uv run streamlit run app.py --server.port 8520
+uv run streamlit run src/app.py --server.port 8520
 ```
 
 Open [http://localhost:8520](http://localhost:8520).
@@ -42,7 +42,7 @@ Edit `.env` (copied from `.env.example`):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `OLLAMA_MODEL` | `gemma3:4b` | Ollama model to use |
+| `OLLAMA_MODEL` | `gemma4:e4b` | Ollama model to use |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `MAX_INGEST_CHARS` | `40000` | Max characters extracted per document |
 | `WIKI_DIR` | `data/wiki` | Wiki page storage |

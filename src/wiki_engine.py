@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 
 import ollama_client
 import schema_loader
+from prompts import ANSWER_PROMPT, INGEST_PROMPT, LINT_PROMPT, SELECT_PROMPT
 
 load_dotenv()
 
@@ -102,40 +103,15 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
         meta_block = ""
         example_extra = ""
 
-    prompt = f"""You are ingesting a new source document into the wiki.
-
-Source name: {source_name}
-
-{meta_block}Current wiki index:
-{index_text}
-
-Source text (may be truncated):
-{text}
-
-Instructions:
-1. Create a source-summary page for this document (filename: summary-{_title_to_filename(source_name).replace('.md','')}.md).
-2. Create or update concept/entity pages for key topics found in the source.
-3. Note any contradictions with existing wiki content.
-4. Output each page in this exact format:
-
-=== filename.md ===
----
-title: "Title"
-type: source-summary | concept | entity
-sources: ["{source_name}"]
-related: []
-created: "{_date()}"
-updated: "{_date()}"
-confidence: high | medium | low{example_extra}
----
-
-Page content here.
-
-=== END ===
-
-List pages you would UPDATE (already in index): UPDATE: filename.md
-List contradictions found: CONTRADICTION: <brief description>
-"""
+    prompt = INGEST_PROMPT.format(
+        source_name=source_name,
+        meta_block=meta_block,
+        index_text=index_text,
+        text=text,
+        summary_slug=_title_to_filename(source_name).replace(".md", ""),
+        example_extra=example_extra,
+        date=_date(),
+    )
 
     response = ollama_client.generate(system, prompt, temperature=0.3)
     pages = _parse_llm_pages(response)
@@ -175,13 +151,7 @@ def query(question: str) -> str:
     index_text = _INDEX.read_text() if _INDEX.exists() else "(empty wiki)"
 
     # Ask LLM to select relevant pages
-    select_prompt = f"""Wiki index:
-{index_text}
-
-User question: {question}
-
-List up to 5 most relevant page filenames (one per line, filename only). If none are relevant, reply NONE."""
-
+    select_prompt = SELECT_PROMPT.format(index_text=index_text, question=question)
     selected_raw = ollama_client.generate(system, select_prompt, temperature=0.1)
     selected = [
         ln.strip()
@@ -198,14 +168,7 @@ List up to 5 most relevant page filenames (one per line, filename only). If none
     if not pages_text:
         pages_text = "(no relevant pages found)"
 
-    answer_prompt = f"""Using only the wiki pages below, answer the user's question.
-Cite pages inline as [page title].
-
-Wiki pages:
-{pages_text}
-
-Question: {question}"""
-
+    answer_prompt = ANSWER_PROMPT.format(pages_text=pages_text, question=question)
     return ollama_client.generate(system, answer_prompt, temperature=0.7)
 
 
@@ -221,19 +184,7 @@ def lint() -> str:
     if not all_pages:
         return "Wiki is empty — nothing to lint."
 
-    prompt = f"""Review all wiki pages below for quality issues.
-
-Report:
-1. CONTRADICTIONS: pages with conflicting facts
-2. ORPHANS: pages not linked from index or other pages
-3. GAPS: important concepts mentioned but lacking their own page
-4. STALE: claims that seem outdated or uncertain
-5. SUGGESTIONS: 2-3 investigation ideas for future ingestion
-
-Wiki pages:
-{all_pages}"""
-
-    report = ollama_client.generate(system, prompt, temperature=0.3)
+    report = ollama_client.generate(system, LINT_PROMPT.format(all_pages=all_pages), temperature=0.3)
     _append_log("Lint", report[:500])
     return report
 

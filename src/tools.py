@@ -7,6 +7,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from prompts import REPORT_WRITER_DESCRIPTION, TAVILY_SEARCH_DESCRIPTION
+
 load_dotenv()
 
 WIKI_DIR = Path(os.getenv("WIKI_DIR", "data/wiki"))
@@ -41,7 +43,7 @@ TAVILY_SEARCH_SCHEMA = {
     "type": "function",
     "function": {
         "name": "tavily_search",
-        "description": "Search the web for current information on a topic. Use to find facts, recent news, or information not in the knowledge base.",
+        "description": TAVILY_SEARCH_DESCRIPTION,
         "parameters": {
             "type": "object",
             "properties": {
@@ -61,7 +63,7 @@ REPORT_WRITER_SCHEMA = {
     "type": "function",
     "function": {
         "name": "report_writer",
-        "description": "Save a completed research report to the knowledge wiki. Call ONLY when you have finished all research and are ready to write the final report.",
+        "description": REPORT_WRITER_DESCRIPTION,
         "parameters": {
             "type": "object",
             "properties": {

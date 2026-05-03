@@ -15,15 +15,16 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `pyproject.toml` / `uv.lock` | **Done** |
 | `.env.example` | **Done** |
 | `SCHEMA.md` | **Done** |
-| `dedup.py` | **Done** |
-| `file_processor.py` | **Done** |
-| `schema_loader.py` | **Done** |
-| `ollama_client.py` | **Done** |
-| `wiki_engine.py` | **Done** |
-| `app.py` (Streamlit, port 8520) | **Done** |
-| `tools.py` | **Done** |
-| `agent.py` | **Done** |
-| `template_loader.py` | **Done** |
+| `src/dedup.py` | **Done** |
+| `src/file_processor.py` | **Done** |
+| `src/schema_loader.py` | **Done** |
+| `src/ollama_client.py` | **Done** |
+| `src/wiki_engine.py` | **Done** |
+| `src/app.py` (Streamlit, port 8520) | **Done** |
+| `src/prompts.py` | **Done** |
+| `src/tools.py` | **Done** |
+| `src/agent.py` | **Done** |
+| `src/template_loader.py` | **Done** |
 | Test suite | **Done** (86 tests) |
 | `.streamlit/config.toml` | **Done** |
 
@@ -49,20 +50,21 @@ All planned modules are implemented. Test suite complete (86 tests, ≤100 cap).
 
 ## 3. Module Inventory
 
-Each module is a single Python file at project root (PRD §4.4).
+All Python modules live under `src/`. Entry point: `uv run streamlit run src/app.py --server.port 8520`.
 
 | Module | Purpose | Status |
 |---|---|---|
-| `dedup.py` | SHA-256 dedup; flat `data/raw/` store + `manifest.json` | Done |
-| `file_processor.py` | Extract text from PDF/DOCX/MD/TXT/HTML; returns string | Done |
-| `ollama_client.py` | `generate()` + `chat()` wrappers; `is_available()` health check | Done |
-| `schema_loader.py` | `get_system_prompt()` — reads `SCHEMA.md` verbatim | Done |
-| `wiki_engine.py` | `init_wiki`, `ingest`, `query`, `lint`, `list_pages`, `read_page`, `stats` | Done |
-| `app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
+| `src/dedup.py` | SHA-256 dedup; flat `data/raw/` store + `manifest.json` | Done |
+| `src/file_processor.py` | Extract text from PDF/DOCX/MD/TXT/HTML; returns string | Done |
+| `src/ollama_client.py` | `generate()` + `chat()` wrappers; `is_available()` health check | Done |
+| `src/schema_loader.py` | `get_system_prompt()` — reads `SCHEMA.md` verbatim | Done |
+| `src/wiki_engine.py` | `init_wiki`, `ingest`, `query`, `lint`, `list_pages`, `read_page`, `stats` | Done |
+| `src/app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
+| `src/prompts.py` | All LLM prompt constants (AGENT_SYSTEM, INGEST_PROMPT, etc.) | Done |
+| `src/tools.py` | `tavily_search` + `report_writer` tool definitions | Done |
+| `src/agent.py` | ReAct loop (max 8 iterations) | Done |
+| `src/template_loader.py` | Reads `templates/insert.md` → ordered list of user-fillable metadata fields | Done |
 | `SCHEMA.md` | Wiki schema injected into every LLM system prompt | Done |
-| `tools.py` | `tavily_search` + `report_writer` tool definitions | Done |
-| `agent.py` | ReAct loop (max 8 iterations) | Done |
-| `template_loader.py` | Reads `templates/insert.md` → ordered list of user-fillable metadata fields | Done |
 
 ---
 
@@ -84,7 +86,7 @@ The mockup simplifies a few planned details — tracked here so future iteration
 
 - **No LangChain, no vector DB, no embeddings, no cloud LLM APIs** (PRD §2.3).
 - **No async** unless UI stack requires it at boundaries (PRD §4.4).
-- **One file per module**, no sub-packages (PRD §4.4).
+- **All modules in `src/`**, one file per module, no sub-packages (PRD §4.4). Prompts in `src/prompts.py`.
 - **`uv` only** for env + deps (PRD §5.3).
 - **Test cap: 100 automated tests**, ≈90% core / ≈10% new features (PRD §4.5).
 - **NYT editorial UI style** (PRD §2.4).
@@ -99,7 +101,7 @@ The mockup simplifies a few planned details — tracked here so future iteration
 
 | Var | Default | Purpose |
 |---|---|---|
-| `OLLAMA_MODEL` | `gemma3:4b` | Override model |
+| `OLLAMA_MODEL` | `gemma4:e4b` | Override model |
 | `OLLAMA_HOST` | `http://localhost:11434` | Override Ollama endpoint |
 | `TAVILY_API_KEY` | — | Web research (Research page, not yet implemented) |
 | `MAX_INGEST_CHARS` | `40000` | Text truncation threshold at extraction |
@@ -114,9 +116,9 @@ The mockup simplifies a few planned details — tracked here so future iteration
 git clone https://github.com/ToHeinAC/KB_BS_local-wiki-he
 cd KB_BS_local-wiki-he
 uv sync
-ollama pull gemma3:4b          # or set OLLAMA_MODEL to any pulled model
+ollama pull gemma4:e4b          # or set OLLAMA_MODEL to any pulled model
 cp .env.example .env           # add TAVILY_API_KEY when Research is implemented
-uv run streamlit run app.py --server.port 8520
+uv run streamlit run src/app.py --server.port 8520
 ```
 
 ---

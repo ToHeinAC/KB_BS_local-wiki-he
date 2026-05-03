@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_MODEL = os.getenv("OLLAMA_MODEL", "gemma3:4b")
+_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
 _HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 
