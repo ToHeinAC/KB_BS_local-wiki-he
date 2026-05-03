@@ -31,10 +31,10 @@ uv run streamlit run app.py --server.port 8520
 
 | Page | Purpose | PRD §§ |
 |---|---|---|
-| **Upload** | Drag-and-drop ingest with explicit dedup confirmation; show ingest summary (created / updated / contradictions). Never auto-ingest. | 3.9.2 |
+| **Upload** | Drag-and-drop ingest with explicit dedup confirmation. Before ingesting, shows an optional metadata form (fields from `templates/insert.md`: name, fullname, description, effective as of, part of) to make LLM output more precise. Shows ingest summary (created / updated / contradictions). Never auto-ingest. | 3.9.2 |
 | **Wiki Explorer** | Tree/document navigator, full-text search across pages, rendered Markdown viewer with metadata, optional graph view. | 3.9.3 |
 | **Chat** | Chatbot using the wiki as context. Supports filing the answer as a wiki page, launching web research from a question, onboarding message when wiki is empty. | 3.9.4 |
-| **Research** | *(Stubbed — next iteration)* Run the ReAct agent (max 8 iterations); show step-by-step progress; gate behind `TAVILY_API_KEY`. Requires `tools.py` + `agent.py`. | 3.9.5 |
+| **Research** | Run the ReAct agent (max 8 iterations); show step-by-step progress; gate behind `TAVILY_API_KEY`. Optional wiki context injection; auto-save final report to wiki. | 3.9.5 |
 | **Maintenance** | Wiki stats, run lint/health check, recent activity log, guarded reset (with confirmation). | 3.9.6 |
 
 ## Top-bar / chrome

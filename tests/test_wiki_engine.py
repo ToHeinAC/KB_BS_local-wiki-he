@@ -145,6 +145,37 @@ def test_ingest_appends_to_log(wiki_dir, monkeypatch):
     assert "mysrc.txt" in log
 
 
+def test_ingest_injects_user_metadata_into_prompt(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    user_meta = {
+        "name": "Alpha Spec",
+        "fullname": "Alpha Specification v3",
+        "description": "Reference doc for Alpha module",
+        "effective as of": "2026-01-01",
+        "part of": "Alpha programme",
+    }
+    wiki_engine.ingest("text", "mysrc.txt", user_meta)
+    sent_prompt = mock.generate.call_args.kwargs["prompt"]
+    assert "User-supplied metadata" in sent_prompt
+    for v in user_meta.values():
+        assert v in sent_prompt
+
+
+def test_ingest_works_without_user_metadata(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    wiki_engine.ingest("text", "mysrc.txt", None)
+    sent_prompt = mock.generate.call_args.kwargs["prompt"]
+    assert "User-supplied metadata" not in sent_prompt
+    # blank-only dict treated identically
+    wiki_engine.ingest("text", "mysrc.txt", {"name": "", "part of": "  "})
+    sent_prompt2 = mock.generate.call_args.kwargs["prompt"]
+    assert "User-supplied metadata" not in sent_prompt2
+
+
 # --- query ---
 
 def test_query_returns_string(wiki_dir, monkeypatch):

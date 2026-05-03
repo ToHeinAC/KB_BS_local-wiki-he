@@ -52,8 +52,9 @@ One Python file per module at project root; no sub-packages (PRD §4.4).
 - **`ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
 - **`schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
 - **`wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`.
-- **`tools.py`** *(not yet implemented)* — wraps `tavily_search` and `report_writer` tool definitions for the ReAct agent.
-- **`agent.py`** *(not yet implemented)* — owns the ReAct loop (hard cap: 8 iterations).
+- **`template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
+- **`tools.py`** — wraps `tavily_search` and `report_writer` tool definitions for the ReAct agent.
+- **`agent.py`** — owns the ReAct loop (hard cap: 8 iterations).
 - **`app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine` and `agent`; never writes wiki files directly.
 
 ## Key dataflows
@@ -62,10 +63,12 @@ One Python file per module at project root; no sub-packages (PRD §4.4).
 
 ```
 upload → dedup.is_duplicate()
-       → dedup.register_file()      # saves to data/raw/
+       → dedup.register_file()           # saves to data/raw/
        → file_processor.extract_text()   # returns string
-       → wiki_engine.ingest(text, source_name)
+       → [Upload UI] optional metadata form driven by template_loader.load_insert_template()
+       → wiki_engine.ingest(text, source_name, user_meta=None)
          → schema_loader.get_system_prompt()
+         → inject user_meta as authoritative block into prompt (if provided)
          → ollama_client.generate(system, prompt, temperature=0.3)
          → parse "=== filename.md ===" blocks from LLM response
          → write pages to data/wiki/

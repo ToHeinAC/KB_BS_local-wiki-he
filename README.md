@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma3:4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** Core pipeline implemented (ingest → wiki → chat). Research page (ReAct agent) is stubbed — next iteration.
+> **Status:** All pages implemented — ingest (with optional metadata form) → wiki → chat → research (ReAct agent). 86-test suite.
 
 ## Documentation
 

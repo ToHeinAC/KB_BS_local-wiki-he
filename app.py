@@ -12,6 +12,7 @@ load_dotenv()
 import dedup
 import file_processor
 import ollama_client
+import template_loader
 import wiki_engine
 import agent as research_agent
 
@@ -86,14 +87,20 @@ if page == "Upload":
             st.warning(f"**{uploaded.name}** has already been ingested (duplicate detected).")
         else:
             st.info(f"New file: **{uploaded.name}** ({len(raw):,} bytes)")
-            if st.button("Ingest into wiki", type="primary"):
+            st.markdown("**Optional metadata** — fill in to make the ingest more reliable.")
+            fields = template_loader.load_insert_template()
+            with st.form("ingest_form"):
+                values = {f: st.text_input(f.capitalize()) for f in fields}
+                submitted = st.form_submit_button("Ingest into wiki", type="primary")
+            if submitted:
+                user_meta = {k: v.strip() for k, v in values.items() if v and v.strip()}
                 with st.spinner("Saving file…"):
                     saved = dedup.register_file(raw, uploaded.name)
                 with st.spinner("Extracting text…"):
                     text = file_processor.extract_text(saved)
                 with st.spinner("Running LLM ingest (this may take a minute)…"):
                     try:
-                        result = wiki_engine.ingest(text, uploaded.name)
+                        result = wiki_engine.ingest(text, uploaded.name, user_meta or None)
                         st.success("Ingest complete.")
                         col1, col2, col3 = st.columns(3)
                         col1.metric("Created", len(result["created"]))

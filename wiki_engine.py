@@ -76,16 +76,37 @@ def _parse_llm_pages(response: str) -> list[dict]:
     return pages
 
 
-def ingest(text: str, source_name: str) -> dict:
-    """Run LLM ingest pipeline. Returns {created, updated, contradictions}."""
+def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
+    """Run LLM ingest pipeline. Returns {created, updated, contradictions}.
+
+    `user_meta` is an optional dict of user-supplied fields (from
+    templates/insert.md) — name, fullname, description, effective as of,
+    part of. Non-blank values are injected into the prompt as authoritative
+    metadata and must be carried into the source-summary page frontmatter.
+    """
     system = schema_loader.get_system_prompt()
     index_text = _INDEX.read_text() if _INDEX.exists() else ""
+
+    clean_meta = {k: v for k, v in (user_meta or {}).items() if v and str(v).strip()}
+    if clean_meta:
+        meta_lines = "\n".join(f"- {k}: {v}" for k, v in clean_meta.items())
+        meta_block = (
+            "User-supplied metadata (authoritative — prefer these over filename inference;\n"
+            "use `name`/`fullname` for the page title and copy `description`,\n"
+            "`effective as of`, `part of` verbatim into the source-summary frontmatter):\n"
+            f"{meta_lines}\n\n"
+        )
+        extra_frontmatter = "\n".join(f'{k}: "{v}"' for k, v in clean_meta.items())
+        example_extra = "\n" + extra_frontmatter
+    else:
+        meta_block = ""
+        example_extra = ""
 
     prompt = f"""You are ingesting a new source document into the wiki.
 
 Source name: {source_name}
 
-Current wiki index:
+{meta_block}Current wiki index:
 {index_text}
 
 Source text (may be truncated):
@@ -105,7 +126,7 @@ sources: ["{source_name}"]
 related: []
 created: "{_date()}"
 updated: "{_date()}"
-confidence: high | medium | low
+confidence: high | medium | low{example_extra}
 ---
 
 Page content here.

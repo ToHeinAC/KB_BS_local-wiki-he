@@ -23,10 +23,11 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `app.py` (Streamlit, port 8520) | **Done** |
 | `tools.py` | **Done** |
 | `agent.py` | **Done** |
-| Test suite | **Done** (84 tests) |
+| `template_loader.py` | **Done** |
+| Test suite | **Done** (86 tests) |
 | `.streamlit/config.toml` | **Done** |
 
-All planned modules are implemented. Test suite complete (84 tests, ≤100 cap).
+All planned modules are implemented. Test suite complete (86 tests, ≤100 cap).
 
 ---
 
@@ -61,6 +62,7 @@ Each module is a single Python file at project root (PRD §4.4).
 | `SCHEMA.md` | Wiki schema injected into every LLM system prompt | Done |
 | `tools.py` | `tavily_search` + `report_writer` tool definitions | Done |
 | `agent.py` | ReAct loop (max 8 iterations) | Done |
+| `template_loader.py` | Reads `templates/insert.md` → ordered list of user-fillable metadata fields | Done |
 
 ---
 
@@ -127,3 +129,4 @@ uv run streamlit run app.py --server.port 8520
 | 2026-05-02 | First mockup: implemented all core modules + Streamlit UI (Research stubbed). |
 | 2026-05-02 | Second mockup: implemented `tools.py` + `agent.py`; Research page now fully wired. |
 | 2026-05-02 | Applied crportfolioapp colour palette (`.streamlit/config.toml`); implemented 84-test suite across all modules. |
+| 2026-05-03 | Added `template_loader.py` + Upload-page metadata form driven by `templates/insert.md`; `wiki_engine.ingest()` now accepts `user_meta`. Test count: 86. |
