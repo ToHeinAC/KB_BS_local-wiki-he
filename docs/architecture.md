@@ -52,7 +52,7 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 - **`src/file_processor.py`** extracts text from uploaded files and returns it as a string (does not write to disk).
 - **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
 - **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
-- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`.
+- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`, `search_wiki()`, `get_wiki_tree()`.
 - **`src/template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
 - **`src/tools.py`** — wraps `tavily_search` and `report_writer` tool definitions for the ReAct agent. Descriptions imported from `prompts.py`.
 - **`src/agent.py`** — owns the ReAct loop (hard cap: 8 iterations).

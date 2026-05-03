@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** All pages implemented — ingest (with optional metadata form) → wiki → chat → research (ReAct agent). 86-test suite.
+> **Status:** All pages implemented — ingest (with optional metadata form) → wiki (tree-by-type + full-text search) → chat → research (ReAct agent). 90-test suite.
 
 ## Documentation
 
@@ -16,7 +16,7 @@ A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; 
 - Python ≥ 3.11
 - [`uv`](https://docs.astral.sh/uv/)
 - [Ollama](https://ollama.ai), running locally with at least one model pulled
-- *(Optional)* Tavily API key for the Research feature (not yet implemented)
+- *(Optional)* Tavily API key for the Research feature
 
 ## Setup
 

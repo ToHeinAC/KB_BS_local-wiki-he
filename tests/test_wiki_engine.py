@@ -266,6 +266,40 @@ def test_stats_correct_page_count(wiki_dir):
     assert s["pages"] == 2
 
 
+def test_search_wiki_matches_title(wiki_dir):
+    (wiki_dir / "transformer.md").write_text(
+        "---\ntitle: Transformer Architecture\ntype: concept\n---\nbody"
+    )
+    hits = wiki_engine.search_wiki("transform")
+    assert any(h["filename"] == "transformer.md" for h in hits)
+
+
+def test_search_wiki_matches_body(wiki_dir):
+    (wiki_dir / "x.md").write_text(
+        "---\ntitle: X\n---\nThe attention mechanism scales context windows."
+    )
+    hits = wiki_engine.search_wiki("attention")
+    assert len(hits) == 1
+    assert "attention" in hits[0]["excerpt"].lower()
+
+
+def test_search_wiki_empty_query_returns_empty(wiki_dir):
+    (wiki_dir / "p.md").write_text("any content")
+    assert wiki_engine.search_wiki("") == []
+    assert wiki_engine.search_wiki("   ") == []
+
+
+def test_get_wiki_tree_groups_by_type(wiki_dir):
+    (wiki_dir / "a.md").write_text("---\ntitle: A\ntype: concept\n---\n")
+    (wiki_dir / "b.md").write_text("---\ntitle: B\ntype: entity\n---\n")
+    (wiki_dir / "c.md").write_text("---\ntitle: C\n---\n")
+    tree = wiki_engine.get_wiki_tree()
+    assert [p["filename"] for p in tree["concept"]] == ["a.md"]
+    assert [p["filename"] for p in tree["entity"]] == ["b.md"]
+    assert [p["filename"] for p in tree["other"]] == ["c.md"]
+    assert "comparison" not in tree
+
+
 def test_stats_excludes_manifest_from_raw_count(wiki_dir, monkeypatch):
     raw = wiki_dir.parent / "raw"
     monkeypatch.setattr(wiki_engine, "RAW_DIR", raw)

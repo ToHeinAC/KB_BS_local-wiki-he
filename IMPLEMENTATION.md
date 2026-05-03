@@ -25,10 +25,10 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `src/tools.py` | **Done** |
 | `src/agent.py` | **Done** |
 | `src/template_loader.py` | **Done** |
-| Test suite | **Done** (86 tests) |
+| Test suite | **Done** (90 tests) |
 | `.streamlit/config.toml` | **Done** |
 
-All planned modules are implemented. Test suite complete (86 tests, ≤100 cap).
+All planned modules are implemented. Test suite complete (90 tests, ≤100 cap).
 
 ---
 
@@ -58,7 +58,7 @@ All Python modules live under `src/`. Entry point: `uv run streamlit run src/app
 | `src/file_processor.py` | Extract text from PDF/DOCX/MD/TXT/HTML; returns string | Done |
 | `src/ollama_client.py` | `generate()` + `chat()` wrappers; `is_available()` health check | Done |
 | `src/schema_loader.py` | `get_system_prompt()` — reads `SCHEMA.md` verbatim | Done |
-| `src/wiki_engine.py` | `init_wiki`, `ingest`, `query`, `lint`, `list_pages`, `read_page`, `stats` | Done |
+| `src/wiki_engine.py` | `init_wiki`, `ingest`, `query`, `lint`, `list_pages`, `read_page`, `stats`, `search_wiki`, `get_wiki_tree` | Done |
 | `src/app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
 | `src/prompts.py` | All LLM prompt constants (AGENT_SYSTEM, INGEST_PROMPT, etc.) | Done |
 | `src/tools.py` | `tavily_search` + `report_writer` tool definitions | Done |
@@ -132,3 +132,4 @@ uv run streamlit run src/app.py --server.port 8520
 | 2026-05-02 | Second mockup: implemented `tools.py` + `agent.py`; Research page now fully wired. |
 | 2026-05-02 | Applied crportfolioapp colour palette (`.streamlit/config.toml`); implemented 84-test suite across all modules. |
 | 2026-05-03 | Added `template_loader.py` + Upload-page metadata form driven by `templates/insert.md`; `wiki_engine.ingest()` now accepts `user_meta`. Test count: 86. |
+| 2026-05-03 | Wiki Explorer: tree-by-type (Concepts/Entities/Source Summaries/Comparisons/Other) + full-text search across page bodies via new `wiki_engine.search_wiki` and `get_wiki_tree`. Test count: 90. |

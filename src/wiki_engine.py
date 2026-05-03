@@ -213,6 +213,62 @@ def read_page(filename: str) -> str:
     return path.read_text()
 
 
+_TYPE_GROUPS = ("concept", "entity", "source-summary", "comparison")
+
+
+def search_wiki(query: str) -> list[dict]:
+    """Case-insensitive full-text search across page titles, filenames, and bodies.
+
+    Returns list of {"filename", "title", "excerpt"} for matching pages.
+    Excerpt is ~160 chars centred on the first body match, or page start
+    when the match is in title/filename only. Empty query returns [].
+    """
+    q = query.strip().lower()
+    if not q:
+        return []
+    results = []
+    for md in sorted(WIKI_DIR.glob("*.md")):
+        if md.name in ("index.md", "log.md"):
+            continue
+        try:
+            post = frontmatter.load(str(md))
+            title = str(post.metadata.get("title", md.stem))
+            body = post.content
+        except Exception:
+            title = md.stem
+            body = md.read_text()
+        body_lower = body.lower()
+        idx = body_lower.find(q)
+        if idx == -1 and q not in title.lower() and q not in md.name.lower():
+            continue
+        if idx == -1:
+            excerpt = body[:160].replace("\n", " ").strip()
+        else:
+            start = max(0, idx - 60)
+            end = min(len(body), idx + 100)
+            excerpt = body[start:end].replace("\n", " ").strip()
+            if start > 0:
+                excerpt = "…" + excerpt
+            if end < len(body):
+                excerpt = excerpt + "…"
+        results.append({"filename": md.name, "title": title, "excerpt": excerpt})
+    return results
+
+
+def get_wiki_tree() -> dict[str, list[dict]]:
+    """Group `list_pages()` output by frontmatter `type`.
+
+    Returns dict keyed by type (concept/entity/source-summary/comparison/other),
+    only including non-empty groups. Order within a group matches list_pages().
+    """
+    tree: dict[str, list[dict]] = {}
+    for page in list_pages():
+        t = str(page.get("type", "")).strip().lower()
+        key = t if t in _TYPE_GROUPS else "other"
+        tree.setdefault(key, []).append(page)
+    return tree
+
+
 def read_log() -> str:
     return _LOG.read_text() if _LOG.exists() else "(no log yet)"
 

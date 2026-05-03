@@ -120,27 +120,43 @@ elif page == "Wiki Explorer":
     if not pages:
         st.info("No wiki pages yet. Upload a document to get started.")
     else:
-        search = st.text_input("Search pages", placeholder="Filter by title or keyword…")
-        filtered = [p for p in pages if not search or search.lower() in str(p).lower()]
-        st.markdown(f"**{len(filtered)}** pages")
-
+        search = st.text_input(
+            "Search pages",
+            placeholder="Search titles and page bodies…",
+        ).strip()
         selected_file = st.session_state.get("selected_page")
-        cols_header = st.columns([4, 1, 1, 1])
-        cols_header[0].markdown("**Title**")
-        cols_header[1].markdown("**Type**")
-        cols_header[2].markdown("**Confidence**")
-        cols_header[3].markdown("**Updated**")
-        st.markdown("---")
 
-        for p in filtered:
-            cols = st.columns([4, 1, 1, 1])
-            title = p.get("title", p["filename"])
-            if cols[0].button(title, key=f"page_{p['filename']}", use_container_width=True):
-                st.session_state["selected_page"] = p["filename"]
-                selected_file = p["filename"]
-            cols[1].markdown(f"`{p.get('type', '—')}`")
-            cols[2].markdown(p.get("confidence", "—"))
-            cols[3].markdown(p.get("updated", "—"))
+        if search:
+            results = wiki_engine.search_wiki(search)
+            st.markdown(f"**{len(results)}** match{'es' if len(results) != 1 else ''} for *{search}*")
+            for r in results:
+                if st.button(r["title"], key=f"hit_{r['filename']}", use_container_width=True):
+                    st.session_state["selected_page"] = r["filename"]
+                    selected_file = r["filename"]
+                st.markdown(f"<span style='color:#666;font-style:italic'>{r['excerpt']}</span>", unsafe_allow_html=True)
+        else:
+            tree = wiki_engine.get_wiki_tree()
+            group_labels = {
+                "concept": "Concepts",
+                "entity": "Entities",
+                "source-summary": "Source Summaries",
+                "comparison": "Comparisons",
+                "other": "Other",
+            }
+            order = ["concept", "entity", "source-summary", "comparison", "other"]
+            for key in order:
+                group = tree.get(key)
+                if not group:
+                    continue
+                with st.expander(f"{group_labels[key]} ({len(group)})", expanded=(key == "concept")):
+                    for p in group:
+                        cols = st.columns([4, 1, 1])
+                        title = p.get("title", p["filename"])
+                        if cols[0].button(title, key=f"page_{p['filename']}", use_container_width=True):
+                            st.session_state["selected_page"] = p["filename"]
+                            selected_file = p["filename"]
+                        cols[1].markdown(p.get("confidence", "—"))
+                        cols[2].markdown(p.get("updated", "—"))
 
         if selected_file:
             st.markdown("---")
