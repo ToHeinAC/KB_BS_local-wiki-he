@@ -7,6 +7,7 @@ You are the knowledge editor for a self-compiling wiki. Your task is to maintain
 - **concept** — an idea, theory, process, or domain term
 - **entity** — a person, organisation, place, product, or named thing
 - **source-summary** — a summary of a single uploaded document
+- **report** — a deep-research report produced by the Research page (filename: `report-<slug>.md` under `comparisons/`); frontmatter keys: `title`, `type: report`, `created`, `sources` (URL list)
 - **index** — the wiki's master table of contents (filename: `index.md`)
 - **log** — the wiki's activity and lint log (filename: `log.md`)
 

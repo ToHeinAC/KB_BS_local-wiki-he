@@ -47,15 +47,15 @@ data/wiki/
 
 All Python modules live in `src/`; one file per module, no sub-packages (PRD §4.4).
 
-- **`src/prompts.py`** is the *only* place that defines LLM prompt strings. All other modules import named constants from here (e.g. `AGENT_SYSTEM`, `INGEST_PROMPT`, `SELECT_PROMPT`, `ANSWER_PROMPT`, `LINT_PROMPT`, `TAVILY_SEARCH_DESCRIPTION`, `REPORT_WRITER_DESCRIPTION`).
+- **`src/prompts.py`** is the *only* place that defines LLM prompt strings. All other modules import named constants from here: `RESEARCHER_INSTRUCTIONS`, `INGEST_PROMPT`, `SELECT_PROMPT`, `ANSWER_PROMPT`, `LINT_PROMPT`, `TAVILY_SEARCH_DESCRIPTION`, `FETCH_WEBPAGE_DESCRIPTION`, `THINK_TOOL_DESCRIPTION`, `SUBMIT_FINAL_DESCRIPTION`.
 - **`src/dedup.py`** owns `manifest.json`. Every ingest must call `is_duplicate()` before `register_file()`.
 - **`src/file_processor.py`** extracts text from uploaded files and returns it as a string (does not write to disk).
 - **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
 - **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
 - **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`, `search_wiki()`, `get_wiki_tree()`.
 - **`src/template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
-- **`src/tools.py`** — wraps `tavily_search` and `report_writer` tool definitions for the ReAct agent. Descriptions imported from `prompts.py`.
-- **`src/agent.py`** — owns the ReAct loop (hard cap: 8 iterations).
+- **`src/tools.py`** — deep-researcher tools wired as `langchain_core.tools`: `tavily_search` (parallel batch when `queries=[...]`), `fetch_webpage_content` (parallel httpx + markdownify), `think_tool`, `submit_final_answer` (word/URL gates → writes to `data/wiki/comparisons/`). Descriptions imported from `prompts.py`. Only `agent.py` and `tools.py` may import LangChain-family packages.
+- **`src/agent.py`** — owns the deep-researcher LangGraph state machine (`ChatOllama.bind_tools` agent node + `ToolNode`). Public generator `run_research_agent(question, wiki_context)` yields `thought` / `tool_call` / `tool_result` / `final_answer` / `error` step dicts.
 - **`src/app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine` and `agent`; never writes wiki files directly.
 
 ## Key dataflows
@@ -113,17 +113,27 @@ wiki_engine.lint()
   → return report string
 ```
 
-### ReAct (not yet implemented)
+### Deep researcher (Research page, `src/agent.py`)
+
+Ported from `ToHeinAC/deepagents_ollama`. LangGraph `StateGraph` over `MessagesState`, two nodes:
 
 ```
-agent.run(question)
-  → alternate ollama.chat(tools=[tavily_search, report_writer]) and tool execution
-  → max 8 iterations
-  → report_writer saves final report to data/wiki/
+START → agent (ChatOllama.bind_tools) → conditional router
+                                          ├─ tools (ToolNode) → agent      (loop)
+                                          └─ END   when last AIMessage has no tool_calls,
+                                                   or submit_final_answer returned ACCEPTED
 ```
 
-Detail: PRD §3.8, §7.2.
+Phases enforced via the system prompt (`prompts.RESEARCHER_INSTRUCTIONS`):
+1. **PLAN** — `think_tool` once at the start; 3–6 sub-questions.
+2. **RESEARCH** — `tavily_search` (parallel batch via `queries=[...]`), optional `fetch_webpage_content` (parallel) for high-value URLs.
+3. **REFLECT** — `think_tool` after every 2–3 searches.
+4. **SUBMIT** — `submit_final_answer(title, answer)`. Validates `>= RESEARCH_MIN_WORDS` words and `>= RESEARCH_MIN_URLS` unique URLs. Rejected reports send the agent back to research.
+
+Quality gates and recursion cap are env-tunable (`RESEARCH_MIN_SEARCHES`, `RESEARCH_MIN_WORDS`, `RESEARCH_MIN_URLS`, `RESEARCH_MAX_ITERATIONS`). LangChain/LangGraph imports are scoped to this module + `src/tools.py` only (CLAUDE.md §5.3).
 
 ## Concurrency & state
 
-Synchronous everywhere. State is files + JSON only — no database, no cache, no async (PRD §4.4).
+Synchronous everywhere except the deep-researcher I/O layer. `tavily_search` and `fetch_webpage_content` fan out across a `concurrent.futures.ThreadPoolExecutor` (size = `RESEARCH_PARALLELISM`, default 4). LLM calls remain sequential — local single-GPU; parallel LLM calls would just queue. No asyncio at any boundary.
+
+State is files + JSON only — no database, no cache (PRD §4.4).

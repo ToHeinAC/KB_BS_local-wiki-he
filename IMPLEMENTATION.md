@@ -61,8 +61,8 @@ All Python modules live under `src/`. Entry point: `uv run streamlit run src/app
 | `src/wiki_engine.py` | `init_wiki`, `ingest`, `query`, `lint`, `list_pages`, `read_page`, `stats`, `search_wiki`, `get_wiki_tree` | Done |
 | `src/app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
 | `src/prompts.py` | All LLM prompt constants (AGENT_SYSTEM, INGEST_PROMPT, etc.) | Done |
-| `src/tools.py` | `tavily_search` + `report_writer` tool definitions | Done |
-| `src/agent.py` | ReAct loop (max 8 iterations) | Done |
+| `src/tools.py` | Deep-researcher tools: `tavily_search` (parallel), `fetch_webpage_content` (parallel), `think_tool`, `submit_final_answer` (gated) | Done |
+| `src/agent.py` | LangGraph deep researcher (planning → research → reflect → submit), ChatOllama backend | Done |
 | `src/template_loader.py` | Reads `templates/insert.md` → ordered list of user-fillable metadata fields | Done |
 | `SCHEMA.md` | Wiki schema injected into every LLM system prompt | Done |
 
@@ -84,7 +84,7 @@ The mockup simplifies a few planned details — tracked here so future iteration
 
 ## 5. Hard Constraints
 
-- **No LangChain, no vector DB, no embeddings, no cloud LLM APIs** (PRD §2.3).
+- **No vector DB, no embeddings, no cloud LLM APIs** (PRD §2.3). Scoped exception: `langgraph` + `langchain-ollama` are permitted **only** inside the deep-research agent layer (`src/agent.py`, `src/tools.py`) — see `docs/architecture.md` §Deep researcher.
 - **No async** unless UI stack requires it at boundaries (PRD §4.4).
 - **All modules in `src/`**, one file per module, no sub-packages (PRD §4.4). Prompts in `src/prompts.py`.
 - **`uv` only** for env + deps (PRD §5.3).
@@ -103,10 +103,16 @@ The mockup simplifies a few planned details — tracked here so future iteration
 |---|---|---|
 | `OLLAMA_MODEL` | `gemma4:e4b` | Override model |
 | `OLLAMA_HOST` | `http://localhost:11434` | Override Ollama endpoint |
-| `TAVILY_API_KEY` | — | Web research (Research page, not yet implemented) |
+| `TAVILY_API_KEY` | — | Required for the Research page (web search). |
 | `MAX_INGEST_CHARS` | `40000` | Text truncation threshold at extraction |
 | `WIKI_DIR` | `data/wiki` | Wiki page storage path |
 | `RAW_DIR` | `data/raw` | Raw source file storage path |
+| `RESEARCH_MIN_SEARCHES` | `6` | Deep researcher: minimum web searches before submitting. |
+| `RESEARCH_MIN_WORDS` | `600` | Deep researcher: minimum final-report word count. |
+| `RESEARCH_MIN_URLS` | `4` | Deep researcher: minimum unique source URLs cited. |
+| `RESEARCH_MAX_ITERATIONS` | `40` | Deep researcher: LangGraph recursion cap. |
+| `RESEARCH_PARALLELISM` | `4` | Deep researcher: thread-pool size for parallel Tavily / page fetches. |
+| `RESEARCH_LLM_TIMEOUT` | `300` | Deep researcher: per-LLM-call timeout in seconds. |
 
 ---
 
@@ -133,3 +139,4 @@ uv run streamlit run src/app.py --server.port 8520
 | 2026-05-02 | Applied crportfolioapp colour palette (`.streamlit/config.toml`); implemented 84-test suite across all modules. |
 | 2026-05-03 | Added `template_loader.py` + Upload-page metadata form driven by `templates/insert.md`; `wiki_engine.ingest()` now accepts `user_meta`. Test count: 86. |
 | 2026-05-03 | Wiki Explorer: tree-by-type (Concepts/Entities/Source Summaries/Comparisons/Other) + full-text search across page bodies via new `wiki_engine.search_wiki` and `get_wiki_tree`. Test count: 90. |
+| 2026-05-05 | Deep researcher: replaced ReAct loop with LangGraph state machine ported from `ToHeinAC/deepagents_ollama`. New tools: `tavily_search` (parallel batch), `fetch_webpage_content`, `think_tool`, `submit_final_answer` (word/URL gates). Parallel I/O via `concurrent.futures` thread pool; LLM calls remain sequential. Lifted `No LangChain` ban (scoped to agent layer). Added `langgraph`, `langchain-ollama`, `langchain-core`, `httpx`, `markdownify`. New env vars `RESEARCH_MIN_SEARCHES`/`MIN_WORDS`/`MIN_URLS`/`MAX_ITERATIONS`/`PARALLELISM`/`LLM_TIMEOUT`. Test count: 97. |

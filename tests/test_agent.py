@@ -1,130 +1,116 @@
-"""Tests for agent.py — ReAct research agent."""
+"""Tests for agent.py — LangGraph deep researcher."""
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
+from langchain_core.messages import AIMessage
 
 import agent
-import ollama_client
 
 
-def _msg(content="", tool_calls=None):
-    return {"message": {"content": content, "tool_calls": tool_calls or []}}
+class FakeLLM:
+    """Drop-in for ChatOllama.bind_tools(...) — returns scripted AIMessages."""
+
+    def __init__(self, responses):
+        self._responses = list(responses)
+        self.calls = []
+
+    def invoke(self, messages):
+        self.calls.append(messages)
+        if not self._responses:
+            return AIMessage(content="done")
+        return self._responses.pop(0)
 
 
-def _make_client(monkeypatch):
-    mock = MagicMock()
-    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
-    return mock
+def _patch_llm(monkeypatch, responses):
+    fake = FakeLLM(responses)
+    monkeypatch.setattr(agent, "_build_llm", lambda: fake)
+    return fake
 
 
-# --- basic step types ---
-
-def test_yields_thought_on_text_response(monkeypatch):
-    mock = _make_client(monkeypatch)
-    mock.chat.return_value = _msg(content="thinking about it")
-    steps = list(agent.run_research_agent("question?"))
-    thoughts = [s for s in steps if s["type"] == "thought"]
-    assert any("thinking" in t["content"] for t in thoughts)
+def _ai_with_tool(name, args, call_id="c1"):
+    return AIMessage(
+        content="",
+        tool_calls=[{"name": name, "args": args, "id": call_id, "type": "tool_call"}],
+    )
 
 
-def test_yields_final_answer_when_no_tool_calls(monkeypatch):
-    mock = _make_client(monkeypatch)
-    mock.chat.return_value = _msg(content="my final answer")
+# --- basic step types ------------------------------------------------------
+
+def test_plain_text_response_yields_final_answer(monkeypatch):
+    _patch_llm(monkeypatch, [AIMessage(content="just an answer")])
     steps = list(agent.run_research_agent("q?"))
+    assert any(s["type"] == "final_answer" and "just an answer" in s["content"] for s in steps)
+
+
+def test_tool_call_emits_tool_call_and_tool_result(monkeypatch):
+    _patch_llm(
+        monkeypatch,
+        [_ai_with_tool("think_tool", {"reflection": "planning"}), AIMessage(content="done")],
+    )
+    steps = list(agent.run_research_agent("q?"))
+    assert any(s["type"] == "tool_call" and s["name"] == "think_tool" for s in steps)
+    assert any(s["type"] == "tool_result" and s["name"] == "think_tool" for s in steps)
+
+
+def test_submit_final_answer_accepted_yields_report_path(monkeypatch, tmp_path):
+    import tools
+    monkeypatch.setattr(tools, "WIKI_DIR", tmp_path)
+    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "MIN_URLS", 1)
+    body = "alpha beta gamma delta http://example.com/x"
+    _patch_llm(
+        monkeypatch,
+        [_ai_with_tool("submit_final_answer", {"title": "T", "answer": body})],
+    )
+    steps = list(agent.run_research_agent("q?"))
+    final = [s for s in steps if s["type"] == "final_answer"]
+    assert final and final[-1]["report_path"] and "report-t.md" in final[-1]["report_path"]
+
+
+def test_submit_rejected_keeps_agent_running(monkeypatch):
+    # Default thresholds reject the trivial answer; the agent then plain-texts -> final_answer.
+    _patch_llm(
+        monkeypatch,
+        [
+            _ai_with_tool("submit_final_answer", {"title": "T", "answer": "too short"}),
+            AIMessage(content="ok I will research more"),
+        ],
+    )
+    steps = list(agent.run_research_agent("q?"))
+    tr = [s for s in steps if s["type"] == "tool_result" and s["name"] == "submit_final_answer"]
+    assert tr and tr[0]["result"].startswith("REJECTED")
     assert any(s["type"] == "final_answer" for s in steps)
 
 
-def test_yields_tool_call_dict(monkeypatch):
-    mock = _make_client(monkeypatch)
-    tool_call = {"function": {"name": "tavily_search", "arguments": {"query": "test"}}}
-    mock.chat.side_effect = [
-        _msg(content="", tool_calls=[tool_call]),
-        _msg(content="done"),
-    ]
+# --- system prompt & wiki context -----------------------------------------
+
+def test_wiki_context_appears_in_system_message(monkeypatch):
+    fake = _patch_llm(monkeypatch, [AIMessage(content="ok")])
+    list(agent.run_research_agent("q?", wiki_context="WIKI-CTX-MARKER"))
+    assert "WIKI-CTX-MARKER" in fake.calls[0][0].content
+
+
+def test_thresholds_appear_in_system_prompt(monkeypatch):
+    fake = _patch_llm(monkeypatch, [AIMessage(content="ok")])
+    list(agent.run_research_agent("q?"))
+    sys_text = fake.calls[0][0].content
+    assert str(agent.MIN_SEARCHES) in sys_text and str(agent.MIN_WORDS) in sys_text
+
+
+# --- error handling --------------------------------------------------------
+
+def test_llm_init_failure_yields_error(monkeypatch):
+    def boom():
+        raise RuntimeError("ollama down")
+    monkeypatch.setattr(agent, "_build_llm", boom)
     steps = list(agent.run_research_agent("q?"))
-    tc_steps = [s for s in steps if s["type"] == "tool_call"]
-    assert len(tc_steps) >= 1
-    assert tc_steps[0]["name"] == "tavily_search"
+    assert steps and steps[-1]["type"] == "error"
 
 
-def test_yields_tool_result_after_execution(monkeypatch):
-    mock = _make_client(monkeypatch)
-    tool_call = {"function": {"name": "tavily_search", "arguments": {"query": "x"}}}
-    mock.chat.side_effect = [
-        _msg(content="", tool_calls=[tool_call]),
-        _msg(content="done"),
-    ]
-    with patch("tools.TOOL_FUNCTIONS", {"tavily_search": lambda **_: "search result"}):
-        steps = list(agent.run_research_agent("q?"))
-    tr_steps = [s for s in steps if s["type"] == "tool_result"]
-    assert any("search result" in s["result"] for s in tr_steps)
-
-
-def test_yields_final_answer_after_report_writer(monkeypatch):
-    mock = _make_client(monkeypatch)
-    tool_call = {"function": {"name": "report_writer", "arguments": {"report": "md", "filename": "r.md"}}}
-    mock.chat.return_value = _msg(content="", tool_calls=[tool_call])
-    with patch("tools.TOOL_FUNCTIONS", {"report_writer": lambda **_: "data/wiki/comparisons/r.md"}):
-        steps = list(agent.run_research_agent("q?"))
-    fa_steps = [s for s in steps if s["type"] == "final_answer"]
-    assert len(fa_steps) >= 1
-    assert fa_steps[0].get("report_path") is not None
-
-
-# --- error cases ---
-
-def test_yields_error_when_ollama_raises(monkeypatch):
-    mock = _make_client(monkeypatch)
-    mock.chat.side_effect = ConnectionError("down")
+def test_invoke_failure_yields_error(monkeypatch):
+    fake = MagicMock()
+    fake.invoke.side_effect = ConnectionError("nope")
+    monkeypatch.setattr(agent, "_build_llm", lambda: fake)
     steps = list(agent.run_research_agent("q?"))
     assert any(s["type"] == "error" for s in steps)
-
-
-def test_yields_error_after_max_iter(monkeypatch):
-    mock = _make_client(monkeypatch)
-    tool_call = {"function": {"name": "tavily_search", "arguments": {"query": "loop"}}}
-    mock.chat.return_value = _msg(content="", tool_calls=[tool_call])
-    with patch("tools.TOOL_FUNCTIONS", {"tavily_search": lambda **_: "result"}):
-        steps = list(agent.run_research_agent("q?"))
-    assert any(s["type"] == "error" and "max" in s["content"].lower() for s in steps)
-
-
-# --- context and edge cases ---
-
-def test_wiki_context_in_system_when_provided(monkeypatch):
-    captured = {}
-    mock = _make_client(monkeypatch)
-
-    def fake_chat(model, messages, tools, options):
-        captured["system"] = messages[0]["content"]
-        return _msg(content="done")
-
-    mock.chat.side_effect = fake_chat
-    list(agent.run_research_agent("q?", wiki_context="WIKI CONTEXT HERE"))
-    assert "WIKI CONTEXT HERE" in captured["system"]
-
-
-def test_unknown_tool_produces_error_result(monkeypatch):
-    mock = _make_client(monkeypatch)
-    tool_call = {"function": {"name": "nonexistent_tool", "arguments": {}}}
-    mock.chat.side_effect = [
-        _msg(content="", tool_calls=[tool_call]),
-        _msg(content="done"),
-    ]
-    steps = list(agent.run_research_agent("q?"))
-    tr_steps = [s for s in steps if s["type"] == "tool_result"]
-    assert any("Unknown tool" in s["result"] for s in tr_steps)
-
-
-def test_malformed_json_args_handled_gracefully(monkeypatch):
-    mock = _make_client(monkeypatch)
-    tool_call = {"function": {"name": "tavily_search", "arguments": "not-json-{"}}
-    mock.chat.side_effect = [
-        _msg(content="", tool_calls=[tool_call]),
-        _msg(content="done"),
-    ]
-    with patch("tools.TOOL_FUNCTIONS", {"tavily_search": lambda **_: "ok"}):
-        steps = list(agent.run_research_agent("q?"))
-    # Should not raise; agent handles gracefully
-    assert any(s["type"] in ("tool_result", "final_answer", "error") for s in steps)

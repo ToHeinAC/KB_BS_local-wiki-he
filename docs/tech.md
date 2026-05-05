@@ -21,6 +21,11 @@ author: Tobias Hein
 |---|---|---|
 | Local LLM SDK | `ollama` | 0.3 |
 | Web search | `tavily-python` | 0.3 |
+| Deep researcher graph | `langgraph` | 0.2 |
+| Deep researcher LLM adapter | `langchain-ollama` | 0.2 |
+| Deep researcher core | `langchain-core` | 0.3 |
+| Webpage fetch (research) | `httpx` | 0.27 |
+| HTML→Markdown (research) | `markdownify` | 0.13 |
 | PDF extraction | `pypdf` | 4.0 |
 | DOCX extraction | `python-docx` | 1.1 |
 | YAML frontmatter | `python-frontmatter` | 1.1 |
@@ -33,10 +38,10 @@ Dev: `pytest ≥ 8.0`.
 
 ## Forbidden
 
-- **No LangChain.**
+- **No LangChain** outside the deep-research agent layer (`src/agent.py`, `src/tools.py`). LangGraph + `langchain-ollama` are scoped to that layer only — see [`architecture.md`](architecture.md) §Deep researcher.
 - **No vector database. No embeddings.**
 - **No cloud LLM APIs** (OpenAI, Anthropic, Bedrock, …).
-- **No async** (unless the chosen UI stack strictly requires it at boundaries).
+- **No asyncio.** Parallelism in the research layer uses `concurrent.futures.ThreadPoolExecutor` (I/O only); LLM calls stay sequential.
 - **No database** of any kind — files + JSON only.
 - **No Docker** in the primary workflow.
 - **No configuration UI** — `.env` is the only config surface.

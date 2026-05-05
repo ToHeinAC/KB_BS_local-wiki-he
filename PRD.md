@@ -73,7 +73,9 @@ localwiki/
 | Environment & Dependency Management | `uv` | latest stable |
 | Standard Library | `hashlib`, `pathlib`, `json`, `re`, `shutil` | — |
 
-**No LangChain. No vector database. No embeddings. No cloud LLM APIs. Streamlit may be used, but it must not be assumed or required by the PRD.** [1]
+**No vector database. No embeddings. No cloud LLM APIs. Streamlit may be used, but it must not be assumed or required by the PRD.** [1]
+
+**LangChain/LangGraph exception (2026-05-05):** the deep-research agent layer (`src/agent.py`, `src/tools.py`) may use `langgraph` + `langchain-ollama` to host the deep researcher ported from `ToHeinAC/deepagents_ollama`. No other module may import LangChain-family packages.
 
 ### 2.4 GUI Design Direction
 
