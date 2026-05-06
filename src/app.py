@@ -159,17 +159,54 @@ elif page == "Wiki Explorer":
         )
         if view_mode == "Graph":
             try:
-                from pyvis.network import Network
+                import json as _json
                 graph = wiki_engine.build_link_graph()
-                net = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="#234637")
-                net.barnes_hut()
+                title_map = {p["filename"]: p["title"] for p in pages}
+                col1, col2 = st.columns(2)
+                show_names = col1.toggle("Node names", value=True)
+                show_themes = col2.toggle("Edge themes", value=False)
+
+                def _abbrev(text: str, n: int = 3) -> str:
+                    return " ".join(str(text).replace("-", " ").split()[:n])
+
+                nodes_data, edges_data = [], []
                 for node in graph:
-                    net.add_node(node, label=node, shape="dot")
-                for src, edges in graph.items():
-                    for tgt in edges:
+                    bare = node.split("/")[-1]
+                    title = title_map.get(bare) or title_map.get(node) or bare
+                    nodes_data.append({
+                        "id": node,
+                        "label": _abbrev(title, 5) if show_names else "",
+                        "title": title,
+                    })
+                for src, targets in graph.items():
+                    for tgt in targets:
                         if tgt in graph:
-                            net.add_edge(src, tgt)
-                html = net.generate_html(notebook=False)
+                            edge: dict = {"from": src, "to": tgt}
+                            if show_themes:
+                                bare_tgt = tgt.split("/")[-1]
+                                theme = title_map.get(bare_tgt) or title_map.get(tgt) or bare_tgt
+                                edge["label"] = _abbrev(theme)
+                            edges_data.append(edge)
+
+                html = f"""<!DOCTYPE html><html><head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"
+  integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>body{{margin:0}}#g{{width:100%;height:595px;background:#fff;border:1px solid #ddd}}</style>
+</head><body>
+<div id="g"></div>
+<script>
+var net=new vis.Network(document.getElementById('g'),
+  {{nodes:new vis.DataSet({_json.dumps(nodes_data)}),
+    edges:new vis.DataSet({_json.dumps(edges_data)})}},
+  {{nodes:{{shape:"dot",size:18,font:{{size:14,color:"#234637"}},
+           color:{{background:"#97c2fc",border:"#2B7CE9"}}}},
+    edges:{{font:{{size:11,color:"#555",align:"middle"}},
+            color:{{color:"#aaa",inherit:false}},
+            smooth:{{type:"continuous"}}}},
+    physics:{{barnesHut:{{gravitationalConstant:-5000,springLength:120,springConstant:0.04}},
+              stabilization:{{fit:true,iterations:300}}}}}});
+</script></body></html>"""
                 st.components.v1.html(html, height=620, scrolling=True)
                 orphans = wiki_engine.find_orphans()
                 if orphans:
