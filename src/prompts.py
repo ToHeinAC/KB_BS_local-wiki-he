@@ -56,15 +56,17 @@ Source name: {source_name}
 
 {meta_block}Current wiki index:
 {index_text}
-
+{existing_block}
 Source text (may be truncated):
 {text}
 
 Instructions:
 1. Create a source-summary page for this document (filename: summary-{summary_slug}.md).
 2. Create or update concept/entity pages for key topics found in the source.
-3. Note any contradictions with existing wiki content.
-4. Output each page in this exact format:
+3. When updating an existing page (provided above as "Existing page content"), MERGE — preserve prior facts, integrate new information, refine wording. Never strip nuance from a prior version.
+4. Populate `related` frontmatter with the filenames of conceptually linked pages you saw in the index.
+5. Note any contradictions with existing wiki content.
+6. Output each page in this exact format:
 
 === filename.md ===
 ---
@@ -84,6 +86,36 @@ Page content here.
 List pages you would UPDATE (already in index): UPDATE: filename.md
 List contradictions found: CONTRADICTION: <brief description>
 """
+
+SELECT_AFFECTED_PROMPT = """A new source is being ingested. Identify which existing wiki pages it most likely updates.
+
+Source name: {source_name}
+
+Wiki index (filename — description):
+{index_text}
+
+Source excerpt:
+{excerpt}
+
+Reply with up to 5 affected filenames, one per line. Filename only (e.g. siemens-ag.md). Reply NONE if no existing page is affected."""
+
+RESOLVE_CONTRADICTION_PROMPT = """Resolve a contradiction in the wiki.
+
+Contradiction: {description}
+
+Affected pages:
+{pages_text}
+
+User guidance (may be empty): {user_guidance}
+
+Rewrite each affected page to resolve the contradiction. Preserve all unrelated content. Use the same `=== filename.md === ... === END ===` block format as ingest. Update `confidence` and `updated` frontmatter accordingly."""
+
+FILE_ANSWER_PROMPT = """Format the following Q&A as a wiki insight page. Output ONLY the page body (no frontmatter — it will be added programmatically). Use markdown headings; preserve any [page title] citations from the answer verbatim.
+
+Question: {question}
+
+Answer:
+{answer}"""
 
 SELECT_PROMPT = """Wiki index:
 {index_text}

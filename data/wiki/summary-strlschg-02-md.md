@@ -1,13 +1,13 @@
 ---
 title: "Strahlenschutzgesetz - StrlSchG"
 type: source-summary
-sources: ["StrlSchG_01.md"]
+sources: ["StrlSchG_02.md"]
 related: ["exposition-situationen.md", "radioaktive-stoffe.md", "notfall.md", "tätigkeiten.md"]
 created: "2026-05-06"
 updated: "2026-05-06"
 confidence: high
 ---
-The Strahlenschutzgesetz (StrlSchG), or the Act on the Protection against the Harmful Effects of Ionizing Radiation, is the German legislation governing protection measures against ionizing radiation.
+The Strahlenschutzgesetz (StrlSchG), or the Act on the Protection against the Harmful Effects of Ionizing Radiation, is the German legislation governing protection measures against ionizing radiation. This source details specific procedural and foundational principles, particularly concerning planned exposure situations.
 
 ## Scope and Applicability
 The law establishes regulations for protecting humans and, concerning long-term human health, the environment from the harmful effects of ionizing radiation. It specifically addresses three types of exposure situations:
@@ -24,6 +24,16 @@ The Act defines several core concepts crucial for its application:
 *   **Exposure Situations (Expositionssituationen):** These are categorized into planned, emergency, and existing situations [summary-strlschg-01-md].
 *   **Radioactive Substances (Radioaktive Stoffe):** These are substances containing one or more radionuclides whose activity cannot be disregarded according to the law or subsequent regulations. The definition details specific types, including nuclear fuels [summary-strlschg-01-md].
 *   **Activities (Tätigkeiten):** Activities encompass a wide range of actions, including the handling, acquisition, storage, processing, and disposal of radioactive substances, as well as operating facilities for generating ionizing radiation [summary-strlschg-01-md].
+
+## Foundational Principles for Activities
+The law mandates several overarching principles that must guide any regulated activity:
+
+*   **Justification (Rechtfertigung):** Any new activity type that may connect to human or environmental exposure must be justified by balancing its economic, societal, or other benefits against the potential health impairment it may cause [summary-strlschg-02-md]. This justification must consider professional, population, and medical exposures [summary-strlschg-02-md].
+*   **Optimization (Dosisreduzierung):** Any activity must be planned, carried out, or allowed such that unnecessary exposure or contamination of humans and the environment is avoided [summary-strlschg-02-md]. Furthermore, exposure or contamination must be kept as low as possible, even below regulatory limits, considering the state of science and technology [summary-strlschg-02-md].
+*   **Dose Limitation (Dosisbegrenzung):** It is mandatory to ensure that established dose limits, set by this law and subsequent regulations, are not exceeded [summary-strlschg-02-md].
+
+## Procedural Oversight
+The process for determining if an activity is justified is rigorous. If an authority suspects doubts regarding the justification of an activity type during a permit or notification process, the relevant authority must forward the documentation to the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety. This ministry can then commission the Federal Office for Radiation Protection (BfS) to conduct a scientific review [summary-strlschg-02-md]. The BfS is tasked with reviewing the justification within twelve months of receiving the documents and publishing a scientific report [summary-strlschg-02-md].
 
 ## Professional and Medical Context
 The law distinguishes between several categories of exposure:

@@ -300,6 +300,76 @@ def test_get_wiki_tree_groups_by_type(wiki_dir):
     assert "comparison" not in tree
 
 
+# --- file_answer ---
+
+def test_file_answer_creates_insight_page(wiki_dir):
+    rel = wiki_engine.file_answer("What is X?", "X is the answer.", related=["a.md"])
+    path = wiki_dir / rel
+    assert path.exists()
+    body = path.read_text()
+    assert "type: comparison" in body
+    assert "X is the answer." in body
+    assert "a.md" in body
+
+
+# --- build_link_graph / find_orphans ---
+
+def test_find_orphans_returns_pages_with_no_inedges(wiki_dir):
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["b.md"]\n---\nA')
+    (wiki_dir / "b.md").write_text("---\ntitle: B\nrelated: []\n---\nB")
+    (wiki_dir / "c.md").write_text("---\ntitle: C\nrelated: []\n---\nC")
+    orphans = wiki_engine.find_orphans()
+    assert "b.md" not in orphans
+    assert "a.md" in orphans
+    assert "c.md" in orphans
+
+
+# --- ingest with existing content + retry ---
+
+def test_ingest_loads_existing_content_for_affected_pages(wiki_dir, monkeypatch):
+    (wiki_dir / "alpha.md").write_text("EXISTING_ALPHA_BODY")
+    (wiki_dir / "index.md").write_text("# Wiki Index\n- [Alpha](alpha.md) — existing\n")
+    mock = MagicMock()
+    # First generate → SELECT_AFFECTED returns "alpha.md"
+    # Second generate → INGEST returns parseable response
+    mock.generate.side_effect = [
+        {"response": "alpha.md\n"},
+        {"response": _INGEST_RESPONSE},
+    ]
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    wiki_engine.ingest("source text about alpha", "src.txt")
+    ingest_prompt = mock.generate.call_args_list[1].kwargs["prompt"]
+    assert "EXISTING_ALPHA_BODY" in ingest_prompt
+    assert "Existing page content" in ingest_prompt
+
+
+def test_ingest_retries_when_no_pages_parsed(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.side_effect = [
+        {"response": "NONE\n"},                # SELECT_AFFECTED
+        {"response": "garbage no delimiters"},  # first INGEST attempt
+        {"response": _INGEST_RESPONSE},         # retry attempt
+    ]
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    result = wiki_engine.ingest("text", "src.txt")
+    assert "concept-alpha.md" in result["created"]
+    # 3 calls: select + ingest + retry
+    assert mock.generate.call_count == 3
+
+
+# --- resolve_contradiction ---
+
+def test_resolve_contradiction_rewrites_pages(wiki_dir, monkeypatch):
+    (wiki_dir / "a.md").write_text("OLD_A")
+    response = "=== a.md ===\n---\ntitle: A\n---\nNEW_A_RESOLVED\n=== END ==="
+    mock = MagicMock()
+    mock.generate.return_value = {"response": response}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    res = wiki_engine.resolve_contradiction("A says X but B says Y", ["a.md"], "Trust source 1")
+    assert "a.md" in res["updated"]
+    assert "NEW_A_RESOLVED" in (wiki_dir / "a.md").read_text()
+
+
 def test_stats_excludes_manifest_from_raw_count(wiki_dir, monkeypatch):
     raw = wiki_dir.parent / "raw"
     monkeypatch.setattr(wiki_engine, "RAW_DIR", raw)

@@ -108,10 +108,41 @@ if page == "Upload":
                         col3.metric("Contradictions", len(result["contradictions"]))
                         if result["created"]:
                             st.markdown("**New pages:** " + ", ".join(f"`{f}`" for f in result["created"]))
+                        if result.get("affected"):
+                            st.caption("Pre-loaded for merge: " + ", ".join(f"`{f}`" for f in result["affected"]))
                         if result["contradictions"]:
                             st.warning("Contradictions found:\n" + "\n".join(f"- {c}" for c in result["contradictions"]))
+                            st.session_state["last_contradictions"] = result["contradictions"]
+                            st.session_state["last_contradiction_pages"] = list({*result["created"], *result["updated"], *result.get("affected", [])})
                     except RuntimeError as e:
                         st.error(str(e))
+
+    if st.session_state.get("last_contradictions"):
+        st.markdown("---")
+        st.subheader("Resolve contradictions")
+        for i, desc in enumerate(st.session_state["last_contradictions"]):
+            with st.expander(desc, expanded=False):
+                pages = st.multiselect(
+                    "Pages to reconcile",
+                    options=st.session_state.get("last_contradiction_pages", []),
+                    default=st.session_state.get("last_contradiction_pages", []),
+                    key=f"resolve_pages_{i}",
+                )
+                guidance = st.text_area(
+                    "Guidance (optional — which claim is authoritative? what is the resolution?)",
+                    key=f"resolve_guidance_{i}",
+                    height=80,
+                )
+                if st.button("Reconcile", key=f"resolve_btn_{i}", type="primary"):
+                    with st.spinner("Reconciling pages…"):
+                        try:
+                            res = wiki_engine.resolve_contradiction(desc, pages, guidance)
+                            if res["updated"]:
+                                st.success("Updated: " + ", ".join(f"`{f}`" for f in res["updated"]))
+                            else:
+                                st.info("No pages were rewritten.")
+                        except RuntimeError as e:
+                            st.error(str(e))
 
 
 elif page == "Wiki Explorer":
@@ -120,13 +151,41 @@ elif page == "Wiki Explorer":
     if not pages:
         st.info("No wiki pages yet. Upload a document to get started.")
     else:
-        search = st.text_input(
-            "Search pages",
-            placeholder="Search titles and page bodies…",
-        ).strip()
-        selected_file = st.session_state.get("selected_page")
+        view_mode = st.radio(
+            "View",
+            ["Tree", "Graph"],
+            horizontal=True,
+            label_visibility="collapsed",
+        )
+        if view_mode == "Graph":
+            try:
+                from pyvis.network import Network
+                graph = wiki_engine.build_link_graph()
+                net = Network(height="600px", width="100%", bgcolor="#ffffff", font_color="#234637")
+                net.barnes_hut()
+                for node in graph:
+                    net.add_node(node, label=node, shape="dot")
+                for src, edges in graph.items():
+                    for tgt in edges:
+                        if tgt in graph:
+                            net.add_edge(src, tgt)
+                html = net.generate_html(notebook=False)
+                st.components.v1.html(html, height=620, scrolling=True)
+                orphans = wiki_engine.find_orphans()
+                if orphans:
+                    st.caption(f"**{len(orphans)} orphan(s)** (no in-links): " + ", ".join(f"`{o}`" for o in orphans[:20]))
+            except Exception as exc:
+                st.error(f"Graph render failed: {exc}")
+            search = ""
+            selected_file = None
+        else:
+            search = st.text_input(
+                "Search pages",
+                placeholder="Search titles and page bodies…",
+            ).strip()
+            selected_file = st.session_state.get("selected_page")
 
-        if search:
+        if view_mode == "Tree" and search:
             results = wiki_engine.search_wiki(search)
             st.markdown(f"**{len(results)}** match{'es' if len(results) != 1 else ''} for *{search}*")
             for r in results:
@@ -134,7 +193,7 @@ elif page == "Wiki Explorer":
                     st.session_state["selected_page"] = r["filename"]
                     selected_file = r["filename"]
                 st.markdown(f"<span style='color:#666;font-style:italic'>{r['excerpt']}</span>", unsafe_allow_html=True)
-        else:
+        elif view_mode == "Tree":
             tree = wiki_engine.get_wiki_tree()
             group_labels = {
                 "concept": "Concepts",
@@ -158,7 +217,7 @@ elif page == "Wiki Explorer":
                         cols[1].markdown(p.get("confidence", "—"))
                         cols[2].markdown(p.get("updated", "—"))
 
-        if selected_file:
+        if view_mode == "Tree" and selected_file:
             st.markdown("---")
             st.markdown(f"### {selected_file}")
             st.markdown(wiki_engine.read_page(selected_file))
@@ -182,11 +241,25 @@ elif page == "Chat":
         with st.chat_message("assistant"):
             with st.spinner("Thinking…"):
                 try:
-                    answer = wiki_engine.query(prompt)
+                    res = wiki_engine.query_with_sources(prompt)
+                    answer = res["answer"]
+                    sources = res["sources"]
                 except RuntimeError as e:
-                    answer = f"Error: {e}"
+                    answer, sources = f"Error: {e}", []
             st.markdown(answer)
-        st.session_state["messages"].append({"role": "assistant", "content": answer})
+        st.session_state["messages"].append(
+            {"role": "assistant", "content": answer, "question": prompt, "sources": sources}
+        )
+
+    # Save-to-Wiki button under the most recent assistant turn (Karpathy filing-back).
+    last = st.session_state["messages"][-1] if st.session_state["messages"] else None
+    if last and last["role"] == "assistant" and last.get("question") and not last["content"].startswith("Error:"):
+        if st.button("Save answer to wiki", key="save_answer"):
+            try:
+                rel = wiki_engine.file_answer(last["question"], last["content"], last.get("sources", []))
+                st.success(f"Filed as `{rel}`")
+            except RuntimeError as e:
+                st.error(str(e))
 
 
 elif page == "Research":
@@ -253,6 +326,15 @@ elif page == "Maintenance":
     c1.metric("Wiki pages", s["pages"])
     c2.metric("Raw sources", s["raw_files"])
     c3.metric("Log size (bytes)", s["log_bytes"])
+
+    st.markdown("---")
+    st.subheader("Link graph health")
+    orphans = wiki_engine.find_orphans()
+    if orphans:
+        st.warning(f"**{len(orphans)} orphan(s)** — pages with no `related` in-links.")
+        st.code("\n".join(orphans), language=None)
+    else:
+        st.success("No orphans — every page is linked from at least one other page.")
 
     st.markdown("---")
     st.subheader("Lint")

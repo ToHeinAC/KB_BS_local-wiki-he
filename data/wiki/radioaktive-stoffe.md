@@ -1,25 +1,16 @@
 ---
 title: "Radioaktive Stoffe"
 type: concept
-sources: ["StrlSchG_01.md"]
-related: ["strahlenschutzgesetz.md"]
-created: "2026-05-03"
-updated: "2026-05-03"
+sources: ["StrlSchG_01.md", "StrlSchG_02.md"]
+related: ["summary-strlschg-01-md", "tätigkeiten.md", "summary-strlschg-02-md"]
+created: "2026-05-06"
+updated: "2026-05-06"
 confidence: high
 ---
-Under the Strahlenschutzgesetz (StrlSchG), **Radioaktive Stoffe** are defined as any substance containing one or more radionuclides whose activity cannot be disregarded according to the law [summary-strlschg-01-md.md].
+Radioaktive Stoffe (Radioactive Substances) are substances containing one or more radionuclides whose activity cannot be disregarded according to the law or subsequent regulations [summary-strlschg-01-md].
 
-## Composition and Types
-The definition specifies that radioactive substances can include:
-*   **Kernbrennstoffe (Nuclear Fuels):** These are defined as specific fissile materials, such as Plutonium-239 and Plutonium-241, or uranium enriched with isotopes 235 or 233, or materials capable of sustaining a self-sustaining chain reaction [summary-strlschg-01-md.md].
-*   **Other Substances:** The definition covers any substance containing radionuclides whose activity meets the legal criteria [summary-strlschg-01-md.md].
+## Definition and Scope
+The definition encompasses materials that require regulatory oversight due to their inherent radioactivity. The scope details specific types, including nuclear fuels [summary-strlschg-01-md].
 
-## Activity Thresholds and Exemptions
-The law sets criteria for when the activity of a substance can be disregarded:
-*   Substances falling below legally defined release limits [summary-strlschg-01-md.md].
-*   Naturally occurring substances that are not used as nuclear fuel or for generating nuclear fuel, and which are not subject to monitoring under the Atomic Energy Act [summary-strlschg-01-md.md].
-
-## Related Concepts
-The concept is closely linked to:
-*   [Umschlossene radioaktive Stoffe](umschlossene-radioaktive-stoffe.md) for materials sealed within an inert casing.
-*   [Kontamination](kontamination.md) for the presence of such substances.
+## Regulatory Context
+The handling, processing, and disposal of these substances are core components of regulated activities under the StrlSchG [summary-strlschg-01-md]. The management of these substances is intrinsically linked to the principles of justification and optimization, ensuring that any use is necessary and risks are minimized [summary-strlschg-02-md].

@@ -2,41 +2,50 @@
 title: "Schaeffler AG"
 type: entity
 sources: ["Schaeffler AG – Investment Overview.md"]
-related: ["e-mobility.md", "bearings.md", "industrial-automation.md"]
-created: "2026-05-03"
-updated: "2026-05-03"
+related: ["e-mobility-drives.md", "bearings-motion-technology.md", "tätigkeiten.md"]
+created: "2026-05-06"
+updated: "2026-05-06"
 confidence: high
 ---
 
-Schaeffler AG is a global industrial technology company headquartered in Herzogenaurach, Germany. The company has undergone a significant strategic transformation, evolving from a traditional bearing specialist into a major player in electrification and advanced mobility solutions [^7][^8].
+# Schaeffler AG
+
+Schaeffler AG is a multinational corporation specializing in motion technology, bearings, and industrial components. Headquartered in Herzogenaurach, Germany, the company operates globally, maintaining a presence in 55 countries and over 250 locations [Schaeffler AG – Investment Overview.md].
 
 ## Corporate Profile
-*   **Ticker/ISIN**: SHA0 (Xetra) / DE000SHA0100 [^1][^2]
-*   **Sector**: Auto Parts / Motion Technology [^1]
-*   **Scale**: The company operates globally with approximately 110,000 employees and maintains a vast network of manufacturing sites [^5][^4].
-*   **Revenue**: Following the merger with Vitesco Technologies (completed October 2024), the company reported revenues of €23.5 billion in 2025 [^6].
 
-## Business Structure and Operations
-Schaeffler's operations are diversified across four primary divisions:
-1.  **E-Mobility**: This division is central to the company's transformation, focusing on electric drives, controls, and mechatronics for the automotive sector.
-2.  **Powertrain & Chassis**: Addresses systems for internal combustion engine (ICE), hybrid, and fully electric vehicles.
-3.  **Vehicle Lifetime Solutions**: Manages the aftermarket business through its established brands, including FAG, INA, and LuK [^10].
-4.  **Bearings & Industrial**: Provides industrial components, including bearings, linear guides, and solutions for wind and rail energy sectors.
+Schaeffler AG has undergone a significant strategic transformation, evolving from a traditional bearing specialist into a major player in the electrification sector [Schaeffler AG – Investment Overview.md]. This transformation was substantially accelerated by the merger with Vitesco Technologies, which was finalized in October 2024 [Schaeffler AG – Investment Overview.md].
 
-The company maintains strong relationships with major Original Equipment Manufacturers (OEMs) across Europe and Asia, while also serving the industrial and aftermarket sectors [^1][^10].
+**Key Identifiers:**
+*   **Ticker**: SHA0 (Xetra) [Schaeffler AG – Investment Overview.md]
+*   **ISIN**: DE000SHA0100 [Schaeffler AG – Investment Overview.md]
+*   **Sector**: Auto Parts / Motion Technology [Schaeffler AG – Investment Overview.md]
+*   **Employees**: Approximately 110,000 globally [Schaeffler AG – Investment Overview.md].
 
-## Investment Thesis and Market Position
-The core investment narrative centers on the successful integration of Vitesco's power electronics expertise, allowing Schaeffler to transition into a comprehensive EV powertrain supplier [^7].
+## Business Model and Revenue Streams
 
-**Strengths**:
-*   **Integration**: The merger provides integrated EV powertrain capability [^7].
-*   **Diversification**: The Industrial and Aftermarket segments help cushion cyclical downturns in the automotive sector [^8].
-*   **Financial Improvement**: The EBIT margin showed improvement in 2025 compared to the prior year [^6].
+The company's operations are structured around four primary divisions, following the Vitesco merger [Schaeffler AG – Investment Overview.md]:
 
-**Risks and Challenges**:
-*   **Profitability**: The E-Mobility segment is flagged as potentially loss-making in the short term (-14% to -17% margin) [^17].
-*   **Leverage**: The high Debt-to-Equity ratio (160.9%) and weak interest coverage (0.7x) present financial risks [^19].
-*   **Competition**: The company faces intense price pressure from Chinese EV suppliers and must continue to close the R&D gap with competitors like Bosch and ZF [^13].
+1.  **E-Mobility**: This division focuses on electric drives, controls, mechatronics, and e-axles, representing over 40% of the automotive revenue [Schaeffler AG – Investment Overview.md].
+2.  **Powertrain & Chassis**: Covers traditional engine/transmission systems, as well as chassis components for hybrid and electric vehicles [Schaeffler AG – Investment Overview.md].
+3.  **Vehicle Lifetime Solutions**: This segment manages the aftermarket business, providing spare parts and repair solutions through established brands like FAG, INA, and LuK [Schaeffler AG – Investment Overview.md].
+4.  **Bearings & Industrial**: Handles industrial bearings, linear guides, and components for sectors such as wind energy, rail, and robotics [Schaeffler AG – Investment Overview.md].
 
-## Valuation Summary
-From a valuation standpoint, the P/S ratio (~0.4x) suggests potential undervaluation compared to peer averages. However, investors must weigh this against the high debt load and the execution risk associated with realizing the projected €600M in annual synergies by 2029 [^7].
+The customer base is diverse, including major European, Asian, and German Original Equipment Manufacturers (OEMs), industrial clients (renewable energy, factory automation), and the global aftermarket distribution network [Schaeffler AG – Investment Overview.md].
+
+## Competitive Positioning and Moats
+
+Schaeffler maintains a competitive edge through its combination of deep mechanical expertise and its integrated systems approach, which is enhanced by the Vitesco merger [Schaeffler AG – Investment Overview.md].
+
+*   **Moat Assessment**: The moat is currently assessed as **Narrow**, though the integration of Vitesco is expected to widen it [Schaeffler AG – Investment Overview.md].
+*   **Strengths**: High switching costs for OEMs due to integrated systems, a strong IP portfolio (75+ years), and scale economies derived from its €23.5 billion revenue base [Schaeffler AG – Investment Overview.md].
+*   **Threats**: The company faces pressure from Chinese EV suppliers regarding component margins and must continuously increase R&D spending to keep pace with rivals like Bosch and ZF [Schaeffler AG – Investment Overview.md].
+
+## Financial Performance and Outlook
+
+Financial analysis indicates a positive trend in profitability, with the EBIT margin improving to 4.0% in 2025 (up from 3.5%) [Schaeffler AG – Investment Overview.md]. However, the financial structure presents risks:
+*   **Leverage**: The Debt-to-Equity ratio remains high at 160.9% [Schaeffler AG – Investment Overview.md].
+*   **Profitability Concern**: The E-Mobility segment is projected to operate at a loss, with margins estimated between -14% and -17% in 2025 [Schaeffler AG – Investment Overview.md].
+*   **Valuation**: The P/S ratio of ~0.4x suggests potential value relative to peer averages [Schaeffler AG – Investment Overview.md].
+
+The investment thesis suggests that while the short-term outlook is cautious due to debt and E-Mobility losses, the long-term potential, contingent on successful synergy realization and EV market growth, remains attractive [Schaeffler AG – Investment Overview.md].

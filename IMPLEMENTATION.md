@@ -25,7 +25,7 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `src/tools.py` | **Done** |
 | `src/agent.py` | **Done** |
 | `src/template_loader.py` | **Done** |
-| Test suite | **Done** (90 tests) |
+| Test suite | **Done** (102 tests) |
 | `.streamlit/config.toml` | **Done** |
 
 All planned modules are implemented. Test suite complete (90 tests, ≤100 cap).
@@ -58,7 +58,7 @@ All Python modules live under `src/`. Entry point: `uv run streamlit run src/app
 | `src/file_processor.py` | Extract text from PDF/DOCX/MD/TXT/HTML; returns string | Done |
 | `src/ollama_client.py` | `generate()` + `chat()` wrappers; `is_available()` health check | Done |
 | `src/schema_loader.py` | `get_system_prompt()` — reads `SCHEMA.md` verbatim | Done |
-| `src/wiki_engine.py` | `init_wiki`, `ingest`, `query`, `lint`, `list_pages`, `read_page`, `stats`, `search_wiki`, `get_wiki_tree` | Done |
+| `src/wiki_engine.py` | `init_wiki`, `ingest` (two-pass with affected-page preload + parse retry), `query`/`query_with_sources`, `file_answer`, `lint` (incl. programmatic orphan check), `build_link_graph`, `find_orphans`, `resolve_contradiction`, `list_pages`, `read_page`, `stats`, `search_wiki`, `get_wiki_tree` | Done |
 | `src/app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
 | `src/prompts.py` | All LLM prompt constants (AGENT_SYSTEM, INGEST_PROMPT, etc.) | Done |
 | `src/tools.py` | Deep-researcher tools: `tavily_search` (parallel), `fetch_webpage_content` (parallel), `think_tool`, `submit_final_answer` (gated) | Done |
@@ -140,3 +140,4 @@ uv run streamlit run src/app.py --server.port 8520
 | 2026-05-03 | Added `template_loader.py` + Upload-page metadata form driven by `templates/insert.md`; `wiki_engine.ingest()` now accepts `user_meta`. Test count: 86. |
 | 2026-05-03 | Wiki Explorer: tree-by-type (Concepts/Entities/Source Summaries/Comparisons/Other) + full-text search across page bodies via new `wiki_engine.search_wiki` and `get_wiki_tree`. Test count: 90. |
 | 2026-05-05 | Deep researcher: replaced ReAct loop with LangGraph state machine ported from `ToHeinAC/deepagents_ollama`. New tools: `tavily_search` (parallel batch), `fetch_webpage_content`, `think_tool`, `submit_final_answer` (word/URL gates). Parallel I/O via `concurrent.futures` thread pool; LLM calls remain sequential. Lifted `No LangChain` ban (scoped to agent layer). Added `langgraph`, `langchain-ollama`, `langchain-core`, `httpx`, `markdownify`. New env vars `RESEARCH_MIN_SEARCHES`/`MIN_WORDS`/`MIN_URLS`/`MAX_ITERATIONS`/`PARALLELISM`/`LLM_TIMEOUT`. Test count: 97. |
+| 2026-05-06 | Karpathy-pattern compounding mechanics (closes openissues.md gaps 1–4 + priorities 4 & 7). Ingest is now two-pass: a `SELECT_AFFECTED_PROMPT` call identifies likely-updated pages, their bodies are loaded (capped at 8K chars) and merged into `INGEST_PROMPT` so the LLM merges instead of overwriting. Parse-retry on empty `=== filename.md ===` blocks. Added `file_answer()` (chat answers fileable as `insights/insight-*.md`), `build_link_graph()`/`find_orphans()` (programmatic orphan check now prepended to lint output), `resolve_contradiction()` (focused reconciliation). Streamlit: Save-to-Wiki button on Chat, contradiction-resolve panel on Upload, pyvis Graph view in Wiki Explorer, orphan summary in Maintenance. Test count: 102. |

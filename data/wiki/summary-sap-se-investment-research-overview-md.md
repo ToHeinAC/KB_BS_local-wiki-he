@@ -2,75 +2,39 @@
 title: "SAP SE Investment Research Overview"
 type: source-summary
 sources: ["SAP SE Investment Research Overview.md"]
-related: ["sap-se.md", "cloud-erp-suite.md", "s/4hana.md", "joule-copilot.md"]
-created: "2026-05-03"
-updated: "2026-05-03"
+related: ["sap-se.md", "cloud-erp-suite.md", "s4hana.md", "ai-copilot.md"]
+created: "2026-05-06"
+updated: "2026-05-06"
 confidence: high
+name: "SAP SE"
+fullname: "SAP SE Investment Thesis"
+description: "SAP SE Investment Thesis vom 03.05.2026"
+part of: "03.05.2026"
 ---
 
-# Wiki Index
-Updated: 2026-05-03 | Pages: 20
+# SAP SE Investment Research Overview
 
-## Pages
-- [AI Integration](ai-integration.md) — AI Integration, in an industrial or technological context, refers to the embedding of Artificial Intelligence algorithms
-- [Bearings](bearings.md) — Bearings constitute the historical and foundational core of the Schaeffler AG business. The company has built its reputa
-- [Data Center Infrastructure](data-center-infrastructure.md) — Data Center Infrastructure refers to the physical hardware, cooling systems, power management, and networking required t
-- [E-Mobility](e-mobility.md) — E-Mobility, in the context of Schaeffler AG, refers to the segment of the automotive and industrial technology market de
-- [Exposition](exposition.md) — In the context of radiation protection, **Exposition** refers to the incidence of ionizing radiation on the human body [
-- [Expositionskategorien](expositionskategorien.md) — The Strahlenschutzgesetz (StrlSchG) distinguishes three primary categories of human exposure to ionizing radiation, each
-- [Industrial Automation](industrial-automation.md) — Industrial Automation refers to the application of advanced control systems, robotics, and software to manage and optimi
-- [Minimierung von Exposition](minimierung-von-exposition.md) — The principle of "Minimization of Exposure" is a mandatory obligation under the German Radiation Protection Act (StrlSch
-- [Notfall](notfall.md) — In the context of radiation protection, a **Notfall** (Emergency) is defined as an event that can result in significant 
-- [Radioaktive Stoffe](radioaktive-stoffe.md) — Under the Strahlenschutzgesetz (StrlSchG), **Radioaktive Stoffe** are defined as any substance containing one or more ra
-- [Rechtfertigung von Tätigkeitsarten](rechtfertigung-von-taetigkeitsarten.md) — The concept of "Justification of Activities" (*Rechtfertigung von Tätigkeitsarten*) is a cornerstone principle within th
-- [Schaeffler AG](schaeffler-ag.md) — Schaeffler AG is a global industrial technology company headquartered in Herzogenaurach, Germany. The company has underg
-- [SAP SE](sap-se.md) — SAP SE is a global enterprise software company specializing in cloud applications and ERP solutions.
-- [Siemens AG](siemens-ag.md) — Siemens Aktiengesellschaft is a global industrial technology leader operating across diverse sectors, including industri
-- [Smart Infrastructure](smart-infrastructure.md) — Smart Infrastructure encompasses the technologies and systems designed to optimize the efficiency, reliability, and sust
-- [Strahlenschutzgesetz (StrlSchG)](strahlenschutzgesetz.md) — The Strahlenschutzgesetz (StrlSchG) is the German federal law governing the protection of human health and the environme
-- [Schaeffler AG Investment Thesis](summary-schaeffler-ag-investment-overview-md.md) — This summary synthesizes the investment thesis for Schaeffler AG, based on the "Schaeffler AG – Investment Overview" doc
-- [Siemens AG Investment Research Overview](summary-siemens-ag-investment-research-overview-md.md) — Investment These für Siemens AG vom 03.05.2026
-- [Strahlenschutzgesetz (StrlSchG) - Teil 2](summary-strlschg-02.md) — The source document, titled "Strahlenschutzgesetz (StrlSchG) - Teil 2," provides detailed excerpts from the German Feder
-- [SAP SE Investment Research Overview](summary-sap-se-investment-research-overview.md) — Investment analysis detailing SAP SE's modernization cycle, cloud growth, and AI integration.
+This document summarizes the investment thesis for SAP SE as of May 3, 2026, detailing the company's financial health, competitive moat, and strategic positioning within the enterprise software market.
 
-## Pages
-- [AI Integration](ai-integration.md) — AI Integration, in an industrial or technological context, refers to the embedding of Artificial Intelligence algorithms
-- [Bearings](bearings.md) — Bearings constitute the historical and foundational core of the Schaeffler AG business. The company has built its reputa
-- [Data Center Infrastructure](data-center-infrastructure.md) — Data Center Infrastructure refers to the physical hardware, cooling systems, power management, and networking required t
-- [E-Mobility](e-mobility.md) — E-Mobility, in the context of Schaeffler AG, refers to the segment of the automotive and industrial technology market de
-- [Exposition](exposition.md) — In the context of radiation protection, **Exposition** refers to the incidence of ionizing radiation on the human body [
-- [Expositionskategorien](expositionskategorien.md) — The Strahlenschutzgesetz (StrlSchG) distinguishes three primary categories of human exposure to ionizing radiation, each
-- [Industrial Automation](industrial-automation.md) — Industrial Automation refers to the application of advanced control systems, robotics, and software to manage and optimi
-- [Minimierung von Exposition](minimierung-von-exposition.md) — The principle of "Minimization of Exposure" is a mandatory obligation under the German Radiation Protection Act (StrlSch
-- [Notfall](notfall.md) — In the context of radiation protection, a **Notfall** (Emergency) is defined as an event that can result in significant 
-- [Radioaktive Stoffe](radioaktive-stoffe.md) — Under the Strahlenschutzgesetz (StrlSchG), **Radioaktive Stoffe** are defined as any substance containing one or more ra
-- [Rechtfertigung von Tätigkeitsarten](rechtfertigung-von-taetigkeitsarten.md) — The concept of "Justification of Activities" (*Rechtfertigung von Tätigkeitsarten*) is a cornerstone principle within th
-- [Schaeffler AG](schaeffler-ag.md) — Schaeffler AG is a global industrial technology company headquartered in Herzogenaurach, Germany. The company has underg
-- [SAP SE](sap-se.md) — SAP SE is a global enterprise software company specializing in cloud applications and ERP solutions.
-- [Siemens AG](siemens-ag.md) — Siemens Aktiengesellschaft is a global industrial technology leader operating across diverse sectors, including industri
-- [Smart Infrastructure](smart-infrastructure.md) — Smart Infrastructure encompasses the technologies and systems designed to optimize the efficiency, reliability, and sust
-- [Strahlenschutzgesetz (StrlSchG)](strahlenschutzgesetz.md) — The Strahlenschutzgesetz (StrlSchG) is the German federal law governing the protection of human health and the environme
-- [Schaeffler AG Investment Thesis](summary-schaeffler-ag-investment-overview-md.md) — This summary synthesizes the investment thesis for Schaeffler AG, based on the "Schaeffler AG – Investment Overview" doc
-- [Siemens AG Investment Research Overview](summary-siemens-ag-investment-research-overview-md.md) — Investment These für Siemens AG vom 03.05.2026
-- [Strahlenschutzgesetz (StrlSchG) - Teil 2](summary-strlschg-02.md) — The source document, titled "Strahlenschutzgesetz (StrlSchG) - Teil 2," provides detailed excerpts from the German Feder
+## Executive Summary
+SAP SE operates in the Enterprise Software and Cloud Applications sector. Key financial metrics reported for 2025 include:
+*   **Total Revenue:** €36.8B (+8% YoY, +11% constant currency).
+*   **Cloud Revenue:** €21.0B (+23% YoY, +26% constant currency), which is noted as the largest revenue stream.
+*   **Operating Profit:** €9.6B IFRS (+111% YoY).
+*   **Free Cash Flow:** €8.2B, nearly doubling from €4.2B.
 
-## Pages
-- [AI Integration](ai-integration.md) — AI Integration, in an industrial or technological context, refers to the embedding of Artificial Intelligence algorithms
-- [Bearings](bearings.md) — Bearings constitute the historical and foundational core of the Schaeffler AG business. The company has built its reputa
-- [Data Center Infrastructure](data-center-infrastructure.md) — Data Center Infrastructure refers to the physical hardware, cooling systems, power management, and networking required t
-- [E-Mobility](e-mobility.md) — E-Mobility, in the context of Schaeffler AG, refers to the segment of the automotive and industrial technology market de
-- [Exposition](exposition.md) — In the context of radiation protection, **Exposition** refers to the incidence of ionizing radiation on the human body [
-- [Expositionskategorien](expositionskategorien.md) — The Strahlenschutzgesetz (StrlSchG) distinguishes three primary categories of human exposure to ionizing radiation, each
-- [Industrial Automation](industrial-automation.md) — Industrial Automation refers to the application of advanced control systems, robotics, and software to manage and optimi
-- [Minimierung von Exposition](minimierung-von-exposition.md) — The principle of "Minimization of Exposure" is a mandatory obligation under the German Radiation Protection Act (StrlSch
-- [Notfall](notfall.md) — In the context of radiation protection, a **Notfall** (Emergency) is defined as an event that can result in significant 
-- [Radioaktive Stoffe](radioaktive-stoffe.md) — Under the Strahlenschutzgesetz (StrlSchG), **Radioaktive Stoffe** are defined as any substance containing one or more ra
-- [Rechtfertigung von Tätigkeitsarten](rechtfertigung-von-taetigkeitsarten.md) — The concept of "Justification of Activities" (*Rechtfertigung von Tätigkeitsarten*) is a cornerstone principle within th
-- [Schaeffler AG](schaeffler-ag.md) — Schaeffler AG is a global industrial technology company headquartered in Herzogenaurach, Germany. The company has underg
-- [SAP SE](sap-se.md) — SAP SE is a global enterprise software company specializing in cloud applications and ERP solutions.
-- [Siemens AG](siemens-ag.md) — Siemens Aktiengesellschaft is a global industrial technology leader operating across diverse sectors, including industri
-- [Smart Infrastructure](smart-infrastructure.md) — Smart Infrastructure encompasses the technologies and systems designed to optimize the efficiency, reliability, and sust
-- [Strahlenschutzgesetz (StrlSchG)](strahlenschutzgesetz.md) — The Strahlenschutzgesetz (StrlSchG) is the German federal law governing the protection of human health and the environme
-- [Schaeffler AG Investment Thesis](summary-schaeffler-ag-investment-overview-md.md) — This summary synthesizes the investment thesis for Schaeffler AG, based on the "Schaeffler AG – Investment Overview" doc
-- [Siemens AG Investment Research Overview](summary-siemens-ag-investment-research-overview-md.md) — Investment These für Siemens AG vom 03.05.2026
-- [Strahlenschutzgesetz (StrlSchG) - Teil 2](summary-strlschg-02.md) — The source document, titled "Strahlenschutzgesetz (StrlSchG) - Teil 2," provides detailed excerpts from the German Feder
+The core investment thesis centers on SAP undergoing an "unstoppable modernization cycle." This cycle involves enterprises migrating from legacy ECC systems to S/4HANA Cloud, with Artificial Intelligence (AI) capabilities, specifically Joule copilot, now driving customer urgency alongside the looming 2027 end-of-support deadline for older systems [source-summary SAP SE Investment Research Overview].
+
+## Business Model and Moat Analysis
+SAP maintains a **Strong Moat** primarily derived from extremely high switching costs. Replacing SAP's core ERP system requires multi-year, high-risk business re-engineering, leading to a core ERP product retention rate exceeding 99% [source-summary SAP SE Investment Research Overview]. The company benefits from a 50+ year reputation and its status as the world's largest ERP vendor, supported by a massive partner and consultant ecosystem [source-summary SAP SE Investment Research Overview].
+
+## Technological Strategy: AI Integration
+The technological moat is being reinforced by AI integration. The **Joule** generative AI copilot is deeply embedded across SAP's offerings, being included in two-thirds of Q4 2025 cloud orders. SAP positions its Business AI as the "main driver for growth," utilizing the SAP Business Data Cloud to unify data sources for high-impact use cases in finance, supply chain, and procurement [source-summary SAP SE Investment Research Overview].
+
+## Competitive Landscape
+SAP is positioned as the undisputed ERP market leader. While competitors like Oracle and Microsoft possess massive scale and diversified platforms, SAP is noted for growing significantly faster than these rivals in the cloud applications space, particularly compared to Salesforce and Workday [source-summary SAP SE Investment Research Overview].
+
+## Financial and Valuation Summary
+The financial analysis indicates strong profitability inflection and robust cash generation. The valuation is considered premium, reflecting the strong cloud growth trajectory and the visibility provided by the multi-year modernization cycle.
+
+***

@@ -10,7 +10,15 @@ from dotenv import load_dotenv
 
 import ollama_client
 import schema_loader
-from prompts import ANSWER_PROMPT, INGEST_PROMPT, LINT_PROMPT, SELECT_PROMPT
+from prompts import (
+    ANSWER_PROMPT,
+    FILE_ANSWER_PROMPT,
+    INGEST_PROMPT,
+    LINT_PROMPT,
+    RESOLVE_CONTRADICTION_PROMPT,
+    SELECT_AFFECTED_PROMPT,
+    SELECT_PROMPT,
+)
 
 load_dotenv()
 
@@ -19,6 +27,9 @@ RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
 
 _INDEX = WIKI_DIR / "index.md"
 _LOG = WIKI_DIR / "log.md"
+_INSIGHTS_DIR = "insights"
+_MAX_AFFECTED_PAGES = 5
+_MAX_EXISTING_CHARS = 8000  # cap injected existing-content per ingest call
 
 
 def init_wiki() -> None:
@@ -77,13 +88,82 @@ def _parse_llm_pages(response: str) -> list[dict]:
     return pages
 
 
+def _select_affected_pages(system: str, source_name: str, index_text: str, text: str) -> list[str]:
+    """Ask the LLM which existing pages a new source likely updates."""
+    if not index_text.strip():
+        return []
+    excerpt = text[:2000]
+    prompt = SELECT_AFFECTED_PROMPT.format(
+        source_name=source_name, index_text=index_text, excerpt=excerpt
+    )
+    try:
+        raw = ollama_client.generate(system, prompt, temperature=0.1)
+    except RuntimeError:
+        return []
+    candidates = []
+    for ln in raw.splitlines():
+        s = ln.strip().strip("-• ").strip()
+        if s.lower() == "none":
+            return []
+        if s.endswith(".md") and s not in ("index.md", "log.md"):
+            if (WIKI_DIR / s).exists() and s not in candidates:
+                candidates.append(s)
+        if len(candidates) >= _MAX_AFFECTED_PAGES:
+            break
+    return candidates
+
+
+def _build_existing_block(filenames: list[str]) -> str:
+    """Render an 'Existing page content' block bounded by _MAX_EXISTING_CHARS."""
+    if not filenames:
+        return ""
+    parts = ["\nExisting page content (MERGE; do not overwrite-erase):\n"]
+    budget = _MAX_EXISTING_CHARS
+    for fname in filenames:
+        path = WIKI_DIR / fname
+        if not path.exists():
+            continue
+        body = path.read_text()
+        if len(body) > budget:
+            body = body[:budget] + "\n…[truncated]"
+        parts.append(f"\n--- {fname} ---\n{body}\n")
+        budget -= len(body)
+        if budget <= 0:
+            break
+    return "".join(parts) + "\n"
+
+
+def _ensure_frontmatter(content: str, fname: str) -> str:
+    """Patch minimal YAML frontmatter when the LLM omitted it."""
+    if content.lstrip().startswith("---"):
+        return content
+    title = fname.replace(".md", "").replace("-", " ").title()
+    today = _date()
+    fm = (
+        "---\n"
+        f'title: "{title}"\n'
+        "type: concept\n"
+        "sources: []\n"
+        "related: []\n"
+        f'created: "{today}"\n'
+        f'updated: "{today}"\n'
+        "confidence: low\n"
+        "---\n"
+    )
+    return fm + content.lstrip()
+
+
 def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
     """Run LLM ingest pipeline. Returns {created, updated, contradictions}.
 
+    Two-pass for true incremental compilation: a lightweight LLM call selects
+    pages affected by the new source, their full bodies are loaded, and
+    injected into the main ingest prompt so the LLM merges rather than
+    rewrites blindly.
+
     `user_meta` is an optional dict of user-supplied fields (from
-    templates/insert.md) — name, fullname, description, effective as of,
-    part of. Non-blank values are injected into the prompt as authoritative
-    metadata and must be carried into the source-summary page frontmatter.
+    templates/insert.md). Non-blank values are injected as authoritative
+    metadata and copied into the source-summary frontmatter.
     """
     system = schema_loader.get_system_prompt()
     index_text = _INDEX.read_text() if _INDEX.exists() else ""
@@ -103,10 +183,14 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
         meta_block = ""
         example_extra = ""
 
+    affected = _select_affected_pages(system, source_name, index_text, text)
+    existing_block = _build_existing_block(affected)
+
     prompt = INGEST_PROMPT.format(
         source_name=source_name,
         meta_block=meta_block,
         index_text=index_text,
+        existing_block=existing_block,
         text=text,
         summary_slug=_title_to_filename(source_name).replace(".md", ""),
         example_extra=example_extra,
@@ -116,22 +200,31 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
     response = ollama_client.generate(system, prompt, temperature=0.3)
     pages = _parse_llm_pages(response)
 
+    # Single retry with a stricter reformatting prompt if parsing failed.
+    if not pages:
+        retry_prompt = (
+            "Your previous response did not contain any `=== filename.md === ... === END ===` blocks. "
+            "Reformat your output now using EXACTLY that delimiter. Same content, correct format.\n\n"
+            f"Original task was:\n{prompt}"
+        )
+        response = ollama_client.generate(system, retry_prompt, temperature=0.2)
+        pages = _parse_llm_pages(response)
+
     created, updated, contradictions = [], [], []
-    index_content = _INDEX.read_text() if _INDEX.exists() else ""
 
     for page in pages:
         dest = WIKI_DIR / page["filename"]
+        content = _ensure_frontmatter(page["content"], page["filename"])
         if dest.exists():
             updated.append(page["filename"])
         else:
             created.append(page["filename"])
-        dest.write_text(page["content"])
+        dest.write_text(content)
 
-    # Extract UPDATE and CONTRADICTION lines from raw response
     for line in response.splitlines():
         if line.startswith("UPDATE:"):
             fname = line.split(":", 1)[1].strip()
-            if fname not in updated:
+            if fname and fname not in updated:
                 updated.append(fname)
         elif line.startswith("CONTRADICTION:"):
             contradictions.append(line.split(":", 1)[1].strip())
@@ -139,18 +232,27 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
     _rebuild_index()
     _append_log(
         f"Ingest: {source_name}",
-        f"Created: {created}\nUpdated: {updated}\nContradictions: {contradictions}",
+        f"Affected: {affected}\nCreated: {created}\nUpdated: {updated}\nContradictions: {contradictions}",
     )
 
-    return {"created": created, "updated": updated, "contradictions": contradictions}
+    return {
+        "created": created,
+        "updated": updated,
+        "contradictions": contradictions,
+        "affected": affected,
+    }
 
 
 def query(question: str) -> str:
-    """Answer a question using wiki content."""
+    """Answer a question using wiki content (string form, kept for back-compat)."""
+    return query_with_sources(question)["answer"]
+
+
+def query_with_sources(question: str) -> dict:
+    """Answer a question using wiki content. Returns {answer, sources}."""
     system = schema_loader.get_system_prompt()
     index_text = _INDEX.read_text() if _INDEX.exists() else "(empty wiki)"
 
-    # Ask LLM to select relevant pages
     select_prompt = SELECT_PROMPT.format(index_text=index_text, question=question)
     selected_raw = ollama_client.generate(system, select_prompt, temperature=0.1)
     selected = [
@@ -160,16 +262,19 @@ def query(question: str) -> str:
     ][:5]
 
     pages_text = ""
+    used_sources = []
     for fname in selected:
         path = WIKI_DIR / fname
         if path.exists():
             pages_text += f"\n\n--- {fname} ---\n{path.read_text()}"
+            used_sources.append(fname)
 
     if not pages_text:
         pages_text = "(no relevant pages found)"
 
     answer_prompt = ANSWER_PROMPT.format(pages_text=pages_text, question=question)
-    return ollama_client.generate(system, answer_prompt, temperature=0.7)
+    answer = ollama_client.generate(system, answer_prompt, temperature=0.7)
+    return {"answer": answer, "sources": used_sources}
 
 
 def lint() -> str:
@@ -185,6 +290,14 @@ def lint() -> str:
         return "Wiki is empty — nothing to lint."
 
     report = ollama_client.generate(system, LINT_PROMPT.format(all_pages=all_pages), temperature=0.3)
+
+    orphans = find_orphans()
+    if orphans:
+        prog = "## Programmatic checks\n\n**Orphans (no in-links from `related` frontmatter):**\n" + "\n".join(
+            f"- {o}" for o in orphans
+        ) + "\n\n---\n\n"
+        report = prog + report
+
     _append_log("Lint", report[:500])
     return report
 
@@ -271,6 +384,130 @@ def get_wiki_tree() -> dict[str, list[dict]]:
 
 def read_log() -> str:
     return _LOG.read_text() if _LOG.exists() else "(no log yet)"
+
+
+def file_answer(question: str, answer: str, related: list[str] | None = None) -> str:
+    """Persist a Q&A as a wiki insight page (Karpathy filing-back mechanic).
+
+    Returns the relative filename written under data/wiki/insights/.
+    """
+    insights_dir = WIKI_DIR / _INSIGHTS_DIR
+    insights_dir.mkdir(parents=True, exist_ok=True)
+
+    slug_source = (question[:80] or "insight").strip()
+    slug = _title_to_filename(slug_source).replace(".md", "")
+    fname = f"insight-{slug}.md"
+    rel = f"{_INSIGHTS_DIR}/{fname}"
+    dest = insights_dir / fname
+
+    related_yaml = "[" + ", ".join(f'"{r}"' for r in (related or [])) + "]"
+    today = _date()
+    title = question.strip().rstrip("?.!").strip() or "Insight"
+    body = answer.strip()
+
+    page = (
+        "---\n"
+        f'title: "{title}"\n'
+        "type: comparison\n"
+        'sources: ["chat"]\n'
+        f"related: {related_yaml}\n"
+        f'created: "{today}"\n'
+        f'updated: "{today}"\n'
+        "confidence: medium\n"
+        "---\n\n"
+        f"## Question\n{question.strip()}\n\n"
+        f"## Answer\n{body}\n"
+    )
+    dest.write_text(page)
+    _append_log("Insight filed", f"{rel}\nQ: {question[:120]}")
+    _rebuild_index()
+    return rel
+
+
+def build_link_graph() -> dict[str, set[str]]:
+    """Return adjacency map filename → set(related filenames) from frontmatter.
+
+    Edges include only targets that exist as wiki pages; non-existent or system
+    targets are dropped silently.
+    """
+    existing = {p["filename"] for p in list_pages()}
+    # Insights live in a subdir — include them too.
+    insights = WIKI_DIR / _INSIGHTS_DIR
+    if insights.exists():
+        for md in insights.glob("*.md"):
+            existing.add(f"{_INSIGHTS_DIR}/{md.name}")
+
+    graph: dict[str, set[str]] = {}
+    targets = [WIKI_DIR.glob("*.md")]
+    if insights.exists():
+        targets.append(insights.glob("*.md"))
+
+    for src_iter in targets:
+        for md in src_iter:
+            if md.name in ("index.md", "log.md"):
+                continue
+            try:
+                post = frontmatter.load(str(md))
+                rel = post.metadata.get("related", []) or []
+            except Exception:
+                rel = []
+            key = md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
+            edges = set()
+            for r in rel:
+                r = str(r).strip()
+                if r and r != key and r in existing and r not in ("index.md", "log.md"):
+                    edges.add(r)
+            graph[key] = edges
+    return graph
+
+
+def find_orphans() -> list[str]:
+    """Pages with zero in-edges in the link graph (not linked from any other page)."""
+    graph = build_link_graph()
+    in_deg: dict[str, int] = {n: 0 for n in graph}
+    for _src, edges in graph.items():
+        for tgt in edges:
+            in_deg[tgt] = in_deg.get(tgt, 0) + 1
+    return sorted(n for n, d in in_deg.items() if d == 0)
+
+
+def resolve_contradiction(description: str, page_filenames: list[str], user_guidance: str = "") -> dict:
+    """Reconcile a contradiction across pages via a focused LLM call.
+
+    Rewrites the affected pages in place using the standard ingest delimiter
+    format. Returns {updated: [...], description}.
+    """
+    system = schema_loader.get_system_prompt()
+    pages_text = ""
+    for fname in page_filenames:
+        path = WIKI_DIR / fname
+        if path.exists():
+            pages_text += f"\n--- {fname} ---\n{path.read_text()}\n"
+    if not pages_text:
+        return {"updated": [], "description": description}
+
+    prompt = RESOLVE_CONTRADICTION_PROMPT.format(
+        description=description,
+        pages_text=pages_text,
+        user_guidance=user_guidance or "(none)",
+    )
+    response = ollama_client.generate(system, prompt, temperature=0.2)
+    pages = _parse_llm_pages(response)
+
+    updated = []
+    for page in pages:
+        dest = WIKI_DIR / page["filename"]
+        if not dest.exists():
+            continue
+        dest.write_text(_ensure_frontmatter(page["content"], page["filename"]))
+        updated.append(page["filename"])
+
+    _append_log(
+        "Contradiction resolved",
+        f"Description: {description}\nUpdated: {updated}\nGuidance: {user_guidance[:200]}",
+    )
+    _rebuild_index()
+    return {"updated": updated, "description": description}
 
 
 def stats() -> dict:
