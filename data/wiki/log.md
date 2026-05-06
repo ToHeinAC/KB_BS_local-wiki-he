@@ -26,3 +26,28 @@ Affected: ['ai-copilot.md', 'e-mobility-drives.md', 'bearings-motion-technology.
 Created: ['summary-siemens-ag-investment-research-overview-md.md', 'siemens-ag.md', 'industrial-automation.md', 'data-center-infrastructure.md']
 Updated: ['ai-copilot.md', 'bearings-motion-technology.md', 'e-mobility-drives.md', 'schaeffler-ag.md', 'index.md']
 Contradictions: []
+
+## 2026-05-06 09:00 — Ingest: Infineon Investment Idea.md
+Affected: ['e-mobility-drives.md', 'industrial-automation.md', 'siemens-ag.md', 'summary-siemens-ag-investment-research-overview-md.md', 'data-center-infrastructure.md']
+Created: ['summary-infineon-investment-idea-md.md', 'infineon-technologies-ag.md', 'power-semiconductors.md']
+Updated: ['summary-infineon-investment-idea-md.md', 'e-mobility-drives.md', 'industrial-automation.md', 'siemens-ag.md']
+Contradictions: []
+
+## 2026-05-06 09:05 — Lint
+## Programmatic checks
+
+**Orphans (no in-links from `related` frontmatter):**
+- summary-sap-se-investment-research-overview-md.md
+- summary-schaeffler-ag-investment-overview-md.md
+- summary-strlschg-01-md.md
+- summary-strlschg-02-md.md
+
+---
+
+This review analyzes the provided wiki pages against the established schema rules, identifying areas of conflict, missing links, conceptual gaps, and suggesting improvements for future ingestion.
+
+***
+
+## 🔍 Wiki Quality Review Report
+
+### 1. CONTRADICTIONS (

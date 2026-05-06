@@ -1,6 +1,7 @@
 """LocalWiki — Streamlit UI."""
 
-import subprocess
+import gc
+import os
 import tempfile
 from pathlib import Path
 
@@ -15,8 +16,6 @@ import ollama_client
 import template_loader
 import wiki_engine
 import agent as research_agent
-
-APP_PORT = 8520
 
 st.set_page_config(
     page_title="LocalWiki",
@@ -43,6 +42,22 @@ st.markdown(
 
 # --- sidebar ---
 
+def _safe_reset() -> None:
+    import requests as _req
+    try:
+        _req.post(
+            f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
+            json={"model": os.getenv("OLLAMA_MODEL", "gemma4:e4b"), "keep_alive": 0},
+            timeout=5,
+        )
+    except Exception:
+        pass
+    gc.collect()
+    for key in list(st.session_state.keys()):
+        del st.session_state[key]
+    st.rerun()
+
+
 def _ollama_badge() -> None:
     ok = ollama_client.is_available()
     color = "#2d6a2d" if ok else "#a00"
@@ -68,9 +83,9 @@ s = wiki_engine.stats()
 st.sidebar.markdown(f"**{s['pages']}** pages &nbsp;·&nbsp; **{s['raw_files']}** sources", unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
-if st.sidebar.button("Exit app", type="secondary"):
-    subprocess.Popen(f"lsof -ti:{APP_PORT} | xargs -r kill -9", shell=True)
-    st.sidebar.info("Shutting down…")
+if st.sidebar.button("Reset session", type="secondary",
+                     help="Unload model from VRAM and reset session. Server stays running."):
+    _safe_reset()
 
 
 # --- pages ---
@@ -300,8 +315,6 @@ elif page == "Chat":
 
 
 elif page == "Research":
-    import os
-
     st.title("Research Agent")
     tavily_key = os.getenv("TAVILY_API_KEY", "")
 

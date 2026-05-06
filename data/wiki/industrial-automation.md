@@ -1,8 +1,8 @@
 ---
 title: "Industrial Automation"
 type: concept
-sources: ["Siemens AG — Investment Research Overview.md"]
-related: ["siemens-ag.md", "industrial-automation.md"]
+sources: ["Siemens AG — Investment Research Overview.md", "Infineon Investment Idea.md"]
+related: ["siemens-ag.md", "industrial-automation.md", "infineon-technologies-ag.md"]
 created: "2026-05-06"
 updated: "2026-05-06"
 confidence: high
@@ -18,6 +18,7 @@ The field encompasses several integrated technologies:
 *   **SCADA/HMI**: Supervisory Control and Data Acquisition (SCADA) systems and Human-Machine Interfaces (HMI) provide operators with centralized visualization and control over entire plant floors [Siemens AG — Investment Research Overview.md].
 *   **Industrial IoT (IIoT)**: The connectivity layer that gathers real-time data from machinery, enabling predictive maintenance and process optimization [Siemens AG — Investment Research Overview.md].
 *   **Software Ecosystems**: Modern systems rely on comprehensive software platforms (like the SIMATIC/TIA ecosystem) that allow for seamless integration across different hardware components [Siemens AG — Investment Research Overview.md].
+*   **Power Control:** The efficiency of the physical machinery is increasingly dependent on advanced power electronics, utilizing components like SiC and GaN semiconductors for motor drives and energy conversion [Infineon Investment Idea.md].
 
 ## Market Drivers and Trends
 The market for industrial automation is characterized by high barriers to entry, primarily due to the complexity and depth of required integration.
