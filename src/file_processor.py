@@ -53,4 +53,20 @@ def extract_text(path: Path) -> str:
         text = _extract_html(path)
     else:
         raise ValueError(f"Unsupported file type: {suffix}")
-    return text[:MAX_CHARS]
+    return text
+
+
+def chunk_text(text: str, chunk_size: int = MAX_CHARS) -> list[str]:
+    """Split text into chunks at paragraph boundaries; fall back to hard split."""
+    if len(text) <= chunk_size:
+        return [text]
+    chunks, start = [], 0
+    while start < len(text):
+        end = min(start + chunk_size, len(text))
+        if end < len(text):
+            boundary = text.rfind("\n\n", start, end)
+            if boundary > start:
+                end = boundary + 2
+        chunks.append(text[start:end])
+        start = end
+    return chunks

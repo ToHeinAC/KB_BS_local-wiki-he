@@ -49,7 +49,7 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 
 - **`src/prompts.py`** is the *only* place that defines LLM prompt strings. All other modules import named constants from here: `RESEARCHER_INSTRUCTIONS`, `INGEST_PROMPT`, `SELECT_PROMPT`, `ANSWER_PROMPT`, `LINT_PROMPT`, `TAVILY_SEARCH_DESCRIPTION`, `FETCH_WEBPAGE_DESCRIPTION`, `THINK_TOOL_DESCRIPTION`, `SUBMIT_FINAL_DESCRIPTION`.
 - **`src/dedup.py`** owns `manifest.json`. Every ingest must call `is_duplicate()` before `register_file()`.
-- **`src/file_processor.py`** extracts text from uploaded files and returns it as a string (does not write to disk).
+- **`src/file_processor.py`** extracts full text from uploaded files (`extract_text()`) and splits large texts into paragraph-bounded chunks (`chunk_text(text, chunk_size=MAX_CHARS)`). Does not write to disk.
 - **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
 - **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
 - **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`, `search_wiki()`, `get_wiki_tree()`.
@@ -64,18 +64,21 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 
 ```
 upload → dedup.is_duplicate()
-       → dedup.register_file()           # saves to data/raw/
-       → file_processor.extract_text()   # returns string
+       → dedup.register_file()                # saves to data/raw/
+       → file_processor.extract_text()        # returns FULL text (no truncation)
+       → file_processor.chunk_text(text)      # [text] if ≤MAX_INGEST_CHARS, else N chunks
        → [Upload UI] optional metadata form driven by template_loader.load_insert_template()
-       → wiki_engine.ingest(text, source_name, user_meta=None)
-         → schema_loader.get_system_prompt()
-         → inject user_meta as authoritative block into prompt (if provided)
-         → ollama_client.generate(system, prompt, temperature=0.3)
-         → parse "=== filename.md ===" blocks from LLM response
-         → write pages to data/wiki/
-         → _rebuild_index()
-         → _append_log()
-         → return {created, updated, contradictions}
+       → for each chunk:
+           wiki_engine.ingest(chunk, source_name, user_meta=None)
+             → schema_loader.get_system_prompt()
+             → inject user_meta as authoritative block into prompt (chunk 1 only)
+             → ollama_client.generate(system, prompt, temperature=0.3)
+             → parse "=== filename.md ===" blocks from LLM response
+             → write pages to data/wiki/
+             → _rebuild_index()
+             → _append_log()
+             → return {created, updated, contradictions}
+       → aggregate results across chunks → display
 ```
 
 LLM output format for ingest:

@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** All pages implemented — ingest (with optional metadata form) → wiki (tree-by-type + full-text search) → chat → research (LangGraph deep researcher: planning → parallel web search → reflection → quality-gated report). 97-test suite.
+> **Status:** All pages implemented — ingest with chunked large-document support (progress bar, paragraph-boundary splits) → wiki (tree-by-type + full-text search) → chat → research (LangGraph deep researcher: planning → parallel web search → reflection → quality-gated report). 102-test suite.
 
 ## Documentation
 
@@ -44,7 +44,7 @@ Edit `.env` (copied from `.env.example`):
 |---|---|---|
 | `OLLAMA_MODEL` | `gemma4:e4b` | Ollama model to use |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
-| `MAX_INGEST_CHARS` | `40000` | Max characters extracted per document |
+| `MAX_INGEST_CHARS` | `40000` | Chunk size for ingest; large documents are split into sequential chunks |
 | `WIKI_DIR` | `data/wiki` | Wiki page storage |
 | `RAW_DIR` | `data/raw` | Uploaded source storage |
 | `TAVILY_API_KEY` | — | Required for the Research page (web search) |

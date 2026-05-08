@@ -55,7 +55,7 @@ All Python modules live under `src/`. Entry point: `uv run streamlit run src/app
 | Module | Purpose | Status |
 |---|---|---|
 | `src/dedup.py` | SHA-256 dedup; flat `data/raw/` store + `manifest.json` | Done |
-| `src/file_processor.py` | Extract text from PDF/DOCX/MD/TXT/HTML; returns string | Done |
+| `src/file_processor.py` | Extract text from PDF/DOCX/MD/TXT/HTML; `chunk_text()` splits large docs at paragraph boundaries | Done |
 | `src/ollama_client.py` | `generate()` + `chat()` wrappers; `is_available()` health check | Done |
 | `src/schema_loader.py` | `get_system_prompt()` — reads `SCHEMA.md` verbatim | Done |
 | `src/wiki_engine.py` | `init_wiki`, `ingest` (two-pass with affected-page preload + parse retry), `query`/`query_with_sources`, `file_answer`, `lint` (incl. programmatic orphan check), `build_link_graph`, `find_orphans`, `resolve_contradiction`, `list_pages`, `read_page`, `stats`, `search_wiki`, `get_wiki_tree` | Done |
@@ -104,7 +104,7 @@ The mockup simplifies a few planned details — tracked here so future iteration
 | `OLLAMA_MODEL` | `gemma4:e4b` | Override model |
 | `OLLAMA_HOST` | `http://localhost:11434` | Override Ollama endpoint |
 | `TAVILY_API_KEY` | — | Required for the Research page (web search). |
-| `MAX_INGEST_CHARS` | `40000` | Text truncation threshold at extraction |
+| `MAX_INGEST_CHARS` | `40000` | Chunk size for ingest; documents exceeding this are split into sequential chunks |
 | `WIKI_DIR` | `data/wiki` | Wiki page storage path |
 | `RAW_DIR` | `data/raw` | Raw source file storage path |
 | `RESEARCH_MIN_SEARCHES` | `6` | Deep researcher: minimum web searches before submitting. |
@@ -142,3 +142,4 @@ uv run streamlit run src/app.py --server.port 8520
 | 2026-05-05 | Deep researcher: replaced ReAct loop with LangGraph state machine ported from `ToHeinAC/deepagents_ollama`. New tools: `tavily_search` (parallel batch), `fetch_webpage_content`, `think_tool`, `submit_final_answer` (word/URL gates). Parallel I/O via `concurrent.futures` thread pool; LLM calls remain sequential. Lifted `No LangChain` ban (scoped to agent layer). Added `langgraph`, `langchain-ollama`, `langchain-core`, `httpx`, `markdownify`. New env vars `RESEARCH_MIN_SEARCHES`/`MIN_WORDS`/`MIN_URLS`/`MAX_ITERATIONS`/`PARALLELISM`/`LLM_TIMEOUT`. Test count: 97. |
 | 2026-05-06 | Karpathy-pattern compounding mechanics (closes openissues.md gaps 1–4 + priorities 4 & 7). Ingest is now two-pass: a `SELECT_AFFECTED_PROMPT` call identifies likely-updated pages, their bodies are loaded (capped at 8K chars) and merged into `INGEST_PROMPT` so the LLM merges instead of overwriting. Parse-retry on empty `=== filename.md ===` blocks. Added `file_answer()` (chat answers fileable as `insights/insight-*.md`), `build_link_graph()`/`find_orphans()` (programmatic orphan check now prepended to lint output), `resolve_contradiction()` (focused reconciliation). Streamlit: Save-to-Wiki button on Chat, contradiction-resolve panel on Upload, pyvis Graph view in Wiki Explorer, orphan summary in Maintenance. Test count: 102. |
 | 2026-05-06 | Wiki Explorer graph view: replaced pyvis with direct vis.js HTML generation (eliminates broken `lib/bindings/utils.js` local-file reference in Streamlit iframe). Added **Node names** toggle (page title, ≤5 words) and **Edge themes** toggle (first 3 words of target page title as edge label). Tighter Barnes-Hut physics (springLength 120, gravitationalConstant −5000) prevents over-zooming and makes labels readable. |
+| 2026-05-08 | Chunked ingest for large documents. `file_processor.extract_text()` now returns full text (no truncation). New `chunk_text(text, chunk_size=MAX_CHARS)` splits at paragraph boundaries with hard-split fallback. `app.py` Upload page loops over chunks with a progress bar; results aggregated. `MAX_INGEST_CHARS` now controls chunk size rather than a hard truncation limit. |
