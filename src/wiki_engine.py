@@ -346,6 +346,11 @@ def read_page_parsed(filename: str) -> dict:
     }
 
 
+def read_raw_source(filename: str) -> bytes | None:
+    path = RAW_DIR / filename
+    return path.read_bytes() if path.exists() else None
+
+
 _TYPE_GROUPS = ("concept", "entity", "source-summary", "comparison")
 
 

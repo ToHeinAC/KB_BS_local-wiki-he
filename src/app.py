@@ -1,6 +1,7 @@
 """LocalWiki — Streamlit UI."""
 
 import gc
+import mimetypes
 import os
 import tempfile
 from pathlib import Path
@@ -38,6 +39,15 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
+def _raw_source_button(filename: str, key: str) -> None:
+    data = wiki_engine.read_raw_source(filename)
+    if data is None:
+        st.markdown(f"- `{filename}` *(not found)*")
+        return
+    mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    st.download_button(filename, data, file_name=filename, mime=mime, key=key)
 
 
 # --- sidebar ---
@@ -296,11 +306,13 @@ var net=new vis.Network(document.getElementById('g'),
                     if raw_sources:
                         st.markdown("**Original documents (data/raw/)**")
                         for s in raw_sources:
-                            st.markdown(f"- `data/raw/{s}`")
+                            _raw_source_button(s, f"dl_wiki_{s}")
                     if related:
                         st.markdown("**Related wiki pages**")
                         for r in related:
-                            st.markdown(f"- `data/wiki/{r}`")
+                            if st.button(r, key=f"nav_related_{r}"):
+                                st.session_state["selected_page"] = r
+                                st.rerun()
 
 
 elif page == "Chat":
@@ -337,7 +349,7 @@ elif page == "Chat":
                     if raw_sources:
                         st.markdown("**Original documents (data/raw/)**")
                         for r in raw_sources:
-                            st.markdown(f"- `data/raw/{r}`")
+                            _raw_source_button(r, f"dl_chat_{r}")
         st.session_state["messages"].append(
             {"role": "assistant", "content": answer, "question": prompt, "sources": sources, "raw_sources": raw_sources}
         )
