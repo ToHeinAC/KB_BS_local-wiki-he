@@ -12,6 +12,7 @@ emitting the same step-dict shape the Streamlit Research page expects:
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Generator
 
 from dotenv import load_dotenv
@@ -67,8 +68,28 @@ def _build_graph(llm):
     return g.compile()
 
 
+def _load_wiki_index() -> str:
+    wiki_dir = Path(os.getenv("WIKI_DIR", "data/wiki"))
+    index = wiki_dir / "index.md"
+    if not index.exists():
+        return ""
+    try:
+        return index.read_text()
+    except Exception:
+        return ""
+
+
 def _system_prompt(wiki_context: str) -> str:
-    wiki_block = f"Wiki context:\n{wiki_context}\n\n" if wiki_context else ""
+    parts: list[str] = []
+    index_text = _load_wiki_index()
+    if index_text.strip():
+        parts.append(
+            "Wiki index (page filenames available to wiki_search / wiki_read):\n"
+            f"{index_text}"
+        )
+    if wiki_context:
+        parts.append(f"Extra wiki context (user paste):\n{wiki_context}")
+    wiki_block = ("\n\n".join(parts) + "\n\n") if parts else ""
     return RESEARCHER_INSTRUCTIONS.format(
         wiki_block=wiki_block,
         min_searches=MIN_SEARCHES,

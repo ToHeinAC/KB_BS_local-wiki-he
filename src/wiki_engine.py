@@ -249,7 +249,7 @@ def query(question: str) -> str:
 
 
 def query_with_sources(question: str) -> dict:
-    """Answer a question using wiki content. Returns {answer, sources}."""
+    """Answer a question using wiki content. Returns {answer, sources, raw_sources}."""
     system = schema_loader.get_system_prompt()
     index_text = _INDEX.read_text() if _INDEX.exists() else "(empty wiki)"
 
@@ -263,18 +263,25 @@ def query_with_sources(question: str) -> dict:
 
     pages_text = ""
     used_sources = []
+    raw_sources_set: set[str] = set()
     for fname in selected:
         path = WIKI_DIR / fname
         if path.exists():
-            pages_text += f"\n\n--- {fname} ---\n{path.read_text()}"
+            text = path.read_text()
+            pages_text += f"\n\n--- {fname} ---\n{text}"
             used_sources.append(fname)
+            try:
+                page_fm = frontmatter.loads(text)
+                raw_sources_set.update(page_fm.get("sources", []))
+            except Exception:
+                pass
 
     if not pages_text:
         pages_text = "(no relevant pages found)"
 
     answer_prompt = ANSWER_PROMPT.format(pages_text=pages_text, question=question)
     answer = ollama_client.generate(system, answer_prompt, temperature=0.7)
-    return {"answer": answer, "sources": used_sources}
+    return {"answer": answer, "sources": used_sources, "raw_sources": sorted(raw_sources_set)}
 
 
 def lint() -> str:

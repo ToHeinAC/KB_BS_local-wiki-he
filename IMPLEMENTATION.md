@@ -60,9 +60,9 @@ All Python modules live under `src/`. Entry point: `uv run streamlit run src/app
 | `src/schema_loader.py` | `get_system_prompt()` — reads `SCHEMA.md` verbatim | Done |
 | `src/wiki_engine.py` | `init_wiki`, `ingest` (two-pass with affected-page preload + parse retry), `query`/`query_with_sources`, `file_answer`, `lint` (incl. programmatic orphan check), `build_link_graph`, `find_orphans`, `resolve_contradiction`, `list_pages`, `read_page`, `stats`, `search_wiki`, `get_wiki_tree` | Done |
 | `src/app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
-| `src/prompts.py` | All LLM prompt constants (AGENT_SYSTEM, INGEST_PROMPT, etc.) | Done |
-| `src/tools.py` | Deep-researcher tools: `tavily_search` (parallel), `fetch_webpage_content` (parallel), `think_tool`, `submit_final_answer` (gated) | Done |
-| `src/agent.py` | LangGraph deep researcher (planning → research → reflect → submit), ChatOllama backend | Done |
+| `src/prompts.py` | All LLM prompt constants including `WIKI_SEARCH_DESCRIPTION`, `WIKI_READ_DESCRIPTION`, `RESEARCHER_INSTRUCTIONS` (wiki-first workflow), `INGEST_PROMPT`, etc. | Done |
+| `src/tools.py` | Deep-researcher tools: `wiki_search` (local wiki full-text, parallel), `wiki_read` (local wiki pages, parallel), `tavily_search` (parallel), `fetch_webpage_content` (parallel), `think_tool`, `submit_final_answer` (word/source gates; counts `[Wiki: ...]` cites) | Done |
+| `src/agent.py` | LangGraph deep researcher (plan → wiki-first → triage → expand → submit), wiki index auto-injected into system prompt, ChatOllama backend | Done |
 | `src/template_loader.py` | Reads `templates/insert.md` → ordered list of user-fillable metadata fields | Done |
 | `SCHEMA.md` | Wiki schema injected into every LLM system prompt | Done |
 
@@ -109,7 +109,7 @@ The mockup simplifies a few planned details — tracked here so future iteration
 | `RAW_DIR` | `data/raw` | Raw source file storage path |
 | `RESEARCH_MIN_SEARCHES` | `6` | Deep researcher: minimum web searches before submitting. |
 | `RESEARCH_MIN_WORDS` | `600` | Deep researcher: minimum final-report word count. |
-| `RESEARCH_MIN_URLS` | `4` | Deep researcher: minimum unique source URLs cited. |
+| `RESEARCH_MIN_URLS` | `4` | Deep researcher: minimum unique sources cited (URLs + `[Wiki: ...]` citations). |
 | `RESEARCH_MAX_ITERATIONS` | `40` | Deep researcher: LangGraph recursion cap. |
 | `RESEARCH_PARALLELISM` | `4` | Deep researcher: thread-pool size for parallel Tavily / page fetches. |
 | `RESEARCH_LLM_TIMEOUT` | `300` | Deep researcher: per-LLM-call timeout in seconds. |
@@ -143,3 +143,4 @@ uv run streamlit run src/app.py --server.port 8520
 | 2026-05-06 | Karpathy-pattern compounding mechanics (closes openissues.md gaps 1–4 + priorities 4 & 7). Ingest is now two-pass: a `SELECT_AFFECTED_PROMPT` call identifies likely-updated pages, their bodies are loaded (capped at 8K chars) and merged into `INGEST_PROMPT` so the LLM merges instead of overwriting. Parse-retry on empty `=== filename.md ===` blocks. Added `file_answer()` (chat answers fileable as `insights/insight-*.md`), `build_link_graph()`/`find_orphans()` (programmatic orphan check now prepended to lint output), `resolve_contradiction()` (focused reconciliation). Streamlit: Save-to-Wiki button on Chat, contradiction-resolve panel on Upload, pyvis Graph view in Wiki Explorer, orphan summary in Maintenance. Test count: 102. |
 | 2026-05-06 | Wiki Explorer graph view: replaced pyvis with direct vis.js HTML generation (eliminates broken `lib/bindings/utils.js` local-file reference in Streamlit iframe). Added **Node names** toggle (page title, ≤5 words) and **Edge themes** toggle (first 3 words of target page title as edge label). Tighter Barnes-Hut physics (springLength 120, gravitationalConstant −5000) prevents over-zooming and makes labels readable. |
 | 2026-05-08 | Chunked ingest for large documents. `file_processor.extract_text()` now returns full text (no truncation). New `chunk_text(text, chunk_size=MAX_CHARS)` splits at paragraph boundaries with hard-split fallback. `app.py` Upload page loops over chunks with a progress bar; results aggregated. `MAX_INGEST_CHARS` now controls chunk size rather than a hard truncation limit. |
+| 2026-05-11 | Wiki-first deep researcher. New tools `wiki_search` / `wiki_read` in `tools.py`; `RESEARCHER_INSTRUCTIONS` rewritten to wiki-first workflow with structured Have/Gaps/Next triage and tangent-parking. `agent.py` auto-injects `data/wiki/index.md` into every system prompt. `submit_final_answer` now counts `[Wiki: filename.md]` citations alongside URLs toward `RESEARCH_MIN_URLS` gate. `query_with_sources()` returns `raw_sources` (original filenames from page frontmatter); Chat page shows both wiki and raw sources in a "Sources" expander. New prompts constants: `WIKI_SEARCH_DESCRIPTION`, `WIKI_READ_DESCRIPTION`. Tests updated/added for new tools and source-counting. |

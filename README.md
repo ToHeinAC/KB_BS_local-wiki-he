@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** All pages implemented — ingest with chunked large-document support (progress bar, paragraph-boundary splits) → wiki (tree-by-type + full-text search) → chat → research (LangGraph deep researcher: planning → parallel web search → reflection → quality-gated report). 102-test suite.
+> **Status:** All pages implemented — ingest with chunked large-document support (progress bar, paragraph-boundary splits) → wiki (tree-by-type + full-text search) → chat (sources expander: wiki + raw) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report). 102-test suite.
 
 ## Documentation
 
@@ -50,7 +50,7 @@ Edit `.env` (copied from `.env.example`):
 | `TAVILY_API_KEY` | — | Required for the Research page (web search) |
 | `RESEARCH_MIN_SEARCHES` | `6` | Min web searches before a report can be submitted |
 | `RESEARCH_MIN_WORDS` | `600` | Min final-report word count |
-| `RESEARCH_MIN_URLS` | `4` | Min unique source URLs cited |
+| `RESEARCH_MIN_URLS` | `4` | Min unique sources cited (URLs + `[Wiki: ...]` citations) |
 | `RESEARCH_PARALLELISM` | `4` | Thread-pool size for parallel Tavily / page fetches |
 | `RESEARCH_MAX_ITERATIONS` | `40` | LangGraph recursion cap for the research agent |
 | `RESEARCH_LLM_TIMEOUT` | `300` | Per-LLM-call timeout (seconds) |

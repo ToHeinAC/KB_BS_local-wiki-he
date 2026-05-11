@@ -47,15 +47,15 @@ data/wiki/
 
 All Python modules live in `src/`; one file per module, no sub-packages (PRD §4.4).
 
-- **`src/prompts.py`** is the *only* place that defines LLM prompt strings. All other modules import named constants from here: `RESEARCHER_INSTRUCTIONS`, `INGEST_PROMPT`, `SELECT_PROMPT`, `ANSWER_PROMPT`, `LINT_PROMPT`, `TAVILY_SEARCH_DESCRIPTION`, `FETCH_WEBPAGE_DESCRIPTION`, `THINK_TOOL_DESCRIPTION`, `SUBMIT_FINAL_DESCRIPTION`.
+- **`src/prompts.py`** is the *only* place that defines LLM prompt strings. All other modules import named constants from here: `RESEARCHER_INSTRUCTIONS`, `INGEST_PROMPT`, `SELECT_PROMPT`, `ANSWER_PROMPT`, `LINT_PROMPT`, `WIKI_SEARCH_DESCRIPTION`, `WIKI_READ_DESCRIPTION`, `TAVILY_SEARCH_DESCRIPTION`, `FETCH_WEBPAGE_DESCRIPTION`, `THINK_TOOL_DESCRIPTION`, `SUBMIT_FINAL_DESCRIPTION`.
 - **`src/dedup.py`** owns `manifest.json`. Every ingest must call `is_duplicate()` before `register_file()`.
 - **`src/file_processor.py`** extracts full text from uploaded files (`extract_text()`) and splits large texts into paragraph-bounded chunks (`chunk_text(text, chunk_size=MAX_CHARS)`). Does not write to disk.
 - **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
 - **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
 - **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`, `search_wiki()`, `get_wiki_tree()`.
 - **`src/template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
-- **`src/tools.py`** — deep-researcher tools wired as `langchain_core.tools`: `tavily_search` (parallel batch when `queries=[...]`), `fetch_webpage_content` (parallel httpx + markdownify), `think_tool`, `submit_final_answer` (word/URL gates → writes to `data/wiki/comparisons/`). Descriptions imported from `prompts.py`. Only `agent.py` and `tools.py` may import LangChain-family packages.
-- **`src/agent.py`** — owns the deep-researcher LangGraph state machine (`ChatOllama.bind_tools` agent node + `ToolNode`). Public generator `run_research_agent(question, wiki_context)` yields `thought` / `tool_call` / `tool_result` / `final_answer` / `error` step dicts.
+- **`src/tools.py`** — deep-researcher tools wired as `langchain_core.tools`: `wiki_search` (full-text local wiki search, parallel), `wiki_read` (read one or more wiki pages in parallel), `tavily_search` (web search, parallel batch), `fetch_webpage_content` (parallel httpx + markdownify), `think_tool`, `submit_final_answer` (word/source gates → writes to `data/wiki/comparisons/`). `submit_final_answer` counts both `https://` URLs and `[Wiki: filename.md]` citations toward the `RESEARCH_MIN_URLS` gate. Descriptions imported from `prompts.py`. Only `agent.py` and `tools.py` may import LangChain-family packages.
+- **`src/agent.py`** — owns the deep-researcher LangGraph state machine (`ChatOllama.bind_tools` agent node + `ToolNode`). `_load_wiki_index()` injects `data/wiki/index.md` into the system prompt so the agent knows which pages exist before any tool call. Public generator `run_research_agent(question, wiki_context)` yields `thought` / `tool_call` / `tool_result` / `final_answer` / `error` step dicts.
 - **`src/app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine` and `agent`; never writes wiki files directly.
 
 ## Key dataflows
@@ -98,13 +98,16 @@ CONTRADICTION: brief description
 ### Query
 
 ```
-wiki_engine.query(question)
+wiki_engine.query_with_sources(question)
   → read index.md
   → ollama_client.generate(select prompt, temperature=0.1)  # pick ≤5 filenames
   → load selected pages from data/wiki/
+  → extract raw_sources from page frontmatter `sources` field
   → ollama_client.generate(answer prompt, temperature=0.7)
-  → return answer string
+  → return {answer, sources (wiki filenames), raw_sources (original data/raw/ filenames)}
 ```
+
+`app.py` Chat page renders both sets in a collapsible "Sources" expander.
 
 ### Lint
 
@@ -128,10 +131,11 @@ START → agent (ChatOllama.bind_tools) → conditional router
 ```
 
 Phases enforced via the system prompt (`prompts.RESEARCHER_INSTRUCTIONS`):
-1. **PLAN** — `think_tool` once at the start; 3–6 sub-questions.
-2. **RESEARCH** — `tavily_search` (parallel batch via `queries=[...]`), optional `fetch_webpage_content` (parallel) for high-value URLs.
-3. **REFLECT** — `think_tool` after every 2–3 searches.
-4. **SUBMIT** — `submit_final_answer(title, answer)`. Validates `>= RESEARCH_MIN_WORDS` words and `>= RESEARCH_MIN_URLS` unique URLs. Rejected reports send the agent back to research.
+1. **PLAN** — `think_tool` once at the start; break question into 3–6 sub-questions.
+2. **WIKI FIRST** — first non-think tool call **must** be `wiki_search` (parallel batch). The system prompt pre-loads `data/wiki/index.md` so the agent already knows which pages exist.
+3. **TRIAGE** — `think_tool` after every tool result with three required sections: `Have:` / `Gaps vs original query:` / `Next:`. Tangential threads must be listed under `Parked (out of scope):` and not pursued.
+4. **AUTONOMOUS EXPANSION** — `wiki_read` for promising hits; `tavily_search` only for gaps the wiki cannot fill; optional `fetch_webpage_content` for high-value URLs.
+5. **SUBMIT** — `submit_final_answer(title, answer)`. Validates `>= RESEARCH_MIN_WORDS` words and `>= RESEARCH_MIN_URLS` unique sources (URLs + `[Wiki: filename.md]` citations). Rejected reports send the agent back to research.
 
 Quality gates and recursion cap are env-tunable (`RESEARCH_MIN_SEARCHES`, `RESEARCH_MIN_WORDS`, `RESEARCH_MIN_URLS`, `RESEARCH_MAX_ITERATIONS`). LangChain/LangGraph imports are scoped to this module + `src/tools.py` only (CLAUDE.md §5.3).
 

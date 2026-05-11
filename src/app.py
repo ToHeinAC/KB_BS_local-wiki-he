@@ -311,11 +311,22 @@ elif page == "Chat":
                     res = wiki_engine.query_with_sources(prompt)
                     answer = res["answer"]
                     sources = res["sources"]
+                    raw_sources = res["raw_sources"]
                 except RuntimeError as e:
-                    answer, sources = f"Error: {e}", []
+                    answer, sources, raw_sources = f"Error: {e}", [], []
             st.markdown(answer)
+            if sources or raw_sources:
+                with st.expander("Sources", expanded=False):
+                    if sources:
+                        st.markdown("**Wiki pages (data/wiki/)**")
+                        for s in sources:
+                            st.markdown(f"- `data/wiki/{s}`")
+                    if raw_sources:
+                        st.markdown("**Original documents (data/raw/)**")
+                        for r in raw_sources:
+                            st.markdown(f"- `data/raw/{r}`")
         st.session_state["messages"].append(
-            {"role": "assistant", "content": answer, "question": prompt, "sources": sources}
+            {"role": "assistant", "content": answer, "question": prompt, "sources": sources, "raw_sources": raw_sources}
         )
 
     # Save-to-Wiki button under the most recent assistant turn (Karpathy filing-back).
@@ -341,9 +352,9 @@ elif page == "Research":
 
     question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
 
-    with st.expander("Include wiki context (optional)"):
+    with st.expander("Extra wiki paste (optional — the agent browses the wiki on its own)"):
         wiki_context = st.text_area(
-            "Paste relevant wiki content or leave blank",
+            "Optional extra context. Leave blank — the agent will run wiki_search first automatically.",
             height=120,
             label_visibility="collapsed",
         )

@@ -1,26 +1,62 @@
 # Wiki Index
-Updated: 2026-05-06 | Pages: 22
+Updated: 2026-05-11 | Pages: 58
 
 ## Pages
-- [AI Copilot](ai-copilot.md) — # AI Copilot  The AI Copilot, exemplified by SAP's Joule generative AI, represents the next major wave of digital transf
-- [Bearings and Motion Technology](bearings-motion-technology.md) — # Bearings and Motion Technology  Bearings and Motion Technology encompasses the design, manufacture, and application of
-- [Cloud ERP Suite](cloud-erp-suite.md) — # Cloud ERP Suite  The Cloud ERP Suite represents the modern, cloud-native evolution of Enterprise Resource Planning (ER
-- [Data Center Infrastructure](data-center-infrastructure.md) — # Data Center Infrastructure  Data Center Infrastructure refers to the physical, computational, and supporting systems r
-- [E-Mobility Drives](e-mobility-drives.md) — # E-Mobility Drives  E-Mobility Drives refer to the specialized components, systems, and technologies required for the p
-- [Expositionssituationen](exposition-situationen.md) — Expositionssituationen (Exposure Situations) are defined within the context of the Strahlenschutzgesetz (StrlSchG) and a
-- [Industrial Automation](industrial-automation.md) — # Industrial Automation  Industrial Automation refers to the use of control systems, software, and mechanical devices to
-- [Infineon Technologies AG](infineon-technologies-ag.md) — # Infineon Technologies AG  Infineon Technologies AG is a German multinational semiconductor manufacturer recognized as 
-- [Notfall](notfall.md) — A Notfall (Emergency) in the context of radiation protection refers to an event that can result in significant adverse e
-- [Power Semiconductors](power-semiconductors.md) — # Power Semiconductors  Power Semiconductors refer to electronic components designed to efficiently manage, convert, and
-- [Radioaktive Stoffe](radioaktive-stoffe.md) — Radioaktive Stoffe (Radioactive Substances) are substances containing one or more radionuclides whose activity cannot be
-- [S/4HANA](s4hana.md) — # S/4HANA  S/4HANA is SAP's flagship, next-generation Enterprise Resource Planning (ERP) platform. It represents the tec
-- [SAP SE](sap-se.md) — # SAP SE  SAP SE is a multinational corporation specializing in enterprise software and cloud applications. The company'
-- [Schaeffler AG](schaeffler-ag.md) — # Schaeffler AG  Schaeffler AG is a multinational corporation specializing in motion technology, bearings, and industria
-- [Siemens AG](siemens-ag.md) — # Siemens AG  Siemens AG is a multinational industrial technology conglomerate headquartered in Germany. The company ope
-- [Infineon Technologies AG Investment Thesis vom 06.05.2026](summary-infineon-investment-idea-md.md) — # Infineon Technologies AG Investment Thesis vom 06.05.2026  This document provides a comprehensive, investment-grade du
-- [SAP SE Investment Research Overview](summary-sap-se-investment-research-overview-md.md) — SAP SE Investment Thesis vom 03.05.2026
-- [Schaeffler AG Investment Thesis](summary-schaeffler-ag-investment-overview-md.md) — Schaeffler AG Investment Thesis vom 03.05.2026
-- [Siemens AG Investment Research Overview](summary-siemens-ag-investment-research-overview-md.md) — # Siemens AG Investment Research Overview  This document summarizes the investment thesis for Siemens AG, detailing its 
-- [Strahlenschutzgesetz - StrlSchG](summary-strlschg-01-md.md) — The Strahlenschutzgesetz (StrlSchG), or the Act on the Protection against the Harmful Effects of Ionizing Radiation, is 
-- [Strahlenschutzgesetz - StrlSchG](summary-strlschg-02-md.md) — The Strahlenschutzgesetz (StrlSchG), or the Act on the Protection against the Harmful Effects of Ionizing Radiation, is 
-- [Tätigkeiten](tätigkeiten.md) — Tätigkeiten (Activities) are defined under the Strahlenschutzgesetz (StrlSchG) and represent a comprehensive list of act
+- [Artificial Intelligence in Enterprise](artificial-intelligence-in-enterprise.md) — # Artificial Intelligence in Enterprise  Artificial Intelligence (AI) in the enterprise context refers to the applicatio
+- [Cloud Applications](cloud-applications.md) — # Cloud Applications  Cloud Applications refer to the delivery of enterprise software solutions via subscription models 
+- [Administrative Competence in Radiation Protection](concept-administrative-competence.md) — # Administrative Competence in Radiation Protection  The German Radiation Protection Act (StrlSchG) delegates specific, 
+- [Automotive Industry](concept-automotive-industry.md) — # Automotive Industry  The Automotive Industry encompasses the design, manufacturing, and servicing of motor vehicles. I
+- [Federal Office for Economic Affairs and Export Control (BAFA)](concept-bafa.md) — # Federal Office for Economic Affairs and Export Control (BAFA)  The Federal Office for Economic Affairs and Export Cont
+- [Federal Office for Nuclear Waste Management (BASE)](concept-base.md) — # Federal Office for Nuclear Waste Management (BASE)  The Federal Office for Nuclear Waste Management (Bundesamt für die
+- [Bearings](concept-bearings.md) — # Bearings  Bearings are mechanical components designed to reduce friction between moving parts, allowing machinery to o
+- [Federal Radiation Protection Agency (BfS)](concept-bundesamt-frs.md) — # Federal Radiation Protection Agency (BfS)  The Federal Radiation Protection Agency (Bundesamt für Strahlenschutz, BfS)
+- [Indemnity/Security (Radiation Protection)](concept-deckungsvorsorge.md) — # Indemnity/Security (Radiation Protection)  The concept of *Deckungsvorsorge* (Indemnity/Security) mandates that adequa
+- [E-Mobility](concept-e-mobility.md) — # E-Mobility  E-Mobility refers to the segment of the automotive industry focused on electric vehicle (EV) technology, e
+- [Railway Authority (EBA)](concept-eba.md) — # Railway Authority (EBA)  The Railway Authority (Eisenbahn-Bundesamt, EBA) is the competent authority for radiation pro
+- [Ethics Committee (Radiation Protection)](concept-ethikkommission.md) — # Ethics Committee (Radiation Protection)  In the context of radiation protection, particularly for medical research, th
+- [Exposition](concept-exposition.md) — # Exposition  Exposition, in the context of radiation protection, refers to the impact of ionizing radiation on the huma
+- [Permit/Authorization (Radiation Protection)](concept-genehmigung.md) — # Permit/Authorization (Radiation Protection)  A permit (*Genehmigung*) is a formal authorization required by the law fo
+- [Geplante Expositionssituationen](concept-geplante-expositionssituationen.md) — # Geplante Expositionssituationen  A planned exposure situation (*Geplante Expositionssituation*) refers to an exposure 
+- [Ionisierende Strahlung](concept-ionisierender-strahlung.md) — # Ionisierende Strahlung  Ionisierende radiation refers to radiation capable of causing ionization in matter [StrlSchG.m
+- [Contamination (Kontamination)](concept-kontamination.md) — # Contamination (Kontamination)  Contamination refers to the presence of radioactive substances in the environment, part
+- [Körperdosis](concept-körperdosis.md) — # Körperdosis  The body dose (*Körperdosis*) refers to the measured or calculated absorbed radiation dose to the entire 
+- [Federal Aviation Office (LBA)](concept-lba.md) — # Federal Aviation Office (LBA)  The Federal Aviation Office (Luftfahrt-Bundesamt, LBA) is the competent authority for r
+- [Medical Research (Radiation Protection)](concept-medizinische-forschung.md) — # Medical Research (Radiation Protection)  This concept outlines the stringent regulatory framework governing the use of
+- [Notfall-Expositionssituationen](concept-notfall-expositionssituationen.md) — # Notfall-Expositionssituationen  An emergency exposure situation (*Notfall-Expositionssituation*) refers to a radiation
+- [Physikalisch-Technische Bundesanstalt (PTB)](concept-ptb.md) — # Physikalisch-Technische Bundesanstalt (PTB)  The Physikalisch-Technische Bundesanstalt (PTB) is a federal institute re
+- [Radioaktive Altlasten](concept-radioaktive-altlasten.md) — # Radioaktive Altlasten  Radioactive contaminated sites (*radioaktive Altlasten*) are grounds, parts of grounds, buildin
+- [Radioaktive kontaminierte Gebiete](concept-radioaktive-kontaminierte-gebiete.md) — # Radioaktive kontaminierte Gebiete  This concept refers to areas contaminated by radioactive substances, encompassing b
+- [Radioaktive Stoffe](concept-radioaktive-stoffe.md) — # Radioaktive Stoffe  Radioactive substances are materials containing radionuclides whose activity or specific activity 
+- [Radon](concept-radon.md) — # Radon  Radon refers to the radioactive gas Radon-222, which poses a long-term radiation risk, particularly in indoor e
+- [Residues (Rückstände)](concept-rückstaenden.md) — # Residues (Rückstände)  In the context of radiation protection, residues (*Rückstände*) refer to materials generated du
+- [Sachverständige (Expert Witnesses)](concept-sachverstaendigen.md) — # Sachverständige (Expert Witnesses)  The designation of experts (*Sachverständigen*) is a regulated aspect of radiation
+- [Sanierungsplan](concept-sanierungsplan.md) — # Sanierungsplan  A remediation plan (*Sanierungsplan*) is a mandatory document required for managing radioactive contam
+- [Sonstige bestehende Expositionssituationen](concept-sonstige-bestehende-expositionssituationen.md) — # Sonstige bestehende Expositionssituationen  This concept refers to existing exposure situations that are not classifie
+- [Radiation Protection Officer (Strahlenschutzbeauftragter)](concept-strahlenschutzbeauftragter.md) — # Radiation Protection Officer (Strahlenschutzbeauftragter)  The Radiation Protection Officer (*Strahlenschutzbeauftragt
+- [Radiation Protection Officer (Strahlenschutzverantwortlicher)](concept-strahlenschutzverantwortlicher.md) — # Radiation Protection Officer (Strahlenschutzverantwortlicher)  The Radiation Protection Officer (*Strahlenschutzverant
+- [Prohibition/Suspension (Radiation Protection)](concept-untersagung.md) — # Prohibition/Suspension (Radiation Protection)  Prohibition (Untersagung) refers to the action taken by the competent a
+- [Wertausgleich](concept-wertausgleich.md) — # Wertausgleich  Value equalization (*Wertausgleich*) is a financial mechanism related to remediation efforts at radioac
+- [Data Center Infrastructure](data-center-infrastructure.md) — # Data Center Infrastructure  Data Center Infrastructure refers to the physical, technological, and energy systems requi
+- [index.md](filename.md) — # Wiki Index Updated: 2026-05-11 | Pages: 54  ## Pages - [Administrative Competence in Radiation Protection](concept-adm
+- [Industrial Automation](industrial-automation.md) — # Industrial Automation  Industrial Automation refers to the use of control systems, robotics, and digital technologies 
+- [SAP SE](sap-se.md) — # SAP SE  SAP SE is a multinational software corporation specializing in enterprise resource planning (ERP) software and
+- [Schaeffler AG](schaeffler-ag.md) — # Schaeffler AG  Schaeffler AG is a multinational corporation specializing in motion technology and industrial component
+- [Siemens AG](siemens-ag.md) — # Siemens AG  Siemens Aktiengesellschaft is a global industrial technology leader and industrial conglomerate. The compa
+- [Smart Infrastructure](smart-infrastructure.md) — # Smart Infrastructure  Smart Infrastructure refers to the integration of digital technologies into physical assets—such
+- [Infineon AG Investment](summary-infineon-investment-idea-md.md) — # Infineon AG Investment Idea vom 03.05.2026  This document provides a structured, investment-grade due diligence report
+- [SAP SE Investment Research Overview](summary-sap-se-investment-research-overview-md.md) — # SAP SE Investment Research Overview  This document provides a structured, investment-grade due diligence report on SAP
+- [Schaeffler AG – Investment Overview](summary-schaeffler-ag-investment-overview-md.md) — # Schaeffler AG – Investment Overview  This document provides a structured, investment-grade due diligence report on Sch
+- [Siemens AG — Investment Research Overview](summary-siemens-ag-investment-research-overview-md.md) — # Siemens AG — Investment Research Overview  This document provides a structured, investment-grade due diligence report 
+- [Strahlenschutzgesetz - StrlSchG (Teil 1/13)](summary-strlschg-md-teil-1-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 1/13)  This document provides a detailed summary of the initial sections of the 
+- [Strahlenschutzgesetz - StrlSchG (Teil 10/13)](summary-strlschg-md-teil-10-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 10/13)  This section of the Radiation Protection Act details provisions concerni
+- [Strahlenschutzgesetz - StrlSchG (Teil 11/13)](summary-strlschg-md-teil-11-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 11/13)  This document provides a detailed summary of the later sections of the G
+- [Strahlenschutzgesetz - StrlSchG (Teil 12/13)](summary-strlschg-md-teil-12-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 12/13)  This section of the Radiation Protection Act (StrlSchG) details numerous
+- [Strahlenschutzgesetz - StrlSchG (Teil 13/13)](summary-strlschg-md-teil-13-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 13/13)  This section of the Radiation Protection Act (StrlSchG) details provisio
+- [Strahlenschutzgesetz - StrlSchG (Teil 2/13)](summary-strlschg-md-teil-2-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 2/13)  This section of the Radiation Protection Act (StrlSchG) details specific 
+- [Strahlenschutzgesetz - StrlSchG (Teil 3/13)](summary-strlschg-md-teil-3-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 3/13)  This section of the Radiation Protection Act (StrlSchG) details specific 
+- [Strahlenschutzgesetz - StrlSchG (Teil 4/13)](summary-strlschg-md-teil-4-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 4/13)  This section of the Radiation Protection Act (StrlSchG) details various r
+- [Strahlenschutzgesetz - StrlSchG (Teil 5/13)](summary-strlschg-md-teil-5-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 5/13)  This document provides a detailed summary of sections 67 through 76 of th
+- [Strahlenschutzgesetz - StrlSchG (Teil 6/13)](summary-strlschg-md-teil-6-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 6/13)  This section provides detailed provisions regarding dose limits, record-k
+- [Strahlenschutzgesetz - StrlSchG (Teil 7/13)](summary-strlschg-md-teil-7-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 7/13)  This section of the Radiation Protection Act (StrlSchG) details extensive
+- [Strahlenschutzgesetz - StrlSchG (Teil 8/13)](summary-strlschg-md-teil-8-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 8/13)  This section of the Radiation Protection Act (StrlSchG) details provision
+- [Strahlenschutzgesetz - StrlSchG (Teil 9/13)](summary-strlschg-md-teil-9-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 9/13)  This section of the Radiation Protection Act (StrlSchG) details comprehen
