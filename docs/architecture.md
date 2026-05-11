@@ -52,7 +52,7 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 - **`src/file_processor.py`** extracts full text from uploaded files (`extract_text()`) and splits large texts into paragraph-bounded chunks (`chunk_text(text, chunk_size=MAX_CHARS)`). Does not write to disk.
 - **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
 - **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
-- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `stats()`, `search_wiki()`, `get_wiki_tree()`.
+- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `read_page_parsed()`, `stats()`, `search_wiki()`, `get_wiki_tree()`. `read_page_parsed()` strips YAML frontmatter and returns `{content, sources, related}` for clean UI rendering.
 - **`src/template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
 - **`src/tools.py`** — deep-researcher tools wired as `langchain_core.tools`: `wiki_search` (full-text local wiki search, parallel), `wiki_read` (read one or more wiki pages in parallel), `tavily_search` (web search, parallel batch), `fetch_webpage_content` (parallel httpx + markdownify), `think_tool`, `submit_final_answer` (word/source gates → writes to `data/wiki/comparisons/`). `submit_final_answer` counts both `https://` URLs and `[Wiki: filename.md]` citations toward the `RESEARCH_MIN_URLS` gate. Descriptions imported from `prompts.py`. Only `agent.py` and `tools.py` may import LangChain-family packages.
 - **`src/agent.py`** — owns the deep-researcher LangGraph state machine (`ChatOllama.bind_tools` agent node + `ToolNode`). `_load_wiki_index()` injects `data/wiki/index.md` into the system prompt so the agent knows which pages exist before any tool call. Public generator `run_research_agent(question, wiki_context)` yields `thought` / `tool_call` / `tool_result` / `final_answer` / `error` step dicts.
@@ -107,7 +107,7 @@ wiki_engine.query_with_sources(question)
   → return {answer, sources (wiki filenames), raw_sources (original data/raw/ filenames)}
 ```
 
-`app.py` Chat page renders both sets in a collapsible "Sources" expander.
+`app.py` Chat page and Wiki Explorer both render sources in a collapsible "Sources" expander (original `data/raw/` documents + related wiki pages).
 
 ### Lint
 

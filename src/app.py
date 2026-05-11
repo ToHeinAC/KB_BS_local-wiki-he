@@ -287,7 +287,20 @@ var net=new vis.Network(document.getElementById('g'),
         if view_mode == "Tree" and selected_file:
             st.markdown("---")
             st.markdown(f"### {selected_file}")
-            st.markdown(wiki_engine.read_page(selected_file))
+            parsed = wiki_engine.read_page_parsed(selected_file)
+            st.markdown(parsed["content"])
+            raw_sources = parsed["sources"]
+            related = parsed["related"]
+            if raw_sources or related:
+                with st.expander("Sources", expanded=False):
+                    if raw_sources:
+                        st.markdown("**Original documents (data/raw/)**")
+                        for s in raw_sources:
+                            st.markdown(f"- `data/raw/{s}`")
+                    if related:
+                        st.markdown("**Related wiki pages**")
+                        for r in related:
+                            st.markdown(f"- `data/wiki/{r}`")
 
 
 elif page == "Chat":

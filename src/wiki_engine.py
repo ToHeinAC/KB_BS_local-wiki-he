@@ -333,6 +333,19 @@ def read_page(filename: str) -> str:
     return path.read_text()
 
 
+def read_page_parsed(filename: str) -> dict:
+    """Return body content and frontmatter sources/related without the YAML header."""
+    path = WIKI_DIR / filename
+    if not path.exists():
+        return {"content": f"Page not found: {filename}", "sources": [], "related": []}
+    post = frontmatter.load(str(path))
+    return {
+        "content": post.content,
+        "sources": post.metadata.get("sources", []),
+        "related": post.metadata.get("related", []),
+    }
+
+
 _TYPE_GROUPS = ("concept", "entity", "source-summary", "comparison")
 
 
