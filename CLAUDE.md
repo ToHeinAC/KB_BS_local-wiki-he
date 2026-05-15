@@ -87,7 +87,7 @@ The project uses the following technology choices:
 - All domain Python modules live in `src/`. Run with `uv run streamlit run src/app.py --server.port 8520`.
 - All LLM prompt strings must live in `src/prompts.py` as named module-level constants (e.g. `AGENT_SYSTEM`, `INGEST_PROMPT`). Never embed prompt strings inline in other modules.
 
-See [docs/architecture.md](docs/architecture.md) for the full module map and dataflow diagrams.
+See [docs/architecture.md](docs/architecture.md) for the full module map and dataflow diagrams, including the retrieval layer (`data/chunks/` + `data/index/`) driven by `src/chunker.py`, `src/lex_index.py`, `src/extractor.py`, and `src/qa_gen.py`. Ingest builds chunks → BM25 index → entity/term/fact sidecars → hypothetical-question sidecars **before** the LLM wiki-synthesis pass; the deep-chat `raw_search` tool reads the index directly. Disable the LLM-driven sidecars in tests/CI by exporting `INGEST_EXTRACT=0` and `INGEST_QA=0`.
 
 ### 5.4 Licencing
 All implementation must be under the Apache Licence 2.0 or more permissive (e.g. MIT). 

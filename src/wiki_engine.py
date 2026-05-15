@@ -8,7 +8,11 @@ from pathlib import Path
 import frontmatter
 from dotenv import load_dotenv
 
+import chunker
+import extractor
+import lex_index
 import ollama_client
+import qa_gen
 import schema_loader
 from prompts import (
     ANSWER_PROMPT,
@@ -183,6 +187,27 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
         meta_block = ""
         example_extra = ""
 
+    # Build the lexical ground-truth layer BEFORE the LLM pass: chunks are the
+    # citation truth, and a fresh BM25 index lets later queries find this source
+    # even if the LLM page-synthesis loses detail.
+    chunks = chunker.split(text)
+    if chunks:
+        chunker.write_chunks(source_name, chunks)
+        if os.getenv("INGEST_EXTRACT", "1") == "1":
+            try:
+                extracted = extractor.extract(source_name, text, chunks)
+                extractor.persist(source_name, extracted)
+            except Exception:
+                pass  # extraction is best-effort; never fail ingest on it
+        if os.getenv("INGEST_QA", "1") == "1":
+            try:
+                qa_items = qa_gen.generate(chunks)
+                qa_gen.persist(qa_items, source_name)
+            except Exception:
+                pass  # qa-gen is best-effort; never fail ingest on it
+        # Rebuild index AFTER sidecars so question tokens fold into the postings.
+        lex_index.build()
+
     affected = _select_affected_pages(system, source_name, index_text, text)
     existing_block = _build_existing_block(affected)
 
@@ -240,7 +265,13 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
         "updated": updated,
         "contradictions": contradictions,
         "affected": affected,
+        "chunks": len(chunks),
     }
+
+
+def rebuild_lex_index() -> dict:
+    """Rebuild the BM25 index from all persisted chunks. Returns a summary."""
+    return lex_index.build()
 
 
 def query(question: str) -> str:

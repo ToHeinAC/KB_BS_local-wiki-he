@@ -175,6 +175,42 @@ Wiki pages:
 
 REPORT_WRITER_DESCRIPTION = SUBMIT_FINAL_DESCRIPTION
 
+GENERATE_QUESTIONS_PROMPT = """For each chunk below, write 2–4 short natural-language questions that the chunk directly answers. Mix German and English when the chunk language allows. Each question must be self-contained (no pronouns referring to other chunks).
+
+Return STRICT JSON (no prose, no fences). The output must be a JSON array where each element has:
+  {{"chunk_id": "<id given below>", "questions": ["<q1>", "<q2>", ...]}}
+
+Keep questions tight (under 100 chars). No multi-part questions. Skip chunks that are purely structural (tables of contents, fußnoten); for those return an empty `questions` array.
+
+Chunks:
+{chunks_block}"""
+
+EXTRACT_TERMS_PROMPT = """You are extracting retrieval-helpful structured data from one source document.
+
+Return STRICT JSON (no prose, no markdown fences) with exactly these keys:
+
+{{
+  "aliases":  [{{"canonical": "<full term>", "variants": ["<alt spellings, EN/DE, paraphrases>"]}}],
+  "acronyms": [{{"acronym": "<short>", "expansion": "<full form>"}}],
+  "terms":    [{{"term": "<defined term>", "anchor": "<section/§ where defined>", "short_definition": "<<=160 chars>"}}],
+  "facts":    [{{"kind": "<short slug>", "subject": "<thing>", "value": <number>, "unit": "<unit>", "anchor": "<section/§>"}}]
+}}
+
+Rules:
+- Output JSON only. No commentary. No code fences.
+- Empty arrays are fine when nothing applies.
+- aliases: cross-language and abbreviation links (e.g. "Strahlenschutzgesetz" ↔ "StrlSchG"; "clearance value" ↔ "Freigabewert").
+- acronyms: only ones that are explicitly defined in the source text.
+- terms: terms the document itself defines (Begriffsbestimmungen, Glossary, "X means Y"). Include the anchor.
+- facts: numeric thresholds, limits, dates, amounts WITH a unit (Bq/g, EUR, %, years). Skip vague numbers.
+- Keep the lists short and high-signal; 20 entries per list is more than enough.
+
+Source name: {source_name}
+
+Source text (may be a digest of larger documents):
+{text}"""
+
+
 # --- Deep chat agent (Chat page "Deep" mode, chat_agent.py) ---------------
 
 CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions strictly from the original source documents in data/raw/. You never invent facts and never use the web.

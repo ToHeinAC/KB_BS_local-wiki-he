@@ -10,13 +10,16 @@ author: Tobias Hein
 > Authoritative spec: [`PRD.md`](../PRD.md) §2 (System Architecture) and §7 (Dataflow Diagrams).
 > Implementation deviations from PRD are tracked in [`IMPLEMENTATION.md`](../IMPLEMENTATION.md) §4.
 
-## Three-layer knowledge model
+## Knowledge model
 
 | Layer | Path | Owner | Mutability |
 |---|---|---|---|
 | 1. Raw sources | `data/raw/` | User uploads | Immutable; LLM **reads only** |
-| 2. Wiki | `data/wiki/` | LLM | LLM owns entirely (ingest/query/lint write here) |
-| 3. Schema | `SCHEMA.md` (project root) | Maintainer | Injected into every LLM system prompt |
+| 2. Retrieval layer | `data/chunks/` + `data/index/` | `chunker` / `lex_index` / `extractor` / `qa_gen` | Auto-rebuilt at ingest; content-addressed |
+| 3. Wiki | `data/wiki/` | LLM | LLM owns entirely (ingest/query/lint write here) |
+| 4. Schema | `SCHEMA.md` (project root) | Maintainer | Injected into every LLM system prompt |
+
+Layer 2 is the *ground truth for retrieval*: every wiki claim should trace back to one or more chunk ids. Wiki pages are LLM summaries over chunks; the chunks themselves are the citation truth and are searched directly by the deep-chat agent's `raw_search`.
 
 ### `data/raw/` layout (current implementation)
 
@@ -31,6 +34,26 @@ data/raw/
 ```
 
 > PRD planned `uploads/` + `extracted/` subdirs and `.manifest.json`. Mockup uses a flat layout. See IMPLEMENTATION.md §4.
+
+### `data/chunks/` + `data/index/` layout
+
+```
+data/chunks/
+  <source-slug>.jsonl       # one chunk per line, content-addressable chunk_id
+data/index/
+  postings.json             # BM25 inverted index (4 variants/token)
+  stats.json                # N, avg_dl, df, chunk_meta, chunk_dl
+  trigrams.json             # fuzzy fallback for zero-posting tokens
+  aliases.json              # synonym/cross-language groups
+  acronyms.json             # short → expansion
+  terms.json                # defined terms with anchor + short definition
+  facts.jsonl               # numeric facts (kind/subject/value/unit/anchor)
+  qa.jsonl                  # hypothetical questions per chunk_id (HyDE)
+```
+
+Auto-built on `wiki_engine.ingest()` and rebuildable via
+`wiki_engine.rebuild_lex_index()`. Best-effort — extractor and qa-gen
+failures don't break ingest.
 
 ### `data/wiki/` layout
 
@@ -50,11 +73,15 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 - **`src/prompts.py`** is the *only* place that defines LLM prompt strings. All other modules import named constants from here: `RESEARCHER_INSTRUCTIONS`, `CHAT_AGENT_SYSTEM`, `INGEST_PROMPT`, `SELECT_PROMPT`, `ANSWER_PROMPT`, `LINT_PROMPT`, `WIKI_SEARCH_DESCRIPTION`, `WIKI_READ_DESCRIPTION`, `TAVILY_SEARCH_DESCRIPTION`, `FETCH_WEBPAGE_DESCRIPTION`, `RAW_SEARCH_DESCRIPTION`, `RAW_READ_DESCRIPTION`, `THINK_TOOL_DESCRIPTION`, `SUBMIT_FINAL_DESCRIPTION`, `SUBMIT_CHAT_DESCRIPTION`.
 - **`src/dedup.py`** owns `manifest.json`. Every ingest must call `is_duplicate()` before `register_file()`.
 - **`src/file_processor.py`** extracts full text from uploaded files (`extract_text()`) and splits large texts into paragraph-bounded chunks (`chunk_text(text, chunk_size=MAX_CHARS)`). Does not write to disk.
+- **`src/chunker.py`** structural chunker. `split(text)` returns a list of `{chunk_id, anchor, heading_path, char_start, char_end, text, lang}` dicts using one of three strategies: legal `§` headers, markdown `##`/`###`, or paragraph windows with overlap. `chunk_id = sha256(normalized)[:16]` is content-addressable so re-ingest is idempotent and diffable. `write_chunks()`/`load_chunks()`/`all_chunks()` persist to `data/chunks/<source-slug>.jsonl`.
+- **`src/lex_index.py`** BM25 lexical index over chunks. `build(chunks=None)` writes `postings.json`, `stats.json`, `trigrams.json`. `query(q, top_k)` ranks chunks via BM25 (k1=1.5, b=0.75). Each surface word is stored under up to four normalized variants — surface lower-cased, NFKD-strip (ü→u), umlaut digraph (ü→ue, ß→ss), and a light German+English suffix stem — so queries match regardless of writing style. Trigram fallback (Jaccard ≥ 0.6) rescues typos. `query()` calls `_expand_query()` first to fold in aliases/acronyms from `extractor`. `facts_lookup(q)` returns matching numeric facts directly. No external NLP deps; built-in stopword list per language.
+- **`src/extractor.py`** ingest-time structured-data extractor. One Ollama call per source (digest for sources >30 KB) emits strict JSON `{aliases, acronyms, terms, facts}`. `persist()` merges idempotently into `data/index/aliases.json` / `acronyms.json` / `terms.json` and appends to `data/index/facts.jsonl`. Failures swallowed — extraction is best-effort.
+- **`src/qa_gen.py`** ingest-time hypothetical-question generator (HyDE, lexical-only). Batches chunks (default 12/call) and asks the LLM for 2–4 short questions per chunk. Persists `(chunk_id, question)` rows to `data/index/qa.jsonl`. `lex_index.build()` folds question tokens into the parent chunk's term frequencies (but not its doc length, so BM25 b-normalization stays honest).
 - **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
 - **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
-- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `read_page_parsed()`, `stats()`, `search_wiki()`, `get_wiki_tree()`. `read_page_parsed()` strips YAML frontmatter and returns `{content, sources, related}` for clean UI rendering.
+- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `read_page_parsed()`, `stats()`, `search_wiki()`, `get_wiki_tree()`, `rebuild_lex_index()`. `read_page_parsed()` strips YAML frontmatter and returns `{content, sources, related}` for clean UI rendering. `ingest()` also drives the retrieval layer (chunker → extractor → qa_gen → lex_index.build) before the LLM page-synthesis pass.
 - **`src/template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
-- **`src/tools.py`** — agent tools wired as `langchain_core.tools`. **Research tools** (`TOOLS`): `wiki_search`, `wiki_read`, `tavily_search`, `fetch_webpage_content`, `think_tool`, `submit_final_answer` (word/source gates → writes to `data/wiki/comparisons/`; counts `https://` URLs and `[Wiki: filename.md]` citations toward `RESEARCH_MIN_URLS`). **Chat tools** (`CHAT_TOOLS`): `raw_search` (tokenized prefix-match grep over `data/raw/` — splits the query into whitespace tokens, matches first 6 chars of each as substring, returns up to 3 excerpts per file ranked by token-hit count; tolerant of German morphology), `raw_read` (bulk read with `offset` parameter; 8000-char window per call with `[truncated; pass offset=N to continue]` footer; strips `§X`/`#section` section suffixes from filenames), `think_tool`, `submit_chat_answer` (word/source gates; returns to caller, no file written). `_RAW_CITE_RE` accepts an optional trailing ` §...` / ` #...` section marker so distinct sections of the same long file count as distinct sources for `CHAT_MIN_SOURCES`. Descriptions imported from `prompts.py`. Only `agent.py`, `chat_agent.py`, and `tools.py` may import LangChain-family packages.
+- **`src/tools.py`** — agent tools wired as `langchain_core.tools`. **Research tools** (`TOOLS`): `wiki_search`, `wiki_read`, `tavily_search`, `fetch_webpage_content`, `think_tool`, `submit_final_answer` (word/source gates → writes to `data/wiki/comparisons/`; counts `https://` URLs and `[Wiki: filename.md]` citations toward `RESEARCH_MIN_URLS`). **Chat tools** (`CHAT_TOOLS`): `raw_search` (BM25 over the chunk store via `lex_index.query()`; prepends a `### Direct facts` block from `lex_index.facts_lookup()` when a numeric fact matches; returns ranked hits with `chunk_id`, anchor, matched terms, score), `raw_read` (bulk read with `offset` parameter; 8000-char window per call with `[truncated; pass offset=N to continue]` footer; strips `§X`/`#section` section suffixes from filenames), `think_tool`, `submit_chat_answer` (word/source gates; returns to caller, no file written). `_RAW_CITE_RE` accepts an optional trailing ` §...` / ` #...` section marker so distinct sections of the same long file count as distinct sources for `CHAT_MIN_SOURCES`. Descriptions imported from `prompts.py`. Only `agent.py`, `chat_agent.py`, and `tools.py` may import LangChain-family packages.
 - **`src/agent.py`** — owns the deep-researcher LangGraph state machine (`ChatOllama.bind_tools(TOOLS)` agent node + `ToolNode`). `_load_wiki_index()` injects `data/wiki/index.md` into the system prompt so the agent knows which pages exist before any tool call. Public generator `run_research_agent(question, wiki_context)` yields `thought` / `tool_call` / `tool_result` / `final_answer` / `error` step dicts.
 - **`src/chat_agent.py`** — owns the deep-chat LangGraph state machine (`ChatOllama.bind_tools(CHAT_TOOLS)` agent node + `ToolNode`). `_build_raw_index()` injects a one-line-per-file index of `data/raw/` (first markdown heading per file) into the system prompt. Public generator `run_chat_agent(question)` yields the same step-dict shape as the research agent. On `GRAPH_RECURSION_LIMIT`, the loop surfaces the last AIMessage as a partial answer rather than only an error.
 - **`src/app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine`, `agent`, and `chat_agent`; never writes wiki files directly. `_raw_source_button()` strips `§`/`#` section suffixes before resolving citations to files in `data/raw/`.
@@ -71,14 +98,21 @@ upload → dedup.is_duplicate()
        → [Upload UI] optional metadata form driven by template_loader.load_insert_template()
        → for each chunk:
            wiki_engine.ingest(chunk, source_name, user_meta=None)
+             # Retrieval layer (always runs first; failures are best-effort)
+             → chunker.split(text) → chunker.write_chunks()
+             → extractor.extract() + persist()              # if INGEST_EXTRACT=1
+             → qa_gen.generate() + persist()                # if INGEST_QA=1
+             → lex_index.build()                            # rebuild postings/trigrams/stats
+             # LLM wiki-synthesis pass (existing behaviour)
              → schema_loader.get_system_prompt()
              → inject user_meta as authoritative block into prompt (chunk 1 only)
+             → _select_affected_pages() via SELECT_AFFECTED_PROMPT
              → ollama_client.generate(system, prompt, temperature=0.3)
              → parse "=== filename.md ===" blocks from LLM response
              → write pages to data/wiki/
              → _rebuild_index()
              → _append_log()
-             → return {created, updated, contradictions}
+             → return {created, updated, contradictions, affected, chunks}
        → aggregate results across chunks → display
 ```
 
@@ -121,7 +155,7 @@ START → agent (ChatOllama.bind_tools(CHAT_TOOLS)) → conditional router
                                                               or submit_chat_answer ACCEPTED
 ```
 
-Tools bound: `raw_search` (tokenized prefix-match grep over `data/raw/` — see `src/tools.py` description for `RAW_TOKEN_PREFIX` semantics; returns up to 3 excerpts per file), `raw_read` (paginated bulk read; 8000-char window per call, `offset` param, footer with continuation hint), `think_tool`, `submit_chat_answer` (gates: `CHAT_MIN_WORDS` / `CHAT_MIN_SOURCES`; section-suffixed citations count as distinct). No web tools. The system prompt (`prompts.CHAT_AGENT_SYSTEM`) pre-loads a one-line-per-file index of `data/raw/` and instructs the agent to use single-stem keywords (not full sentences) and to paginate long documents via `offset`.
+Tools bound: `raw_search` (BM25 over `data/chunks/` via `lex_index.query()` with alias/acronym expansion, trigram fuzzy fallback, and a direct-facts block when `facts_lookup` matches; returns chunk-level hits with anchors and scores), `raw_read` (paginated bulk read; 8000-char window per call, `offset` param, footer with continuation hint), `think_tool`, `submit_chat_answer` (gates: `CHAT_MIN_WORDS` / `CHAT_MIN_SOURCES`; section-suffixed citations count as distinct). No web tools. The system prompt (`prompts.CHAT_AGENT_SYSTEM`) pre-loads a one-line-per-file index of `data/raw/` and instructs the agent to use single-stem keywords (not full sentences) and to paginate long documents via `offset`.
 
 Gates roughly halved vs research for ~2× speed, with one extra iteration headroom for pagination: `CHAT_MAX_ITERATIONS=25`, `CHAT_MIN_WORDS=300`, `CHAT_MIN_SOURCES=2`, `CHAT_MIN_SEARCHES=3`. On accept, the answer is returned to the UI (no file written); the existing manual "Save to wiki" button writes to `data/wiki/insights/` as in Fast mode. If the recursion limit is hit before submission, the loop surfaces the last AIMessage as a `(partial — recursion limit hit)` answer instead of a bare error.
 

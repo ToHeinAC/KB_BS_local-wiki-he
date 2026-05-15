@@ -25,10 +25,14 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `src/tools.py` | **Done** |
 | `src/agent.py` | **Done** |
 | `src/template_loader.py` | **Done** |
-| Test suite | **Done** (102 tests) |
+| `src/chunker.py` | **Done** |
+| `src/lex_index.py` | **Done** |
+| `src/extractor.py` | **Done** |
+| `src/qa_gen.py` | **Done** |
+| Test suite | **Done** (135 tests; old 100-cap superseded — see [`docs/tests.md`](docs/tests.md)) |
 | `.streamlit/config.toml` | **Done** |
 
-All planned modules are implemented. Test suite complete (90 tests, ≤100 cap).
+All planned modules implemented plus a retrieval layer (Tiers 1.1–1.4 of the retrieval optimisation: chunk store + BM25 lexical index + ingest-time entity/term/fact extraction + hypothetical-question chunks).
 
 ---
 
@@ -56,12 +60,16 @@ All Python modules live under `src/`. Entry point: `uv run streamlit run src/app
 |---|---|---|
 | `src/dedup.py` | SHA-256 dedup; flat `data/raw/` store + `manifest.json` | Done |
 | `src/file_processor.py` | Extract text from PDF/DOCX/MD/TXT/HTML; `chunk_text()` splits large docs at paragraph boundaries | Done |
+| `src/chunker.py` | Structural chunker: legal `§` / markdown headings / paragraph windows with overlap. Content-addressable `chunk_id`. Persists to `data/chunks/<source-slug>.jsonl`. | Done |
+| `src/lex_index.py` | BM25 lexical index over chunks. 4 normalized token variants (surface / NFKD / umlaut-digraph / stem) + trigram fuzzy fallback. Query expansion via aliases+acronyms. `facts_lookup()` shortcut for numeric questions. Persists to `data/index/`. | Done |
+| `src/extractor.py` | Ingest-time structured-data extractor. One LLM call per source → strict JSON `{aliases, acronyms, terms, facts}`. Idempotent merge into `data/index/`. Best-effort. | Done |
+| `src/qa_gen.py` | Ingest-time HyDE: 2–4 hypothetical questions per chunk via batched LLM calls. Persists to `data/index/qa.jsonl`. Folded into BM25 by `lex_index.build()`. Best-effort. | Done |
 | `src/ollama_client.py` | `generate()` + `chat()` wrappers; `is_available()` health check | Done |
 | `src/schema_loader.py` | `get_system_prompt()` — reads `SCHEMA.md` verbatim | Done |
-| `src/wiki_engine.py` | `init_wiki`, `ingest` (two-pass with affected-page preload + parse retry), `query`/`query_with_sources`, `file_answer`, `lint` (incl. programmatic orphan check), `build_link_graph`, `find_orphans`, `resolve_contradiction`, `list_pages`, `read_page`, `read_page_parsed` (strips frontmatter → `{content, sources, related}`), `stats`, `search_wiki`, `get_wiki_tree` | Done |
+| `src/wiki_engine.py` | `init_wiki`, `ingest` (now: chunker → extractor → qa_gen → lex_index.build → two-pass LLM page-synthesis), `rebuild_lex_index`, `query`/`query_with_sources`, `file_answer`, `lint`, `build_link_graph`, `find_orphans`, `resolve_contradiction`, `list_pages`, `read_page`, `read_page_parsed`, `stats`, `search_wiki`, `get_wiki_tree` | Done |
 | `src/app.py` | Streamlit UI, 5 pages, port 8520, NYT editorial style | Done |
-| `src/prompts.py` | All LLM prompt constants including `WIKI_SEARCH_DESCRIPTION`, `WIKI_READ_DESCRIPTION`, `RESEARCHER_INSTRUCTIONS` (wiki-first workflow), `INGEST_PROMPT`, etc. | Done |
-| `src/tools.py` | Deep-researcher tools: `wiki_search`/`wiki_read`, `tavily_search`, `fetch_webpage_content`, `think_tool`, `submit_final_answer` (word/source gates; counts `[Wiki: ...]` cites). Deep-chat tools: `raw_search`/`raw_read` (full-text grep + bulk-read over `data/raw/`), `submit_chat_answer` (halved gates). | Done |
+| `src/prompts.py` | All LLM prompt constants including `WIKI_SEARCH_DESCRIPTION`, `WIKI_READ_DESCRIPTION`, `RESEARCHER_INSTRUCTIONS`, `INGEST_PROMPT`, `EXTRACT_TERMS_PROMPT`, `GENERATE_QUESTIONS_PROMPT`, etc. | Done |
+| `src/tools.py` | Deep-researcher tools: `wiki_search`/`wiki_read`, `tavily_search`, `fetch_webpage_content`, `think_tool`, `submit_final_answer`. Deep-chat tools: `raw_search` (BM25 via `lex_index.query()` + facts-lookup shortcut), `raw_read` (paginated), `submit_chat_answer` (halved gates). | Done |
 | `src/agent.py` | LangGraph deep researcher (plan → wiki-first → triage → expand → submit), wiki index auto-injected into system prompt, ChatOllama backend | Done |
 | `src/chat_agent.py` | LangGraph deep chat agent over `data/raw/` originals. Gates: `CHAT_MAX_ITERATIONS=25`, `CHAT_MIN_WORDS=300`, `CHAT_MIN_SOURCES=2`, `CHAT_MIN_SEARCHES=3`. Tokenized prefix-search + paginated reads + section-suffixed citations. Recursion-limit surfaces partial answer. Used by the Chat page in "Deep" mode. | Done |
 | `src/template_loader.py` | Reads `templates/insert.md` → ordered list of user-fillable metadata fields | Done |
@@ -108,6 +116,11 @@ The mockup simplifies a few planned details — tracked here so future iteration
 | `MAX_INGEST_CHARS` | `40000` | Chunk size for ingest; documents exceeding this are split into sequential chunks |
 | `WIKI_DIR` | `data/wiki` | Wiki page storage path |
 | `RAW_DIR` | `data/raw` | Raw source file storage path |
+| `CHUNKS_DIR` | `data/chunks` | Chunk store path (one JSONL per source) |
+| `INDEX_DIR` | `data/index` | Lexical index + sidecars path |
+| `INGEST_EXTRACT` | `1` | Run `extractor` during ingest (aliases/acronyms/terms/facts). Set `0` to disable. |
+| `INGEST_QA` | `1` | Run `qa_gen` during ingest (hypothetical questions). Set `0` to disable. |
+| `QA_BATCH_SIZE` | `12` | Number of chunks per `qa_gen` LLM batch. |
 | `RESEARCH_MIN_SEARCHES` | `6` | Deep researcher: minimum web searches before submitting. |
 | `RESEARCH_MIN_WORDS` | `600` | Deep researcher: minimum final-report word count. |
 | `RESEARCH_MIN_URLS` | `4` | Deep researcher: minimum unique sources cited (URLs + `[Wiki: ...]` citations). |
@@ -153,3 +166,4 @@ uv run streamlit run src/app.py --server.port 8520
 | 2026-05-15 | Deep chat recall fix. `raw_search` rewritten as tokenized prefix-match (first 6 chars per token), returning up to 3 excerpts per file ranked by token-hit count — fixes zero-recall on German morphology / multi-word queries. `raw_read` now paginated via `offset` parameter (cap raised 4K→8K with `[truncated; pass offset=N to continue]` footer). `_RAW_CITE_RE` accepts optional `§...`/`#...` section suffix so distinct sections of the same long file count as distinct sources for the `CHAT_MIN_SOURCES=2` gate. Prompts (`CHAT_AGENT_SYSTEM`, `RAW_SEARCH_DESCRIPTION`, `RAW_READ_DESCRIPTION`) updated with single-stem search strategy + pagination guidance. `CHAT_MAX_ITERATIONS` 20→25. `chat_agent.run_chat_agent` now surfaces a partial answer instead of bare error on recursion-limit. `_raw_source_button` in app.py strips `§`/`#` section suffix for raw-file lookup. |
 | 2026-05-15 | Deep chat mode. Chat page now has Fast/Deep toggle. Fast is the existing one-shot RAG over wiki pages. Deep is a new LangGraph agent (`src/chat_agent.py`) that searches/reads originals in `data/raw/` via new tools `raw_search` / `raw_read` and submits via `submit_chat_answer` (halved gates: 300 words / 2 sources / 20 iter / 3 searches). No Tavily, no web fetch. Manual "Save to wiki" → `insights/` flow unchanged. New env vars `CHAT_*`. New prompt constant `CHAT_AGENT_SYSTEM`. |
 | 2026-05-11 | Wiki-first deep researcher. New tools `wiki_search` / `wiki_read` in `tools.py`; `RESEARCHER_INSTRUCTIONS` rewritten to wiki-first workflow with structured Have/Gaps/Next triage and tangent-parking. `agent.py` auto-injects `data/wiki/index.md` into every system prompt. `submit_final_answer` now counts `[Wiki: filename.md]` citations alongside URLs toward `RESEARCH_MIN_URLS` gate. `query_with_sources()` returns `raw_sources` (original filenames from page frontmatter); Chat page shows both wiki and raw sources in a "Sources" expander. New prompts constants: `WIKI_SEARCH_DESCRIPTION`, `WIKI_READ_DESCRIPTION`. Tests updated/added for new tools and source-counting. |
+| 2026-05-15 | **Retrieval optimisation, Tiers 1.1–1.4.** New modules: `src/chunker.py` (structural chunker with stable `chunk_id`), `src/lex_index.py` (BM25 over chunks with 4-variant token normalisation + trigram fuzzy fallback + alias/acronym query expansion + numeric-fact direct-answer shortcut), `src/extractor.py` (ingest-time aliases/acronyms/terms/facts via one LLM call per source, idempotent merge), `src/qa_gen.py` (batched hypothetical-question generator, folded into BM25 postings without inflating doc length). `wiki_engine.ingest()` now drives the retrieval layer before the LLM page-synthesis pass; new `rebuild_lex_index()` helper. `tools._raw_search_one` replaced by `lex_index.query()` + `facts_lookup()` (dead helpers removed). New prompts `EXTRACT_TERMS_PROMPT`, `GENERATE_QUESTIONS_PROMPT`. New env vars `CHUNKS_DIR`, `INDEX_DIR`, `INGEST_EXTRACT`, `INGEST_QA`, `QA_BATCH_SIZE`. `tests/conftest.py` `wiki_dir` fixture extended to isolate retrieval-layer paths and disable the new ingest-time LLM passes. 30 new tests; suite at 135 passing. |

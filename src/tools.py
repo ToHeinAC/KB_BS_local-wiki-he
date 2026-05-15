@@ -15,6 +15,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 
+import lex_index
 import wiki_engine
 from prompts import (
     FETCH_WEBPAGE_DESCRIPTION,
@@ -39,9 +40,6 @@ CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "300"))
 CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 CONTENT_TRUNCATE = 2000
 RAW_READ_CAP = 8000  # chars per raw_read call (per file, per offset window)
-RAW_TOKEN_MIN = 3
-RAW_TOKEN_PREFIX = 6  # match first N chars of each token for German morphology tolerance
-RAW_MAX_EXCERPTS_PER_FILE = 3
 
 _URL_RE = re.compile(r"https?://[^\s\)\]]+")
 _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([\w\-./]+\.md)\s*\]")
@@ -50,7 +48,6 @@ _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([\w\-./]+\.md)\s*\]")
 _RAW_CITE_RE = re.compile(
     r"\[Source:\s*([^\]\n]+?\.(?:md|txt|html)(?:\s*[§#][^\]\n]+?)?)\s*\]"
 )
-_RAW_TEXT_EXTS = {".md", ".txt", ".html"}
 
 
 def _slug(text: str) -> str:
@@ -173,82 +170,32 @@ def _wiki_read_impl(filenames) -> str:
     return "\n\n".join(outs)
 
 
-def _raw_files() -> list[Path]:
-    if not RAW_DIR.exists():
-        return []
-    return [p for p in sorted(RAW_DIR.iterdir())
-            if p.is_file() and p.suffix.lower() in _RAW_TEXT_EXTS]
-
-
-def _tokenize_query(query: str) -> list[str]:
-    raw = re.split(r"\s+", (query or "").strip().lower())
-    seen: list[str] = []
-    for tok in raw:
-        tok = tok.strip("\"'.,;:!?()[]{}<>")
-        if len(tok) < RAW_TOKEN_MIN:
-            continue
-        stem = tok[:RAW_TOKEN_PREFIX]
-        if stem not in seen:
-            seen.append(stem)
-    return seen
-
-
-def _window_excerpt(body: str, idx: int, before: int = 80, after: int = 120) -> str:
-    start = max(0, idx - before)
-    end = min(len(body), idx + after)
-    s = body[start:end].replace("\n", " ").strip()
-    if start > 0:
-        s = "…" + s
-    if end < len(body):
-        s = s + "…"
-    return s
-
-
 def _raw_search_one(query: str, max_results: int) -> str:
     parts = [f"## Raw query: {query}"]
-    stems = _tokenize_query(query)
-    if not stems:
-        parts.append("(empty or too-short query)")
-        return "\n".join(parts)
-
-    scored: list[tuple[int, str, list[str]]] = []  # (score, filename, excerpts)
-    for path in _raw_files():
-        try:
-            body = path.read_text(errors="replace")
-        except Exception:
-            continue
-        body_lower = body.lower()
-        excerpts: list[str] = []
-        score = 0
-        for stem in stems:
-            idx = body_lower.find(stem)
-            if idx == -1:
-                continue
-            score += 1
-            if len(excerpts) < RAW_MAX_EXCERPTS_PER_FILE:
-                excerpts.append(_window_excerpt(body, idx))
-        if score == 0 and not any(s in path.name.lower() for s in stems):
-            continue
-        if score == 0:  # filename-only match — still useful to surface
-            excerpts.append(_window_excerpt(body, 0, before=0, after=160))
-            score = 1
-        scored.append((score, path.name, excerpts))
-
-    if not scored:
-        parts.append("(no results — try a single stem keyword, e.g. 'Rückstand', 'Freigabe')")
-        return "\n".join(parts)
-
-    scored.sort(key=lambda t: (-t[0], t[1]))
-    out_idx = 1
-    for score, fname, excerpts in scored[:max_results]:
-        for ex in excerpts:
+    facts = lex_index.facts_lookup(query)
+    if facts:
+        parts.append("### Direct facts")
+        for i, f in enumerate(facts, 1):
             parts.append(
-                f"[Raw hit {out_idx}]\n"
-                f"file: {fname}\n"
-                f"score: {score} / {len(stems)} stems\n"
-                f"excerpt: {ex}\n---"
+                f"[Fact {i}] {f.get('subject', '')} {f.get('kind', '')} = "
+                f"{f.get('value', '')} {f.get('unit', '')} "
+                f"(source: {f.get('source', '')} {f.get('anchor', '')})"
             )
-            out_idx += 1
+    hits = lex_index.query(query, top_k=max_results)
+    if not hits:
+        if not facts:
+            parts.append("(no results — try a different keyword or a question phrasing)")
+        return "\n".join(parts)
+    for i, h in enumerate(hits, 1):
+        anchor = h.get("anchor") or ""
+        cite_suffix = f" {anchor}" if anchor else ""
+        parts.append(
+            f"[Raw hit {i}]\n"
+            f"file: {h['source']}{cite_suffix}\n"
+            f"chunk_id: {h['chunk_id']}\n"
+            f"score: {h['score']}  matched: {', '.join(h['matched_terms'])}\n"
+            f"excerpt: {h['preview']}\n---"
+        )
     return "\n".join(parts)
 
 
