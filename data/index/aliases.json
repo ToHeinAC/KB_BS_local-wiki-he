@@ -1,0 +1,31 @@
+[
+  {
+    "canonical": "Automotive semiconductors",
+    "variants": [
+      "auto semis",
+      "automotive semiconductors"
+    ]
+  },
+  {
+    "canonical": "Infineon Technologies AG",
+    "variants": [
+      "IFNNY",
+      "IFX",
+      "Infineon"
+    ]
+  },
+  {
+    "canonical": "Power semiconductors",
+    "variants": [
+      "power devices",
+      "power semis"
+    ]
+  },
+  {
+    "canonical": "Strahlenschutzgesetz",
+    "variants": [
+      "Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung",
+      "StrlSchG"
+    ]
+  }
+]

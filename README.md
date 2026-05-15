@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** All pages implemented — ingest with chunked large-document support (progress bar, paragraph-boundary splits) plus a structural chunk store + BM25 lexical index + ingest-time entity/acronym/fact extraction + hypothetical-question chunks under `data/chunks/` and `data/index/` → wiki (tree-by-type + full-text search + interactive graph) → chat (Fast: one-shot RAG over wiki pages; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25 + direct-fact lookup) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report). 135-test suite.
+> **Status:** All pages implemented — three-stage ingest (`ingest_begin` / `ingest_piece` / `ingest_end`) drives a structural chunk store + BM25 lexical index + ingest-time entity/acronym/fact extraction + capped hypothetical-question chunks under `data/chunks/` and `data/index/` → wiki (tree-by-type + full-text search + interactive graph) → chat (Fast: one-shot RAG over wiki pages; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25 + direct-fact lookup) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report). Long-source ingest (e.g. 488 KB legal docs): ~7 min. 140-test suite.
 
 ## Documentation
 
@@ -52,6 +52,7 @@ Edit `.env` (copied from `.env.example`):
 | `INGEST_EXTRACT` | `1` | Run alias/acronym/fact extractor during ingest (`0` to disable) |
 | `INGEST_QA` | `1` | Run hypothetical-question generator during ingest (`0` to disable) |
 | `QA_BATCH_SIZE` | `12` | Chunks per QA-generator LLM batch |
+| `QA_MAX_PAIRS_PER_SOURCE` | `5` | Max hypothetical-question pairs persisted per source (caps `qa_gen` cost) |
 | `TAVILY_API_KEY` | — | Required for the Research page (web search) |
 | `RESEARCH_MIN_SEARCHES` | `6` | Min web searches before a report can be submitted |
 | `RESEARCH_MIN_WORDS` | `600` | Min final-report word count |

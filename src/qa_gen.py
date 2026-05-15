@@ -32,6 +32,10 @@ QA_PATH = INDEX_DIR / "qa.jsonl"
 # context, comfortable for any local model.
 BATCH_SIZE = int(os.getenv("QA_BATCH_SIZE", "12"))
 CHUNK_PREVIEW_CHARS = 600
+# Total cap on hypothetical-question pairs persisted per source. Keeping this
+# small is the dominant ingest-speed lever for long documents: at the source
+# level only the top-N retrieval-valuable chunks get questions generated.
+MAX_PAIRS_PER_SOURCE = int(os.getenv("QA_MAX_PAIRS_PER_SOURCE", "5"))
 
 
 def _chunks_block(batch: list[dict]) -> str:
@@ -87,15 +91,65 @@ def _run_batch(batch: list[dict]) -> list[tuple[str, str]]:
     return out
 
 
+def _select_target_chunks(chunks: list[dict], k: int) -> list[dict]:
+    """Pick the top-k retrieval-valuable chunks (heading-anchored, dense).
+
+    Heuristic (no LLM): prefer chunks whose anchor or heading_path names a
+    semantic section (`§ N` or any markdown heading), then rank by unique-token
+    count after stopword/variant normalisation (proxy for information density).
+    Tie-break by chunk length, then by char_start for stable ordering.
+    """
+    if k <= 0 or not chunks:
+        return []
+    import lex_index
+
+    def density(ch: dict) -> int:
+        seen: set[str] = set()
+        for tok in lex_index.tokenize(ch.get("text") or ""):
+            for v in lex_index.variants(tok):
+                seen.add(v)
+        return len(seen)
+
+    def is_anchored(ch: dict) -> int:
+        anchor = (ch.get("anchor") or "").strip()
+        if anchor.startswith("§") or anchor.startswith("#"):
+            return 1
+        if anchor and not anchor.lower().startswith(("preamble", "präambel", "part ")):
+            return 1
+        if ch.get("heading_path"):
+            return 1
+        return 0
+
+    scored = [
+        (
+            -is_anchored(ch),       # anchored first
+            -density(ch),           # then densest
+            -len(ch.get("text") or ""),  # then longest
+            ch.get("char_start", 0),     # stable
+            i,                            # break remaining ties by input order
+        )
+        for i, ch in enumerate(chunks)
+    ]
+    scored.sort()
+    return [chunks[t[-1]] for t in scored[:k]]
+
+
 def generate(chunks: list[dict]) -> list[tuple[str, str]]:
-    """Return (chunk_id, question) pairs across all chunks. Empty on failure."""
+    """Return up to `MAX_PAIRS_PER_SOURCE` (chunk_id, question) pairs.
+
+    Picks the top-k highest-value chunks and runs a single LLM batch against
+    them. Empty list on failure.
+    """
     if not chunks:
         return []
+    targets = _select_target_chunks(chunks, MAX_PAIRS_PER_SOURCE)
+    if not targets:
+        return []
     results: list[tuple[str, str]] = []
-    for i in range(0, len(chunks), BATCH_SIZE):
-        batch = chunks[i : i + BATCH_SIZE]
+    for i in range(0, len(targets), BATCH_SIZE):
+        batch = targets[i : i + BATCH_SIZE]
         results.extend(_run_batch(batch))
-    return results
+    return results[:MAX_PAIRS_PER_SOURCE]
 
 
 def persist(items: list[tuple[str, str]], source: str) -> None:

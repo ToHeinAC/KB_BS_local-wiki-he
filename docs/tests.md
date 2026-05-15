@@ -11,7 +11,7 @@ author: Tobias Hein
 
 ## Cap (relaxed)
 
-**Originally 100 tests, current: 135.** The original cap was relaxed in 2026-05 when the retrieval layer (chunker, lex_index, extractor, qa_gen) added 30 high-signal unit + end-to-end tests. The relaxation principle: the cap exists to discourage low-value proliferation; whole new modules with verifiable behaviour are exempt.
+**Originally 100 tests, current: 140.** The original cap was relaxed in 2026-05 when the retrieval layer (chunker, lex_index, extractor, qa_gen) added 30 high-signal unit + end-to-end tests; Tier A ingest speedup added 5 more (qa_gen cap, anchored-preference selection, begin/piece/end roundtrip, single-select assertion, back-compat wrapper). The relaxation principle: the cap exists to discourage low-value proliferation; whole new modules with verifiable behaviour are exempt.
 
 ## Allocation
 

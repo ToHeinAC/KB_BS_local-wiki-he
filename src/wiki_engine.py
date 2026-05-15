@@ -157,17 +157,13 @@ def _ensure_frontmatter(content: str, fname: str) -> str:
     return fm + content.lstrip()
 
 
-def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
-    """Run LLM ingest pipeline. Returns {created, updated, contradictions}.
+def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None) -> dict:
+    """Source-scoped ingest setup. Runs the once-per-source LLM/index work.
 
-    Two-pass for true incremental compilation: a lightweight LLM call selects
-    pages affected by the new source, their full bodies are loaded, and
-    injected into the main ingest prompt so the LLM merges rather than
-    rewrites blindly.
-
-    `user_meta` is an optional dict of user-supplied fields (from
-    templates/insert.md). Non-blank values are injected as authoritative
-    metadata and copied into the source-summary frontmatter.
+    Builds the chunk store, runs extractor + qa_gen on the whole document, and
+    selects affected wiki pages — exactly once per uploaded source — then
+    returns a `ctx` dict the per-piece synthesis and the final wrap-up consume.
+    `lex_index.build()` is deferred to `ingest_end`.
     """
     system = schema_loader.get_system_prompt()
     index_text = _INDEX.read_text() if _INDEX.exists() else ""
@@ -187,15 +183,14 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
         meta_block = ""
         example_extra = ""
 
-    # Build the lexical ground-truth layer BEFORE the LLM pass: chunks are the
-    # citation truth, and a fresh BM25 index lets later queries find this source
-    # even if the LLM page-synthesis loses detail.
-    chunks = chunker.split(text)
+    # Build the lexical ground-truth layer once on the whole document so § / ##
+    # boundaries are honoured across former 40 KB cuts.
+    chunks = chunker.split(full_text)
     if chunks:
         chunker.write_chunks(source_name, chunks)
         if os.getenv("INGEST_EXTRACT", "1") == "1":
             try:
-                extracted = extractor.extract(source_name, text, chunks)
+                extracted = extractor.extract(source_name, full_text, chunks)
                 extractor.persist(source_name, extracted)
             except Exception:
                 pass  # extraction is best-effort; never fail ingest on it
@@ -205,68 +200,99 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
                 qa_gen.persist(qa_items, source_name)
             except Exception:
                 pass  # qa-gen is best-effort; never fail ingest on it
-        # Rebuild index AFTER sidecars so question tokens fold into the postings.
-        lex_index.build()
 
-    affected = _select_affected_pages(system, source_name, index_text, text)
+    affected = _select_affected_pages(system, source_name, index_text, full_text)
     existing_block = _build_existing_block(affected)
 
+    return {
+        "system": system,
+        "source_name": source_name,
+        "index_text": index_text,
+        "meta_block": meta_block,
+        "example_extra": example_extra,
+        "affected": affected,
+        "existing_block": existing_block,
+        "chunks": chunks,
+        "created": [],
+        "updated": [],
+        "contradictions": [],
+    }
+
+
+def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> None:
+    """Run the LLM wiki-synthesis for one 40 KB piece. Mutates `ctx` in place."""
+    piece_source = ctx["source_name"] if total == 1 else f"{ctx['source_name']} [Teil {index + 1}/{total}]"
     prompt = INGEST_PROMPT.format(
-        source_name=source_name,
-        meta_block=meta_block,
-        index_text=index_text,
-        existing_block=existing_block,
-        text=text,
-        summary_slug=_title_to_filename(source_name).replace(".md", ""),
-        example_extra=example_extra,
+        source_name=piece_source,
+        meta_block=ctx["meta_block"],
+        index_text=ctx["index_text"],
+        existing_block=ctx["existing_block"],
+        text=piece_text,
+        summary_slug=_title_to_filename(piece_source).replace(".md", ""),
+        example_extra=ctx["example_extra"],
         date=_date(),
     )
 
-    response = ollama_client.generate(system, prompt, temperature=0.3)
+    response = ollama_client.generate(ctx["system"], prompt, temperature=0.3)
     pages = _parse_llm_pages(response)
 
-    # Single retry with a stricter reformatting prompt if parsing failed.
     if not pages:
         retry_prompt = (
             "Your previous response did not contain any `=== filename.md === ... === END ===` blocks. "
             "Reformat your output now using EXACTLY that delimiter. Same content, correct format.\n\n"
             f"Original task was:\n{prompt}"
         )
-        response = ollama_client.generate(system, retry_prompt, temperature=0.2)
+        response = ollama_client.generate(ctx["system"], retry_prompt, temperature=0.2)
         pages = _parse_llm_pages(response)
-
-    created, updated, contradictions = [], [], []
 
     for page in pages:
         dest = WIKI_DIR / page["filename"]
         content = _ensure_frontmatter(page["content"], page["filename"])
         if dest.exists():
-            updated.append(page["filename"])
+            if page["filename"] not in ctx["updated"] and page["filename"] not in ctx["created"]:
+                ctx["updated"].append(page["filename"])
         else:
-            created.append(page["filename"])
+            if page["filename"] not in ctx["created"]:
+                ctx["created"].append(page["filename"])
         dest.write_text(content)
 
     for line in response.splitlines():
         if line.startswith("UPDATE:"):
             fname = line.split(":", 1)[1].strip()
-            if fname and fname not in updated:
-                updated.append(fname)
+            if fname and fname not in ctx["updated"] and fname not in ctx["created"]:
+                ctx["updated"].append(fname)
         elif line.startswith("CONTRADICTION:"):
-            contradictions.append(line.split(":", 1)[1].strip())
+            ctx["contradictions"].append(line.split(":", 1)[1].strip())
 
+
+def ingest_end(ctx: dict) -> dict:
+    """Finalise: single lex_index rebuild, index page rebuild, log entry."""
+    if ctx["chunks"]:
+        lex_index.build()
     _rebuild_index()
     _append_log(
-        f"Ingest: {source_name}",
-        f"Affected: {affected}\nCreated: {created}\nUpdated: {updated}\nContradictions: {contradictions}",
+        f"Ingest: {ctx['source_name']}",
+        f"Affected: {ctx['affected']}\nCreated: {ctx['created']}\n"
+        f"Updated: {ctx['updated']}\nContradictions: {ctx['contradictions']}",
     )
-
     return {
-        "created": created,
-        "updated": updated,
-        "contradictions": contradictions,
-        "affected": affected,
-        "chunks": len(chunks),
+        "created": ctx["created"],
+        "updated": ctx["updated"],
+        "contradictions": ctx["contradictions"],
+        "affected": ctx["affected"],
+        "chunks": len(ctx["chunks"]),
     }
+
+
+def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
+    """Back-compat single-call ingest. New callers should use begin/piece/end.
+
+    Internally: begin + one piece + end. Identical end-state to the previous
+    monolithic implementation, just routed through the three new helpers.
+    """
+    ctx = ingest_begin(text, source_name, user_meta)
+    ingest_piece(ctx, text, 0, 1)
+    return ingest_end(ctx)
 
 
 def rebuild_lex_index() -> dict:

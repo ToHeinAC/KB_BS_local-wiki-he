@@ -370,6 +370,48 @@ def test_resolve_contradiction_rewrites_pages(wiki_dir, monkeypatch):
     assert "NEW_A_RESOLVED" in (wiki_dir / "a.md").read_text()
 
 
+# --- Tier A: begin / piece / end split ---
+
+def test_ingest_begin_piece_end_creates_pages(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    ctx = wiki_engine.ingest_begin("source body", "src.txt")
+    wiki_engine.ingest_piece(ctx, "source body", 0, 1)
+    result = wiki_engine.ingest_end(ctx)
+    assert "summary-mysrc.md" in result["created"]
+    assert "concept-alpha.md" in result["created"]
+    assert (wiki_dir / "summary-mysrc.md").exists()
+
+
+def test_ingest_begin_runs_select_affected_once_across_many_pieces(wiki_dir, monkeypatch):
+    """The select-affected LLM call must NOT run per piece."""
+    (wiki_dir / "alpha.md").write_text("EXISTING_ALPHA_BODY")
+    (wiki_dir / "index.md").write_text("# Wiki Index\n- [Alpha](alpha.md) — existing\n")
+    mock = MagicMock()
+    mock.generate.side_effect = [
+        {"response": "alpha.md\n"},        # SELECT_AFFECTED (once)
+        {"response": _INGEST_RESPONSE},    # piece 1
+        {"response": _INGEST_RESPONSE},    # piece 2
+        {"response": _INGEST_RESPONSE},    # piece 3
+    ]
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    ctx = wiki_engine.ingest_begin("full text", "src.txt")
+    for i in range(3):
+        wiki_engine.ingest_piece(ctx, "piece text", i, 3)
+    wiki_engine.ingest_end(ctx)
+    # 1 select + 3 synthesis = 4 LLM calls total (no per-piece extra select).
+    assert mock.generate.call_count == 4
+
+
+def test_ingest_back_compat_wrapper_still_works(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    result = wiki_engine.ingest("text", "mysrc.txt")
+    assert "summary-mysrc.md" in result["created"]
+
+
 def test_stats_excludes_manifest_from_raw_count(wiki_dir, monkeypatch):
     raw = wiki_dir.parent / "raw"
     monkeypatch.setattr(wiki_engine, "RAW_DIR", raw)

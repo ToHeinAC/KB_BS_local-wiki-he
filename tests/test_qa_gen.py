@@ -81,6 +81,44 @@ def test_batching_chunks_runs_multiple_calls(isolated, monkeypatch):
     assert len(out) == 5
 
 
+def test_generate_caps_pairs_per_source(isolated, monkeypatch):
+    """Tier A: qa_gen must emit at most MAX_PAIRS_PER_SOURCE pairs per source."""
+    monkeypatch.setattr(qa_gen, "MAX_PAIRS_PER_SOURCE", 3)
+    monkeypatch.setattr(qa_gen, "BATCH_SIZE", 12)
+    chunks = [
+        {"chunk_id": f"c{i}", "anchor": f"§ {i}", "heading_path": [f"§ {i}"],
+         "text": f"Some German technical paragraph number {i} with various tokens.",
+         "char_start": i * 100}
+        for i in range(10)
+    ]
+    # LLM returns 2 questions per chunk seen → would be 20 if uncapped.
+    def stub(system, prompt, temperature=0.2):
+        ids = [ln.split("--- chunk_id: ")[1].split(" ")[0]
+               for ln in prompt.splitlines() if ln.startswith("--- chunk_id: ")]
+        return json.dumps([{"chunk_id": cid, "questions": [f"Q1 {cid}?", f"Q2 {cid}?"]}
+                           for cid in ids])
+    with patch.object(qa_gen.ollama_client, "generate", side_effect=stub):
+        out = qa_gen.generate(chunks)
+    assert len(out) == 3
+    # Only the selected (anchored) chunks may appear.
+    seen_ids = {cid for cid, _ in out}
+    assert seen_ids.issubset({ch["chunk_id"] for ch in chunks})
+
+
+def test_select_target_chunks_prefers_anchored(isolated):
+    """Anchored chunks must outrank a denser-but-unanchored chunk."""
+    dense_unanchored = {
+        "chunk_id": "dense", "anchor": "", "heading_path": [],
+        "text": " ".join(f"word{i}" for i in range(200)), "char_start": 0,
+    }
+    anchored = {
+        "chunk_id": "anc", "anchor": "§ 5", "heading_path": ["§ 5"],
+        "text": "kurz", "char_start": 10,
+    }
+    out = qa_gen._select_target_chunks([dense_unanchored, anchored], k=1)
+    assert out[0]["chunk_id"] == "anc"
+
+
 def test_questions_lift_chunk_rank(isolated):
     body = """\
 ## § 1 Anwendungsbereich

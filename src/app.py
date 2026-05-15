@@ -227,21 +227,19 @@ if page == "Upload":
                 chunks = file_processor.chunk_text(text)
                 n = len(chunks)
                 try:
-                    agg: dict = {"created": [], "updated": [], "contradictions": [], "affected": []}
                     if n > 1:
                         st.info(f"Dokument aufgeteilt in {n} Teile — jeder Teil wird separat verarbeitet.")
                         progress = st.progress(0)
+                    with st.spinner("Indexing document (chunker, lexical index, sidecars)…"):
+                        ctx = wiki_engine.ingest_begin(text, uploaded.name, user_meta or None)
                     for i, chunk in enumerate(chunks):
-                        chunk_name = uploaded.name if n == 1 else f"{uploaded.name} [Teil {i + 1}/{n}]"
-                        meta = user_meta or None if i == 0 else None
                         label = "Running LLM ingest (this may take a minute)…" if n == 1 else f"Teil {i + 1}/{n} wird verarbeitet…"
                         with st.spinner(label):
-                            r = wiki_engine.ingest(chunk, chunk_name, meta)
-                        for k in agg:
-                            agg[k].extend(x for x in r[k] if x not in agg[k])
+                            wiki_engine.ingest_piece(ctx, chunk, i, n)
                         if n > 1:
                             progress.progress((i + 1) / n)
-                    result = agg
+                    with st.spinner("Finalising index…"):
+                        result = wiki_engine.ingest_end(ctx)
                     st.success("Ingest complete.")
                     col1, col2, col3 = st.columns(3)
                     col1.metric("Created", len(result["created"]))

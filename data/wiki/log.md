@@ -7,23 +7,17 @@ created: "2026-05-15"
 updated: "2026-05-15"
 confidence: high
 ---
-
+# Activity Log
 ## 2026-05-15 — Ingestion
-Ingested new source document `StrlSchG.md [Teil 12/13]`. Created `summary-strlschg-md-teil-12-13.md` and updated several existing concept pages (`roentgen-raechnereinrichtung.md`, `radioaktive-stoff-befoerderung.md`, `medizinische-forschung-anwendung.md`, `radioaktive-stoffe.md`, `notfall-expositionssituation.md`) to incorporate transitional provisions and new regulatory details from the source. Updated `index.md` to reflect the new summary page.
-## 2026-05-15 15:06 — Ingest: StrlSchG.md [Teil 12/13]
-Affected: ['roentgen-raechnereinrichtung.md', 'radioaktive-stoff-befoerderung.md', 'medizinische-forschung-anwendung.md', 'radioaktive-stoffe.md', 'geplant-expositionssituation.md']
-Created: ['summary-strlschg-md-teil-12-13.md']
-Updated: ['roentgen-raechnereinrichtung.md', 'radioaktive-stoff-befoerderung.md', 'medizinische-forschung-anwendung.md', 'radioaktive-stoffe.md', 'notfall-expositionssituation.md', 'index.md', 'log.md', 'summary-strlschg-md-teil-12-13.md']
-Contradictions: ['No explicit contradictions were found between the new source material and the existing page content; the new content primarily serves to update or expand upon existing regulatory details, especially regarding transitional provisions.']
-
-## 2026-05-15 15:07 — Ingest: StrlSchG.md [Teil 13/13]
-Affected: ['notfall-expositionssituation.md', 'summary-strlschg-md-teil-8-13.md', 'geplant-expositionssituation.md']
-Created: ['summary-strlschg-md-teil-13-13.md']
-Updated: ['notfall-expositionssituation.md', 'berufliche-exposition.md', 'index.md']
+Ingested source document `StrlSchG.md [Teil 11/13]`. Created a source-summary page and established concept/entity pages for the core legal concepts and authorities mentioned in the text. Updated the Wiki Index.
+## 2026-05-15 20:06 — Ingest: StrlSchG.md
+Affected: []
+Created: ['summary-strlschg-md-teil-1-13.md', 'strahlenschutzgesetz-strlschg.md', 'exposition-concept.md', 'geplante-expositionssituation.md', 'notfall-expositionssituation.md', 'bestehende-expositionssituation.md', 'radioactive-substances.md', 'taetigkeit-concept.md', 'summary-strlschg-md-teil-2-13.md', 'summary-strlschg-md-teil-3-13.md', 'summary-strlschg-md-teil-4-13.md', 'summary-strlschg-md-teil-5-13.md', 'summary-strlschg-md-teil-6-13.md', 'summary-strlschg-md-teil-7-13.md', 'summary-strlschg-md-teil-8-13.md', 'summary-strlschg-md-teil-9-13.md', 'summary-strlschg-md-teil-10-13.md', 'summary-strlschg-md-teil-11-13.md', 'bundesamt-fuer-strahlenschutz.md', 'luftfahrt-bundesamt.md', 'physikalisch-technische-bundesanstalt.md', 'summary-strlschg-md-teil-12-13.md', 'strahlenschutzgesetz.md', 'bauartzulassung.md', 'radioaktive-altlasten.md', 'summary-strlschg-md-teil-13-13.md', 'notfall-plan.md', 'radioaktivitaet.md', 'informationsaustausch-notfall.md']
+Updated: ['index.md', 'log.md', 'strahlenschutzverantwortlicher.md', 'strahlenschutzbeauftragter.md', 'ueberwachungsbeduerftige-rueckstaende.md', 'koerpdosis.md', 'radiation-source-management.md', 'emergency-response-planning.md', 'radiation-safety-standards.md', 'incident-management-and-reporting.md', 'public-information-and-preparedness.md', 'radiological-situation-picture.md', 'dose-assessment.md', 'emergency-response-personnel.md', 'post-incident-exposure-situation.md', 'radon-protection.md']
 Contradictions: []
 
-## 2026-05-15 15:10 — Ingest: Infineon Investment Idea.md
+## 2026-05-15 20:11 — Ingest: Infineon Investment Idea.md
 Affected: []
-Created: ['summary-infineon-investment-idea.md', 'infineon-technologies-ag.md', 'automotive-semiconductors.md', 'power-semiconductors.md']
-Updated: ['summary-infineon-investment-idea.md']
+Created: ['summary-infineon-investment-idea-md.md']
+Updated: ['index.md']
 Contradictions: []

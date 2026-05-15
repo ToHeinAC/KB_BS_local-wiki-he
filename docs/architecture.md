@@ -76,10 +76,10 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 - **`src/chunker.py`** structural chunker. `split(text)` returns a list of `{chunk_id, anchor, heading_path, char_start, char_end, text, lang}` dicts using one of three strategies: legal `§` headers, markdown `##`/`###`, or paragraph windows with overlap. `chunk_id = sha256(normalized)[:16]` is content-addressable so re-ingest is idempotent and diffable. `write_chunks()`/`load_chunks()`/`all_chunks()` persist to `data/chunks/<source-slug>.jsonl`.
 - **`src/lex_index.py`** BM25 lexical index over chunks. `build(chunks=None)` writes `postings.json`, `stats.json`, `trigrams.json`. `query(q, top_k)` ranks chunks via BM25 (k1=1.5, b=0.75). Each surface word is stored under up to four normalized variants — surface lower-cased, NFKD-strip (ü→u), umlaut digraph (ü→ue, ß→ss), and a light German+English suffix stem — so queries match regardless of writing style. Trigram fallback (Jaccard ≥ 0.6) rescues typos. `query()` calls `_expand_query()` first to fold in aliases/acronyms from `extractor`. `facts_lookup(q)` returns matching numeric facts directly. No external NLP deps; built-in stopword list per language.
 - **`src/extractor.py`** ingest-time structured-data extractor. One Ollama call per source (digest for sources >30 KB) emits strict JSON `{aliases, acronyms, terms, facts}`. `persist()` merges idempotently into `data/index/aliases.json` / `acronyms.json` / `terms.json` and appends to `data/index/facts.jsonl`. Failures swallowed — extraction is best-effort.
-- **`src/qa_gen.py`** ingest-time hypothetical-question generator (HyDE, lexical-only). Batches chunks (default 12/call) and asks the LLM for 2–4 short questions per chunk. Persists `(chunk_id, question)` rows to `data/index/qa.jsonl`. `lex_index.build()` folds question tokens into the parent chunk's term frequencies (but not its doc length, so BM25 b-normalization stays honest).
+- **`src/qa_gen.py`** ingest-time hypothetical-question generator (HyDE, lexical-only). `_select_target_chunks` ranks chunks (anchored > densest > longest > stable) and keeps the top `QA_MAX_PAIRS_PER_SOURCE` (default 5). One batched LLM call asks for 2–4 short questions per kept chunk; the output is sliced to the per-source cap. Persists `(chunk_id, question)` rows to `data/index/qa.jsonl`. `lex_index.build()` folds question tokens into the parent chunk's term frequencies (but not its doc length, so BM25 b-normalization stays honest).
 - **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate()`, `chat()`, `is_available()`.
 - **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md`. Returns the full content as a system prompt string via `get_system_prompt()`.
-- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, `ingest()`, `query()`, `lint()`, `list_pages()`, `read_page()`, `read_page_parsed()`, `stats()`, `search_wiki()`, `get_wiki_tree()`, `rebuild_lex_index()`. `read_page_parsed()` strips YAML frontmatter and returns `{content, sources, related}` for clean UI rendering. `ingest()` also drives the retrieval layer (chunker → extractor → qa_gen → lex_index.build) before the LLM page-synthesis pass.
+- **`src/wiki_engine.py`** is the *only* writer to `data/wiki/`. Owns `init_wiki()`, three-stage `ingest_begin` / `ingest_piece` / `ingest_end` (back-compat single-call `ingest()` still exists), `query()`, `lint()`, `list_pages()`, `read_page()`, `read_page_parsed()`, `stats()`, `search_wiki()`, `get_wiki_tree()`, `rebuild_lex_index()`. `read_page_parsed()` strips YAML frontmatter and returns `{content, sources, related}` for clean UI rendering. The three-stage split keeps source-scoped work (chunker, extractor, qa_gen, select-affected) out of the per-piece loop, dropping long-source ingest from ~30 min to ~7 min.
 - **`src/template_loader.py`** reads `templates/insert.md` and returns the ordered list of user-fillable metadata field names via `load_insert_template()`.
 - **`src/tools.py`** — agent tools wired as `langchain_core.tools`. **Research tools** (`TOOLS`): `wiki_search`, `wiki_read`, `tavily_search`, `fetch_webpage_content`, `think_tool`, `submit_final_answer` (word/source gates → writes to `data/wiki/comparisons/`; counts `https://` URLs and `[Wiki: filename.md]` citations toward `RESEARCH_MIN_URLS`). **Chat tools** (`CHAT_TOOLS`): `raw_search` (BM25 over the chunk store via `lex_index.query()`; prepends a `### Direct facts` block from `lex_index.facts_lookup()` when a numeric fact matches; returns ranked hits with `chunk_id`, anchor, matched terms, score), `raw_read` (bulk read with `offset` parameter; 8000-char window per call with `[truncated; pass offset=N to continue]` footer; strips `§X`/`#section` section suffixes from filenames), `think_tool`, `submit_chat_answer` (word/source gates; returns to caller, no file written). `_RAW_CITE_RE` accepts an optional trailing ` §...` / ` #...` section marker so distinct sections of the same long file count as distinct sources for `CHAT_MIN_SOURCES`. Descriptions imported from `prompts.py`. Only `agent.py`, `chat_agent.py`, and `tools.py` may import LangChain-family packages.
 - **`src/agent.py`** — owns the deep-researcher LangGraph state machine (`ChatOllama.bind_tools(TOOLS)` agent node + `ToolNode`). `_load_wiki_index()` injects `data/wiki/index.md` into the system prompt so the agent knows which pages exist before any tool call. Public generator `run_research_agent(question, wiki_context)` yields `thought` / `tool_call` / `tool_result` / `final_answer` / `error` step dicts.
@@ -96,24 +96,22 @@ upload → dedup.is_duplicate()
        → file_processor.extract_text()        # returns FULL text (no truncation)
        → file_processor.chunk_text(text)      # [text] if ≤MAX_INGEST_CHARS, else N chunks
        → [Upload UI] optional metadata form driven by template_loader.load_insert_template()
-       → for each chunk:
-           wiki_engine.ingest(chunk, source_name, user_meta=None)
-             # Retrieval layer (always runs first; failures are best-effort)
-             → chunker.split(text) → chunker.write_chunks()
-             → extractor.extract() + persist()              # if INGEST_EXTRACT=1
-             → qa_gen.generate() + persist()                # if INGEST_QA=1
-             → lex_index.build()                            # rebuild postings/trigrams/stats
-             # LLM wiki-synthesis pass (existing behaviour)
-             → schema_loader.get_system_prompt()
-             → inject user_meta as authoritative block into prompt (chunk 1 only)
-             → _select_affected_pages() via SELECT_AFFECTED_PROMPT
-             → ollama_client.generate(system, prompt, temperature=0.3)
-             → parse "=== filename.md ===" blocks from LLM response
-             → write pages to data/wiki/
-             → _rebuild_index()
-             → _append_log()
+       → wiki_engine.ingest_begin(full_text, source_name, user_meta)   # ONCE per source
+           → schema_loader.get_system_prompt()
+           → chunker.split(full_text) → chunker.write_chunks()         # whole-document
+           → extractor.extract() + persist()                            # if INGEST_EXTRACT=1
+           → qa_gen.generate() + persist()                              # if INGEST_QA=1, ≤ QA_MAX_PAIRS_PER_SOURCE
+           → _select_affected_pages() via SELECT_AFFECTED_PROMPT
+           → return ctx (system, index_text, meta_block, affected, existing_block, chunks, …)
+       → for each piece in file_processor.chunk_text(full_text):       # per 40 KB cut
+           wiki_engine.ingest_piece(ctx, piece, i, n)
+             → ollama_client.generate(system, INGEST_PROMPT, temperature=0.3)
+             → parse "=== filename.md ===" blocks + UPDATE:/CONTRADICTION: lines
+             → write pages to data/wiki/; accumulate created/updated/contradictions in ctx
+       → wiki_engine.ingest_end(ctx)                                    # ONCE per source
+             → lex_index.build()                                        # single rebuild
+             → _rebuild_index() + _append_log()
              → return {created, updated, contradictions, affected, chunks}
-       → aggregate results across chunks → display
 ```
 
 LLM output format for ingest:
