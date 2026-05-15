@@ -32,7 +32,7 @@ st.markdown(
     @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@400;600&display=swap');
     html, body, [class*="css"] { font-family: 'Source Sans 3', sans-serif; }
     h1, h2, h3 { font-family: 'Libre Baskerville', Georgia, serif; font-weight: 700; }
-    .block-container { max-width: 900px; padding-top: 2rem; }
+    .block-container { padding-top: 2rem; }
     .stButton>button { border-radius: 2px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.8rem; }
     hr { border-top: 2px solid #234637; margin: 1.5rem 0; }
     </style>
@@ -61,6 +61,74 @@ def _raw_source_button(filename: str, key: str) -> None:
             _show_md_dialog(filename, data.decode("utf-8", errors="replace"))
     else:
         st.markdown(f"- `{filename}`")
+
+
+def _render_wiki_nav(key_prefix: str) -> str | None:
+    """Render wiki navigation tree in a narrow column. Returns clicked filename or None."""
+    search = st.text_input(
+        "Search pages", placeholder="Search…",
+        key=f"{key_prefix}_nav_search", label_visibility="collapsed",
+    ).strip()
+    selected: str | None = None
+    if search:
+        results = wiki_engine.search_wiki(search)
+        st.caption(f"{len(results)} result(s)")
+        for r in results:
+            if st.button(r["title"], key=f"{key_prefix}_hit_{r['filename']}", use_container_width=True):
+                st.session_state[f"{key_prefix}_selected_page"] = r["filename"]
+                selected = r["filename"]
+    else:
+        tree = wiki_engine.get_wiki_tree()
+        group_labels = {
+            "concept": "Concepts", "entity": "Entities",
+            "source-summary": "Source Summaries", "comparison": "Comparisons", "other": "Other",
+        }
+        for grp in ["concept", "entity", "source-summary", "comparison", "other"]:
+            group = tree.get(grp)
+            if not group:
+                continue
+            with st.expander(f"{group_labels[grp]} ({len(group)})", expanded=(grp == "concept")):
+                for p in group:
+                    title = p.get("title", p["filename"])
+                    if st.button(title, key=f"{key_prefix}_nav_{p['filename']}", use_container_width=True):
+                        st.session_state[f"{key_prefix}_selected_page"] = p["filename"]
+                        selected = p["filename"]
+    return selected
+
+
+def _render_chat_sources_panel() -> None:
+    messages = st.session_state.get("messages", [])
+    last = next((m for m in reversed(messages) if m["role"] == "assistant"), None)
+    if not last:
+        st.caption("Sources appear here after each answer.")
+        return
+    sources = last.get("sources", [])
+    raw_sources = last.get("raw_sources", [])
+    if not sources and not raw_sources:
+        st.caption("No sources for the last answer.")
+        return
+    if sources:
+        st.markdown("**Wiki pages**")
+        for s in sources:
+            if st.button(s, key=f"cpanel_wiki_{s}", use_container_width=True):
+                parsed = wiki_engine.read_page_parsed(s)
+                _show_md_dialog(s, parsed["content"])
+    if raw_sources:
+        st.markdown("**Documents**")
+        for r in raw_sources:
+            _raw_source_button(r, f"cpanel_raw_{r}")
+
+
+def _render_research_sources_panel() -> None:
+    sources = st.session_state.get("research_sources", [])
+    if not sources:
+        st.caption("Sources appear here during research.")
+        return
+    for i, src in enumerate(sources):
+        st.markdown(f"**{src['tool']}**")
+        st.caption(src["query"])
+        if i < len(sources) - 1:
+            st.markdown("---")
 
 
 def _render_chat_sources(sources: list[str], raw_sources: list[str], key_prefix: str) -> None:
@@ -222,43 +290,76 @@ elif page == "Wiki Explorer":
         st.info("No wiki pages yet. Upload a document to get started.")
     else:
         view_mode = st.radio(
-            "View",
-            ["Tree", "Graph"],
-            horizontal=True,
-            label_visibility="collapsed",
+            "View", ["Tree", "Graph"],
+            horizontal=True, label_visibility="collapsed",
         )
-        if view_mode == "Graph":
-            try:
-                import json as _json
-                graph = wiki_engine.build_link_graph()
-                title_map = {p["filename"]: p["title"] for p in pages}
-                col1, col2 = st.columns(2)
-                show_names = col1.toggle("Node names", value=True)
-                show_themes = col2.toggle("Edge themes", value=False)
 
-                def _abbrev(text: str, n: int = 3) -> str:
-                    return " ".join(str(text).replace("-", " ").split()[:n])
+        if view_mode == "Tree":
+            main_col, nav_col = st.columns([2, 1])
+            with nav_col:
+                _render_wiki_nav("explorer")
+            selected_file = st.session_state.get("explorer_selected_page")
+            with main_col:
+                if selected_file:
+                    st.markdown(f"### {selected_file}")
+                    parsed = wiki_engine.read_page_parsed(selected_file)
+                    st.markdown(parsed["content"])
+                    raw_sources = parsed["sources"]
+                    related = parsed["related"]
+                    if raw_sources or related:
+                        with st.expander("Sources", expanded=False):
+                            if raw_sources:
+                                st.markdown("**Original documents (data/raw/)**")
+                                for s in raw_sources:
+                                    _raw_source_button(s, f"dl_wiki_{s}")
+                            if related:
+                                st.markdown("**Related wiki pages**")
+                                for r in related:
+                                    if st.button(r, key=f"view_related_{r}"):
+                                        parsed = wiki_engine.read_page_parsed(r)
+                                        _show_md_dialog(r, parsed["content"])
+                else:
+                    st.info("Select a page from the navigation panel on the right.")
 
-                nodes_data, edges_data = [], []
-                for node in graph:
-                    bare = node.split("/")[-1]
-                    title = title_map.get(bare) or title_map.get(node) or bare
-                    nodes_data.append({
-                        "id": node,
-                        "label": _abbrev(title, 5) if show_names else "",
-                        "title": title,
-                    })
-                for src, targets in graph.items():
-                    for tgt in targets:
-                        if tgt in graph:
-                            edge: dict = {"from": src, "to": tgt}
-                            if show_themes:
-                                bare_tgt = tgt.split("/")[-1]
-                                theme = title_map.get(bare_tgt) or title_map.get(tgt) or bare_tgt
-                                edge["label"] = _abbrev(theme)
-                            edges_data.append(edge)
+        else:  # Graph
+            main_col, nav_col = st.columns([3, 1])
+            with nav_col:
+                clicked = _render_wiki_nav("explorer_graph")
+                if clicked:
+                    parsed = wiki_engine.read_page_parsed(clicked)
+                    _show_md_dialog(clicked, parsed["content"])
+            with main_col:
+                try:
+                    import json as _json
+                    graph = wiki_engine.build_link_graph()
+                    title_map = {p["filename"]: p["title"] for p in pages}
+                    tcol1, tcol2 = st.columns(2)
+                    show_names = tcol1.toggle("Node names", value=True)
+                    show_themes = tcol2.toggle("Edge themes", value=False)
 
-                html = f"""<!DOCTYPE html><html><head>
+                    def _abbrev(text: str, n: int = 3) -> str:
+                        return " ".join(str(text).replace("-", " ").split()[:n])
+
+                    nodes_data, edges_data = [], []
+                    for node in graph:
+                        bare = node.split("/")[-1]
+                        title = title_map.get(bare) or title_map.get(node) or bare
+                        nodes_data.append({
+                            "id": node,
+                            "label": _abbrev(title, 5) if show_names else "",
+                            "title": title,
+                        })
+                    for src, targets in graph.items():
+                        for tgt in targets:
+                            if tgt in graph:
+                                edge: dict = {"from": src, "to": tgt}
+                                if show_themes:
+                                    bare_tgt = tgt.split("/")[-1]
+                                    theme = title_map.get(bare_tgt) or title_map.get(tgt) or bare_tgt
+                                    edge["label"] = _abbrev(theme)
+                                edges_data.append(edge)
+
+                    html = f"""<!DOCTYPE html><html><head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"
   integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -277,72 +378,12 @@ var net=new vis.Network(document.getElementById('g'),
     physics:{{barnesHut:{{gravitationalConstant:-5000,springLength:120,springConstant:0.04}},
               stabilization:{{fit:true,iterations:300}}}}}});
 </script></body></html>"""
-                st.components.v1.html(html, height=620, scrolling=True)
-                orphans = wiki_engine.find_orphans()
-                if orphans:
-                    st.caption(f"**{len(orphans)} orphan(s)** (no in-links): " + ", ".join(f"`{o}`" for o in orphans[:20]))
-            except Exception as exc:
-                st.error(f"Graph render failed: {exc}")
-            search = ""
-            selected_file = None
-        else:
-            search = st.text_input(
-                "Search pages",
-                placeholder="Search titles and page bodies…",
-            ).strip()
-            selected_file = st.session_state.get("selected_page")
-
-        if view_mode == "Tree" and search:
-            results = wiki_engine.search_wiki(search)
-            st.markdown(f"**{len(results)}** match{'es' if len(results) != 1 else ''} for *{search}*")
-            for r in results:
-                if st.button(r["title"], key=f"hit_{r['filename']}", use_container_width=True):
-                    st.session_state["selected_page"] = r["filename"]
-                    selected_file = r["filename"]
-                st.markdown(f"<span style='color:#666;font-style:italic'>{r['excerpt']}</span>", unsafe_allow_html=True)
-        elif view_mode == "Tree":
-            tree = wiki_engine.get_wiki_tree()
-            group_labels = {
-                "concept": "Concepts",
-                "entity": "Entities",
-                "source-summary": "Source Summaries",
-                "comparison": "Comparisons",
-                "other": "Other",
-            }
-            order = ["concept", "entity", "source-summary", "comparison", "other"]
-            for key in order:
-                group = tree.get(key)
-                if not group:
-                    continue
-                with st.expander(f"{group_labels[key]} ({len(group)})", expanded=(key == "concept")):
-                    for p in group:
-                        cols = st.columns([4, 1, 1])
-                        title = p.get("title", p["filename"])
-                        if cols[0].button(title, key=f"page_{p['filename']}", use_container_width=True):
-                            st.session_state["selected_page"] = p["filename"]
-                            selected_file = p["filename"]
-                        cols[1].markdown(p.get("confidence", "—"))
-                        cols[2].markdown(p.get("updated", "—"))
-
-        if view_mode == "Tree" and selected_file:
-            st.markdown("---")
-            st.markdown(f"### {selected_file}")
-            parsed = wiki_engine.read_page_parsed(selected_file)
-            st.markdown(parsed["content"])
-            raw_sources = parsed["sources"]
-            related = parsed["related"]
-            if raw_sources or related:
-                with st.expander("Sources", expanded=False):
-                    if raw_sources:
-                        st.markdown("**Original documents (data/raw/)**")
-                        for s in raw_sources:
-                            _raw_source_button(s, f"dl_wiki_{s}")
-                    if related:
-                        st.markdown("**Related wiki pages**")
-                        for r in related:
-                            if st.button(r, key=f"view_related_{r}"):
-                                parsed = wiki_engine.read_page_parsed(r)
-                                _show_md_dialog(r, parsed["content"])
+                    st.components.v1.html(html, height=620, scrolling=True)
+                    orphans = wiki_engine.find_orphans()
+                    if orphans:
+                        st.caption(f"**{len(orphans)} orphan(s)** (no in-links): " + ", ".join(f"`{o}`" for o in orphans[:20]))
+                except Exception as exc:
+                    st.error(f"Graph render failed: {exc}")
 
 
 elif page == "Chat":
@@ -352,12 +393,27 @@ elif page == "Chat":
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    for i, msg in enumerate(st.session_state["messages"]):
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-            if msg["role"] == "assistant":
-                _render_chat_sources(msg.get("sources", []), msg.get("raw_sources", []), f"msg{i}")
+    main_col, nav_col = st.columns([3, 1])
 
+    with nav_col:
+        st.markdown("#### Sources")
+        _render_chat_sources_panel()
+
+    with main_col:
+        for i, msg in enumerate(st.session_state["messages"]):
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        last = st.session_state["messages"][-1] if st.session_state["messages"] else None
+        if last and last["role"] == "assistant" and last.get("question") and not last["content"].startswith("Error:"):
+            if st.button("Save answer to wiki", key="save_answer"):
+                try:
+                    rel = wiki_engine.file_answer(last["question"], last["content"], last.get("sources", []))
+                    st.success(f"Filed as `{rel}`")
+                except RuntimeError as e:
+                    st.error(str(e))
+
+    # chat_input at root level for sticky-bottom behavior
     if prompt := st.chat_input("Ask something…"):
         st.session_state["messages"].append({"role": "user", "content": prompt})
         with st.spinner("Thinking…"):
@@ -373,16 +429,6 @@ elif page == "Chat":
         )
         st.rerun()
 
-    # Save-to-Wiki button under the most recent assistant turn (Karpathy filing-back).
-    last = st.session_state["messages"][-1] if st.session_state["messages"] else None
-    if last and last["role"] == "assistant" and last.get("question") and not last["content"].startswith("Error:"):
-        if st.button("Save answer to wiki", key="save_answer"):
-            try:
-                rel = wiki_engine.file_answer(last["question"], last["content"], last.get("sources", []))
-                st.success(f"Filed as `{rel}`")
-            except RuntimeError as e:
-                st.error(str(e))
-
 
 elif page == "Research":
     st.title("Research Agent")
@@ -394,58 +440,69 @@ elif page == "Research":
             "Get a free key at [tavily.com](https://tavily.com)."
         )
 
-    question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
+    main_col, nav_col = st.columns([3, 1])
 
-    with st.expander("Extra wiki paste (optional — the agent browses the wiki on its own)"):
-        wiki_context = st.text_area(
-            "Optional extra context. Leave blank — the agent will run wiki_search first automatically.",
-            height=120,
-            label_visibility="collapsed",
-        )
+    with nav_col:
+        st.markdown("#### Sources")
+        _render_research_sources_panel()
 
-    auto_save = st.checkbox("Auto-save final report to wiki", value=True)
+    with main_col:
+        question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
 
-    if st.button("Start research", type="primary", disabled=not (tavily_key and question)):
-        steps_container = st.container()
-        with steps_container:
-            for step in research_agent.run_research_agent(question, wiki_context or ""):
-                stype = step["type"]
-                if stype == "thought":
-                    with st.expander("Thought", expanded=False):
-                        st.markdown(step["content"])
-                elif stype == "tool_call":
-                    st.info(f"**{step['name']}** — `{step['args']}`")
-                elif stype == "tool_result":
-                    with st.expander(f"Result: {step['name']}", expanded=False):
-                        st.text(step["result"][:800])
-                elif stype == "final_answer":
-                    st.success("Research complete.")
-                    if step.get("report_path"):
-                        st.session_state["last_report"] = step["report_path"]
-                        if auto_save:
-                            try:
-                                from pathlib import Path as _P
-                                import os as _os
-                                wiki_dir = _P(_os.getenv("WIKI_DIR", "data/wiki"))
-                                report_path = wiki_dir / "comparisons" / _P(step["report_path"].split("comparisons/")[-1])
-                                if report_path.exists():
-                                    wiki_engine.ingest(report_path.read_text(), f"Research: {question[:60]}")
-                                    st.success("Report also ingested into wiki.")
-                            except Exception as exc:
-                                st.warning(f"Auto-save to wiki failed: {exc}")
-                    else:
-                        st.markdown(step["content"])
-                elif stype == "error":
-                    st.error(step["content"])
+        with st.expander("Extra wiki paste (optional — the agent browses the wiki on its own)"):
+            wiki_context = st.text_area(
+                "Optional extra context. Leave blank — the agent will run wiki_search first automatically.",
+                height=120,
+                label_visibility="collapsed",
+            )
 
-    if st.session_state.get("last_report"):
-        _rp = st.session_state["last_report"]
-        _report_filename = _rp.split("comparisons/")[-1]
-        _report_rel = f"comparisons/{_report_filename}"
-        st.markdown(f"Report saved: `{_report_rel}`")
-        if st.button(_report_filename, key="view_report"):
-            _parsed = wiki_engine.read_page_parsed(_report_rel)
-            _show_md_dialog(_report_filename, _parsed["content"])
+        auto_save = st.checkbox("Auto-save final report to wiki", value=True)
+
+        if st.button("Start research", type="primary", disabled=not (tavily_key and question)):
+            st.session_state["research_sources"] = []
+            steps_container = st.container()
+            with steps_container:
+                for step in research_agent.run_research_agent(question, wiki_context or ""):
+                    stype = step["type"]
+                    if stype == "thought":
+                        with st.expander("Thought", expanded=False):
+                            st.markdown(step["content"])
+                    elif stype == "tool_call":
+                        st.info(f"**{step['name']}** — `{step['args']}`")
+                        st.session_state.setdefault("research_sources", []).append(
+                            {"tool": step["name"], "query": str(step["args"])[:80]}
+                        )
+                    elif stype == "tool_result":
+                        with st.expander(f"Result: {step['name']}", expanded=False):
+                            st.text(step["result"][:800])
+                    elif stype == "final_answer":
+                        st.success("Research complete.")
+                        if step.get("report_path"):
+                            st.session_state["last_report"] = step["report_path"]
+                            if auto_save:
+                                try:
+                                    from pathlib import Path as _P
+                                    import os as _os
+                                    wiki_dir = _P(_os.getenv("WIKI_DIR", "data/wiki"))
+                                    report_path = wiki_dir / "comparisons" / _P(step["report_path"].split("comparisons/")[-1])
+                                    if report_path.exists():
+                                        wiki_engine.ingest(report_path.read_text(), f"Research: {question[:60]}")
+                                        st.success("Report also ingested into wiki.")
+                                except Exception as exc:
+                                    st.warning(f"Auto-save to wiki failed: {exc}")
+                        else:
+                            st.markdown(step["content"])
+                    elif stype == "error":
+                        st.error(step["content"])
+
+        if st.session_state.get("last_report"):
+            _rp = st.session_state["last_report"]
+            _report_filename = _rp.split("comparisons/")[-1]
+            _report_rel = f"comparisons/{_report_filename}"
+            st.markdown(f"Report saved: `{_report_rel}`")
+            if st.button(_report_filename, key="view_report"):
+                _parsed = wiki_engine.read_page_parsed(_report_rel)
+                _show_md_dialog(_report_filename, _parsed["content"])
 
 
 elif page == "Maintenance":
