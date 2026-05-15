@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** All pages implemented — ingest with chunked large-document support (progress bar, paragraph-boundary splits) → wiki (tree-by-type + full-text search) → chat (sources expander: wiki + raw) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report). 102-test suite.
+> **Status:** All pages implemented — ingest with chunked large-document support (progress bar, paragraph-boundary splits) → wiki (tree-by-type + full-text search + interactive graph) → chat (Fast: one-shot RAG over wiki pages; **Deep**: LangGraph agent loop over `data/raw/` originals with tokenized prefix search and paginated reads) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report). 105-test suite.
 
 ## Documentation
 
@@ -54,6 +54,11 @@ Edit `.env` (copied from `.env.example`):
 | `RESEARCH_PARALLELISM` | `4` | Thread-pool size for parallel Tavily / page fetches |
 | `RESEARCH_MAX_ITERATIONS` | `40` | LangGraph recursion cap for the research agent |
 | `RESEARCH_LLM_TIMEOUT` | `300` | Per-LLM-call timeout (seconds) |
+| `CHAT_MIN_SEARCHES` | `3` | Deep chat: min tool calls before submission |
+| `CHAT_MIN_WORDS` | `300` | Deep chat: min answer word count |
+| `CHAT_MIN_SOURCES` | `2` | Deep chat: min unique `[Source: ...]` citations (section-suffixed forms count distinctly) |
+| `CHAT_MAX_ITERATIONS` | `25` | Deep chat: LangGraph recursion cap |
+| `CHAT_LLM_TIMEOUT` | `180` | Deep chat: per-LLM-call timeout (seconds) |
 
 ## License
 

@@ -17,6 +17,7 @@ import ollama_client
 import template_loader
 import wiki_engine
 import agent as research_agent
+import chat_agent
 
 st.set_page_config(
     page_title="LocalWiki",
@@ -42,6 +43,7 @@ st.markdown(
 
 
 _CHUNK_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*$")
+_CITE_SECTION_SUFFIX_RE = re.compile(r"\s*[§#].*$")
 
 
 @st.dialog("Source", width="large")
@@ -52,6 +54,7 @@ def _show_md_dialog(title: str, content: str) -> None:
 
 def _raw_source_button(filename: str, key: str) -> None:
     base = _CHUNK_SUFFIX_RE.sub("", filename)
+    base = _CITE_SECTION_SUFFIX_RE.sub("", base).strip()
     if base.lower().endswith((".md", ".txt")):
         data = wiki_engine.read_raw_source(base)
         if data is None:
@@ -388,7 +391,7 @@ var net=new vis.Network(document.getElementById('g'),
 
 elif page == "Chat":
     st.title("Chat with the Wiki")
-    st.caption("Ask questions — answers are drawn from your wiki pages.")
+    st.caption("Ask questions — Fast mode reads wiki pages; Deep mode reasons over the original documents.")
 
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
@@ -400,9 +403,26 @@ elif page == "Chat":
         _render_chat_sources_panel()
 
     with main_col:
+        mode = st.radio(
+            "Mode", ["Fast", "Deep"], horizontal=True, key="chat_mode",
+            help="Fast: one-shot retrieval over wiki pages. Deep: agentic loop over data/raw/ originals (~2x slower than Research, but more grounded).",
+        )
+
         for i, msg in enumerate(st.session_state["messages"]):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
+                if msg["role"] == "assistant" and msg.get("steps"):
+                    with st.expander("Agent trace", expanded=False):
+                        for step in msg["steps"]:
+                            stype = step["type"]
+                            if stype == "thought":
+                                st.markdown(f"> {step['content']}")
+                            elif stype == "tool_call":
+                                st.info(f"**{step['name']}** — `{step['args']}`")
+                            elif stype == "tool_result":
+                                st.text(step["result"][:600])
+                            elif stype == "error":
+                                st.error(step["content"])
 
         last = st.session_state["messages"][-1] if st.session_state["messages"] else None
         if last and last["role"] == "assistant" and last.get("question") and not last["content"].startswith("Error:"):
@@ -416,17 +436,35 @@ elif page == "Chat":
     # chat_input at root level for sticky-bottom behavior
     if prompt := st.chat_input("Ask something…"):
         st.session_state["messages"].append({"role": "user", "content": prompt})
-        with st.spinner("Thinking…"):
-            try:
-                res = wiki_engine.query_with_sources(prompt)
-                answer = res["answer"]
-                sources = res["sources"]
-                raw_sources = res["raw_sources"]
-            except RuntimeError as e:
-                answer, sources, raw_sources = f"Error: {e}", [], []
-        st.session_state["messages"].append(
-            {"role": "assistant", "content": answer, "question": prompt, "sources": sources, "raw_sources": raw_sources}
-        )
+        if st.session_state.get("chat_mode", "Fast") == "Fast":
+            with st.spinner("Thinking…"):
+                try:
+                    res = wiki_engine.query_with_sources(prompt)
+                    answer = res["answer"]
+                    sources = res["sources"]
+                    raw_sources = res["raw_sources"]
+                except RuntimeError as e:
+                    answer, sources, raw_sources = f"Error: {e}", [], []
+            st.session_state["messages"].append(
+                {"role": "assistant", "content": answer, "question": prompt,
+                 "sources": sources, "raw_sources": raw_sources}
+            )
+        else:
+            steps: list[dict] = []
+            answer = ""
+            raw_sources: list[str] = []
+            with st.spinner("Deep chat — agent is searching originals…"):
+                for step in chat_agent.run_chat_agent(prompt):
+                    steps.append(step)
+                    if step["type"] == "final_answer":
+                        answer = step["content"]
+                        raw_sources = step.get("sources", []) or []
+                    elif step["type"] == "error" and not answer:
+                        answer = f"Error: {step['content']}"
+            st.session_state["messages"].append(
+                {"role": "assistant", "content": answer or "(no answer)", "question": prompt,
+                 "sources": [], "raw_sources": raw_sources, "steps": steps}
+            )
         st.rerun()
 
 

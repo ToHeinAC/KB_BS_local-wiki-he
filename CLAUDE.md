@@ -81,7 +81,7 @@ This project must be implemented efficiently, without unnecessary code or comple
 ### 5.3 Tech
 The project uses the following technology choices:
 - All implementation must be in python and the pythonic way of implementation.
-- LangChain/LangGraph are permitted **only** inside the deep-research agent layer (`src/agent.py`, `src/tools.py`). Everywhere else: no LangChain, no vector DB, no embeddings, no cloud LLM APIs.
+- LangChain/LangGraph are permitted **only** inside the agent layer (`src/agent.py`, `src/chat_agent.py`, `src/tools.py`). Everywhere else: no LangChain, no vector DB, no embeddings, no cloud LLM APIs.
 - `uv` is used for the virtual python environment setup and the running. Dependencies shall be defined in `pyproject.toml` and installed via `uv`.
 - Use python-dotenv for the environmental variable handling.
 - All domain Python modules live in `src/`. Run with `uv run streamlit run src/app.py --server.port 8520`.
