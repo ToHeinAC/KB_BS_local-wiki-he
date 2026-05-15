@@ -31,6 +31,7 @@ MIN_SEARCHES = int(os.getenv("RESEARCH_MIN_SEARCHES", "6"))
 MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
 MAX_ITER = int(os.getenv("RESEARCH_MAX_ITERATIONS", "40"))
+MAX_SUBMIT_ATTEMPTS = int(os.getenv("RESEARCH_MAX_SUBMIT_ATTEMPTS", "3"))
 LLM_TIMEOUT = int(os.getenv("RESEARCH_LLM_TIMEOUT", "300"))
 
 
@@ -52,11 +53,15 @@ def _build_graph(llm):
         tool_calls = getattr(last, "tool_calls", None) or []
         if not tool_calls:
             return END
-        # End immediately once submit_final_answer was just accepted.
-        for m in reversed(state["messages"]):
-            if isinstance(m, ToolMessage) and m.name == "submit_final_answer" \
-                    and isinstance(m.content, str) and m.content.startswith("ACCEPTED"):
-                return END
+        submit_msgs = [
+            m for m in state["messages"]
+            if isinstance(m, ToolMessage) and m.name == "submit_final_answer"
+            and isinstance(m.content, str)
+        ]
+        if any(m.content.startswith("ACCEPTED") for m in submit_msgs):
+            return END
+        if len(submit_msgs) >= MAX_SUBMIT_ATTEMPTS:
+            return END
         return "tools"
 
     g = StateGraph(MessagesState)
@@ -134,12 +139,16 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
     seen = 0
     final_msg: ToolMessage | AIMessage | None = None
     report_path: str | None = None
+    last_submit_args: dict | None = None
 
     try:
         for chunk in graph.stream(init, config=config, stream_mode="values"):
             messages = chunk.get("messages", [])
             for msg in messages[seen:]:
                 if isinstance(msg, AIMessage):
+                    for tc in getattr(msg, "tool_calls", None) or []:
+                        if tc.get("name") == "submit_final_answer":
+                            last_submit_args = tc.get("args") or {}
                     yield from _ai_to_thought(msg)
                     final_msg = msg
                 elif isinstance(msg, ToolMessage):
@@ -164,5 +173,14 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
         if not getattr(final_msg, "tool_calls", None):
             yield {"type": "final_answer", "content": text, "report_path": None}
             return
+
+    if last_submit_args and last_submit_args.get("answer"):
+        yield {
+            "type": "final_answer",
+            "content": last_submit_args["answer"],
+            "report_path": None,
+            "note": "Submission did not meet quality bar; returning best-effort draft.",
+        }
+        return
 
     yield {"type": "error", "content": f"Reached max iterations ({MAX_ITER}) without submitting a final report."}
