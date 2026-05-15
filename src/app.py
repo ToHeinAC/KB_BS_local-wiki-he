@@ -1,8 +1,8 @@
 """LocalWiki — Streamlit UI."""
 
 import gc
-import mimetypes
 import os
+import re
 import tempfile
 from pathlib import Path
 
@@ -41,13 +41,42 @@ st.markdown(
 )
 
 
+_CHUNK_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*$")
+
+
+@st.dialog("Source", width="large")
+def _show_md_dialog(title: str, content: str) -> None:
+    st.subheader(title)
+    st.markdown(content)
+
+
 def _raw_source_button(filename: str, key: str) -> None:
-    data = wiki_engine.read_raw_source(filename)
-    if data is None:
-        st.markdown(f"- `{filename}` *(not found)*")
+    base = _CHUNK_SUFFIX_RE.sub("", filename)
+    if base.lower().endswith((".md", ".txt")):
+        data = wiki_engine.read_raw_source(base)
+        if data is None:
+            st.markdown(f"- `{filename}` *(not found)*")
+            return
+        if st.button(filename, key=key):
+            _show_md_dialog(filename, data.decode("utf-8", errors="replace"))
+    else:
+        st.markdown(f"- `{filename}`")
+
+
+def _render_chat_sources(sources: list[str], raw_sources: list[str], key_prefix: str) -> None:
+    if not (sources or raw_sources):
         return
-    mime = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-    st.download_button(filename, data, file_name=filename, mime=mime, key=key)
+    with st.expander("Sources", expanded=False):
+        if sources:
+            st.markdown("**Related wiki pages**")
+            for s in sources:
+                if st.button(s, key=f"{key_prefix}_wiki_{s}"):
+                    parsed = wiki_engine.read_page_parsed(s)
+                    _show_md_dialog(s, parsed["content"])
+        if raw_sources:
+            st.markdown("**Original documents (data/raw/)**")
+            for r in raw_sources:
+                _raw_source_button(r, f"{key_prefix}_raw_{r}")
 
 
 # --- sidebar ---
@@ -87,6 +116,7 @@ page = st.sidebar.radio(
     "Navigate",
     ["Upload", "Wiki Explorer", "Chat", "Research", "Maintenance"],
     label_visibility="collapsed",
+    key="page_nav",
 )
 
 s = wiki_engine.stats()
@@ -310,9 +340,9 @@ var net=new vis.Network(document.getElementById('g'),
                     if related:
                         st.markdown("**Related wiki pages**")
                         for r in related:
-                            if st.button(r, key=f"nav_related_{r}"):
-                                st.session_state["selected_page"] = r
-                                st.rerun()
+                            if st.button(r, key=f"view_related_{r}"):
+                                parsed = wiki_engine.read_page_parsed(r)
+                                _show_md_dialog(r, parsed["content"])
 
 
 elif page == "Chat":
@@ -322,37 +352,26 @@ elif page == "Chat":
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
-    for msg in st.session_state["messages"]:
+    for i, msg in enumerate(st.session_state["messages"]):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
+            if msg["role"] == "assistant":
+                _render_chat_sources(msg.get("sources", []), msg.get("raw_sources", []), f"msg{i}")
 
     if prompt := st.chat_input("Ask something…"):
         st.session_state["messages"].append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking…"):
-                try:
-                    res = wiki_engine.query_with_sources(prompt)
-                    answer = res["answer"]
-                    sources = res["sources"]
-                    raw_sources = res["raw_sources"]
-                except RuntimeError as e:
-                    answer, sources, raw_sources = f"Error: {e}", [], []
-            st.markdown(answer)
-            if sources or raw_sources:
-                with st.expander("Sources", expanded=False):
-                    if sources:
-                        st.markdown("**Wiki pages (data/wiki/)**")
-                        for s in sources:
-                            st.markdown(f"- `data/wiki/{s}`")
-                    if raw_sources:
-                        st.markdown("**Original documents (data/raw/)**")
-                        for r in raw_sources:
-                            _raw_source_button(r, f"dl_chat_{r}")
+        with st.spinner("Thinking…"):
+            try:
+                res = wiki_engine.query_with_sources(prompt)
+                answer = res["answer"]
+                sources = res["sources"]
+                raw_sources = res["raw_sources"]
+            except RuntimeError as e:
+                answer, sources, raw_sources = f"Error: {e}", [], []
         st.session_state["messages"].append(
             {"role": "assistant", "content": answer, "question": prompt, "sources": sources, "raw_sources": raw_sources}
         )
+        st.rerun()
 
     # Save-to-Wiki button under the most recent assistant turn (Karpathy filing-back).
     last = st.session_state["messages"][-1] if st.session_state["messages"] else None
@@ -402,7 +421,7 @@ elif page == "Research":
                 elif stype == "final_answer":
                     st.success("Research complete.")
                     if step.get("report_path"):
-                        st.markdown(f"Report saved: `{step['report_path']}`")
+                        st.session_state["last_report"] = step["report_path"]
                         if auto_save:
                             try:
                                 from pathlib import Path as _P
@@ -418,6 +437,15 @@ elif page == "Research":
                         st.markdown(step["content"])
                 elif stype == "error":
                     st.error(step["content"])
+
+    if st.session_state.get("last_report"):
+        _rp = st.session_state["last_report"]
+        _report_filename = _rp.split("comparisons/")[-1]
+        _report_rel = f"comparisons/{_report_filename}"
+        st.markdown(f"Report saved: `{_report_rel}`")
+        if st.button(_report_filename, key="view_report"):
+            _parsed = wiki_engine.read_page_parsed(_report_rel)
+            _show_md_dialog(_report_filename, _parsed["content"])
 
 
 elif page == "Maintenance":
