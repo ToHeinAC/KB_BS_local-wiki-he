@@ -2,48 +2,33 @@
 title: "Strahlenschutzgesetz - StrlSchG (Teil 3/13)"
 type: source-summary
 sources: ["StrlSchG.md [Teil 3/13]"]
-related: ["concept-medizinische-forschung.md", "concept-ethikkommission.md", "concept-deckungsvorsorge.md", "concept-untersagung.md", "concept-genehmigung.md"]
-created: "2026-05-11"
-updated: "2026-05-11"
+related: ["roentgen-raechnereinrichtung.md", "radioaktive-stoff-befoerderung.md", "medizinische-forschung-anwendung.md", "geplante-expositionssituation.md", "exposition.md"]
+created: "2026-05-15"
+updated: "2026-05-15"
 confidence: high
 ---
 
-# Strahlenschutzgesetz - StrlSchG (Teil 3/13)
+This document details specific procedural requirements and specialized applications regulated by the *Strahlenschutzgesetz* (StrlSchG) [StrlSchG.md [Teil 3/13].md]. These sections cover the technical requirements for X-ray equipment, the transport of radioactive substances, and the application of ionizing radiation in medical research.
 
-This section of the Radiation Protection Act (StrlSchG) details specific regulations concerning the application of ionizing radiation and radioactive substances in medical research, the required ethical oversight, and the associated security and procedural requirements.
+## X-ray Equipment and Facilities (§ 20, § 22)
+The law mandates strict procedures for the operation and maintenance of X-ray equipment:
+*   **Announced Operation (§ 20):** When announcing the operation of an X-ray facility, specific documents must be submitted, including:
+    *   A copy of the certificate from a state-appointed expert (§ 172), detailing the X-ray device and planned operation [StrlSchG.md [Teil 3/13].md].
+    *   Proof that the equipment is type-approved or marked as a medical device according to the relevant EU regulation [StrlSchG.md [Teil 3/13].md].
+    *   Proof that necessary protective measures are in place for the intended operation [StrlSchG.md [Teil 3/13].md].
+    *   For facilities used on humans, proof that prerequisites mentioned in § 14 Abs. 1 Nr. 5 Buchstabe a are met and the required acceptance test has been conducted [StrlSchG.md [Teil 3/13].md].
+*   **Notification-Required Activities (§ 22):** For commercial inspection, testing, maintenance, or repair of X-ray equipment, the responsible authority must be notified. Required documentation includes proof of the required expertise for radiation protection officers and personnel involved in the activity [StrlSchG.md [Teil 3/13].md].
 
-## Medical Research Applications (§ 31 & § 32)
+## Transport of Radioactive Substances (§ 27, § 28, § 29, § 30)
+The law regulates the movement of radioactive materials:
+*   **Permit-Required Transport (§ 27):** Transporting other radioactive substances requires a permit. This permit must be carried during the transport and can be issued for up to three years for multiple shipments [StrlSchG.md [Teil 3/13].md].
+*   **Permit-Free Transport (§ 28):** Certain substances are exempt from permits, including those exempt under regulations for dangerous goods transport, provided they meet specific criteria [StrlSchG.md [Teil 3/13].md].
+*   **Conditions for Permit Granting (§ 29):** A permit requires demonstrating the reliability of all involved parties, the availability of necessary radiation protection officers, and ensuring that the transport is conducted by personnel with the necessary knowledge and skills [StrlSchG.md [Teil 3/13].md].
+*   **Cross-Border Transport (§ 30):** The government is empowered to regulate cross-border transport via ordinance, specifying requirements for permits, documentation, and exemptions [StrlSchG.md [Teil 3/13].md].
 
-### Genehmigungsbedürftige Anwendung (Permit-Required) (§ 31)
-An application using radioactive substances or ionizing radiation on humans for medical research requires a permit if the application is not notification-required under § 32 Absatz 1. A permit is also required if there is a substantial deviation from a previously permitted application [StrlSchG.md [Teil 3/13].md].
-
-The authority must ensure that:
-1. The radiation-related risks are medically justified, considering the expected significance of the results for the development of medical examination methods or treatment procedures, potentially considering the medical benefit for the person [StrlSchG.md [Teil 3/13].md].
-2. The substances or application types correspond to the purpose of the research project and cannot be replaced by other examination and treatment methods that result in no or lower exposure for the person [StrlSchG.md [Teil 3/13].md].
-3. The exposure and activity cannot be further reduced according to the state of science and technology without jeopardizing the purpose of the research project [StrlSchG.md [Teil 3/13].md].
-4. The number of people included in the research project is limited to the necessary measure for the fulfillment of the purpose of the research project [StrlSchG.md [Teil 3/13].md].
-5. A favorable statement from an Ethics Committee (§ 36) regarding the research project is available [StrlSchG.md [Teil 3/13].md].
-6. The applications are conducted by a physician who possesses the required expertise in radiation protection and at least two years of experience in the application of radioactive substances or ionizing radiation on humans [StrlSchG.md [Teil 3/13].md].
-7. The necessary security for the fulfillment of statutory compensation obligations has been made [StrlSchG.md [Teil 3/13].md].
-8. A permit under § 12 Absatz 1 Nummer 1 bis 4 for application on humans is available, or the operation of an X-ray device notified under § 19 Absatz 1 for application on humans is permissible [StrlSchG.md [Teil 3/13].md].
-
-### Anzeigebedürftige Anwendung (Notification-Required) (§ 32)
-Notification is required if the research project intends to apply radioactive substances or ionizing radiation on humans for medical research, provided that:
-1. The research project involves the testing of safety or efficacy of a procedure for treating adult, sick people, and
-2. The application of radioactive substances or ionizing radiation itself is not the subject of the research project [StrlSchG.md [Teil 3/13].md].
-
-The notification must demonstrate that:
-1. The type of application corresponds to recognized standard procedures for examining humans,
-2. The purpose of the research project justifies the type and frequency of the application,
-3. Only adult persons are included in the research project, who suffer from a disease that is tested within the scope of the research project, and
-4. A permit under § 12 Absatz 1 Nummer 1 bis 4 for application on humans is available, or the operation of an X-ray device notified under § 19 Absatz 1 for application on humans is permissible [StrlSchG.md [Teil 3/13].md].
-
-## Ethics Committee (§ 36)
-An Ethics Committee must be independent, interdisciplinary, established according to state law, and registered with the competent authority. It must consist of medical experts and non-medical members possessing the required professional competence [StrlSchG.md [Teil 3/13].md].
-
-## Procedural and Technical Regulations
-*   **X-ray/Interference Devices (§ 20, § 22):** Details the inspection, testing, and maintenance requirements for X-ray devices and interference sources, including mandatory documentation regarding personnel competence and technical standards [StrlSchG.md [Teil 3/13].md].
-*   **Transport (§ 27, § 28, § 29):** Outlines permitting requirements for transporting radioactive substances, distinguishing between permit-required (§ 27) and permit-free (§ 28) transport. Permits require demonstrating the reliability and competence of all involved parties [StrlSchG.md [Teil 3/13].md].
-*   **Cross-Border Transport (§ 30):** Grants the Federal Government the authority to regulate the cross-border transfer of radioactive substances via ordinance [StrlSchG.md [Teil 3/13].md].
-
-***
+## Medical Research Applications (§ 31 - § 36)
+The use of radiation for medical research is highly regulated:
+*   **Permit vs. Notification (§ 31, § 32):** Applications for medical research require either a permit (§ 31) or a notification (§ 32), depending on the scope.
+*   **Review Process (§ 33):** The competent authority must confirm the completeness of the notification within 14 calendar days. The substantive review must be completed within 28 calendar days (or 21 days for supplementary information) [StrlSchG.md [Teil 3/13].md].
+*   **Ethical Oversight (§ 36):** An independent, interdisciplinary Ethics Committee must be involved in the process [StrlSchG.md [Teil 3/13].md].
+*   **Security Provision (§ 35):** A security provision (e.g., insurance) must be provided for the notified application, ensuring compensation for potential harm, with a minimum coverage of 500,000 Euro per person for death or permanent disability [StrlSchG.md [Teil 3/13].md].
