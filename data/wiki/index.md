@@ -1,10 +1,11 @@
 # Wiki Index
-Updated: 2026-05-15 | Pages: 30
+Updated: 2026-05-16 | Pages: 33
 
 ## Pages
 - [Bauartzulassung (Type Approval)](bauartzulassung.md) — A Bauartzulassung (Type Approval) is a regulatory authorization required for certain devices and facilities that generat
 - [Bestehende Expositionssituation](bestehende-expositionssituation.md) — A **Bestehende Expositionssituation** is defined within the *Strahlenschutzgesetz* (StrlSchG) as an exposure situation t
 - [Bundesamt für Strahlenschutz (BfS)](bundesamt-fuer-strahlenschutz.md) — # Bundesamt für Strahlenschutz (BfS)  Das Bundesamt für Strahlenschutz (BfS) ist eine zentrale Bundesbehörde, die für di
+- [E-Mobility](e-mobility.md) — # E-Mobility  In the context of industrial and automotive technology, **E-Mobility** refers to the segment of the market
 - [Exposition](exposition-concept.md) — In the context of the *Strahlenschutzgesetz* (StrlSchG), **Exposition** refers to the incidence of ionizing radiation on
 - [Geplante Expositionssituation](geplante-expositionssituation.md) — A **Planned Exposure Situation** is defined within the *Strahlenschutzgesetz* (StrlSchG) as an exposure situation that a
 - [Informationsaustausch bei Notfällen](informationsaustausch-notfall.md) — # Informationsaustausch bei Notfällen  Der Informationsaustausch ist ein kritischer Bestandteil der Notfallreaktion, der
@@ -15,9 +16,11 @@ Updated: 2026-05-15 | Pages: 30
 - [Radioaktive Stoffe](radioactive-substances.md) — Under the *Strahlenschutzgesetz* (StrlSchG), **Radioactive Substances** are defined as all substances containing one or 
 - [Radioaktive Altlasten (Radioactive Residues)](radioaktive-altlasten.md) — Radioactive residues (Rückstände) are materials subject to specific regulations under the Radiation Protection Act, gove
 - [Radioaktivität](radioaktivitaet.md) — # Radioaktivität  Radioaktivität bezieht sich auf die Emission von ionisierender Strahlung, deren Grundbegriffe und Ausw
+- [Schaeffler AG](schaeffler-ag.md) — # Schaeffler AG  Schaeffler AG is a global technology company specializing in motion technology, bearings, and industria
 - [Strahlenschutzgesetz - StrlSchG](strahlenschutzgesetz-strlschg.md) — # Strahlenschutzgesetz (StrlSchG)  Das Strahlenschutzgesetz (StrlSchG) ist das zentrale Gesetz zum Schutz vor der schädl
 - [Strahlenschutzgesetz (Radiation Protection Act)](strahlenschutzgesetz.md) — The Strahlenschutzgesetz (StrlSchG) is the German federal law governing the protection against the harmful effects of io
 - [Infineon AG Investment Idee](summary-infineon-investment-idea-md.md) — Infineon AG Investment Idee vom 06.05.2026
+- [Schaeffler AG Investment Overview](summary-schaeffler-ag-investment-overview-md.md) — # Schaeffler AG Investment Overview  This document provides a comprehensive investment analysis of Schaeffler AG, detail
 - [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-1-13.md) — The document provides a comprehensive overview of the *Strahlenschutzgesetz* (StrlSchG), or the "Law for the Protection 
 - [Strahlenschutzgesetz - StrlSchG (Teil 10/13)](summary-strlschg-md-teil-10-13.md) — This document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahl
 - [StrlSchG - Teil 11/13](summary-strlschg-md-teil-11-13.md) — # StrlSchG - Teil 11/13  This summary covers sections of the German Radiation Protection Act (Strahlenschutzgesetz - Str
