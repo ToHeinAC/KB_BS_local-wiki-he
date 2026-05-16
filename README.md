@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** All pages implemented — three-stage ingest (`ingest_begin` / `ingest_piece` / `ingest_end`) drives a structural chunk store + BM25 lexical index + ingest-time entity/acronym/fact extraction + capped hypothetical-question chunks under `data/chunks/` and `data/index/` → wiki (tree-by-type + full-text search + interactive graph) → chat (Fast: one-shot RAG over wiki pages; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25 + direct-fact lookup) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report). Long-source ingest (e.g. 488 KB legal docs): ~7 min. 140-test suite.
+> **Status:** All pages implemented — three-stage ingest (`ingest_begin` / `ingest_piece` / `ingest_end`) drives a structural chunk store + BM25 lexical index + 1–5 hypothetical questions per source (folded into BM25 TF) under `data/chunks/` and `data/index/` → wiki (tree-by-type + full-text search + typed-graph viz with `derived-from` source edges) → chat (Fast: one-shot RAG over wiki pages; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report). Long-source ingest (e.g. 488 KB legal docs): ~7 min. 130-test suite.
 
 ## Documentation
 
@@ -48,8 +48,7 @@ Edit `.env` (copied from `.env.example`):
 | `WIKI_DIR` | `data/wiki` | Wiki page storage |
 | `RAW_DIR` | `data/raw` | Uploaded source storage |
 | `CHUNKS_DIR` | `data/chunks` | Chunk store (one JSONL per source) |
-| `INDEX_DIR` | `data/index` | BM25 lexical index + extractor/QA sidecars |
-| `INGEST_EXTRACT` | `1` | Run alias/acronym/fact extractor during ingest (`0` to disable) |
+| `INDEX_DIR` | `data/index` | BM25 lexical index (`postings.json`, `stats.json`) + hypothetical questions (`qa.jsonl`) |
 | `INGEST_QA` | `1` | Run hypothetical-question generator during ingest (`0` to disable) |
 | `QA_BATCH_SIZE` | `12` | Chunks per QA-generator LLM batch |
 | `QA_MAX_PAIRS_PER_SOURCE` | `5` | Max hypothetical-question pairs persisted per source (caps `qa_gen` cost) |

@@ -332,33 +332,39 @@ elif page == "Wiki Explorer":
             with main_col:
                 try:
                     import json as _json
-                    graph = wiki_engine.build_link_graph()
-                    title_map = {p["filename"]: p["title"] for p in pages}
+                    graph = wiki_engine.build_typed_graph()
                     tcol1, tcol2 = st.columns(2)
                     show_names = tcol1.toggle("Node names", value=True)
-                    show_themes = tcol2.toggle("Edge themes", value=False)
+                    show_sources = tcol2.toggle("Source nodes", value=True)
 
-                    def _abbrev(text: str, n: int = 3) -> str:
+                    def _abbrev(text: str, n: int = 5) -> str:
                         return " ".join(str(text).replace("-", " ").split()[:n])
 
-                    nodes_data, edges_data = [], []
-                    for node in graph:
-                        bare = node.split("/")[-1]
-                        title = title_map.get(bare) or title_map.get(node) or bare
+                    nodes_data: list[dict] = []
+                    edges_data: list[dict] = []
+                    keep_ids: set[str] = set()
+                    for node in graph["nodes"]:
+                        if node["type"] == "source" and not show_sources:
+                            continue
+                        keep_ids.add(node["id"])
+                        label = node["label"]
                         nodes_data.append({
-                            "id": node,
-                            "label": _abbrev(title, 5) if show_names else "",
-                            "title": title,
+                            "id": node["id"],
+                            "group": node["type"],
+                            "label": (_abbrev(label) if node["type"] == "page" else label) if show_names else "",
+                            "title": label,
                         })
-                    for src, targets in graph.items():
-                        for tgt in targets:
-                            if tgt in graph:
-                                edge: dict = {"from": src, "to": tgt}
-                                if show_themes:
-                                    bare_tgt = tgt.split("/")[-1]
-                                    theme = title_map.get(bare_tgt) or title_map.get(tgt) or bare_tgt
-                                    edge["label"] = _abbrev(theme)
-                                edges_data.append(edge)
+                    for edge in graph["edges"]:
+                        if edge["from"] not in keep_ids or edge["to"] not in keep_ids:
+                            continue
+                        edges_data.append({
+                            "from": edge["from"],
+                            "to": edge["to"],
+                            "group": edge["type"],
+                            "dashes": edge["type"] == "derived-from",
+                            "color": "#d97a3a" if edge["type"] == "derived-from" else "#aaa",
+                            "arrows": "to" if edge["type"] == "derived-from" else "",
+                        })
 
                     html = f"""<!DOCTYPE html><html><head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"
@@ -371,15 +377,22 @@ elif page == "Wiki Explorer":
 var net=new vis.Network(document.getElementById('g'),
   {{nodes:new vis.DataSet({_json.dumps(nodes_data)}),
     edges:new vis.DataSet({_json.dumps(edges_data)})}},
-  {{nodes:{{shape:"dot",size:18,font:{{size:14,color:"#234637"}},
-           color:{{background:"#97c2fc",border:"#2B7CE9"}}}},
+  {{groups:{{
+      page:{{shape:"dot",size:18,color:{{background:"#97c2fc",border:"#2B7CE9"}}}},
+      source:{{shape:"diamond",size:22,color:{{background:"#f3b27a",border:"#d97a3a"}}}}
+    }},
+    nodes:{{font:{{size:14,color:"#234637"}}}},
     edges:{{font:{{size:11,color:"#555",align:"middle"}},
-            color:{{color:"#aaa",inherit:false}},
             smooth:{{type:"continuous"}}}},
     physics:{{barnesHut:{{gravitationalConstant:-5000,springLength:120,springConstant:0.04}},
               stabilization:{{fit:true,iterations:300}}}}}});
 </script></body></html>"""
                     st.components.v1.html(html, height=620, scrolling=True)
+                    st.caption(
+                        "**Legend:** blue dot = wiki page, orange diamond = source document. "
+                        "Solid grey = `related-to` (page ↔ page). "
+                        "Dashed orange → = `derived-from` (page → source)."
+                    )
                     orphans = wiki_engine.find_orphans()
                     if orphans:
                         st.caption(f"**{len(orphans)} orphan(s)** (no in-links): " + ", ".join(f"`{o}`" for o in orphans[:20]))

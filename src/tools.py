@@ -172,19 +172,9 @@ def _wiki_read_impl(filenames) -> str:
 
 def _raw_search_one(query: str, max_results: int) -> str:
     parts = [f"## Raw query: {query}"]
-    facts = lex_index.facts_lookup(query)
-    if facts:
-        parts.append("### Direct facts")
-        for i, f in enumerate(facts, 1):
-            parts.append(
-                f"[Fact {i}] {f.get('subject', '')} {f.get('kind', '')} = "
-                f"{f.get('value', '')} {f.get('unit', '')} "
-                f"(source: {f.get('source', '')} {f.get('anchor', '')})"
-            )
     hits = lex_index.query(query, top_k=max_results)
     if not hits:
-        if not facts:
-            parts.append("(no results — try a different keyword or a question phrasing)")
+        parts.append("(no results — try a different keyword or a question phrasing)")
         return "\n".join(parts)
     for i, h in enumerate(hits, 1):
         anchor = h.get("anchor") or ""

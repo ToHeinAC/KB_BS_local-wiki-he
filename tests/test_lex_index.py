@@ -30,7 +30,6 @@ def fresh_index(tmp_path, monkeypatch):
     monkeypatch.setattr(lex_index, "INDEX_DIR", tmp_path / "index")
     monkeypatch.setattr(lex_index, "POSTINGS_PATH", tmp_path / "index" / "postings.json")
     monkeypatch.setattr(lex_index, "STATS_PATH", tmp_path / "index" / "stats.json")
-    monkeypatch.setattr(lex_index, "TRIGRAMS_PATH", tmp_path / "index" / "trigrams.json")
 
     chunks_de = chunker.split(SAMPLE_LEGAL)
     chunker.write_chunks("StrlSchG.md", chunks_de)
@@ -83,9 +82,3 @@ def test_english_query(fresh_index):
 def test_no_results_for_unknown_query(fresh_index):
     hits = lex_index.query("xyzzy quux frobnicate")
     assert hits == []
-
-
-def test_fuzzy_fallback_handles_typo(fresh_index):
-    # "Rueckstaend" is missing the final e; trigram fallback should still find it.
-    hits = lex_index.query("Rueckstaend")
-    assert hits, "trigram fallback should rescue minor typos"

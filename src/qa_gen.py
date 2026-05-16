@@ -60,14 +60,14 @@ def _strip_json_fences(s: str) -> str:
     return s
 
 
-def _run_batch(batch: list[dict]) -> list[tuple[str, str]]:
+def _run_batch(batch: list[dict], temperature: float = 0.2) -> list[tuple[str, str]]:
     try:
         system = schema_loader.get_system_prompt()
     except Exception:
         system = ""
     prompt = GENERATE_QUESTIONS_PROMPT.format(chunks_block=_chunks_block(batch))
     try:
-        raw = ollama_client.generate(system, prompt, temperature=0.2)
+        raw = ollama_client.generate(system, prompt, temperature=temperature)
     except Exception:
         return []
     try:
@@ -98,6 +98,9 @@ def _select_target_chunks(chunks: list[dict], k: int) -> list[dict]:
     semantic section (`§ N` or any markdown heading), then rank by unique-token
     count after stopword/variant normalisation (proxy for information density).
     Tie-break by chunk length, then by char_start for stable ordering.
+
+    Guarantees ≥1 returned target whenever `chunks` is non-empty so qa.jsonl
+    gets at least one question per source.
     """
     if k <= 0 or not chunks:
         return []
@@ -134,11 +137,20 @@ def _select_target_chunks(chunks: list[dict], k: int) -> list[dict]:
     return [chunks[t[-1]] for t in scored[:k]]
 
 
-def generate(chunks: list[dict]) -> list[tuple[str, str]]:
-    """Return up to `MAX_PAIRS_PER_SOURCE` (chunk_id, question) pairs.
+def _title_question(source: str) -> str:
+    """Fallback question derived from the source filename (no LLM)."""
+    stem = source.rsplit(".", 1)[0].replace("_", " ").replace("-", " ").strip()
+    return f"Worum geht es in {stem}?" if stem else "Worum geht es in diesem Dokument?"
+
+
+def generate(chunks: list[dict], source: str = "") -> list[tuple[str, str]]:
+    """Return 1–`MAX_PAIRS_PER_SOURCE` (chunk_id, question) pairs.
 
     Picks the top-k highest-value chunks and runs a single LLM batch against
-    them. Empty list on failure.
+    them. If the LLM returns nothing usable, retries once at a higher
+    temperature; if still empty, emits one fallback question synthesised from
+    the source filename (no LLM) so every source contributes at least one
+    entry to qa.jsonl.
     """
     if not chunks:
         return []
@@ -149,6 +161,12 @@ def generate(chunks: list[dict]) -> list[tuple[str, str]]:
     for i in range(0, len(targets), BATCH_SIZE):
         batch = targets[i : i + BATCH_SIZE]
         results.extend(_run_batch(batch))
+    if not results:
+        # One retry at a slightly higher temperature on the same top batch.
+        results.extend(_run_batch(targets[:BATCH_SIZE], temperature=0.5))
+    if not results:
+        # Last-resort title fallback so every source gets at least one entry.
+        results = [(targets[0]["chunk_id"], _title_question(source))]
     return results[:MAX_PAIRS_PER_SOURCE]
 
 

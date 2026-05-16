@@ -9,7 +9,6 @@ import frontmatter
 from dotenv import load_dotenv
 
 import chunker
-import extractor
 import lex_index
 import ollama_client
 import qa_gen
@@ -137,6 +136,29 @@ def _build_existing_block(filenames: list[str]) -> str:
     return "".join(parts) + "\n"
 
 
+def _ensure_source_in_frontmatter(content: str, source_name: str) -> str:
+    """Append `source_name` to the frontmatter `sources:` list (idempotent).
+
+    Parses with python-frontmatter so an existing `sources:` entry is preserved
+    and merged. If the page has no frontmatter yet, leaves the content alone —
+    `_ensure_frontmatter` will add a minimal block with `sources: [source_name]`.
+    """
+    if not source_name:
+        return content
+    try:
+        post = frontmatter.loads(content)
+    except Exception:
+        return content
+    existing = post.metadata.get("sources") or []
+    if not isinstance(existing, list):
+        existing = [existing]
+    existing = [str(s).strip() for s in existing if str(s).strip()]
+    if source_name not in existing:
+        existing.append(source_name)
+    post.metadata["sources"] = existing
+    return frontmatter.dumps(post) + "\n"
+
+
 def _ensure_frontmatter(content: str, fname: str) -> str:
     """Patch minimal YAML frontmatter when the LLM omitted it."""
     if content.lstrip().startswith("---"):
@@ -160,9 +182,9 @@ def _ensure_frontmatter(content: str, fname: str) -> str:
 def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None) -> dict:
     """Source-scoped ingest setup. Runs the once-per-source LLM/index work.
 
-    Builds the chunk store, runs extractor + qa_gen on the whole document, and
-    selects affected wiki pages — exactly once per uploaded source — then
-    returns a `ctx` dict the per-piece synthesis and the final wrap-up consume.
+    Builds the chunk store, runs qa_gen on the whole document, and selects
+    affected wiki pages — exactly once per uploaded source — then returns a
+    `ctx` dict the per-piece synthesis and the final wrap-up consume.
     `lex_index.build()` is deferred to `ingest_end`.
     """
     system = schema_loader.get_system_prompt()
@@ -188,15 +210,9 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
     chunks = chunker.split(full_text)
     if chunks:
         chunker.write_chunks(source_name, chunks)
-        if os.getenv("INGEST_EXTRACT", "1") == "1":
-            try:
-                extracted = extractor.extract(source_name, full_text, chunks)
-                extractor.persist(source_name, extracted)
-            except Exception:
-                pass  # extraction is best-effort; never fail ingest on it
         if os.getenv("INGEST_QA", "1") == "1":
             try:
-                qa_items = qa_gen.generate(chunks)
+                qa_items = qa_gen.generate(chunks, source=source_name)
                 qa_gen.persist(qa_items, source_name)
             except Exception:
                 pass  # qa-gen is best-effort; never fail ingest on it
@@ -248,6 +264,10 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
     for page in pages:
         dest = WIKI_DIR / page["filename"]
         content = _ensure_frontmatter(page["content"], page["filename"])
+        # Merge current source into frontmatter `sources:` so the graph viz can
+        # draw `derived-from` edges (source → page) without trusting the LLM
+        # to have written it correctly.
+        content = _ensure_source_in_frontmatter(content, ctx["source_name"])
         if dest.exists():
             if page["filename"] not in ctx["updated"] and page["filename"] not in ctx["created"]:
                 ctx["updated"].append(page["filename"])
@@ -541,6 +561,62 @@ def build_link_graph() -> dict[str, set[str]]:
                     edges.add(r)
             graph[key] = edges
     return graph
+
+
+def build_typed_graph() -> dict:
+    """Return a typed node/edge list for the wiki graph viz.
+
+    Two node types:
+      - `page`   : wiki page filename (e.g. `strahlenschutzgesetz.md`)
+      - `source` : raw source filename pulled from each page's `sources:` field
+
+    Two edge types:
+      - `related-to`  : page ↔ page, from frontmatter `related:` (existing)
+      - `derived-from`: page → source, from frontmatter `sources:`
+    """
+    existing = {p["filename"] for p in list_pages()}
+    insights = WIKI_DIR / _INSIGHTS_DIR
+    if insights.exists():
+        for md in insights.glob("*.md"):
+            existing.add(f"{_INSIGHTS_DIR}/{md.name}")
+
+    nodes: dict[str, dict] = {}
+    edges: list[dict] = []
+    source_set: set[str] = set()
+
+    targets = [WIKI_DIR.glob("*.md")]
+    if insights.exists():
+        targets.append(insights.glob("*.md"))
+
+    for src_iter in targets:
+        for md in src_iter:
+            if md.name in ("index.md", "log.md"):
+                continue
+            try:
+                post = frontmatter.load(str(md))
+                related = post.metadata.get("related", []) or []
+                sources = post.metadata.get("sources", []) or []
+                title = str(post.metadata.get("title", md.stem))
+            except Exception:
+                related, sources, title = [], [], md.stem
+            page_id = md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
+            nodes[page_id] = {"id": page_id, "type": "page", "label": title}
+            for r in related:
+                r = str(r).strip()
+                if r and r != page_id and r in existing and r not in ("index.md", "log.md"):
+                    edges.append({"from": page_id, "to": r, "type": "related-to"})
+            for s in sources:
+                s = str(s).strip()
+                if not s or s == "chat":
+                    continue
+                source_id = f"source::{s}"
+                source_set.add(s)
+                edges.append({"from": page_id, "to": source_id, "type": "derived-from"})
+
+    for s in source_set:
+        nodes[f"source::{s}"] = {"id": f"source::{s}", "type": "source", "label": s}
+
+    return {"nodes": list(nodes.values()), "edges": edges}
 
 
 def find_orphans() -> list[str]:

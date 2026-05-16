@@ -1,13 +1,13 @@
 """Lexical BM25 index over chunks for fast, recall-friendly retrieval.
 
-Tokens are stored in three normalized variants per surface word:
+Tokens are stored in up to four normalized variants per surface word:
   - surface lower-cased (preserves diacritics): "rückstände"
-  - diacritic-folded ASCII (handles ue↔ü etc.):  "rueckstaende"
-  - light Snowball-style stem:                   "ruckstand"
+  - NFKD-folded ASCII:                          "ruckstande"
+  - German digraph fold (ü→ue, ß→ss):           "rueckstaende"
+  - light Snowball-style stem on the NFKD form: "ruckstand"
 
-Query tokens are expanded to the same three variants; a chunk that indexed any
-variant becomes a candidate. BM25 scoring then ranks by relevance. A trigram
-fallback handles zero-posting query tokens (typos / morphology surprises).
+Query tokens are expanded to the same variants; a chunk that indexed any
+variant becomes a candidate. BM25 scoring then ranks by relevance.
 
 No external NLP deps: a small built-in German+English suffix stripper plays the
 role of a stemmer. Good enough for the project's domains (legal German, English
@@ -26,7 +26,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import chunker
-import extractor
 import qa_gen
 
 load_dotenv()
@@ -34,7 +33,6 @@ load_dotenv()
 INDEX_DIR = Path(os.getenv("INDEX_DIR", "data/index"))
 POSTINGS_PATH = INDEX_DIR / "postings.json"
 STATS_PATH = INDEX_DIR / "stats.json"
-TRIGRAMS_PATH = INDEX_DIR / "trigrams.json"
 
 BM25_K1 = 1.5
 BM25_B = 0.75
@@ -118,17 +116,11 @@ def tokenize(text: str) -> list[str]:
     return [m.group(0).lower() for m in _TOKEN_RE.finditer(text)]
 
 
-def _trigrams(token: str) -> list[str]:
-    t = f"^{token}$"
-    return [t[i:i + 3] for i in range(len(t) - 2)]
-
-
 def build(chunks: list[dict] | None = None) -> dict:
     """Build (or rebuild) the index over all chunks. Returns a small summary."""
     if chunks is None:
         chunks = chunker.all_chunks()
     postings: dict[str, dict[str, int]] = {}
-    trigrams: dict[str, set[str]] = {}
     chunk_meta: dict[str, dict] = {}
     chunk_dl: dict[str, int] = {}
     df: dict[str, int] = {}
@@ -164,9 +156,6 @@ def build(chunks: list[dict] | None = None) -> dict:
                 if v not in seen_in_doc:
                     df[v] = df.get(v, 0) + 1
                     seen_in_doc.add(v)
-                # trigrams keyed on the variant for fuzzy fallback
-                for tg in _trigrams(v):
-                    trigrams.setdefault(tg, set()).add(v)
 
     n = len(chunk_meta)
     avg_dl = (sum(chunk_dl.values()) / n) if n else 0.0
@@ -181,99 +170,15 @@ def build(chunks: list[dict] | None = None) -> dict:
     INDEX_DIR.mkdir(parents=True, exist_ok=True)
     POSTINGS_PATH.write_text(json.dumps(postings, ensure_ascii=False))
     STATS_PATH.write_text(json.dumps(stats, ensure_ascii=False))
-    TRIGRAMS_PATH.write_text(json.dumps(
-        {tg: sorted(toks) for tg, toks in trigrams.items()}, ensure_ascii=False
-    ))
     return {"chunks": n, "tokens": len(postings), "avg_dl": avg_dl}
 
 
-def _load() -> tuple[dict, dict, dict]:
+def _load() -> tuple[dict, dict]:
     if not POSTINGS_PATH.exists() or not STATS_PATH.exists():
-        return {}, {"n": 0, "avg_dl": 0.0, "df": {}, "chunk_dl": {}, "chunk_meta": {}}, {}
+        return {}, {"n": 0, "avg_dl": 0.0, "df": {}, "chunk_dl": {}, "chunk_meta": {}}
     postings = json.loads(POSTINGS_PATH.read_text())
     stats = json.loads(STATS_PATH.read_text())
-    trigrams = json.loads(TRIGRAMS_PATH.read_text()) if TRIGRAMS_PATH.exists() else {}
-    return postings, stats, trigrams
-
-
-def _fuzzy_match(query_variant: str, trigrams: dict, postings: dict, limit: int = 3) -> list[str]:
-    """Return up to `limit` index tokens with high trigram overlap to the query.
-
-    Requires Jaccard-like overlap >= 0.6 to avoid spurious matches on
-    completely unrelated tokens (e.g. "xyzzy" sharing one trigram with "yzy").
-    """
-    qtg = set(_trigrams(query_variant))
-    if len(qtg) < 3:
-        return []
-    scores: dict[str, int] = {}
-    for tg in qtg:
-        for tok in trigrams.get(tg, []):
-            scores[tok] = scores.get(tok, 0) + 1
-    if not scores:
-        return []
-    ranked = []
-    for tok, hits in scores.items():
-        if tok not in postings:
-            continue
-        tok_tg = set(_trigrams(tok))
-        union = len(qtg | tok_tg) or 1
-        jaccard = hits / union
-        if jaccard >= 0.6:
-            ranked.append((jaccard, tok))
-    ranked.sort(key=lambda kv: -kv[0])
-    return [tok for _, tok in ranked[:limit]]
-
-
-def _expand_query(q: str) -> str:
-    """Append alias/acronym expansions to the query as extra search terms.
-
-    Acronyms are case-sensitive on lookup (StrlSchG ≠ strlschg), but the
-    expansion is appended as plain text and re-tokenized later. Alias matching
-    is case-insensitive on canonical and variants.
-    """
-    extra: list[str] = []
-    acronyms = extractor.load_acronyms()
-    aliases = extractor.load_aliases()
-    if not acronyms and not aliases:
-        return q
-    q_lower_words = {w.lower() for w in re.findall(r"\w+", q, flags=re.UNICODE)}
-    # Acronym hits: surface form match (case-sensitive) OR lowercase match
-    for entry in acronyms:
-        acro = entry.get("acronym", "")
-        if not acro:
-            continue
-        if acro in q or acro.lower() in q_lower_words:
-            extra.append(entry.get("expansion", ""))
-    # Alias hits: any variant or canonical present in the query → add the others
-    for entry in aliases:
-        canon = entry.get("canonical", "")
-        variants = entry.get("variants", []) or []
-        forms = [canon] + list(variants)
-        forms_lower = [f.lower() for f in forms if f]
-        if any(f in q.lower() for f in forms_lower):
-            extra.extend(f for f in forms if f and f.lower() not in q.lower())
-    if not extra:
-        return q
-    return q + " " + " ".join(extra)
-
-
-def facts_lookup(q: str, limit: int = 5) -> list[dict]:
-    """Return facts whose subject/kind tokens overlap the query."""
-    facts = extractor.load_facts()
-    if not facts:
-        return []
-    q_tokens = {t.lower() for t in tokenize(q)} - _STOPWORDS
-    if not q_tokens:
-        return []
-    scored: list[tuple[int, dict]] = []
-    for f in facts:
-        hay = " ".join(str(f.get(k, "")) for k in ("kind", "subject", "unit", "anchor"))
-        hay_tokens = {t for t in tokenize(hay) if t not in _STOPWORDS}
-        overlap = len(q_tokens & hay_tokens)
-        if overlap:
-            scored.append((overlap, f))
-    scored.sort(key=lambda kv: -kv[0])
-    return [f for _, f in scored[:limit]]
+    return postings, stats
 
 
 def query(q: str, top_k: int = 10) -> list[dict]:
@@ -282,7 +187,7 @@ def query(q: str, top_k: int = 10) -> list[dict]:
     Each hit: {chunk_id, score, source, anchor, heading_path, char_start, char_end,
                text_preview, lang, matched_terms}.
     """
-    postings, stats, trigrams = _load()
+    postings, stats = _load()
     n = stats.get("n", 0)
     if n == 0:
         return []
@@ -291,21 +196,11 @@ def query(q: str, top_k: int = 10) -> list[dict]:
     chunk_dl = stats.get("chunk_dl", {})
     chunk_meta = stats.get("chunk_meta", {})
 
-    q_expanded = _expand_query(q)
-    q_terms: list[str] = []
-    for tok in tokenize(q_expanded):
-        for v in variants(tok):
-            if v not in q_terms:
-                q_terms.append(v)
-
     expanded: list[str] = []
-    for term in q_terms:
-        if term in postings:
-            expanded.append(term)
-        else:
-            for alt in _fuzzy_match(term, trigrams, postings):
-                if alt not in expanded:
-                    expanded.append(alt)
+    for tok in tokenize(q):
+        for v in variants(tok):
+            if v in postings and v not in expanded:
+                expanded.append(v)
 
     if not expanded:
         return []

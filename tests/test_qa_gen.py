@@ -16,7 +16,6 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(lex_index, "INDEX_DIR", tmp_path / "index")
     monkeypatch.setattr(lex_index, "POSTINGS_PATH", tmp_path / "index" / "postings.json")
     monkeypatch.setattr(lex_index, "STATS_PATH", tmp_path / "index" / "stats.json")
-    monkeypatch.setattr(lex_index, "TRIGRAMS_PATH", tmp_path / "index" / "trigrams.json")
     monkeypatch.setattr(qa_gen, "INDEX_DIR", tmp_path / "index")
     monkeypatch.setattr(qa_gen, "QA_PATH", tmp_path / "index" / "qa.jsonl")
     return tmp_path
@@ -46,15 +45,20 @@ def test_generate_drops_unknown_chunk_ids(isolated):
     chunks = [{"chunk_id": "real", "anchor": "x", "text": "x"}]
     response = json.dumps([{"chunk_id": "ghost", "questions": ["Q?"]}])
     with patch.object(qa_gen.ollama_client, "generate", return_value=response):
-        assert qa_gen.generate(chunks) == []
+        out = qa_gen.generate(chunks, source="src.md")
+    # All LLM responses get dropped → title fallback fires (1 entry, attached to
+    # the selected target chunk).
+    assert out == [("real", qa_gen._title_question("src.md"))]
 
 
-def test_generate_empty_on_ollama_failure(isolated):
+def test_generate_falls_back_on_ollama_failure(isolated):
     chunks = [{"chunk_id": "c1", "anchor": "x", "text": "x"}]
     def boom(*a, **kw):
         raise RuntimeError("ollama down")
     with patch.object(qa_gen.ollama_client, "generate", side_effect=boom):
-        assert qa_gen.generate(chunks) == []
+        out = qa_gen.generate(chunks, source="src.md")
+    # Guarantee: 1 entry per source even when the LLM is completely unreachable.
+    assert out == [("c1", qa_gen._title_question("src.md"))]
 
 
 def test_persist_and_load_roundtrip(isolated):
