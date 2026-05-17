@@ -2,12 +2,11 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-professional-exposure.md
-- concept-public-exposure.md
-- concept-radiation-dose-limits.md
+- professional-exposure
+- public-exposure
 sources:
 - StrlSchG.md [Teil 6/13]
-- StrlSchV.md [Teil 1/15]
+- StrlSchV.md [Teil 3/15]
 - StrlSchV.md
 title: Radiation Dose Limits
 type: concept
@@ -31,7 +30,7 @@ Radiation Dose Limits are legally established maximum permissible levels of radi
 
 *Note: Limits for minors and pregnant women are also specified in the law [StrlSchG.md [Teil 6/13].md].*
 
-## Detailed Dose Concepts
-The StrlSchV provides technical definitions for dose measurement:
-*   **Äquivalentdosis (Equivalent Dose):** Calculated as the product of the energy dose in ICRU soft tissue and the quality factor Q of the ICRU (according to Anlage 18 Teil D) [StrlSchV.md [Teil 1/15].md].
-*   **Dosisrichtwert (Dose Limit):** Defined as an effective dose or organ-equivalent dose that serves as the upper value for considering exposure during the planning and optimization of protective measures for persons in planned exposure situations [StrlSchV.md [Teil 1/15].md].
+## Operational Context (StrlSchV)
+The *Strahlenschutzverordnung* (StrlSchV) incorporates these limits into operational control:
+*   **Area Definition:** The establishment of radiation protection areas (Überwachungsbereich, Kontrollbereich, Sperrbereich) is triggered if expected exposure exceeds specific dose thresholds, such as an effective dose exceeding 1 mSv in a Monitoring Area or 6 mSv in a Control Area [StrlSchV.md [Teil 3/15].md].
+*   **Monitoring:** Technical monitoring must be conducted to ensure compliance with these limits, with records kept for at least five years [StrlSchV.md [Teil 3/15].md].

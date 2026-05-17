@@ -1,7 +1,15 @@
 ---
 confidence: high
 created: '2026-05-17'
-related: []
+description: Munich Re (MUV2) — Full Deep-Dive Investment Report vom 16.05.2026
+effective as of: 16.05.2026
+fullname: Munich Re (MUV2) — Full Deep-Dive Investment Report
+name: Münchner Rückversicherungsgesellschaft - Munich Re
+related:
+- munich-re.md
+- reinsurance.md
+- private-credit.md
+- war-risk-insurance.md
 sources:
 - Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2]
 - Munich Re (MUV2) — Full Deep-Dive Investment Report.md
@@ -10,22 +18,23 @@ type: source-summary
 updated: '2026-05-17'
 ---
 
-# Munich Re (MUV2) — Full Deep-Dive Investment Report
+# Munich Re (MUV2) — Full Deep-Dive Investment Report (Part 2/2)
 
-This document summarizes key findings and operational data from the Munich Re (MUV2) — Full Deep-Dive Investment Report, effective as of 16.05.2026.
+This document summarizes various reports and news articles concerning the financial performance, investment activities, and risk exposures of Munich Re.
 
-## Financial Targets and Performance Indicators
-The report outlines specific financial expectations for Munich Re:
-*   **Profit Target:** Munich Re expects an IFRS net profit of €6.3 billion in 2026, as part of its Ambition 2030 strategy [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
-*   **Return Metrics:** The company anticipates Return on Equity (ROE) above 18% and Earnings Per Share (EPS) growth exceeding 8% in 2026 [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
-*   **Historical/Recent Data:** Other reported figures include Q1 2026 earnings showing EPS at EU13.41... [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md]. Furthermore, one report noted that Munich Re's profit jumped 57%, although shares subsequently slid [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
+## Financial Performance and Targets
+Munich Re has set specific financial targets for 2026. The company expects to achieve an IFRS net profit of €6.3 billion in 2026, alongside an expected Return on Equity (ROE) above 18% and Earnings Per Share (EPS) growth exceeding 8% [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
 
-## Risk Provisions and Conflict Exposure
-The report details provisions made in response to geopolitical instability:
-*   **Iran War Claims:** In the first quarter of the year, the reinsurance giant allocated EUR90 million ($105.6 million) for claims related to the Iran war [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
-*   **Management Confidence:** Despite these provisions, the CFO expressed confidence in the company's ability to handle potential claims inflation arising from the Iran war [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
-*   **Geopolitical Context:** Discussions held during the Association of Insurance and Financial Analysts conference indicated that Middle East conflict risks are viewed as manageable by re/insurers, although concerns regarding escalation persist [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md]. This context is further highlighted by reports of insurers canceling war-risk cover as conflict rages across the Persian Gulf [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
+Recent reports indicate fluctuations in performance; for instance, one report noted that Munich Re's profit jumped by 57%, although shares subsequently slid due to the reinsurer cutting new business [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md]. Furthermore, Q1 2026 earnings reports showed an EPS of EU13.41 [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
 
-## Investment Activities
-The report highlights the company's investment portfolio:
-*   **Private Credit:** Munich Re reported having investments of up to €2.5 billion ($2.9 billion) in private credit [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
+## Risk Provisions and Claims Management
+The company has allocated provisions related to geopolitical conflicts. Specifically, Munich Re booked EUR90 million ($105.6 million) in the first quarter of the year for claims related to the Iran war [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md]. Despite these provisions, the CFO expressed confidence regarding the handling of potential claims inflation stemming from the Iran war [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
+
+## Investment Exposure
+Munich Re maintains significant investment portfolios. The company reported having investments in private credit amounting to as much as €2.5 billion ($2.9 billion) [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
+
+## Geopolitical and Insurance Risks
+The Middle East conflict presents ongoing risk factors. Discussions among insurance and financial analysts noted that while Middle East conflict risks are generally seen as manageable for reinsurers, concerns regarding potential escalation remain present [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md]. This geopolitical instability has led to observable market behavior, including the cancellation of war-risk cover as conflict rages across the Persian Gulf [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
+
+## Historical Data
+Stock price history for Munich Re (Münchener Rück) is available for tracking from 1998 up to 2026 [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].

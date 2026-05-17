@@ -2,12 +2,12 @@
 confidence: high
 created: '2026-05-17'
 related:
-- radiation-protection
-- health-record-radiation
-- radiation-dose-limits
+- summary-strlschv-md-teil-11-15.md
 sources:
 - StrlSchG.md [Teil 6/13]
 - StrlSchG.md
+- StrlSchV.md [Teil 11/15]
+- StrlSchV.md
 title: Professional Exposure
 type: concept
 updated: '2026-05-17'
@@ -28,3 +28,8 @@ The management of professional exposure is highly regulated:
 *   **Radiation Protection Officer:** The Radiation Protection Officer is responsible for ensuring that records of body dose are immediately recorded for those under physical radiation protection control [StrlSchG.md [Teil 6/13].md].
 *   **Health Records:** A comprehensive health record must be maintained, detailing working conditions and monitoring results. This record must be kept until the individual reaches age 75, or at least 30 years after ceasing professional activity [StrlSchG.md [Teil 6/13].md].
 *   **Authorization:** The law details the process by which authorized physicians (ermächtigte Ärzte) can conduct medical monitoring and issue certificates regarding professional exposure [StrlSchG.md [Teil 6/13].md].
+
+## Technical Basis
+The technical assessment of professional exposure, especially when dealing with complex mixtures of radioactive materials, relies on detailed isotopic data, which is provided in the *Strahlenschutzverordnung* (StrlSchV) [StrlSchV.md [Teil 11/15].md].
+
+***

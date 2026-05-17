@@ -2,11 +2,12 @@
 confidence: high
 created: '2026-05-17'
 related:
-- professional-exposure
-- radiation-protection
+- concept-professional-exposure.md
+- concept-radiation-dose-limits.md
 sources:
 - StrlSchG.md [Teil 6/13]
-- StrlSchG.md
+- StrlSchV.md [Teil 9/15]
+- StrlSchV.md
 title: Health Record (Radiation)
 type: concept
 updated: '2026-05-17'
@@ -14,15 +15,15 @@ updated: '2026-05-17'
 
 # Health Record (Radiation)
 
-A Health Record specific to radiation exposure is a mandatory, detailed document used to track the health status and radiation dose history of individuals who are professionally exposed or undergo specific medical procedures involving radiation.
+A Health Record specific to radiation exposure is a mandatory, detailed document used to track an individual's cumulative exposure and health status related to ionizing radiation.
 
-## Required Contents
-The record must contain specific data points, including:
-*   Details about the working conditions [StrlSchG.md [Teil 6/13].md].
-*   Results of medical monitoring and special medical monitoring [StrlSchG.md [Teil 6/13].md].
-*   The medical certificate and information regarding the received body dose [StrlSchG.md [Teil 6/13].md].
+## Maintenance and Retention
+The maintenance of this record is strictly regulated:
+*   **Professional Exposure:** For professional exposure, a comprehensive health record must be maintained, detailing working conditions and monitoring results. This record must be kept until the individual reaches age 75, or at least 30 years after ceasing professional activity [StrlSchG.md [Teil 6/13].md].
+*   **Medical Oversight:** The authorized physician (*ermächtigte Ärzte*) is obliged to maintain a health record (§ 79 Abs. 2 StrlSchG) for every person subject to medical monitoring [StrlSchV.md [Teil 9/15].md].
 
-## Retention and Transfer
-The management of this record is governed by strict rules:
-*   **Retention Period:** The record must be kept until the person reaches the age of 75, or at least 30 years after ceasing professional activity, and must be destroyed no later than 100 years after birth [StrlSchG.md [Teil 6/13].md].
-*   **Access:** The authorized physician must provide the record to the competent authority upon request and must grant the examined person access to their own record upon request [StrlSchG.md [Teil 6/13].md].
+## Content and Purpose
+The record serves to document:
+*   **Dose Tracking:** It must record body dose measurements and monitoring results [StrlSchG.md [Teil 6/13].md].
+*   **Monitoring Details:** It includes details from initial examinations, repeat examinations, and assessments conducted by authorized physicians [StrlSchV.md [Teil 9/15].md].
+*   **Radiation Pass Integration:** The information recorded in the Radiation Pass (Strahlenpass) regarding dose values and monitoring results contributes to the overall health record [StrlSchV.md [Teil 9/15].md].

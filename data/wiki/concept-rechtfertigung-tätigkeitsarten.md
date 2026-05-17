@@ -2,10 +2,13 @@
 confidence: high
 created: '2026-05-17'
 related:
-- strahlenschutzgesetz-strlschg.md
+- concept-radiation-protection-law.md
+- concept-radiation-dose-limits.md
+- concept-public-exposure.md
 sources:
-- StrlSchG.md [Teil 2/13]
-- StrlSchG.md
+- StrlSchV.md [Teil 1/15]
+- StrlSchG.md [Teil 12/13]
+- StrlSchV.md
 title: Rechtfertigung von Tätigkeitsarten
 type: concept
 updated: '2026-05-17'
@@ -13,13 +16,20 @@ updated: '2026-05-17'
 
 # Rechtfertigung von Tätigkeitsarten
 
-Die Rechtfertigung von Tätigkeitsarten ist ein zentrales Prinzip des Strahlenschutzes.
+The justification of activities (*Rechtfertigung von Tätigkeitsarten*) is a central principle of radiation protection, requiring that any activity involving ionizing radiation or radioactive materials must be scientifically and legally necessary to achieve a beneficial outcome [StrlSchV.md [Teil 2/184].md].
 
-## Grundsätze
+## Legal Framework
+The process is governed by the *Strahlenschutzgesetz* (StrlSchG) and detailed in the StrlSchV. The law mandates that activities must be assessed to ensure that the potential benefits outweigh the associated risks [StrlSchV.md [Teil 2/184].md].
 
-*   **Rechtfertigung von Tätigkeitsarten (§ 6):** Neue Tätigkeitsarten, mit denen Expositionen von Mensch und Umwelt verbunden sein können, müssen unter Abwägung ihres wirtschaftlichen, gesellschaftlichen oder sonstigen Nutzens gegen die möglicherweise von ihnen ausgehende gesundheitliche Beeinträchtigung gerechtfertigt sein. Bei der Rechtfertigung sind die berufliche Exposition, die Exposition der Bevölkerung und die medizinische Exposition zu berücksichtigen [StrlSchG.md [Teil 2/13].md].
-*   **Überprüfung der Rechtfertigung:** Die Rechtfertigung bestehender Tätigkeitsarten kann überprüft werden, sobald wesentliche neue Erkenntnisse über den Nutzen oder die Auswirkungen der Tätigkeit oder wesentliche neue Informationen über andere Verfahren und Techniken vorliegen [StrlSchG.md [Teil 2/13].md].
+## Assessment Procedures
+The StrlSchV details the administrative procedures for establishing justification:
+1.  **Procedure via § 7 StrlSchG:** This involves submitting documentation (including those listed in Anlage 2) to the competent authority, which forwards the materials to the Federal Office for Radiation Protection (BfS) for review [StrlSchV.md [Teil 2/184].md].
+2.  **Procedure via § 38 StrlSchG:** This procedure is used for applications concerning permits or type approvals, requiring the applicant to demonstrate why the intended use, storage, or operation constitutes a new activity type [StrlSchV.md [Teil 2/184].md].
 
-## Verfahren
+## BfS Assessment Criteria
+When assessing justification, the BfS evaluates, in particular:
+*   The performance capability and suitability of the consumer good, device, facility, X-ray unit, or scatter source for the intended use, storage, or operation [StrlSchV.md [Teil 2/184].md].
+*   Whether the application is suitable to ensure that exposures during normal use, as well as the probability of misuse or accident-related exposures and their consequences, are as low as possible [StrlSchV.md [Teil 2/184].md].
 
-*   **Prüfung durch die Behörden:** Liegen Zweifel an der Rechtfertigung vor, übermittelt die zuständige Behörde die Unterlagen an das Bundesministerium für Umwelt, Naturschutz und nukleare Sicherheit. Das Bundesamt für Strahlenschutz prüft die Rechtfertigung innerhalb von zwölf Monaten und veröffentlicht einen wissenschaftlichen Bericht [StrlSchG.md [Teil 2/13].md].
+## Non-Justified Activities
+The StrlSchV explicitly lists activities that are not justified and therefore may not be carried out (see Anlage 1) [StrlSchV.md [Teil 2/184].md].

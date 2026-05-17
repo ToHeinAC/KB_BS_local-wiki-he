@@ -2,8 +2,7 @@
 confidence: medium
 created: '2026-05-17'
 related:
-- summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-2-2.md
-- munich-re.md
+- reinsurance.md
 sources:
 - Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2]
 - Munich Re (MUV2) — Full Deep-Dive Investment Report.md
@@ -14,9 +13,10 @@ updated: '2026-05-17'
 
 # War Risk Insurance
 
-War risk insurance pertains to coverage provided against losses resulting from armed conflict, civil unrest, or war-related perils.
+War risk insurance is a specialized form of coverage designed to protect insured assets or operations against losses arising from armed conflict, civil unrest, or war-related hostilities [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
 
-## Market Trends and Coverage Status
-The insurance market is currently experiencing significant volatility regarding this coverage:
-*   **Cancellation of Cover:** There are reports indicating that insurers are canceling war-risk cover as conflict continues to rage across the Persian Gulf [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
-*   **Industry Assessment:** Despite the risks, discussions among industry analysts suggest that Middle East conflict risks are currently viewed as manageable by re/insurers, though concerns regarding potential escalation remain present [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
+## Market Volatility
+The market for war risk insurance is highly sensitive to geopolitical stability. During periods of conflict, such as those described in the Persian Gulf, insurers have been observed canceling war-risk cover entirely [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
+
+## Role in Reinsurance
+This type of coverage is often managed within the broader reinsurance framework, as the risk transfer mechanisms must account for non-standard perils that exceed typical natural disaster modeling [Munich Re (MUV2) — Full Deep-Dive Investment Report.md [Teil 2/2].md].
