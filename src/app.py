@@ -583,5 +583,28 @@ elif page == "Maintenance":
                 st.error(str(e))
 
     st.markdown("---")
+    st.subheader("Delete Source")
+    _sources = dedup.list_sources()
+    if not _sources:
+        st.info("No sources ingested yet.")
+    else:
+        _selected = st.selectbox("Source to delete", _sources)
+        st.warning(
+            "Deletes the raw file, all chunks, QA pairs, and **all wiki pages** "
+            "that reference this source. This cannot be undone."
+        )
+        _confirmed = st.checkbox("I understand this is irreversible")
+        if st.button("Delete source", disabled=not _confirmed, type="primary"):
+            with st.spinner("Deleting…"):
+                _result = wiki_engine.delete_source(_selected)
+            st.success(
+                f"Deleted **{_selected}**. "
+                f"Wiki pages removed: {len(_result['wiki_pages'])}. "
+                f"QA rows removed: {_result['qa_rows']}. "
+                "Index rebuilt."
+            )
+            st.rerun()
+
+    st.markdown("---")
     st.subheader("Activity Log")
     st.code(wiki_engine.read_log(), language=None)

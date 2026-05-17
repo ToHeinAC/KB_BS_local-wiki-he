@@ -9,6 +9,7 @@ import frontmatter
 from dotenv import load_dotenv
 
 import chunker
+import dedup
 import lex_index
 import ollama_client
 import qa_gen
@@ -318,6 +319,60 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
 def rebuild_lex_index() -> dict:
     """Rebuild the BM25 index from all persisted chunks. Returns a summary."""
     return lex_index.build()
+
+
+def delete_source(source_name: str) -> dict:
+    """Remove a source and all derived data. Wiki pages referencing it are deleted.
+
+    Returns a summary dict with keys: raw, manifest, chunks, qa_rows, wiki_pages.
+    """
+    result: dict = {"raw": False, "manifest": False, "chunks": False, "qa_rows": 0, "wiki_pages": []}
+
+    raw_file = RAW_DIR / source_name
+    if raw_file.exists():
+        raw_file.unlink()
+        result["raw"] = True
+
+    result["manifest"] = dedup.deregister_source(source_name)
+
+    chunk_file = chunker.CHUNKS_DIR / f"{chunker._slug(source_name)}.jsonl"
+    if chunk_file.exists():
+        chunk_file.unlink()
+        result["chunks"] = True
+
+    result["qa_rows"] = qa_gen.delete_source_entries(source_name)
+
+    # Delete all wiki pages that reference this source in their frontmatter.
+    _SKIP = {"index.md", "log.md"}
+    search_dirs = [WIKI_DIR.glob("*.md")]
+    insights = WIKI_DIR / _INSIGHTS_DIR
+    if insights.exists():
+        search_dirs.append(insights.glob("*.md"))
+    for md_iter in search_dirs:
+        for md in md_iter:
+            if md.name in _SKIP:
+                continue
+            try:
+                post = frontmatter.load(str(md))
+                sources = post.metadata.get("sources", []) or []
+            except Exception:
+                continue
+            if any(str(s).startswith(source_name) for s in sources):
+                md.unlink()
+                rel = md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
+                result["wiki_pages"].append(rel)
+
+    lex_index.build()
+    _rebuild_index()
+    _append_log(
+        "Source deleted",
+        f"Source: {source_name}\n"
+        f"Raw file removed: {result['raw']}\n"
+        f"Chunks removed: {result['chunks']}\n"
+        f"QA rows removed: {result['qa_rows']}\n"
+        f"Wiki pages removed: {result['wiki_pages']}",
+    )
+    return result
 
 
 def query(question: str) -> str:

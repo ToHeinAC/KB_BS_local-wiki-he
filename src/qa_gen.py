@@ -180,6 +180,27 @@ def persist(items: list[tuple[str, str]], source: str) -> None:
                                ensure_ascii=False) + "\n")
 
 
+def delete_source_entries(source_name: str) -> int:
+    """Remove all QA entries for a source. Returns number of rows deleted."""
+    if not QA_PATH.exists():
+        return 0
+    kept, removed = [], 0
+    for line in QA_PATH.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            rec = json.loads(line)
+        except Exception:
+            kept.append(line)
+            continue
+        if rec.get("source") == source_name:
+            removed += 1
+        else:
+            kept.append(line)
+    QA_PATH.write_text("\n".join(kept) + ("\n" if kept else ""))
+    return removed
+
+
 def load() -> dict[str, list[str]]:
     """Return {chunk_id: [questions]} from qa.jsonl."""
     if not QA_PATH.exists():

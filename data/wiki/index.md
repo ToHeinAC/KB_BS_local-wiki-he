@@ -1,25 +1,35 @@
 # Wiki Index
-Updated: 2026-05-16 | Pages: 33
+Updated: 2026-05-17 | Pages: 44
 
 ## Pages
+- [Ambition 2030](ambition-2030-concept.md) — # Ambition 2030  Ambition 2030 is Munich Re's comprehensive strategic plan, announced on December 9, 2025, outlining the
 - [Bauartzulassung (Type Approval)](bauartzulassung.md) — A Bauartzulassung (Type Approval) is a regulatory authorization required for certain devices and facilities that generat
 - [Bestehende Expositionssituation](bestehende-expositionssituation.md) — A **Bestehende Expositionssituation** is defined within the *Strahlenschutzgesetz* (StrlSchG) as an exposure situation t
 - [Bundesamt für Strahlenschutz (BfS)](bundesamt-fuer-strahlenschutz.md) — # Bundesamt für Strahlenschutz (BfS)  Das Bundesamt für Strahlenschutz (BfS) ist eine zentrale Bundesbehörde, die für di
+- [Cyber Risk](cyber-risk-concept.md) — # Cyber Risk  Cyber Risk refers to the potential for financial loss, operational disruption, or data breach resulting fr
 - [E-Mobility](e-mobility.md) — # E-Mobility  In the context of industrial and automotive technology, **E-Mobility** refers to the segment of the market
 - [Exposition](exposition-concept.md) — In the context of the *Strahlenschutzgesetz* (StrlSchG), **Exposition** refers to the incidence of ionizing radiation on
 - [Geplante Expositionssituation](geplante-expositionssituation.md) — A **Planned Exposure Situation** is defined within the *Strahlenschutzgesetz* (StrlSchG) as an exposure situation that a
 - [Informationsaustausch bei Notfällen](informationsaustausch-notfall.md) — # Informationsaustausch bei Notfällen  Der Informationsaustausch ist ein kritischer Bestandteil der Notfallreaktion, der
+- [Life and Health Insurance](life-and-health-concept.md) — # Life and Health Insurance  Life and Health (L&H) insurance covers risks related to human mortality, morbidity, and lon
 - [Luftfahrt-Bundesamt (LBA)](luftfahrt-bundesamt.md) — # Luftfahrt-Bundesamt (LBA)  Das Luftfahrt-Bundesamt (LBA) ist die zuständige Bundesbehörde für die Überwachung des Schu
+- [Munich Re](munich-re-entity.md) — # Munich Re  Munich Reinsurance Company (MUV2) is one of the world's largest reinsurers, operating across multiple lines
+- [Munich Re](munich-re.md) — # Munich Re  Munich Re (Münchner Rückversicherungs AG) is a major global reinsurance company. The entity's financial per
 - [Notfall-Expositionssituation](notfall-expositionssituation.md) — A **Notfall-Expositionssituation** is defined under the *Strahlenschutzgesetz* (StrlSchG) as an exposure situation that 
 - [Notfallplan](notfall-plan.md) — # Notfallplan  Ein Notfallplan ist ein strukturiertes Regelwerk zur Koordination von Maßnahmen im Falle eines akuten Ere
 - [Physikalisch-Technische Bundesanstalt (PTB)](physikalisch-technische-bundesanstalt.md) — # Physikalisch-Technische Bundesanstalt (PTB)  Die Physikalisch-Technische Bundesanstalt (PTB) ist eine Bundesbehörde, d
+- [Private Credit](private-credit.md) — # Private Credit  In the context of investment portfolios, Private Credit refers to debt financing provided directly to 
+- [Property-Casualty Insurance](property-casualty-concept.md) — # Property-Casualty Insurance  Property-Casualty (P&C) insurance refers to coverage against physical damage to property 
 - [Radioaktive Stoffe](radioactive-substances.md) — Under the *Strahlenschutzgesetz* (StrlSchG), **Radioactive Substances** are defined as all substances containing one or 
 - [Radioaktive Altlasten (Radioactive Residues)](radioaktive-altlasten.md) — Radioactive residues (Rückstände) are materials subject to specific regulations under the Radiation Protection Act, gove
 - [Radioaktivität](radioaktivitaet.md) — # Radioaktivität  Radioaktivität bezieht sich auf die Emission von ionisierender Strahlung, deren Grundbegriffe und Ausw
+- [Reinsurance](reinsurance-concept.md) — # Reinsurance  Reinsurance is the practice where an insurance company (the ceding company) transfers a portion of its ri
 - [Schaeffler AG](schaeffler-ag.md) — # Schaeffler AG  Schaeffler AG is a global technology company specializing in motion technology, bearings, and industria
 - [Strahlenschutzgesetz - StrlSchG](strahlenschutzgesetz-strlschg.md) — # Strahlenschutzgesetz (StrlSchG)  Das Strahlenschutzgesetz (StrlSchG) ist das zentrale Gesetz zum Schutz vor der schädl
 - [Strahlenschutzgesetz (Radiation Protection Act)](strahlenschutzgesetz.md) — The Strahlenschutzgesetz (StrlSchG) is the German federal law governing the protection against the harmful effects of io
 - [Infineon AG Investment Idee](summary-infineon-investment-idea-md.md) — Infineon AG Investment Idee vom 06.05.2026
+- [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-1-2.md) — # Munich Re (MUV2) — Full Deep-Dive Investment Report  This document provides a comprehensive investment analysis of Mun
+- [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-2-2.md) — Munich Re (MUV2) — Full Deep-Dive Investment Report vom 16.05.2026
 - [Schaeffler AG Investment Overview](summary-schaeffler-ag-investment-overview-md.md) — # Schaeffler AG Investment Overview  This document provides a comprehensive investment analysis of Schaeffler AG, detail
 - [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-1-13.md) — The document provides a comprehensive overview of the *Strahlenschutzgesetz* (StrlSchG), or the "Law for the Protection 
 - [Strahlenschutzgesetz - StrlSchG (Teil 10/13)](summary-strlschg-md-teil-10-13.md) — This document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahl
@@ -35,3 +45,4 @@ Updated: 2026-05-16 | Pages: 33
 - [Strahlenschutzgesetz - StrlSchG (Teil 8/13)](summary-strlschg-md-teil-8-13.md) — This document summarizes excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung (Strah
 - [Strahlenschutzgesetz - StrlSchG (Teil 9/13)](summary-strlschg-md-teil-9-13.md) — This document summarizes excerpts from the German Radiation Protection Act (Strahlenschutzgesetz - StrlSchG), specifical
 - [Tätigkeit (Activity)](taetigkeit-concept.md) — Within the framework of the *Strahlenschutzgesetz* (StrlSchG), **Tätigkeit** (Activity) refers to a broad range of actio
+- [War Risk](war-risk.md) — # War Risk  War Risk, in the insurance and reinsurance industry, refers to the potential financial losses arising from a

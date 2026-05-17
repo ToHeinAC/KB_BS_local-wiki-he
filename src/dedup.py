@@ -51,3 +51,19 @@ def register_file(file_bytes: bytes, filename: str) -> Path:
     }
     _save_manifest(manifest)
     return dest
+
+
+def list_sources() -> list[str]:
+    """Return filenames of all registered sources."""
+    return [v["filename"] for v in _load_manifest().values()]
+
+
+def deregister_source(source_name: str) -> bool:
+    """Remove a source from the manifest by filename. Returns True if found."""
+    manifest = _load_manifest()
+    key = next((k for k, v in manifest.items() if v["filename"] == source_name), None)
+    if key is None:
+        return False
+    del manifest[key]
+    _save_manifest(manifest)
+    return True
