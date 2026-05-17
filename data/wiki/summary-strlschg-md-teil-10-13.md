@@ -1,93 +1,89 @@
 ---
-title: "Strahlenschutzgesetz - StrlSchG (Teil 10/13)"
-type: source-summary
-sources: ["StrlSchG.md [Teil 10/13]"]
-related: ["strahlenschutzgesetz-strlschg.md"]
-created: "2026-05-15"
-updated: "2026-05-15"
 confidence: high
+created: '2026-05-17'
+related:
+- strahlenschutzgesetz-strlschg.md
+- umweltradioaktivitaet.md
+- strahlenschutzregister.md
+- berufliche-exposition.md
+sources:
+- StrlSchG.md [Teil 10/13]
+- StrlSchG.md
+title: Strahlenschutzgesetz - StrlSchG (Teil 10/13)
+type: source-summary
+updated: '2026-05-17'
 ---
 
-This document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahlenschutzgesetz - StrlSchG), specifically covering sections § 156 through § 181, detailing measures for existing exposure situations, environmental monitoring, occupational dose recording, and regulatory oversight.
+The source document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahlenschutzgesetz - StrlSchG), detailing various sections concerning environmental monitoring, occupational exposure, and administrative procedures.
 
-## Maßnahmen bei sonstigen bestehenden Expositionssituationen (§ 156 - § 159)
+## § 156 Maßnahmen
+The competent authority can determine the type, scope, duration, and goal of remediation and other measures to prevent or reduce exposure based on the assessment of the existing exposure situation [StrlSchG.md [Teil 10/13].md].
+*   **Principles for Measures:** When setting measures, the following principles must be observed:
+    1.  Any unnecessary exposure or contamination of man and environment must be avoided [StrlSchG.md [Teil 10/13].md].
+    2.  Reference values set according to § 155 should be kept as low as possible [StrlSchG.md [Teil 10/13].md].
+    3.  Any exposure or contamination of man and environment must be kept as low as possible, even below the reference values [StrlSchG.md [Teil 10/13].md].
+*   The competent authority can mandate responsible parties to carry out the determined measures and to determine the effective dose for workers and individuals after completion [StrlSchG.md [Teil 10/13].md].
 
-### § 156 Maßnahmen
-*   **Festlegung von Maßnahmen:** Die zuständige Behörde kann Art, Umfang, Dauer und Ziel von Sanierungs- und sonstigen Maßnahmen zur Verhinderung oder Verminderung der Exposition festlegen, basierend auf der Ermittlung und Bewertung der sonstigen bestehenden Expositionssituation [StrlSchG.md [Teil 10/13].md].
-*   **Grundprinzipien:** Bei der Festlegung sind folgende Grundsätze zu beachten:
-    1.  Jede unnötige Exposition oder Kontamination von Mensch und Umwelt ist zu vermeiden [StrlSchG.md [Teil 10/13].md].
-    2.  Die nach § 155 festgelegten Referenzwerte sollen möglichst unterschritten werden [StrlSchG.md [Teil 10/13].md].
-    3.  Jede Exposition oder Kontamination von Mensch und Umwelt ist auch unterhalb der Referenzwerte so gering wie möglich zu halten [StrlSchG.md [Teil 10/13].md].
-*   **Verpflichtungen:** Die zuständige Behörde kann Verantwortliche verpflichten, die festgelegten Maßnahmen durchzuführen und nach Abschluss die effektive Dosis der Arbeitskräfte und von Einzelpersonen der Bevölkerung zu ermitteln [StrlSchG.md [Teil 10/13].md].
-*   **Überprüfung:** Die zuständige Behörde bewertet die ergriffenen Maßnahmen in regelmäßigen Abständen und kann Unterlagen verlangen [StrlSchG.md [Teil 10/13].md].
+## § 158 Information
+The competent authority must:
+1.  Regularly inform the exposed and potentially exposed population about possible risks from the existing exposure situation and available measures to reduce exposure [StrlSchG.md [Teil 10/13].md].
+2.  Publish recommendations for individual behavior or local measures and update them if necessary [StrlSchG.md [Teil 10/13].md].
 
-### § 157 Kosten; Ausgleichsanspruch
-Die Kosten der nach § 154 Absatz 3 und § 156 Absatz 3 angeordneten Maßnahmen tragen die Verpflichteten [StrlSchG.md [Teil 10/13].md].
+## § 159 Anmeldung
+The provisions of this section apply if:
+1.  The existing exposure situation is significant from a radiation protection perspective, especially if the reference value according to § 155 can be exceeded, or, if no reference value is set, an effective dose of 1 millisievert in a calendar year can be exceeded, and one of the responsible parties is simultaneously the cause of the existing exposure situation [StrlSchG.md [Teil 10/13].md].
+The responsible party must report the existing exposure situation immediately to the competent authority [StrlSchG.md [Teil 10/13].md].
 
-### § 158 Information
-Die zuständige Behörde ist verpflichtet:
-1.  Die exponierte und potentiell exponierte Bevölkerung regelmäßig über mögliche Risiken durch die sonstige bestehende Expositionssituation sowie über verfügbare Maßnahmen zur Verringerung ihrer Exposition zu informieren [StrlSchG.md [Teil 10/13].md].
-2.  Empfehlungen für das individuelle Verhalten oder Maßnahmen auf örtlicher Ebene zu veröffentlichen und diese bei Bedarf zu aktualisieren [StrlSchG.md [Teil 10/13].md].
+## § 161 Aufgaben des Bundes (Federal Tasks)
+The federal government has tasks including:
+1.  Large-scale determination of radioactivity in:
+    a) air,
+    b) precipitation,
+    c) federal waterways and the North and Baltic Seas outside federal waterways and in marine organisms,
+    d) the ground surface, and
+    e) gamma site dose rate [StrlSchG.md [Teil 10/13].md].
+2.  Developing and setting sampling, analysis, measuring, and calculation procedures for determining environmental radioactivity, as well as conducting comparative measurements and analyses [StrlSchG.md [Teil 10/13].md].
+3.  Compiling, documenting, and processing data on environmental radioactivity provided by the federal government, the states, and bodies outside the scope of this law [StrlSchG.md [Teil 10/13].md].
+4.  Creating dispersion forecasts, developing and operating decision support systems, and evaluating data on environmental radioactivity [StrlSchG.md [Teil 10/13].md].
 
-### § 159 Anmeldung; Anwendung der Bestimmungen zu geplanten Expositionssituationen; Verordnungsermächtigung
-*   **Anwendungsbereich:** Die Vorschriften gelten, wenn die sonstige bestehende Expositionssituation aus Sicht des Strahlenschutzes bedeutsam ist, insbesondere wenn der Referenzwert nach § 155 überschritten werden kann oder, falls kein Referenzwert festgelegt ist, eine effektive Dosis von 1 Millisievert im Kalenderjahr überschritten werden kann, und einer der Verantwortlichen zugleich Verursacher ist [StrlSchG.md [Teil 10/13].md].
-*   **Verantwortliche Pflichten:** Der Verantwortliche muss die Situation unverzüglich anmelden und dafür sorgen, dass Expositionen so gering wie möglich gehalten werden [StrlSchG.md [Teil 10/13].md].
+## § 162 Aufgaben der Länder (State Tasks)
+The states are responsible for determining radioactivity, particularly in:
+1.  food, feed, and consumer goods, if these serve as indicators for environmental radioactivity [StrlSchG.md [Teil 10/13].md].
+2.  medicines and their active ingredients [StrlSchG.md [Teil 10/13].md].
+3.  drinking water, groundwater, and surface waters outside federal waterways [StrlSchG.md [Teil 10/13].md].
+4.  sewage, sludge, and waste [StrlSchG.md [Teil 10/13].md].
+5.  soil and plants [StrlSchG.md [Teil 10/13].md].
 
-## Umweltradioaktivität (§ 161 - § 164)
+## § 163 Integriertes Mess- und Informationssystem des Bundes
+The Federal Radiation Protection Agency operates an integrated measurement and information system for monitoring environmental radioactivity, where data determined according to § 161 (1) and § 162 (1) are compiled [StrlSchG.md [Teil 10/13].md].
 
-### § 161 Aufgaben des Bundes
-Der Bund hat Aufgaben wie die großräumige Ermittlung der Radioaktivität in der Luft, Niederschlägen, Bundeswasserstraßen/Nord- und Ostsee, auf der Bodenoberfläche und die Gamma-Ortsdosisleistung [StrlSchG.md [Teil 10/13].md]. Der Bund entwickelt und legt Verfahren zur Ermittlung der Umweltradioaktivität fest und erstellt Ausbreitungsprognosen [StrlSchG.md [Teil 10/13].md].
+## § 166 Festlegungen zur Ermittlung der beruflichen Exposition
+Body doses from professional exposure must be added if they are determined in several of the following areas:
+1.  activities as a professionally exposed person [StrlSchG.md [Teil 10/13].md].
+2.  in connection with Radon at the workplace [StrlSchG.md [Teil 10/13].md].
+3.  during remediation and other measures to prevent and reduce exposure from radioactive contaminated sites, as well as other activities related to radioactive contaminated sites [StrlSchG.md [Teil 10/13].md].
+4.  in reportable existing exposure situations [StrlSchG.md [Teil 10/13].md].
 
-### § 162 Aufgaben der Länder
-Die Länder ermitteln die Radioaktivität insbesondere in Lebensmitteln, Futtermitteln und Bedarfsgegenständen, Arzneimitteln, Trinkwasser/Grundwasser/oberirdischen Gewässern, Abwässern/Klärschlamm/Abfällen, sowie im Boden und in Pflanzen [StrlSchG.md [Teil 10/13].md].
+## § 167 Aufzeichnungs-, Aufbewahrungs- und behördliche Mitteilungspflichten
+The radiation protection responsible person, the obligated party, and the responsible party must immediately record:
+1.  The results of measurements, determinations, or estimates of the body dose, and data used for these [StrlSchG.md [Teil 10/13].md].
+2.  Personal data (surname, birth name, first names, date and place of birth, gender, nationality) [StrlSchG.md [Teil 10/13].md].
+3.  The personal identification number according to § 170 (3) sentence 1 [StrlSchG.md [Teil 10/13].md].
+4.  For radiation pass holders, the continuous number of the radiation pass [StrlSchG.md [Teil 10/13].md].
+5.  Employment characteristics and exposure conditions [StrlSchG.md [Teil 10/13].md].
+Records must be kept until the supervised person reaches the age of 75 or would have reached it, but at least 30 years after the end of the respective employment [StrlSchG.md [Teil 10/13].md].
 
-### § 163 Integriertes Mess- und Informationssystem des Bundes
-Das Bundesamt für Strahlenschutz betreibt ein integriertes Mess- und Informationssystem, in dem Daten nach § 161 Abs. 1 und § 162 Abs. 1 zusammengefasst werden [StrlSchG.md [Teil 10/13].md].
+## § 170 Strahlenschutzregister
+Data on professional exposures collected under this law are recorded in the Radiation Protection Register (Strahlenschutzregister) for the purpose of monitoring dose limits, observing radiation protection principles, checking claims against statutory accident insurance, and scientific research [StrlSchG.md [Teil 10/13].md].
+The register records data including:
+1.  The personal identification number according to paragraph 3 [StrlSchG.md [Teil 10/13].md].
+2.  The respective personal data [StrlSchG.md [Teil 10/13].md].
+3.  Employment characteristics and exposure conditions [StrlSchG.md [Teil 10/13].md].
+4.  The operating number of the employing operation [StrlSchG.md [Teil 10/13].md].
+5.  Name and address of the radiation protection responsible person, the obligated party, and the responsible party [StrlSchG.md [Teil 10/13].md].
+6.  Data on a radiation pass registered according to a law supporting this law [StrlSchG.md [Teil 10/13].md].
+7.  Data on the competent authority [StrlSchG.md [Teil 10/13].md].
+8.  The body dose determined due to professional exposure, the exposure conditions, and the findings of the competent authority regarding this body dose and the exposure conditions [StrlSchG.md [Teil 10/13].md].
 
-### § 164 Bewertung der Daten
-Das Bundesministerium für Umwelt, Naturschutz und nukleare Sicherheit bewertet die Daten zur Umweltradioaktivität und leitet dem Deutschen Bundestag und dem Bundesrat jährlich einen Bericht über die Entwicklung der Radioaktivität in der Umwelt zu [StrlSchG.md [Teil 10/13].md].
-
-## Berufliche Exposition und Dosisermittlung (§ 166 - § 172)
-
-### § 166 Festlegungen zur Ermittlung der beruflichen Exposition
-Die Körperdosen aus beruflicher Exposition sind zu addieren, wenn sie in mehreren der folgenden Bereiche ermittelt werden:
-1. Bei Tätigkeiten als beruflich exponierte Person [StrlSchG.md [Teil 10/13].md].
-2. Im Zusammenhang mit Radon am Arbeitsplatz [StrlSchG.md [Teil 10/13].md].
-3. Bei Sanierungs- und sonstigen Maßnahmen bei radioaktiven Altlasten [StrlSchG.md [Teil 10/13].md].
-4. Bei anmeldebedürftigen sonstigen bestehenden Expositionssituationen [StrlSchG.md [Teil 10/13].md].
-
-### § 167 Aufzeichnungs-, Aufbewahrungs- und behördliche Mitteilungspflichten
-Der Strahlenschutzverantwortliche und andere Verpflichtete müssen unverzüglich aufzeichnen:
-*   Ergebnisse von Messungen, Ermittlungen oder Abschätzungen der Körperdosis sowie zugehörige Daten [StrlSchG.md [Teil 10/13].md].
-*   Personendaten (Familienname, Geburtsname, Vornamen, Geburtsdatum und -ort, Geschlecht, Staatsangehörigkeit) [StrlSchG.md [Teil 10/13].md].
-*   Die persönliche Kennnummer nach § 170 Absatz 3 Satz 1 [StrlSchG.md [Teil 10/13].md].
-*   Bei Strahlenpassinhabern die fortlaufende Nummer des Strahlenpasses [StrlSchG.md [Teil 10/13].md].
-*   Beschäftigungsmerkmale und Expositionsverhältnisse [StrlSchG.md [Teil 10/13].md].
-Die Aufzeichnungen müssen bis zum 75. Lebensjahr oder mindestens 30 Jahre nach Beendigung der Beschäftigung aufbewahrt werden [StrlSchG.md [Teil 10/13].md].
-
-### § 169 Bestimmung von Messstellen
-Die zuständige Behörde bestimmt Messstellen für die Ermittlung der beruflichen Exposition bei äußeren und inneren Expositionen, bei Einsatzkräften, bei Radon, bei Altlasten und bei sonstigen bestehenden Expositionssituationen [StrlSchG.md [Teil 10/13].md].
-*   **Voraussetzungen:** Eine Messstelle muss ausreichend Personal, erforderliche Verfahren, räumliche/technische Ausstattung, ein angemessenes Qualitätsmanagementsystem und Unabhängigkeit vorweisen [StrlSchG.md [Teil 10/13].md].
-*   **Aufbewahrung:** Die Messstelle muss die Aufzeichnungen fünf Jahre lang aufbewahren [StrlSchG.md [Teil 10/13].md].
-
-### § 170 Strahlenschutzregister
-Daten über berufliche Expositionen werden in einem beim Bundesamt für Strahlenschutz eingerichteten Register erfasst. Die eingetragenen Daten umfassen unter anderem:
-*   Die persönliche Kennnummer nach Absatz 3 [StrlSchG.md [Teil 10/13].md].
-*   Personendaten, Beschäftigungsmerkmale und Expositionsverhältnisse [StrlSchG.md [Teil 10/13].md].
-*   Die ermittelte Körperdosis infolge einer beruflichen Exposition sowie die Expositionsbedingungen [StrlSchG.md [Teil 10/13].md].
-Das Bundesamt für Strahlenschutz vergibt die persönliche Kennnummer mittels nicht rückführbarer Verschlüsselung aus der Versicherungsnummer des Sechsten Buches Sozialgesetzbuch [StrlSchG.md [Teil 10/13].md].
-
-### § 172 Bestimmung von Sachverständigen
-Die zuständige Behörde bestimmt Sachverständige für Tätigkeiten wie die Prüfung von Röntgeneinrichtungen, die Prüfung von Arbeitsplätzen mit natürlicher Radioaktivität, die Prüfung von Anlagen zur Erzeugung ionisierender Strahlung, Dichtheitsprüfung von radioaktiven Stoffen und bauartzugelassenen Vorrichtungen [StrlSchG.md [Teil 10/13].md].
-*   **Unabhängigkeit:** Der Sachverständige muss unabhängig von Personen sein, die an der Herstellung, dem Vertrieb oder der Instandhaltung der betroffenen Anlagen beteiligt sind [StrlSchG.md [Teil 10/13].md].
-
-## Weitere Vorschriften (§ 175 - § 181)
-
-### § 175 Dosis- und Messgrößen
-Für die Ermittlung der Organ-Äquivalentdosis ist die äußere und innere Exposition zu berücksichtigen. Das Bundesministerium für Umwelt, Naturschutz und nukleare Sicherheit wird ermächtigt, Rechtsverordnungen zu treffen, um nähere Anforderungen an die Bestimmung der Organ-Äquivalentdosis und der effektiven Dosis festzulegen [StrlSchG.md [Teil 10/13].md].
-
-### § 176 Haftung
-Die Haftung für durch ionisierende Strahlung verursachte Schäden richtet sich nach den §§ 25 bis 40 des Atomgesetzes [StrlSchG.md [Teil 10/13].md].
-
-### § 180 Aufsichtsprogramm
-Im Rahmen der strahlenschutzrechtlichen Aufsicht bei geplanten Expositionssituationen richtet die zuständige Behörde ein Aufsichtsprogramm ein, das dem möglichen Ausmaß und der Art der Risiken Rechnung trägt [StrlSchG.md [Teil 10/13].md].
+## § 175 Dosis- und Messgrößen
+For the determination of the organ equivalent dose, the external and internal exposure must be considered, unless otherwise specified. For internal exposure, the exposure occurring outside the reference period due to radionuclides ingested during the reference period must also be considered [StrlSchG.md [Teil 10/13].md].

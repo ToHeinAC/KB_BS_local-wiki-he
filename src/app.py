@@ -389,9 +389,9 @@ var net=new vis.Network(document.getElementById('g'),
 </script></body></html>"""
                     st.components.v1.html(html, height=620, scrolling=True)
                     st.caption(
-                        "**Legend:** blue dot = wiki page, orange diamond = source document. "
-                        "Solid grey = `related-to` (page ↔ page). "
-                        "Dashed orange → = `derived-from` (page → source)."
+                        "**Legend:** blue dot = concept/entity, orange diamond = source document. "
+                        "Solid grey = `related-to` (concept ↔ concept, incl. shared-source clique). "
+                        "Dashed orange → = `derived-from` (concept → source)."
                     )
                     orphans = wiki_engine.find_orphans()
                     if orphans:
@@ -604,6 +604,19 @@ elif page == "Maintenance":
                 "Index rebuilt."
             )
             st.rerun()
+
+    st.markdown("---")
+    st.subheader("Reset all data")
+    st.error(
+        "Deletes EVERY raw source, chunk, QA pair, lexical index entry, and "
+        "wiki page. Wiki is re-initialised empty. Used to start tests fresh."
+    )
+    _reset_ok = st.checkbox("I understand this wipes all ingested data")
+    if st.button("Reset all data", disabled=not _reset_ok):
+        with st.spinner("Wiping…"):
+            _counts = wiki_engine.reset_all_data()
+        st.success(f"Cleared: {_counts}")
+        st.rerun()
 
     st.markdown("---")
     st.subheader("Activity Log")

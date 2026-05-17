@@ -1,25 +1,38 @@
 ---
-title: "Radioaktive Altlasten (Radioactive Residues)"
-type: concept
-sources: ["StrlSchG.md [Teil 12/13]"]
-related: ["strahlenschutzgesetz.md", "summary-strlschg-md-teil-12-13.md"]
-created: "2026-05-15"
-updated: "2026-05-15"
 confidence: high
+created: '2026-05-17'
+related:
+- summary-strlschg-md-teil-9-13.md
+- strahlenschutzgesetz-strlschg.md
+- sanierungsplan.md
+sources:
+- StrlSchG.md [Teil 9/13]
+- StrlSchG.md
+title: Radioaktive Altlasten
+type: concept
+updated: '2026-05-17'
 ---
-Radioactive residues (Rückstände) are materials subject to specific regulations under the Radiation Protection Act, governing their handling, disposal, and potential reuse.
 
-## Definition of Residues
-According to Anlage 1, residues include:
-1.  Sludges and deposits from the extraction, processing, and refinement of crude oil and natural gas, and from deep geothermal energy [StrlSchG.md [Teil 12/13].md].
-2.  Kyanite, sands, resins, and activated charcoal from groundwater purification [StrlSchG.md [Teil 12/13].md].
-3.  Unprocessed phosphate gypsum, sludges from its refinement, and dusts and slags from raw phosphate processing [StrlSchG.md [Teil 12/13].md].
-4.  Various geological materials (e.g., Bauxite, Columbite, etc.) and associated byproducts [StrlSchG.md [Teil 12/13].md].
+# Radioaktive Altlasten
 
-## Exclusions
-Materials are explicitly *not* considered residues if:
-1.  Their specific activity for every radionuclide of the U-238 decay chain and the Th-232 decay chain is below 0.2 Becquerel per gram (Bq/g), and they are not intended for use as building products [StrlSchG.md [Teil 12/13].md].
-2.  They are introduced as raw materials in the technological processes mentioned above [StrlSchG.md [Teil 12/13].md].
+Radioactive contaminated sites (radioaktive Altlasten) are defined under the Strahlenschutzgesetz (StrlSchG) as properties, parts of properties, buildings, or bodies of water contaminated by completed human activities, where the contamination causes or can cause an exposure exceeding the reference value of 1 millisievert in the calendar year for individuals in the population [summary-strlschg-md-teil-9-13.md].
 
-## Disposal and Handling
-The law governs the disposal and remediation of such materials, including provisions for the continuation of permits for remediation, protection, or aftercare measures on sites mentioned in the Unification Treaty of September 6, 1990 [StrlSchG.md [Teil 12/13].md].
+## Definition and Scope
+*   **Definition:** Contamination resulting from completed human activities that exceeds the reference dose of 1 mSv/year [summary-strlschg-md-teil-9-13.md].
+*   **Scope:** The law covers contaminated sites, and provisions also apply to other non-classified remnants from mining and industrial activities, provided the contamination is attributable to completed human activities [summary-strlschg-md-teil-9-13.md].
+*   **Assessment:** The competent authority must consider the legally permissible use of the properties and their environment when determining the exposure [summary-strlschg-md-teil-9-13.md].
+
+## Responsibility
+Responsibility for a radioactive contaminated site lies with:
+1.  Whoever caused the contamination.
+2.  A person following in total legal succession to the person listed in Number 1.
+3.  The owner of the site.
+4.  Whoever exercises actual control over the site.
+5.  Whoever relinquishes ownership of the site [summary-strlschg-md-teil-9-13.md].
+
+## Management and Remediation
+The management of these sites involves several mandatory steps:
+*   **Suspicion:** Any person who has grounds for suspecting a contaminated site must notify the competent authority immediately [summary-strlschg-md-teil-9-13.md].
+*   **Planning:** The competent authority may require the responsible party to submit a comprehensive **Remediation Plan (Sanierungsplan)**. This plan must detail investigation results, planned remediation measures, and follow-up actions [summary-strlschg-md-teil-9-13.md].
+*   **Authority Powers:** The competent authority has the power to mandate investigations, remediation measures, and monitoring to ensure the reference value is undercut [summary-strlschg-md-teil-9-13.md].
+*   **Financial Liability:** The costs of mandated measures are generally borne by the responsible parties [summary-strlschg-md-teil-9-13.md].

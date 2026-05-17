@@ -1,172 +1,68 @@
 ---
-title: "Strahlenschutzgesetz - StrlSchG (Teil 8/13)"
-type: source-summary
-sources: ["StrlSchG.md [Teil 8/13]"]
-related: ["radiological-situation-picture.md", "dose-assessment.md", "emergency-response-personnel.md", "post-incident-exposure-situation.md", "radon-protection.md"]
-created: "2026-05-15"
-updated: "2026-05-15"
 confidence: high
+created: '2026-05-17'
+related:
+- radiologisches-lagebild.md
+- dosisabschätzung.md
+- schutz-der-einsatzkräfte.md
+- radon-schutz.md
+sources:
+- StrlSchG.md [Teil 8/13]
+- StrlSchG.md
+title: Strahlenschutzgesetz - StrlSchG (Teil 8/13)
+type: source-summary
+updated: '2026-05-17'
 ---
 
-This document summarizes excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung (Strahlenschutzgesetz - StrlSchG)*, specifically detailing procedures related to radiological emergencies, protective measures, and radon protection.
+This document summarizes sections of the German Radiation Protection Act ($\text{Strahlenschutzgesetz - StrlSchG}$), detailing procedures for managing radiological emergencies, assessing risks, and protecting the population and emergency personnel.
 
-### General Provisions and Radiological Situation
+## Tasks and Reporting (Sections $\S 107 - \S 112$)
 
-**§ 107 Aufgaben der Länder bei der Ermittlung und Auswertung der radiologischen Lage**
-The Länder must immediately transmit to the radiological situation center of the Federal Government:
-1. Data to be transmitted to the Central Office for Monitoring Environmental Radioactivity according to § 162 Absatz 2 [StrlSchG.md [Teil 8/13].md].
-2. Notifications from the radiation protection officer regarding a transregional or regional emergency in their state territory or an event in their state territory that could lead to such an emergency [StrlSchG.md [Teil 8/13].md].
-3. Other findings regarding a transregional or regional emergency in their state territory [StrlSchG.md [Teil 8/13].md].
-4. In the event of a transregional or regional emergency in their state territory, data relevant to the radiological situation for the facility or radiation source, the radiological inventory, and releases, as well as release assessments and prognoses [StrlSchG.md [Teil 8/13].md].
-5. In the event of a transregional or regional emergency in the federal territory or in the neighboring foreign country, facility-related measurement data originating from facility-related monitoring programs or from further location-dependent measurements [StrlSchG.md [Teil 8/13].md].
-6. In the event of transregional or regional emergencies, notifications of protective measures taken by the responsible state authorities, as well as information for the population and behavioral recommendations according to § 112 Absatz 2 [StrlSchG.md [Teil 8/13].md].
-7. Notifications regarding the effectiveness of these protective measures and behavioral recommendations [StrlSchG.md [Teil 8/13].md].
+### $\S 107$ Tasks of the Länder
+The Länder (States) must immediately transmit the following to the Federal Radiological Situation Center ($\text{radiologisches Lagezentrum des Bundes}$):
+1. Data transmitted under $\S 162$ Paragraph 2 to the Central Office for Environmental Radioactivity Monitoring.
+2. Notifications from the radiation protection officer regarding a regional or supra-regional emergency in their state territory, or an event that could lead to such an emergency.
+3. Other findings concerning a regional or supra-regional emergency in their state territory.
+4. In case of a regional or supra-regional emergency in their state territory: data relevant to the radiological situation for the facility or radiation source, the radiological inventory, and releases, as well as release assessments and prognoses.
+5. In case of a regional or supra-regional emergency in the federal territory or in the border area: facility-related measurement data from facility-related monitoring programs or from further location-dependent measurements.
+6. In case of regional or supra-regional emergencies: notifications about protective measures taken by the responsible state authorities, as well as information for the population and recommendations for behavior according to $\S 112$ Paragraph 2.
+7. Notifications about the effectiveness of these protective measures and behavior recommendations.
 
-**§ 108 Radiologisches Lagebild**
-(1) Upon the occurrence of a transregional or regional emergency, a radiological situation picture must be created. This picture must process, display, and evaluate information according to §§ 106, 107, and 161 to 163, and other relevant information regarding the type, scope, and expected development of the radiological situation. The radiological situation picture must be updated according to the further development of the emergency and the relevant information. If a dose assessment according to § 111 Absatz 1 is available, it must also be included in the radiological situation picture [StrlSchG.md [Teil 8/13].md].
-(2) In the event of a transregional emergency, the radiological situation picture is created by the radiological situation center of the Federal Government. In the event of a regional emergency, the state where the emergency occurs creates the radiological situation picture. The state can assign this task to the radiological situation center of the Federal Government generally or in individual cases in agreement with the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety; the radiological situation center of the Federal Government can take over this task in individual cases in consultation with the state [StrlSchG.md [Teil 8/13].md].
-(3) The Federal Government can determine when to assume a transregional, regional, or local emergency in the general emergency plan of the Federal Government, particularly based on the reference scenarios set out therein [StrlSchG.md [Teil 8/13].md].
-(4) By administrative agreement of the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety with the responsible state authority, it can be stipulated that in the event of an emergency in a nuclear technical facility or establishment requiring a permit according to §§ 6, 7, or 9 of the Atomic Energy Act or planning approval according to § 9b of the Atomic Energy Act, the state where the nuclear technical facility or establishment is located provides the radiological situation center of the Federal Government with an assessment of its regional data, in addition to the data according to § 107, up to the distance from the nuclear technical facility or establishment that the procedural and technical equipment of the state prognostically and diagnostically allows [StrlSchG.md [Teil 8/13].md].
+### $\S 108$ Radiological Situation Picture ($\text{radiologisches Lagebild}$)
+A radiological situation picture is created upon the occurrence of a supra-regional or regional emergency. This picture must process, display, and evaluate information regarding the type, scope, and expected development of the radiological situation, referencing $\S\S 106, 107$ and $161$ to $163$, and other relevant information. The picture must be updated according to the further development of the emergency. If a dose assessment according to $\S 111$ Paragraph 1 is available, it must also be included.
 
-**§ 109 Entscheidungen über Schutzmaßnahmen durch die zuständigen Behörden**
-(1) Whether protective measures are taken in the event of an emergency and which protective measures are appropriate for this emergency are decided by the responsible authorities according to the legal ordinances based on §§ 94 to 96 and, if nothing else results from these, based on:
-1. the federal and state legal regulations applicable to the repulsion of dangers for human health, for the environment, or for public safety; and
-2. immediately applicable acts of the European Union and the European Atomic Community, insofar as these legal regulations and acts are also applicable in the case of radiological dangers.
-Decisions must consider the emergency plans, the radiological situation, and the other decision-making circumstances of the respective emergency [StrlSchG.md [Teil 8/13].md].
-(2) For the assessment of the radiological situation, the radiological situation picture according to § 108 is decisive in the event of transregional and regional emergencies [StrlSchG.md [Teil 8/13].md].
-(3) In the further course of the emergency, the responsible authorities examine whether the protective measures should be changed, supplemented, or terminated. They take into account the effectiveness of the protective measures taken and changes in the radiological situation and the other circumstances of the emergency [StrlSchG.md [Teil 8/13].md].
+*   **Creation Authority:** During a supra-regional emergency, the Federal Radiological Situation Center creates the picture. During a regional emergency, the state where the emergency occurs creates it.
+*   **Transfer:** The state can transfer this task to the Federal Radiological Situation Center (generally or in specific cases) with the consent of the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety ($\text{BMU}$). The Federal Radiological Situation Center can take over the task in specific cases with the consent of the responsible state authority if the further effects are expected to be essentially limited to that state.
 
-**§ 110 Zusammenarbeit und Abstimmung bei Notfällen**
-Authorities and organizations involved in decisions on or implementation of protective measures must cooperate according to the emergency plans. Decisions and protective measures must be coordinated to the required extent, provided that the timely implementation of appropriate protective measures is not prevented or unduly delayed [StrlSchG.md [Teil 8/13].md].
+### $\S 109$ Decisions on Protective Measures
+The responsible authorities decide whether protective measures are necessary during an emergency and which measures are appropriate, based on legal ordinances derived from $\S\S 94$ to $96$, and, where nothing else results, based on:
+1. Federal and state legal provisions concerning the repulsion of dangers to human health, the environment, or public safety.
+2. Directly applicable EU and Euratom law, insofar as these regulations and acts are also applicable in the case of radiological dangers.
+Decisions must consider the emergency plans, the radiological situation, and other decision-relevant circumstances.
 
-### Dose Assessment and Public Information
+### $\S 111$ Dose Assessment and Adaptation
+1. **Dose Assessment:** During a supra-regional or regional emergency, the authority responsible for creating the radiological situation picture assesses the dose that affected population groups have already received and are expected to receive (Dose Assessment).
+2. **Effectiveness Assessment:** The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety compares the results of the dose assessment with the reference value and assesses the effectiveness of protective measures, behavior recommendations, and applied protection strategies. It must check if the reference values for population protection, dose values, and limits for emergency contamination or dose performance need to be adapted to the radiological situation and other relevant circumstances.
+3. **Plan Adaptation:** Responsible federal ministries check whether protection strategies, protective measures, and behavior recommendations in the federal emergency plans and ordinances must be adapted based on the radiological situation and other relevant circumstances.
+4. **Plan Amendment:** If necessary for coordinated and appropriate decisions regarding required protective measures or their implementation, the Federal Government may amend or supplement the federal emergency plans for that emergency through general administrative regulations with the consent of the Federal Council.
 
-**§ 111 Dosisabschätzung, Abschätzung der Wirksamkeit der Schutzmaßnahmen, Anpassung der Notfallplanungen bei überregionalen und regionalen Notfällen**
-(1) In the event of a transregional or regional emergency, the authority or body responsible for creating the radiological situation picture estimates the dose for the affected population groups that they have already received and are expected to receive (dose assessment) [StrlSchG.md [Teil 8/13].md].
-(2) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety compares the results of the dose assessment with the reference value and estimates the effectiveness of the protective measures, behavioral recommendations, and applied protection strategies. It examines whether the reference values for the protection of the population, the dose values, and the limits for emergency-related contamination or dose rates should be adapted to the radiological situation and the other relevant circumstances of the respective emergency or to the entered or expected changes in these circumstances. It takes into account the emergency protection principles, the results of the dose assessment, as well as the information on the protective measures taken and still planned, provided by the responsible federal and state authorities according to §§ 106 and 107 [StrlSchG.md [Teil 8/13].md].
-(3) The responsible federal ministries examine whether the protection strategies, protective measures, behavioral recommendations, and other regulations set out in the federal emergency plans and in legal ordinances according to § 95 can be adapted to the radiological situation and the other relevant circumstances of the respective emergency, or to the entered or expected changes in these circumstances, within the scope of their responsibilities mentioned in §§ 98, 99, and § 96 Absatz 1. They take into account the results of the assessment of the effectiveness of the protective measures, behavioral recommendations, and applied protection strategies [StrlSchG.md [Teil 8/13].md].
-(4) To the extent that coordinated and appropriate decisions on the required protective measures or for their implementation are necessary in the event of a transregional or regional emergency, the Federal Government amends or supplements the federal emergency plans for this emergency by general administrative regulations with the consent of the Bundesrat, on proposal of the responsible federal ministries [StrlSchG.md [Teil 8/13].md].
-(5) The Federal Government is authorized, in the event of a transregional or regional emergency, in case of urgency, by individual directives according to Article 84 Absatz 5 of the Basic Law, to determine for this emergency:
-1. which of the optimized protection strategies set out in the federal emergency plans for specific reference scenarios are to be applied wholly or partially, if this emergency may deviate significantly from the reference scenarios or if the findings about this emergency are not yet sufficient to assign it to a specific reference scenario; or
-2. reference values for emergency-related contamination or dose rates [StrlSchG.md [Teil 8/13].md].
-(6) Urgency exists when:
-1. the optimized protection strategies set out in the existing federal emergency plans or the protective measures set out in these emergency plans and in legal ordinances according to this chapter are not appropriate or sufficient, considering the assessments according to paragraphs 1 and 2, as well as international cooperation and coordination; and
-2. legal ordinances according to this chapter or federal emergency plans for this emergency are not expected to be enacted or amended in time [StrlSchG.md [Teil 8/13].md].
+### $\S 112$ Information to the Population
+1. **Local Emergency:** State authorities immediately inform the possibly affected population about a local emergency and provide appropriate recommendations for behavior.
+2. **Supra-regional/Regional Emergency:** Authorities responsible for disaster protection immediately inform the possibly affected population about the emergency and provide appropriate recommendations for behavior.
+3. **Federal Ministry:** The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety immediately informs the possibly affected population and provides appropriate recommendations for behavior in supra-regional and regional emergencies, unless the authorities responsible for disaster protection are competent for the notification and behavior recommendations according to Paragraph 2.
 
-**§ 112 Information der betroffenen Bevölkerung und Empfehlungen für das Verhalten bei Notfällen**
-(1) The authorities responsible under state law inform the possibly affected population immediately about the emergency and give them appropriate recommendations for behavior in this emergency in the event of a local emergency [StrlSchG.md [Teil 8/13].md].
-(2) The authorities responsible for disaster protection inform the possibly affected population immediately about the emergency and give them appropriate recommendations for behavior in this emergency in the event of transregional and regional emergencies, which have or may lead to a catastrophe in their area of responsibility [StrlSchG.md [Teil 8/13].md].
-(3) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety informs the possibly affected population immediately about the emergency and gives them appropriate recommendations for behavior in this emergency in the event of transregional and regional emergencies, unless the authorities responsible for disaster protection are responsible for informing the population and giving behavioral recommendations according to paragraph 2 [StrlSchG.md [Teil 8/13].md].
-(4) The information, calls, and behavioral recommendations include the points listed in Annex 7, which are relevant for the respective emergency [StrlSchG.md [Teil 8/13].md].
+## Protection of Emergency Personnel ($\S 113 - \S 117$)
+*   **$\S 113$ Training:** Personnel designated in federal or state emergency plans, or designated as experts for participation in decisions regarding tasks and measures for emergency personnel, must be adequately informed and trained regarding the health risks and the protective and monitoring measures to be taken during an emergency.
+*   **$\S 114$ Protection:** Protective and monitoring measures must be aimed at keeping the exposure of emergency personnel below the dose limits set in $\S 78$ for planned exposure situations. If the mission serves the protection of life or health and the values in Paragraph 1 cannot be maintained even with appropriate measures, the exposure must be aimed to not exceed the reference value for the effective dose of 100 millisieverts.
+*   **$\S 115$ Responsibility:** Responsibility for training lies with the radiation protection officers, the authorities responsible for emergency response, and the participating organizations. Responsibility for protection during the emergency mission lies with the radiation protection officers regarding their own and commissioned personnel, and with the leading authority for multiple agencies if the personnel are not subordinate to that authority.
 
-### Protection of Emergency Personnel
+## Transition to Existing Exposure Situations ($\S 118 - \S 120$)
+*   **$\S 118$ Transition:** If the radiological situation stabilizes during a supra-regional or regional emergency, the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety must assess whether the effective dose for the affected population is expected to exceed 1 millisievert in the following year. If so, the assessment must also cover whether and for how long appropriate protective measures are necessary to ensure the effective dose falls below 20 millisieverts as soon as possible.
+*   **$\S 120$ Information:** Federal plans are published by the responsible federal bodies according to the Environmental Information Act. The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety informs the affected population about a supra-regional or regional emergency existing outside the area.
 
-**§ 113 Unterrichtung, Aus- und Fortbildung der Einsatzkräfte im Rahmen der Notfallvorsorge**
-(1) Persons who are:
-1. intended as emergency personnel in the federal or state emergency plans or in internal planning of the radiation protection officer;
-2. intended as specialists for participation in decisions on tasks and measures of emergency personnel; or
-3. intended for the instruction of emergency personnel in the event of an emergency,
-must be adequately informed and trained accordingly about the health risks that an emergency may entail and about the protective and monitoring measures to be taken during an operation [StrlSchG.md [Teil 8/13].md].
-(2) The instruction, training, and further training must take into account the emergencies considered in the emergency plans as well as the corresponding types of deployment or participation or instruction tasks. The content of the instruction, training, and further training, and the teaching and learning materials, must be regularly brought up to date. Where useful, the training and further training should also include participation in emergency drills [StrlSchG.md [Teil 8/13].md].
-
-**§ 114 Schutz der Einsatzkräfte bei Notfalleinsätzen**
-(1) During emergency deployments, appropriate protective and monitoring measures must be aimed at ensuring that the exposure of emergency personnel remains below the dose limits set out in § 78 for planned exposure situations [StrlSchG.md [Teil 8/13].md].
-(2) If the deployment serves the protection of life or health and one of the values according to paragraph 1 cannot be maintained even with appropriate protective and monitoring measures for deployments for the protection of life or health, it must be aimed that the exposure of the emergency personnel does not exceed the reference value for the effective dose of 100 millisieverts. The emergency personnel must be adequately informed before the respective deployment about the associated health risks and the protective and monitoring measures to be taken. For emergency personnel who have already been instructed, trained, and further trained in the context of emergency preparedness, their general instruction must be supplemented according to the circumstances of the respective emergency. Pregnant women and persons under 18 years of age may not be deployed in situations according to sentence 1 [StrlSchG.md [Teil 8/13].md].
-(3) If the deployment serves the rescue of life, the prevention of severe radiation-related health damage, or the prevention or combat of a catastrophe, and the effective dose can exceed the reference value for the effective dose of 100 millisieverts even with appropriate protective and monitoring measures, it must be aimed that the exposure of the emergency personnel does not exceed the reference value for the effective dose of 250 millisieverts. In exceptional cases, where it is also possible that the effective dose exceeds the value of 250 millisieverts even with appropriate protective and monitoring measures, the command can set an increased reference value of 500 millisieverts. Deployments according to sentences 1 and 2 may only be carried out by volunteers who have been informed before the respective deployment about the possibility of such exposure. Paragraph 2 Sentence 2 to 4 applies accordingly [StrlSchG.md [Teil 8/13].md].
-(4) It must be aimed that emergency personnel who have already received an effective dose of more than 250 millisieverts or whose occupational lifetime dose limit according to § 77 has been reached in an emergency situation are not deployed in situations according to paragraph 3 in subsequent emergencies [StrlSchG.md [Teil 8/13].md].
-(5) When determining or estimating the exposure of an emergency personnel in an emergency exposure situation, the determined or estimated body doses from all deployments carried out by the emergency personnel in this emergency exposure situation must be added. The exposure of an emergency personnel during their deployment in an emergency exposure situation must take into account the limit for the occupational lifetime dose according to § 77 [StrlSchG.md [Teil 8/13].md].
-
-**§ 115 Verantwortlichkeit für den Schutz der Einsatzkräfte**
-(1) Responsible for the instruction, training, and further training of their own emergency personnel are:
-1. the radiation protection officers;
-2. the authorities responsible for measures of emergency response according to the federal and state emergency plans or participating in these measures; and
-3. the organizations participating in the emergency response [StrlSchG.md [Teil 8/13].md].
-(2) Responsible for the protection of emergency personnel in the emergency deployment are:
-1. the radiation protection officers regarding their own and the emergency personnel acting on their behalf;
-2. regarding other emergency personnel:
-    a) the authority leading the emergency deployment of several authorities or participating organizations; or
-    b) the authorities and organizations responsible for measures of emergency response or participating in these measures, insofar as the emergency personnel are not subordinate to the authority leading the emergency deployment [StrlSchG.md [Teil 8/13].md].
-
-**§ 116 Schutz der Einsatzkräfte bei anderen Gefahrenlagen**
-For the preparation and execution of deployments that do not serve the combating of an emergency within the meaning of this law, but the combating of another danger situation, and in which the emergency personnel may be exposed to ionizing radiation, §§ 113 to 115 shall apply accordingly [StrlSchG.md [Teil 8/13].md].
-
-**§ 117 Verordnungsermächtigungen zum Schutz der Einsatzkräfte**
-(1) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety is authorized by ordinance to regulate:
-1. essential contents of the instruction, training, and further training required by § 113;
-2. the type and contents of the instruction required by § 114 Absatz 2 and 3;
-3. further regulations on physical radiation protection control, protection areas, protective, preventive, and monitoring measures for the protection of emergency personnel mentioned in § 76 Absatz 1 and § 79;
-4. to determine which persons, authorities, or organizations are responsible for the measures for the protection of emergency personnel regulated under number 3 [StrlSchG.md [Teil 8/13].md].
-(2) In case of urgency following the occurrence of an emergency, the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety may issue regulations according to Paragraph 1 Sentence 1 Number 2 to 4 by ordinance without the consent of the Bundesrat (Interim Ordinances), insofar as no corresponding regulations exist. Interim ordinances expire at the latest six months after their entry into force. Their validity period can only be extended by an ordinance with the consent of the Bundesrat and in agreement with the federal ministries involved. Interim ordinances that change existing regulations must be repealed immediately if the Bundesrat demands it [StrlSchG.md [Teil 8/13].md].
-(3) State law regulates whether and to what extent the ordinances according to Paragraph 1 Sentence 1 Number 1 also apply to employees of the responsible authorities of the states, municipalities, and other bodies or foundations of public law of the states, as well as private aid organizations participating in disaster protection or in the execution of other state law provisions for danger prevention and assistance [StrlSchG.md [Teil 8/13].md].
-
-### Post-Incident Exposure Situations
-
-**§ 118 Übergang zu einer bestehenden Expositionssituation; Verordnungsermächtigungen**
-(1) If the radiological situation stabilizes in the event of a transregional or regional emergency, the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety estimates within the scope of the effectiveness check according to § 111 Absatz 2 whether the effective dose for the affected population is expected to exceed the value of 1 millisievert per year in the federal territory or parts of the federal territory in the following year. If the value of 1 millisievert is expected to be exceeded in the federal territory or parts of the federal territory in the following year, the checks to be carried out by the responsible federal ministries according to § 111 Absatz 3 and 4 also extend to:
-1. whether and for how long appropriate protective measures and other measures according to Part 3 are still necessary in the federal territory or parts of the federal territory to ensure that the effective dose for the affected population falls below the value of 20 millisieverts as soon as possible; and
-2. whether and from what point in time, by applying the legal provisions on existing exposure situations, it can be achieved that the effective dose is further reduced and falls as far as possible below the reference value to be set out in Paragraph 4 [StrlSchG.md [Teil 8/13].md].
-(2) If a reduction of the effective dose is possible, the Federal Government issues a Federal Plan for the protection of the population in the post-emergency exposure situation, by corresponding application of §§ 92 and 97 Absatz 1 to Paragraph 4 Sentence 1 to Paragraph 3 Sentence 3, and § 98. This plan is adopted as a general administrative regulation with the consent of the Bundesrat [StrlSchG.md [Teil 8/13].md].
-(3) On proposal of the responsible federal ministries for the respective subject areas, the Federal Government can supplement and specify the Federal Plan according to Paragraph 2 with special Federal Plans, in which the special planning for measures according to Paragraph 1 Sentence 2 Number 2 for specific areas mentioned in § 99 Absatz 2 is presented. These special Federal Plans are adopted as general administrative regulations with the consent of the Bundesrat [StrlSchG.md [Teil 8/13].md].
-(4) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety establishes by ordinance with the consent of the Bundesrat a reference value for the effective dose received by affected persons from the emergency over all exposure pathways in a post-emergency situation according to Paragraph 1 Sentence 2 Number 2. This reference value must not exceed 20 millisieverts per year. The ordinance must also specify in which areas and from what point in time the reference values of §§ 119, 120, and 152 as well as the plans according to Paragraph 2 and 3 are to be applied [StrlSchG.md [Teil 8/13].md].
-(5) To the extent that this is necessary for the appropriate protection of the population, the states, insofar as the states are responsible for the planning or implementation of measures according to Paragraph 1 Sentence 2 Number 2, shall draw up state plans that supplement and specify the federal plans according to Paragraphs 2 and 3 for this existing exposure situation [StrlSchG.md [Teil 8/13].md].
-(6) If the radiological situation stabilizes in the event of a local emergency, but the effective dose for the affected population still exceeds the value of 1 millisievert per year due to the emergency, the responsible authority shall establish a reference value for the effective dose received by affected persons from the emergency over all exposure pathways by general ordinance. This reference value must not exceed 20 millisieverts per year. The responsible authority can additionally establish appropriate reference values for organ equivalent doses [StrlSchG.md [Teil 8/13].md].
-
-**§ 119 Radiologische Lage, Maßnahmen, Zusammenarbeit und Abstimmung in einer nach einem Notfall bestehenden Expositionssituation**
-In a post-emergency exposure situation, §§ 92 and 106 to 111 shall apply accordingly. In place of the reference values according to § 93, the reference values set out in § 118 Absatz 4 or 6 apply for the protection of the population; in place of the emergency plans according to §§ 98 to 100, the plans according to § 118 Absatz 2, 3, and 5 apply [StrlSchG.md [Teil 8/13].md].
-
-**§ 120 Information der Bevölkerung und Verhaltensempfehlungen**
-(1) The federal plans according to § 118 Absatz 2 and 3 shall be published by the responsible federal authorities according to § 10 of the Environmental Information Act [StrlSchG.md [Teil 8/13].md].
-(2) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety informs the affected population about a post-transregional or regional emergency over-regional exposure situation. § 105 Absatz 2 applies accordingly [StrlSchG.md [Teil 8/13].md].
-(3) In the event of a transregional or regional emergency, the responsible state authorities supplement and specify the information and behavioral recommendations of the federal government. § 105 Absatz 3 applies accordingly [StrlSchG.md [Teil 8/13].md].
-(4) The authorities responsible under state law inform the affected population about a post-local emergency exposure situation, about the reference values according to § 118 Absatz 6, and about the protective, remediation, and other measures taken and planned. They give the affected population appropriate recommendations for behavior in this exposure situation [StrlSchG.md [Teil 8/13].md].
-
-### Radon Protection
-
-**§ 121 Festlegung von Gebieten; Verordnungsermächtigung**
-(1) The responsible authority shall designate by general ordinance within two years of the entry into force of a legal ordinance according to Paragraph 2 the areas for which it is expected that the average Radon-222 activity concentration in the air over the year exceeds the reference value according to § 124 or § 126 in a considerable number of buildings with living or working spaces. It shall publish the designation of the areas. The designation of the areas must be reviewed at least every ten years [StrlSchG.md [Teil 8/13].md].
-(2) The Federal Government is authorized by ordinance with the consent of the Bundesrat to determine under which circumstances the responsible authority may assume that the reference values according to §§ 124 and 126 are exceeded in a considerable number of buildings with living or working spaces in an area, and which procedures and criteria are to be used for the designation of the areas [StrlSchG.md [Teil 8/13].md].
-
-**§ 122 Radonmaßnahmenplan**
-(1) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety shall create a Radon Action Plan. The Radon Action Plan shall be created with the participation of the states. It explains the measures according to this law and contains goals for managing the long-term risks of exposure to Radon in living spaces and workplaces in indoor areas regarding all sources from which Radon enters, whether from the ground, from building products, or from water [StrlSchG.md [Teil 8/13].md].
-(2) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety shall announce the Radon Action Plan in the Federal Gazette [StrlSchG.md [Teil 8/13].md].
-(3) The Radon Action Plan shall be regularly updated by the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety with the participation of the states, but at least every ten years [StrlSchG.md [Teil 8/13].md].
-(4) The responsible authority develops strategies adapted to the respective conditions for its area of responsibility for dealing with long-term risks of exposure to Radon. It takes into account the Radon Action Plan. It collects the required data. The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety coordinates the development of the strategies [StrlSchG.md [Teil 8/13].md].
-
-**§ 123 Maßnahmen an Gebäuden; Verordnungsermächtigung**
-(1) Whoever constructs a building with living or working spaces must take suitable measures to prevent or significantly impede the entry of Radon from the building ground. This obligation is fulfilled if:
-1. the measures required by generally recognized technical rules for moisture protection are maintained; and
-2. in the areas specified in § 121 Absatz 1 Satz 1, additionally the measures specified in the ordinance according to Paragraph 2 are maintained.
-The obligation according to Sentence 1 can also be fulfilled in other ways [StrlSchG.md [Teil 8/13].md].
-(2) The Federal Government is authorized by ordinance with the consent of the Bundesrat to determine further measures for protection against Radon for buildings to be constructed within the areas specified in § 121 Absatz 1 Satz 1 [StrlSchG.md [Teil 8/13].md].
-(3) The responsible authority can be exempted from the obligation according to Paragraph 1 Sentence 1 upon application, insofar as the requirements lead to an unreasonable effort or an undue hardship in the individual case. An undue hardship can particularly occur if an exceedance of the reference value in the building is not expected even without measures [StrlSchG.md [Teil 8/13].md].
-(4) Whoever carries out structural changes to a building with living or working spaces should consider measures for protection against Radon, insofar as these measures are necessary and reasonable, if these measures lead to a significant reduction of the air exchange rate [StrlSchG.md [Teil 8/13].md].
-
-**§ 124 Referenzwert; Verordnungsermächtigung**
-The reference value for the average Radon-222 activity concentration in the air in living spaces is 300 Becquerel per cubic meter. At least ten years after the entry into force of this law, the Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety shall submit a report on the development of protective measures for the general population against Radon exposures, on their effectiveness and costs at the federal and state levels. The Federal Government is authorized by ordinance with the consent of the Bundesrat to determine how the measurement of the Radon-222 activity concentration in the air in living spaces shall be carried out [StrlSchG.md [Teil 8/13].md].
-
-**§ 125 Unterrichtung der Bevölkerung; Reduzierung der Radonkonzentration**
-(1) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety and the responsible state authorities inform the population in an appropriate manner about exposure to Radon in living spaces and the associated health risks, about the importance of Radon measurements, and about the technical possibilities available for reducing existing Radon-222 activity concentrations [StrlSchG.md [Teil 8/13].md].
-(2) The Federal Ministry for the Environment, Nature Conservation, and Nuclear Safety and the responsible state authorities encourage measures to determine living spaces where the average Radon-222 activity concentration in the air exceeds the reference value according to § 124, and recommend technical or other means for reducing exposure to Radon [StrlSchG.md [Teil 8/13].md].
-
-**§ 126 Referenzwert**
-The reference value for the average Radon-222 activity concentration in the air at workplaces is 300 Becquerel per cubic meter [StrlSchG.md [Teil 8/13].md].
-
-**§ 127 Messung der Radonkonzentration**
-(1) Whoever is responsible for a workplace in an indoor room must arrange for measurements of the Radon-222 activity concentration in the air if:
-1. the workplace is located in the ground or basement floor of a building specified in § 121 Absatz 1 Satz 1, or
-2. the type of workplace can be assigned to one of the work fields according to Annex 8.
-In the case of Sentence 1 Number 1, the measurement must take place within 18 months after the designation of the area and the commencement of professional activity at the workplace, and in the case of Sentence 1 Number 2, within 18 months after the commencement of professional activity at the workplace. The person responsible for the workplace must arrange for repeat measurements of the Radon-222 activity concentration in the air if changes are made to the workplace that can cause the Radon-222 activity concentration in the air to exceed the reference value according to § 126; Sentence 2 applies in this case. The responsible authority can order that the person responsible for the workplace also arrange for measurements of the Radon-222 activity concentration in the air for other indoor workplaces if there are indications that the Radon-222 activity concentration in the air exceeds the reference value according to § 126. The responsible authority can extend the period in Sentence 2 for at most six months in individual cases if the period cannot be met due to circumstances not attributable to the person responsible for the workplace.
-(2) The person responsible for a workplace is:
-1. whoever carries out or has carried out professional activity in their business premises, or
-2. in whose business premises a third party carries out professional activity in its own responsibility or has persons working under its supervision carry out professional activity [StrlSchG.md [Teil 8/13].md].
-(3) The person responsible for the workplace must immediately record the results of the measurements according to Paragraph 1 Sentence 1, 3, and 4. They must keep the records until the end of the activity or until new measurement results are available and present them to the responsible authority upon request [StrlSchG.md [Teil 8/13].md].
-(4) In the case of responsibility according to Paragraph 2 Number 1, the person responsible for the workplace must immediately inform the affected employees and the works council or the personnel council about the results of the measurements. In the case of responsibility according to Paragraph 2 Number 2, the person responsible for the workplace must immediately inform the third party; the obligation of Sentence 1 applies accordingly to the third party [StrlSchG.md [Teil 8/13].md].
-
-**§ 128 Reduzierung der Radonkonzentration**
-(1) If the Radon-222 activity concentration in the air at a workplace exceeds the reference value according to § 126, the person responsible for the workplace must immediately take measures to reduce the Radon-222 activity concentration in the air [StrlSchG.md [Teil 8/13].md].
-(2) The person responsible for the workplace must check the success of the measures taken by them by a measurement of the Radon-222 activity concentration in the air; the measurement must take place within 30 months after the exceedance of the reference value was known. The responsible authority can extend the period in Sentence 1 in individual cases if the period cannot be met due to circumstances not attributable to the person responsible for the workplace. The person responsible for the workplace must immediately record the result of the measurement. They must keep the records until the end of the activity or until new measurement results are available and present them to the responsible authority upon request [StrlSchG.md [Teil 8/13].md].
-(3) In the case of responsibility according to § 127 Absatz 2 Nummer 1, the person responsible for the workplace must immediately inform the affected employees and the works council or the personnel council about the results of the measurements. In the case of responsibility according to § 127 Absatz 2 Nummer 2, the person responsible for the workplace must immediately inform the third party; the obligation of Sentence 1 applies accordingly to the third party [StrlSchG.md [Teil 8/13].md].
-(4) The person responsible for the workplace must not take measures to reduce the Radon-222 activity concentration in the air if the measures are not or only with disproportionately high effort possible, and this is due to special reasons arising from:
-1. overriding interests of occupational or health protection; or
-2. the nature of the workplace [StrlSchG.md [Teil 8/13].md].
-In the case of responsibility according to § 127 Absatz 2 Nummer 2, the person responsible for the workplace must immediately inform the third party about the reasons upon becoming known [StrlSchG.md [Teil 8/13].md].
+## Radon Protection ($\S 121 - \S 129$)
+*   **$\S 121$ Area Designation:** The responsible authority designates areas where the average Radon-222-activity concentration in the air is expected to exceed the reference value ($\S 124$ or $\S 126$) in a significant number of buildings.
+*   **$\S 124$ Reference Value (Occupied Rooms):** The reference value for the average Radon-222-activity concentration in occupied rooms is 300 Becquerel per cubic meter.
+*   **$\S 126$ Reference Value (Workplaces):** The reference value for the average Radon-222-activity concentration in the air at workplaces is 300 Becquerel per cubic meter.
+*   **$\S 127$ Measurement:** The person responsible for a workplace must commission measurements of the Radon-222-activity concentration if the workplace is in the ground or basement floor of a building in an area designated under $\S 121$ Paragraph 1 Sentence 1, or if the type of workplace corresponds to a field listed in Annex 8.
+*   **$\S 128$ Reduction:** If the Radon-222-activity concentration at a workplace exceeds the reference value ($\S 126$), the person responsible must immediately take measures to reduce the concentration.

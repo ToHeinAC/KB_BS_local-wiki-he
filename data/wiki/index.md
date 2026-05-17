@@ -1,48 +1,56 @@
 # Wiki Index
-Updated: 2026-05-17 | Pages: 44
+Updated: 2026-05-17 | Pages: 52
 
 ## Pages
-- [Ambition 2030](ambition-2030-concept.md) — # Ambition 2030  Ambition 2030 is Munich Re's comprehensive strategic plan, announced on December 9, 2025, outlining the
-- [Bauartzulassung (Type Approval)](bauartzulassung.md) — A Bauartzulassung (Type Approval) is a regulatory authorization required for certain devices and facilities that generat
-- [Bestehende Expositionssituation](bestehende-expositionssituation.md) — A **Bestehende Expositionssituation** is defined within the *Strahlenschutzgesetz* (StrlSchG) as an exposure situation t
-- [Bundesamt für Strahlenschutz (BfS)](bundesamt-fuer-strahlenschutz.md) — # Bundesamt für Strahlenschutz (BfS)  Das Bundesamt für Strahlenschutz (BfS) ist eine zentrale Bundesbehörde, die für di
-- [Cyber Risk](cyber-risk-concept.md) — # Cyber Risk  Cyber Risk refers to the potential for financial loss, operational disruption, or data breach resulting fr
-- [E-Mobility](e-mobility.md) — # E-Mobility  In the context of industrial and automotive technology, **E-Mobility** refers to the segment of the market
-- [Exposition](exposition-concept.md) — In the context of the *Strahlenschutzgesetz* (StrlSchG), **Exposition** refers to the incidence of ionizing radiation on
-- [Geplante Expositionssituation](geplante-expositionssituation.md) — A **Planned Exposure Situation** is defined within the *Strahlenschutzgesetz* (StrlSchG) as an exposure situation that a
-- [Informationsaustausch bei Notfällen](informationsaustausch-notfall.md) — # Informationsaustausch bei Notfällen  Der Informationsaustausch ist ein kritischer Bestandteil der Notfallreaktion, der
-- [Life and Health Insurance](life-and-health-concept.md) — # Life and Health Insurance  Life and Health (L&H) insurance covers risks related to human mortality, morbidity, and lon
-- [Luftfahrt-Bundesamt (LBA)](luftfahrt-bundesamt.md) — # Luftfahrt-Bundesamt (LBA)  Das Luftfahrt-Bundesamt (LBA) ist die zuständige Bundesbehörde für die Überwachung des Schu
-- [Munich Re](munich-re-entity.md) — # Munich Re  Munich Reinsurance Company (MUV2) is one of the world's largest reinsurers, operating across multiple lines
-- [Munich Re](munich-re.md) — # Munich Re  Munich Re (Münchner Rückversicherungs AG) is a major global reinsurance company. The entity's financial per
-- [Notfall-Expositionssituation](notfall-expositionssituation.md) — A **Notfall-Expositionssituation** is defined under the *Strahlenschutzgesetz* (StrlSchG) as an exposure situation that 
-- [Notfallplan](notfall-plan.md) — # Notfallplan  Ein Notfallplan ist ein strukturiertes Regelwerk zur Koordination von Maßnahmen im Falle eines akuten Ere
-- [Physikalisch-Technische Bundesanstalt (PTB)](physikalisch-technische-bundesanstalt.md) — # Physikalisch-Technische Bundesanstalt (PTB)  Die Physikalisch-Technische Bundesanstalt (PTB) ist eine Bundesbehörde, d
-- [Private Credit](private-credit.md) — # Private Credit  In the context of investment portfolios, Private Credit refers to debt financing provided directly to 
-- [Property-Casualty Insurance](property-casualty-concept.md) — # Property-Casualty Insurance  Property-Casualty (P&C) insurance refers to coverage against physical damage to property 
-- [Radioaktive Stoffe](radioactive-substances.md) — Under the *Strahlenschutzgesetz* (StrlSchG), **Radioactive Substances** are defined as all substances containing one or 
-- [Radioaktive Altlasten (Radioactive Residues)](radioaktive-altlasten.md) — Radioactive residues (Rückstände) are materials subject to specific regulations under the Radiation Protection Act, gove
-- [Radioaktivität](radioaktivitaet.md) — # Radioaktivität  Radioaktivität bezieht sich auf die Emission von ionisierender Strahlung, deren Grundbegriffe und Ausw
-- [Reinsurance](reinsurance-concept.md) — # Reinsurance  Reinsurance is the practice where an insurance company (the ceding company) transfers a portion of its ri
-- [Schaeffler AG](schaeffler-ag.md) — # Schaeffler AG  Schaeffler AG is a global technology company specializing in motion technology, bearings, and industria
-- [Strahlenschutzgesetz - StrlSchG](strahlenschutzgesetz-strlschg.md) — # Strahlenschutzgesetz (StrlSchG)  Das Strahlenschutzgesetz (StrlSchG) ist das zentrale Gesetz zum Schutz vor der schädl
-- [Strahlenschutzgesetz (Radiation Protection Act)](strahlenschutzgesetz.md) — The Strahlenschutzgesetz (StrlSchG) is the German federal law governing the protection against the harmful effects of io
-- [Infineon AG Investment Idee](summary-infineon-investment-idea-md.md) — Infineon AG Investment Idee vom 06.05.2026
-- [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-1-2.md) — # Munich Re (MUV2) — Full Deep-Dive Investment Report  This document provides a comprehensive investment analysis of Mun
-- [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-2-2.md) — Munich Re (MUV2) — Full Deep-Dive Investment Report vom 16.05.2026
-- [Schaeffler AG Investment Overview](summary-schaeffler-ag-investment-overview-md.md) — # Schaeffler AG Investment Overview  This document provides a comprehensive investment analysis of Schaeffler AG, detail
-- [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-1-13.md) — The document provides a comprehensive overview of the *Strahlenschutzgesetz* (StrlSchG), or the "Law for the Protection 
-- [Strahlenschutzgesetz - StrlSchG (Teil 10/13)](summary-strlschg-md-teil-10-13.md) — This document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahl
-- [StrlSchG - Teil 11/13](summary-strlschg-md-teil-11-13.md) — # StrlSchG - Teil 11/13  This summary covers sections of the German Radiation Protection Act (Strahlenschutzgesetz - Str
-- [Transitional Provisions of the Radiation Protection Act](summary-strlschg-md-teil-12-13.md) — This document summarizes the transitional provisions of the Radiation Protection Act (Strahlenschutzgesetz - StrlSchG), 
-- [Strahlenschutzgesetz - StrlSchG (Teil 13/13)](summary-strlschg-md-teil-13-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 13/13)  Dieses Dokument stellt einen Auszug aus dem Gesetz zum Schutz vor der sc
-- [Strahlenschutzgesetz - StrlSchG (Teil 2/13)](summary-strlschg-md-teil-2-13.md) — This summary details definitions and regulatory requirements extracted from Part 2 of the Radiation Protection Act (Stra
-- [Strahlenschutzgesetz - StrlSchG (Teil 3/13)](summary-strlschg-md-teil-3-13.md) — This summary details sections of the German Radiation Protection Act ($\text{StrlSchG}$), covering requirements for repo
-- [Strahlenschutzgesetz - StrlSchG (Teil 4/13)](summary-strlschg-md-teil-4-13.md) — This document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahl
-- [Strahlenschutzgesetz - StrlSchG (Teil 5/13)](summary-strlschg-md-teil-5-13.md) — This document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahl
-- [Strahlenschutzgesetz - StrlSchG (Teil 6/13)](summary-strlschg-md-teil-6-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 6/13)  Dieses Dokument fasst die Inhalte des Gesetzes zum Schutz vor der schädli
-- [Strahlenschutzgesetz - StrlSchG (Teil 7/13)](summary-strlschg-md-teil-7-13.md) — This document provides excerpts from the German Radiation Protection Act (Strahlenschutzgesetz - StrlSchG), specifically
-- [Strahlenschutzgesetz - StrlSchG (Teil 8/13)](summary-strlschg-md-teil-8-13.md) — This document summarizes excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung (Strah
-- [Strahlenschutzgesetz - StrlSchG (Teil 9/13)](summary-strlschg-md-teil-9-13.md) — This document summarizes excerpts from the German Radiation Protection Act (Strahlenschutzgesetz - StrlSchG), specifical
-- [Tätigkeit (Activity)](taetigkeit-concept.md) — Within the framework of the *Strahlenschutzgesetz* (StrlSchG), **Tätigkeit** (Activity) refers to a broad range of actio
-- [War Risk](war-risk.md) — # War Risk  War Risk, in the insurance and reinsurance industry, refers to the potential financial losses arising from a
+- [Ambition 2030](ambition-2030.md) — # Ambition 2030  Ambition 2030 is the comprehensive strategic plan set forth by Munich Re, announced on December 9, 2025
+- [Berufliche Exposition](berufliche-exposition.md) — Professional exposure refers to the radiation dose received by an individual due to their employment or professional act
+- [Bestehende Expositionssituation](bestehende-expositionssituation.md) — An existing exposure situation is defined as an exposure situation that already exists when a decision regarding its con
+- [Dosisbegrenzung](concept-dosisbegrenzung.md) — # Dosisbegrenzung  Die Dosisbegrenzung verpflichtet jeden, der eine Tätigkeit plant, ausübt oder ausüben lässt, dafür zu
+- [Einsatzkraft](concept-einsatzkraft.md) — # Einsatzkraft  Eine Einsatzkraft ist definiert als eine Person, die bei einem Notfall oder einer anderen Gefahrenlage e
+- [Emergency Planning](concept-emergency-planning.md) — Emergency planning, within the context of radiation protection, refers to the structured preparation and protocols estab
+- [Health Record (Radiation)](concept-health-record-radiation.md) — # Health Record (Radiation)  A Health Record specific to radiation exposure is a mandatory, detailed document used to tr
+- [Medizinphysik-Experte](concept-medizinphysik-experte.md) — # Medizinphysik-Experte  Ein Medizinphysik-Experte ist definiert als eine Person mit Masterabschluss in medizinischer Ph
+- [Notfall](concept-notfall.md) — # Notfall  Ein Notfall ist ein Ereignis, bei dem sich durch ionisierende Strahlung erhebliche nachteilige Auswirkungen a
+- [Professional Exposure](concept-professional-exposure.md) — # Professional Exposure  Professional exposure refers to the occupational exposure of individuals to ionizing radiation 
+- [Public Exposure](concept-public-exposure.md) — # Public Exposure  Public exposure refers to the incidental or planned exposure of individuals in the general population
+- [Radiation Dose Limits](concept-radiation-dose-limits.md) — # Radiation Dose Limits  Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab
+- [Radiation Protection Law](concept-radiation-protection-law.md) — The Radiation Protection Law (Strahlenschutzgesetz - StrlSchG) is the comprehensive legal framework governing the protec
+- [Radiation Protection](concept-radiation-protection.md) — # Radiation Protection  Radiation Protection refers to the set of legal, technical, and organizational measures designed
+- [Radioactive Residues](concept-radioactive-residues.md) — Radioactive residues are materials defined under the Radiation Protection Act (StrlSchG) that result from various indust
+- [Rechtfertigung von Tätigkeitsarten](concept-rechtfertigung-tätigkeitsarten.md) — # Rechtfertigung von Tätigkeitsarten  Die Rechtfertigung von Tätigkeitsarten ist ein zentrales Prinzip des Strahlenschut
+- [Röntgeneinrichtung](concept-röntgeneinrichtung.md) — # Röntgeneinrichtung  Eine Röntgeneinrichtung ist eine Vorrichtung oder ein Gerät, in der oder dem Röntgenstrahlung mit 
+- [Cyber Risk](cyber-risk.md) — # Cyber Risk  Cyber risk refers to the potential for financial, operational, and reputational damage resulting from digi
+- [Exposition (Radiation)](exposition.md) — # Exposition (Radiation)  In the context of radiation safety, "Exposition" refers to the potential dose received by indi
+- [Geplante Expositionssituation](geplante-expositionssituation.md) — A planned exposure situation is defined as an exposure situation that arises from activities and in which an exposure is
+- [Ionisierende Strahlung](ionisierende-strahlung.md) — Ionizing radiation refers to electromagnetic radiation or particulate radiation that possesses sufficient energy to caus
+- [Ionisierende Strahlung](ionisierender-strahlung.md) — Ionizing radiation refers to radiation that has enough energy to remove electrons from atoms or molecules, thereby ioniz
+- [Kontaminierte Abfälle](kontaminierte-abfaelle.md) — The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under th
+- [Munich Re](munich-re.md) — # Munich Re  Munich Re, formally Müncher Rückversicherungsgesellschaft, is a major global reinsurance company [Munich Re
+- [Notfall-Expositionssituation](notfall-expositionssituation.md) — An emergency exposure situation is defined as an exposure situation that arises from an emergency, provided the situatio
+- [Notfallvorsorge](notfallvorsorge.md) — Emergency preparedness concerning ionizing radiation is governed by a hierarchical and multi-layered system detailed wit
+- [Private Credit Investment](private-credit-investment.md) — # Private Credit Investment  Private credit refers to debt financing provided directly to companies or projects, bypassi
+- [Strahlenschutzgesetz (StrlSchG)](radiation-protection-law.md) — The *Strahlenschutzgesetz* (StrlSchG) is the German federal law governing the protection against the harmful effects of 
+- [Radioaktive Altlasten](radioaktive-altlasten.md) — # Radioaktive Altlasten  Radioactive contaminated sites (radioaktive Altlasten) are defined under the Strahlenschutzgese
+- [Radioaktive Stoffe](radioaktive-stoffe.md) — Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more
+- [Reinsurance](reinsurance.md) — # Reinsurance  Reinsurance is the practice where an insurance company (the ceding company) transfers a portion of its ri
+- [Sanierungsplan](sanierungsplan.md) — # Sanierungsplan (Remediation Plan)  A Sanierungsplan is a mandatory, comprehensive document required when dealing with 
+- [Strahlenschutzgesetz - StrlSchG](strahlenschutzgesetz-strlschg.md) — The Strahlenschutzgesetz (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is the
+- [Strahlenschutzrechtliche Genehmigungen](strahlenschutzrechtliche-genehmigungen.md) — Radiation protection permits (Strahlenschutzrechtliche Genehmigungen) are formal authorizations required under the Germa
+- [Strahlenschutzregister](strahlenschutzregister.md) — The Radiation Protection Register (Strahlenschutzregister) is a central repository established under the *Strahlenschutz
+- [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-1-2.md) — Munich Re (MUV2) — Full Deep-Dive Investment Report vom 16.05.2026
+- [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-2-2.md) — # Munich Re (MUV2) — Full Deep-Dive Investment Report  This document summarizes key findings and operational data from t
+- [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-1-13.md) — The *Strahlenschutzgesetz* (StrlSchG) is the German law concerning the protection against the harmful effects of ionizin
+- [Strahlenschutzgesetz - StrlSchG (Teil 10/13)](summary-strlschg-md-teil-10-13.md) — The source document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (
+- [Strahlenschutzgesetz - StrlSchG (Teil 11/13)](summary-strlschg-md-teil-11-13.md) — This document provides excerpts from the German Radiation Protection Act ($\text{StrlSchG}$), detailing administrative p
+- [Strahlenschutzgesetz - StrlSchG (Teil 12/13)](summary-strlschg-md-teil-12-13.md) — The document provides transitional provisions and detailed appendices from the German Radiation Protection Act (Strahlen
+- [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-13-13.md) — This document provides excerpts and annexes from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahl
+- [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-2-13.md) — # Strahlenschutzgesetz - StrlSchG  Dieses Dokument ist ein Auszug aus dem Gesetz zum Schutz vor der schädlichen Wirkung 
+- [Strahlenschutzgesetz - StrlSchG (Teil 3/13)](summary-strlschg-md-teil-3-13.md) — This document summarizes excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Stra
+- [Strahlenschutzgesetz - StrlSchG (Teil 4/13)](summary-strlschg-md-teil-4-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 4/13)  Dieses Dokument ist ein Auszug aus dem Gesetz zum Schutz vor der schädlic
+- [Strahlenschutzgesetz - StrlSchG (Teil 5/13)](summary-strlschg-md-teil-5-13.md) — The source document provides detailed excerpts from the German Radiation Protection Act (Strahlenschutzgesetz - StrlSchG
+- [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-6-13.md) — # Strahlenschutzgesetz - StrlSchG  The *Strahlenschutzgesetz* (StrlSchG) is the German law concerning the protection aga
+- [Strahlenschutzgesetz - StrlSchG (Teil 7/13)](summary-strlschg-md-teil-7-13.md) — This document summarizes excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Stra
+- [Strahlenschutzgesetz - StrlSchG (Teil 8/13)](summary-strlschg-md-teil-8-13.md) — This document summarizes sections of the German Radiation Protection Act ($\text{Strahlenschutzgesetz - StrlSchG}$), det
+- [Strahlenschutzgesetz - StrlSchG (Teil 9/13)](summary-strlschg-md-teil-9-13.md) — # Strahlenschutzgesetz - StrlSchG (Teil 9/13)  This summary details sections of the German Radiation Protection Act (Str
+- [Umweltradioaktivität](umweltradioaktivitaet.md) — Environmental radioactivity refers to the presence and measurement of radioactive substances in the natural environment,
+- [War Risk Insurance](war-risk-insurance.md) — # War Risk Insurance  War risk insurance pertains to coverage provided against losses resulting from armed conflict, civ

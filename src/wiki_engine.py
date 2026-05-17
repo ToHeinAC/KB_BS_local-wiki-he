@@ -2,6 +2,7 @@
 
 import os
 import re
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,6 +35,7 @@ _LOG = WIKI_DIR / "log.md"
 _INSIGHTS_DIR = "insights"
 _MAX_AFFECTED_PAGES = 5
 _MAX_EXISTING_CHARS = 8000  # cap injected existing-content per ingest call
+_TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*$")
 
 
 def init_wiki() -> None:
@@ -342,25 +344,54 @@ def delete_source(source_name: str) -> dict:
 
     result["qa_rows"] = qa_gen.delete_source_entries(source_name)
 
-    # Delete all wiki pages that reference this source in their frontmatter.
+    # Cascade through wiki pages: drop this source from every page's
+    # frontmatter; delete pages whose `sources:` becomes empty; then scrub
+    # surviving pages' `related:` lists of any references to deleted pages.
     _SKIP = {"index.md", "log.md"}
-    search_dirs = [WIKI_DIR.glob("*.md")]
     insights = WIKI_DIR / _INSIGHTS_DIR
-    if insights.exists():
-        search_dirs.append(insights.glob("*.md"))
-    for md_iter in search_dirs:
-        for md in md_iter:
-            if md.name in _SKIP:
-                continue
+
+    def _all_pages() -> list[Path]:
+        out = [p for p in WIKI_DIR.glob("*.md") if p.name not in _SKIP]
+        if insights.exists():
+            out.extend(p for p in insights.glob("*.md") if p.name not in _SKIP)
+        return out
+
+    def _rel(md: Path) -> str:
+        return md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
+
+    removed_pages: set[str] = set()
+    for md in _all_pages():
+        try:
+            post = frontmatter.load(str(md))
+        except Exception:
+            continue
+        sources = post.metadata.get("sources", []) or []
+        kept = [s for s in sources if not str(s).startswith(source_name)]
+        if sources and not kept:
+            md.unlink()
+            removed_pages.add(_rel(md))
+        elif len(kept) != len(sources):
+            post.metadata["sources"] = kept
+            post.metadata["updated"] = _date()
+            md.write_text(frontmatter.dumps(post))
+
+    scrubbed = 0
+    if removed_pages:
+        for md in _all_pages():
             try:
                 post = frontmatter.load(str(md))
-                sources = post.metadata.get("sources", []) or []
             except Exception:
                 continue
-            if any(str(s).startswith(source_name) for s in sources):
-                md.unlink()
-                rel = md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
-                result["wiki_pages"].append(rel)
+            related = post.metadata.get("related", []) or []
+            cleaned = [r for r in related if str(r).strip() not in removed_pages]
+            if len(cleaned) != len(related):
+                post.metadata["related"] = cleaned
+                post.metadata["updated"] = _date()
+                md.write_text(frontmatter.dumps(post))
+                scrubbed += 1
+
+    result["wiki_pages"] = sorted(removed_pages)
+    result["related_scrubbed"] = scrubbed
 
     lex_index.build()
     _rebuild_index()
@@ -370,9 +401,32 @@ def delete_source(source_name: str) -> dict:
         f"Raw file removed: {result['raw']}\n"
         f"Chunks removed: {result['chunks']}\n"
         f"QA rows removed: {result['qa_rows']}\n"
-        f"Wiki pages removed: {result['wiki_pages']}",
+        f"Wiki pages removed: {result['wiki_pages']}\n"
+        f"Related scrubbed: {scrubbed}",
     )
     return result
+
+
+def reset_all_data() -> dict:
+    """Wipe every raw source, chunk, lexical index entry, and wiki page.
+
+    Re-initialises the wiki to its empty bootstrap state. Returns a count
+    of files removed per top-level data directory.
+    """
+    targets = [RAW_DIR, chunker.CHUNKS_DIR, lex_index.INDEX_DIR, WIKI_DIR]
+    counts: dict[str, int] = {}
+    for d in targets:
+        if d.exists():
+            counts[d.name] = sum(1 for p in d.rglob("*") if p.is_file())
+            shutil.rmtree(d)
+        else:
+            counts[d.name] = 0
+    init_wiki()
+    chunker.CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
+    lex_index.INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    lex_index.build()
+    _append_log("Reset all data", f"Files removed per dir: {counts}")
+    return counts
 
 
 def query(question: str) -> str:
@@ -635,9 +689,15 @@ def build_typed_graph() -> dict:
         for md in insights.glob("*.md"):
             existing.add(f"{_INSIGHTS_DIR}/{md.name}")
 
+    def _raw_source(name: str) -> str:
+        return _TEIL_SUFFIX_RE.sub("", str(name)).strip()
+
     nodes: dict[str, dict] = {}
     edges: list[dict] = []
+    related_pairs: set[frozenset[str]] = set()
+    derived_pairs: set[tuple[str, str]] = set()
     source_set: set[str] = set()
+    source_to_pages: dict[str, list[str]] = {}
 
     targets = [WIKI_DIR.glob("*.md")]
     if insights.exists():
@@ -652,24 +712,45 @@ def build_typed_graph() -> dict:
                 related = post.metadata.get("related", []) or []
                 sources = post.metadata.get("sources", []) or []
                 title = str(post.metadata.get("title", md.stem))
+                ptype = str(post.metadata.get("type", "other")).strip().lower()
             except Exception:
-                related, sources, title = [], [], md.stem
+                related, sources, title, ptype = [], [], md.stem, "other"
+            if ptype not in ("concept", "entity"):
+                continue
             page_id = md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
             nodes[page_id] = {"id": page_id, "type": "page", "label": title}
             for r in related:
                 r = str(r).strip()
                 if r and r != page_id and r in existing and r not in ("index.md", "log.md"):
-                    edges.append({"from": page_id, "to": r, "type": "related-to"})
+                    pair = frozenset({page_id, r})
+                    if pair not in related_pairs:
+                        related_pairs.add(pair)
+                        edges.append({"from": page_id, "to": r, "type": "related-to"})
             for s in sources:
-                s = str(s).strip()
-                if not s or s == "chat":
+                raw = _raw_source(s)
+                if not raw or raw == "chat":
                     continue
-                source_id = f"source::{s}"
-                source_set.add(s)
+                source_id = f"source::{raw}"
+                source_set.add(raw)
+                pair = (page_id, source_id)
+                if pair in derived_pairs:
+                    continue
+                derived_pairs.add(pair)
+                source_to_pages.setdefault(raw, []).append(page_id)
                 edges.append({"from": page_id, "to": source_id, "type": "derived-from"})
 
     for s in source_set:
         nodes[f"source::{s}"] = {"id": f"source::{s}", "type": "source", "label": s}
+
+    for s, pages in source_to_pages.items():
+        unique_pages = sorted(set(pages))
+        for i in range(len(unique_pages)):
+            for j in range(i + 1, len(unique_pages)):
+                pair = frozenset({unique_pages[i], unique_pages[j]})
+                if pair in related_pairs:
+                    continue
+                related_pairs.add(pair)
+                edges.append({"from": unique_pages[i], "to": unique_pages[j], "type": "related-to"})
 
     return {"nodes": list(nodes.values()), "edges": edges}
 
