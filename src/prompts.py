@@ -92,7 +92,11 @@ Instructions:
    Preserve relevant passages from chunk sources in detail. Copy relevant numbers, sizes, and references exactly as they appear in the original, never round or paraphrase. Format every citation as e.g. [{source_name}.md] using the source from the original doc.
 2. Create or update concept/entity pages for key topics found in the source.
 3. When updating an existing page (provided above as "Existing page content"), MERGE — preserve prior facts, integrate new information, refine wording. Never strip nuance from a prior version.
-4. Populate `related` frontmatter with the filenames of conceptually linked pages you saw in the index.
+4. Populate `related` frontmatter ONLY with filenames of pages whose topic is directly
+   and explicitly discussed in THIS source text in connection with the current page.
+   A link requires clear evidence in the source — loose thematic or domain overlap is
+   not sufficient. When in doubt, use an empty list. A missing link is less harmful
+   than a wrong one.
 5. Note any contradictions with existing wiki content.
 6. Output each page in this exact format:
 

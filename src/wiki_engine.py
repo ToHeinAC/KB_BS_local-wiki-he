@@ -139,6 +139,20 @@ def _build_existing_block(filenames: list[str]) -> str:
     return "".join(parts) + "\n"
 
 
+def _scrub_related(content: str, existing: set[str]) -> str:
+    """Remove `related:` entries that don't exist as actual wiki pages."""
+    try:
+        post = frontmatter.loads(content)
+    except Exception:
+        return content
+    related = post.metadata.get("related", []) or []
+    cleaned = [r for r in related if str(r).strip() in existing]
+    if len(cleaned) == len(related):
+        return content
+    post.metadata["related"] = cleaned
+    return frontmatter.dumps(post)
+
+
 def _ensure_source_in_frontmatter(content: str, source_name: str) -> str:
     """Append `source_name` to the frontmatter `sources:` list (idempotent).
 
@@ -235,6 +249,7 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
         "created": [],
         "updated": [],
         "contradictions": [],
+        "existing_filenames": {p["filename"] for p in list_pages()},
     }
 
 
@@ -271,6 +286,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
         # draw `derived-from` edges (source → page) without trusting the LLM
         # to have written it correctly.
         content = _ensure_source_in_frontmatter(content, ctx["source_name"])
+        content = _scrub_related(content, ctx["existing_filenames"])
         if dest.exists():
             if page["filename"] not in ctx["updated"] and page["filename"] not in ctx["created"]:
                 ctx["updated"].append(page["filename"])
