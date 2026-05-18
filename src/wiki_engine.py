@@ -697,7 +697,7 @@ def build_typed_graph() -> dict:
     related_pairs: set[frozenset[str]] = set()
     derived_pairs: set[tuple[str, str]] = set()
     source_set: set[str] = set()
-    source_to_pages: dict[str, list[str]] = {}
+
 
     targets = [WIKI_DIR.glob("*.md")]
     if insights.exists():
@@ -728,7 +728,7 @@ def build_typed_graph() -> dict:
                         edges.append({"from": page_id, "to": r, "type": "related-to"})
             for s in sources:
                 raw = _raw_source(s)
-                if not raw or raw == "chat":
+                if not raw or raw == "chat" or raw.startswith("summary-"):
                     continue
                 source_id = f"source::{raw}"
                 source_set.add(raw)
@@ -736,21 +736,11 @@ def build_typed_graph() -> dict:
                 if pair in derived_pairs:
                     continue
                 derived_pairs.add(pair)
-                source_to_pages.setdefault(raw, []).append(page_id)
                 edges.append({"from": page_id, "to": source_id, "type": "derived-from"})
 
     for s in source_set:
         nodes[f"source::{s}"] = {"id": f"source::{s}", "type": "source", "label": s}
 
-    for s, pages in source_to_pages.items():
-        unique_pages = sorted(set(pages))
-        for i in range(len(unique_pages)):
-            for j in range(i + 1, len(unique_pages)):
-                pair = frozenset({unique_pages[i], unique_pages[j]})
-                if pair in related_pairs:
-                    continue
-                related_pairs.add(pair)
-                edges.append({"from": unique_pages[i], "to": unique_pages[j], "type": "related-to"})
 
     return {"nodes": list(nodes.values()), "edges": edges}
 
