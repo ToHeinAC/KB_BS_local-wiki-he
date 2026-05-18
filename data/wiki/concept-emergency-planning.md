@@ -1,40 +1,34 @@
 ---
+confidence: high
+created: '2026-05-18'
 related:
-- summary-strlschv-md-teil-14-15.md
 - concept-radiation-protection-law.md
+- concept-radiation-dose-limits.md
 sources:
-- StrlSchG.md [Teil 12/13]
-- StrlSchG.md
-- StrlSchV.md
+- AtG.md [Teil 5/5]
+- AtG.md
 title: Emergency Planning
 type: concept
-updated: '2026-05-17'
+updated: '2026-05-18'
 ---
 
-Emergency planning, within the context of radiation protection, refers to the structured preparation and protocols established by federal and state authorities to manage the consequences of radiological accidents or incidents. This planning is codified within the Radiation Protection Act (StrlSchG) and involves multiple levels of governmental coordination.
+Emergency planning, within the context of radiation protection, refers to the structured preparation and protocols established to manage potential radiological incidents [concept-radiation-protection-law.md]. The *Atomgesetz* (AtG) details comprehensive requirements for safety and planning following nuclear events.
 
-## Planning Frameworks
-The law mandates several layers of planning documentation:
-*   **General Federal Emergency Plans (Anlage 5):** These plans outline the general legal bases, tasks, and responsibilities of federal and state authorities involved in emergency response. They include:
-    *   Information exchange and coordination procedures across federal, state
-…[truncated]
+## Core Planning Principles (AtG)
+The AtG mandates an integrated safety and protection concept, which must be coordinated between the license holder and the state [AtG.md [Teil 5/5].md].
 
-## Public Information Requirements (StrlSchV)
-The *Strahlenschutzverordnung* (StrlSchV) mandates that public information regarding preparedness for an emergency must include:
-1. The name of the radiation protection responsible party and the location of the facility whose surrounding area has an external emergency plan established by the competent authority for disaster protection or public safety.
-2. The body providing the information.
-3. A generally understandable brief description of the nature and purpose of the facility or establishment and its activity.
-4. Basic concepts of radioactivity and the effects of radioactivity on humans and the environment.
-5. The emergencies considered in the external emergency plan and their consequences for the population and environment.
-6. Planned measures for the protection and assistance of the population.
-7. Information on how the potentially affected population will be warned and continuously informed about the course of an emergency.
-8. Recommendations on how potentially affected persons should act and behave during an emergency.
-9. Confirmation that the radiation protection responsible party has taken suitable measures and precautions at the site to be ready in case of an emergency and to keep its effects as low as possible, including measures and precautions for connection with the authorities responsible for disaster protection and public safety.
-10. A reference to external emergency plans established for the effects of an emergency in the vicinity of the facility's location.
-11. The designation of the authorities responsible for disaster protection and public safety.
-12. A reference to the emergency plans and the information and recommendations published by § 105 StrlSchG by the competent federal and state authorities, and potentially other affected states, including where this information and recommendations can be found.
-13. A notice that the information from the permit holder will be updated upon substantial changes affecting the safety or protection of the population, and how this information is accessible to everyone in its current version at any time via the internet.
+### Protection Goals
+The primary goals of the safety measures are to prevent:
+1. The release and misuse of ionizing radiation from nuclear fuels or their by-products in significant quantities on site [AtG.md [Teil 5/5].md].
+2. The simple or repeated removal of nuclear fuels or their by-products in significant quantities with the aim of releasing or misusing ionizing radiation at any location [AtG.md [Teil 5/5].md].
+3. The simple or repeated removal of nuclear fuels in quantities sufficient in total to create a critical assembly [AtG.md [Teil 5/5].md].
 
-## Significance Criteria for Planned Exposure (StrlSchV)
-The *Verordnung* defines criteria for determining if an exposure situation is significant when planned:
-*   Exceeding dose limits for professionals or the general population, or exceeding permissible derivation limits for radioactive substances in air or water [StrlSchV.md [Teil 14/15].md].
+### Required Safety Measures
+*   **Scope of Protection:** The required protection against disruptions or third-party influences must be ensured through technical, personnel, and organizational measures [AtG.md [Teil 5/5].md].
+*   **Functional Reserve:** The determination of required measures is based on the current state of knowledge (Lastannahmen). For setting requirements, an effective dose of 100 millisieverts up to the age of 70 years, calculated as the sum of inhalation and seven days of external irradiation, is to be used as a guideline [AtG.md [Teil 5/5].md].
+*   **IT Security:** License holders must immediately report impairments of their IT systems, components, or processes that could lead to or have led to a danger or disruption of the nuclear safety to the Federal Office for Information Security (BSI) [AtG.md [Teil 5/5].md].
+
+## Liability in Emergencies
+The AtG also establishes clear rules for liability following a nuclear incident:
+*   **Compensation:** Compensation for nuclear damage to the means of transport carrying nuclear materials is only required if the sum is not reduced below 80 million Euros, which would otherwise be available for satisfying other claims for damages [AtG.md [Teil 5/5].md].
+*   **State Guarantee:** The federal government provides indemnification to the facility owner or radioactive substance owner to the extent that compensation obligations are not covered by the provision for coverage or cannot be met by it [AtG.md [Teil 5/5].md].

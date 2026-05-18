@@ -1,15 +1,19 @@
 # Wiki Index
-Updated: 2026-05-17 | Pages: 70
+Updated: 2026-05-18 | Pages: 100
 
 ## Pages
 - [Berufliche Exposition](berufliche-exposition.md) — Professional exposure refers to the radiation dose received by an individual due to their employment or professional act
 - [Bestehende Expositionssituation](bestehende-expositionssituation.md) — An existing exposure situation is defined as an exposure situation that already exists when a decision regarding its con
+- [Atomgesetz - AtG](concept-atomgesetz-atg.md) — The *Atomgesetz* (AtG), or Law on the Peaceful Use of Nuclear Energy and Protection Against its Dangers, is the foundati
+- [Cloud Applications](concept-cloud-applications.md) — # Cloud Applications  Cloud applications refer to software solutions delivered and operated over the internet, allowing 
+- [Digital Industries](concept-digital-industries.md) — # Digital Industries  Digital Industries refers to the segment of industrial technology focused on industrial automation
 - [Radiation Dose Limits](concept-dosisbegrenzung.md) — # Radiation Dose Limits  Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab
 - [Einsatzkraft](concept-einsatzkraft.md) — # Einsatzkraft (Emergency Response Personnel)  *Einsatzkräfte* refers to personnel involved in emergency response, parti
 - [Emergency Planning](concept-emergency-planning.md) — Emergency planning, within the context of radiation protection, refers to the structured preparation and protocols estab
 - [Health Record (Radiation)](concept-health-record-radiation.md) — # Health Record (Radiation)  A Health Record specific to radiation exposure is a mandatory, detailed document used to tr
-- [Kontaminierte Abfälle](concept-kontaminierte-abfaelle.md) — The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under th
+- [Kontaminierte Abfälle](concept-kontaminierte-abfaelle.md) — The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under Ge
 - [Medizinphysik-Experte](concept-medizinphysik-experte.md) — # Medizinphysik-Experte  A Medizinphysik-Experte is defined as a person with a Master's degree in medical physics. Withi
+- [Mobility Sector](concept-mobility-sector.md) — # Mobility Sector  The Mobility Sector, within the context of industrial technology, refers to the division responsible 
 - [Notfall](concept-notfall.md) — # Notfall  Ein Notfall ist ein Ereignis, bei dem sich durch ionisierende Strahlung erhebliche nachteilige Auswirkungen a
 - [Professional Exposure](concept-professional-exposure.md) — # Professional Exposure  Professional exposure refers to the occupational exposure of individuals to ionizing radiation 
 - [Public Exposure](concept-public-exposure.md) — # Public Exposure  Public exposure refers to the incidental or planned exposure of individuals in the general population
@@ -19,11 +23,18 @@ Updated: 2026-05-17 | Pages: 70
 - [Radiation Protection](concept-radiation-protection.md) — # Radiation Protection  Radiation Protection refers to the set of legal, technical, and organizational measures designed
 - [Radioactive Residues](concept-radioactive-residues.md) — Radioactive residues are materials defined under the Radiation Protection Act (StrlSchG) that result from various indust
 - [Radioaktive Altlasten](concept-radioaktive-altlasten.md) — # Radioaktive Altlasten (Radioactive Contaminated Sites)  Radioactive contaminated sites (*radioaktive Altlasten*) are d
+- [Radioactive Substances](concept-radioaktive-stoffe.md) — Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more
 - [Rechtfertigung von Tätigkeitsarten](concept-rechtfertigung-tätigkeitsarten.md) — # Rechtfertigung von Tätigkeitsarten  The justification of activities (*Rechtfertigung von Tätigkeitsarten*) is a centra
 - [Röntgeneinrichtung](concept-röntgeneinrichtung.md) — Eine Röntgeneinrichtung ist eine Vorrichtung oder ein Gerät, in der oder dem Röntgenstrahlung mit [StrlSchG.md [Teil 12/
+- [Smart Infrastructure](concept-smart-infrastructure.md) — # Smart Infrastructure  Smart Infrastructure is a business segment dedicated to modernizing and optimizing physical and 
+- [Staatliche Aufsicht](concept-staatliche-aufsicht.md) — State supervision (*staatliche Aufsicht*) is the mandatory regulatory oversight mechanism governing all activities invol
 - [Strahlenschutzverordnung - StrlSchV](concept-strahlenschutzverordnung-strlschv.md) — # Strahlenschutzverordnung - StrlSchV  The *Strahlenschutzverordnung* (StrlSchV) is a detailed implementing regulation t
+- [Veränderungssperre](concept-veränderungssperre.md) — A *Veränderungssperre* (Change Restriction) is a legal mechanism established under the *Atomgesetz* (AtG) to protect sit
 - [Vorkommnis](concept-vorkommnis.md) — # Vorkommnis (Incident)  In the context of radiation safety, a *Vorkommnis* (Incident) is a defined event that triggers 
+- [E-Mobility](e-mobility.md) — # E-Mobility  E-Mobility refers to the segment of the automotive industry focused on electric vehicle (EV) technology an
+- [Siemens AG](entity-siemens-ag.md) — # Siemens AG  Siemens Aktiengesellschaft is a German multinational conglomerate and industrial technology leader [Siemen
 - [Exposition (Radiation)](exposition.md) — # Exposition (Radiation)  In the context of radiation safety, "Exposition" refers to the potential dose received by indi
+- [Infineon Technologies AG](filename.md) — # Infineon Technologies AG  Infineon Technologies AG is a German semiconductor manufacturer recognized for its focus on 
 - [Geplante Expositionssituation](geplante-expositionssituation.md) — A planned exposure situation is defined as an exposure situation that arises from activities and in which an exposure is
 - [Ionisierende Strahlung](ionisierende-strahlung.md) — Ionizing radiation refers to electromagnetic radiation or particulate radiation that possesses sufficient energy to caus
 - [Ionisierende Strahlung](ionisierender-strahlung.md) — Ionizing radiation refers to radiation that has enough energy to remove electrons from atoms or molecules, thereby ioniz
@@ -37,11 +48,29 @@ Updated: 2026-05-17 | Pages: 70
 - [Radioaktive Stoffe](radioaktive-stoffe.md) — Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more
 - [Reinsurance](reinsurance.md) — # Reinsurance  Reinsurance is a concept within the insurance industry where a reinsurer (a company that sells insurance 
 - [Sanierungsplan](sanierungsplan.md) — # Sanierungsplan (Remediation Plan)  A Sanierungsplan is a mandatory, comprehensive document required when dealing with 
+- [SAP SE](sap-se.md) — # SAP SE  SAP SE is a German multinational software corporation specializing in enterprise resource planning (ERP) softw
+- [Schaeffler AG](schaeffler-ag.md) — # Schaeffler AG  Schaeffler AG is a German multinational corporation specializing in motion technology and industrial co
 - [Strahlenschutzgesetz - StrlSchG](strahlenschutzgesetz-strlschg.md) — The Strahlenschutzgesetz (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is the
 - [Strahlenschutzrechtliche Genehmigungen](strahlenschutzrechtliche-genehmigungen.md) — Radiation protection permits (Strahlenschutzrechtliche Genehmigungen) are formal authorizations required under the Germa
 - [Strahlenschutzregister](strahlenschutzregister.md) — The Radiation Protection Register (Strahlenschutzregister) is a central repository established under the *Strahlenschutz
+- [Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV](summary-atdeckv-md-teil-1-2.md) — The *Atomrechtliche Deckungsvorsorge-Verordnung* (AtDeckV) is a regulation concerning the financial security provision f
+- [Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV](summary-atdeckv-md-teil-2-2.md) — The *Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV* is a specific regulation detailing the provisions for financi
+- [Atomrechtliche Entsorgungsverordnung - AtEV](summary-atev-md-teil-1-2.md) — # Atomrechtliche Entsorgungsverordnung - AtEV  The *Atomrechtliche Entsorgungsverordnung* (AtEV) is a regulation concern
+- [Atomrechtliche Entsorgungsverordnung - AtEV](summary-atev-md-teil-2-2.md) — # Atomrechtliche Entsorgungsverordnung - AtEV  This document summarizes technical annexes and detailed requirements deri
+- [Atomgesetz - AtG](summary-atg-md-teil-1-5.md) — # Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihre Gefahren (Atomgesetz)  This summary de
+- [Atomgesetz - AtG](summary-atg-md-teil-2-5.md) — The *Atomgesetz* (AtG), or Law for the Peaceful Use of Nuclear Energy and Protection Against Its Dangers, is a comprehen
+- [Atomgesetz - AtG (Teil 3/5)](summary-atg-md-teil-3-5.md) — This document provides excerpts from the *Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihr
+- [Atomgesetz - AtG](summary-atg-md-teil-4-5.md) — The *Atomgesetz* (AtG), or Law for the Peaceful Use of Nuclear Energy and Protection Against its Dangers, is a foundatio
+- [Atomgesetz - AtG](summary-atg-md-teil-5-5.md) — # Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihre Gefahren (Atomgesetz)  This document p
+- [Infineon AG Investment Idea](summary-infineon-investment-idea-md.md) — # Infineon AG Investment Idea  This document provides a structured, investment-grade due diligence on Infineon Technolog
 - [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-1-2.md) — # Munich Re (MUV2) — Full Deep-Dive Investment Report  This document summarizes the findings from the "Munich Re (MUV2) 
 - [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-2-2.md) — Munich Re (MUV2) — Full Deep-Dive Investment Report vom 16.05.2026
+- [PDF Document](summary-pdf-document.md) — # PDF Document  A PDF (Portable Document Format) is a file format designed to present documents, including text, graphic
+- [Python PDF Libraries Deep Comparison](summary-python-pdf-libraries-deep-comparison-md.md) — Python PDF Libraries Deep Comparison vom 07.05.2026
+- [SAP SE Investment Research Overview](summary-sap-se-investment-research-overview-md.md) — # SAP SE Investment Research Overview  This document provides a comprehensive investment research overview of SAP SE, de
+- [Schaeffler AG – Investment Overview](summary-schaeffler-ag-investment-overview-md.md) — # Schaeffler AG – Investment Overview  This document provides a comprehensive investment overview of Schaeffler AG, deta
+- [Siemens AG — Investment Research Overview](summary-siemens-ag-investment-research-overview-md.md) — # Siemens AG — Investment Research Overview  This document provides a comprehensive investment research overview of Siem
+- [Software Licensing](summary-software-licensing.md) — # Software Licensing  Software licensing defines the legal terms under which software can be used, modified, and distrib
 - [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-1-13.md) — The *Strahlenschutzgesetz* (StrlSchG) is the German law concerning the protection against the harmful effects of ionizin
 - [Strahlenschutzgesetz - StrlSchG (Teil 10/13)](summary-strlschg-md-teil-10-13.md) — The source document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (
 - [Strahlenschutzgesetz - StrlSchG (Teil 11/13)](summary-strlschg-md-teil-11-13.md) — This document provides excerpts from the German Radiation Protection Act ($\text{StrlSchG}$), detailing administrative p
@@ -71,4 +100,5 @@ Updated: 2026-05-17 | Pages: 70
 - [Strahlenschutzverordnung - StrlSchV (Teil 8/15)](summary-strlschv-md-teil-8-15.md) — This document provides excerpts from the *Verordnung zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (St
 - [Strahlenschutzverordnung - StrlSchV (Teil 9/15)](summary-strlschv-md-teil-9-15.md) — This document provides excerpts from the *Strahlenschutzverordnung* (StrlSchV), which details the administrative and pro
 - [Umweltradioaktivität](umweltradioaktivitaet.md) — Environmental radioactivity refers to the presence and measurement of radioactive substances in the natural environment,
+- [Vitesco Technologies](vitesco-technologies.md) — # Vitesco Technologies  Vitesco Technologies is an entity that underwent a merger with Schaeffler AG.  ## Merger Context
 - [War Risk Insurance](war-risk-insurance.md) — # War Risk Insurance  War risk insurance is a specialized form of coverage designed to protect insured assets or operati

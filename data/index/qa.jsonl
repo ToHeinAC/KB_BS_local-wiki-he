@@ -13,3 +13,43 @@
 {"chunk_id": "a909d189e51b55cd", "question": "Welche Werte dürfen nach § 135 Absatz 1 Satz 3 nicht überschritten werden?", "source": "StrlSchV.md"}
 {"chunk_id": "a909d189e51b55cd", "question": "Welche Prüfungen sind für Sachverständige nach § 172 Absatz 1 nötig?", "source": "StrlSchV.md"}
 {"chunk_id": "8eeec8cd176a6548", "question": "Was ist bei Qualitätskontrolle entgegen § 24 Nummer 2 zu vermeiden?", "source": "StrlSchV.md"}
+{"chunk_id": "269795260addf1c1", "question": "Welche Codes gelten für ferritische Metalle?", "source": "AtEV.md"}
+{"chunk_id": "269795260addf1c1", "question": "Welche Abfallart ist als 'Feste Abfälle anorganisch' gelistet?", "source": "AtEV.md"}
+{"chunk_id": "269795260addf1c1", "question": "Welche Materialien fallen unter 'Buntmetalle'?", "source": "AtEV.md"}
+{"chunk_id": "607b6fa102eb0587", "question": "Was ist für den physikalischen Zustand des Abfalls anzugeben?", "source": "AtEV.md"}
+{"chunk_id": "607b6fa102eb0587", "question": "Welche Angaben muss die Transportmeldung enthalten?", "source": "AtEV.md"}
+{"chunk_id": "cd50a82b59b36b67", "question": "Welche Vorsorgemaßnahmen sind beim Umgang mit radioaktiven Stoffen nötig?", "source": "AtG.md"}
+{"chunk_id": "cd50a82b59b36b67", "question": "Welche Dosen und Konzentrationen dürfen in Luft und Wasser nicht überschritten werden?", "source": "AtG.md"}
+{"chunk_id": "cd50a82b59b36b67", "question": "Was muss über den Verbleib radioaktiver Stoffe gemessen werden?", "source": "AtG.md"}
+{"chunk_id": "5f87f0b6b5343794", "question": "Wie müssen Maßnahmen bei der Beförderung radioaktiver Stoffe abgestuft werden?", "source": "AtG.md"}
+{"chunk_id": "5f87f0b6b5343794", "question": "Welche Faktoren bestimmen die Verhältnismäßigkeit der Maßnahmen?", "source": "AtG.md"}
+{"chunk_id": "438897f4f8626797", "question": "Für welche Uranverbindungen gelten die Werte (a) und (b)?", "source": "AtDeckV.md"}
+{"chunk_id": "438897f4f8626797", "question": "Welche chemische Form muss das Uran bei Beförderung annehmen?", "source": "AtDeckV.md"}
+{"chunk_id": "438897f4f8626797", "question": "Gilt diese Werte nur für unbestrahltes Uran?", "source": "AtDeckV.md"}
+{"chunk_id": "438897f4f8626797", "question": "Welche Verbindungen sind in (a) und (b) aufgeführt?", "source": "AtDeckV.md"}
+{"chunk_id": "fce006be0c539160", "question": "Wann muss die Deckungsvorsorge neu festgesetzt werden?", "source": "AtDeckV.md"}
+{"chunk_id": "a6271067483f1566", "question": "Wie viel Prozent des Portfolios für einen konservativen Investor?", "source": "Infineon Investment Idea.md"}
+{"chunk_id": "a6271067483f1566", "question": "Welcher Anteil wird für einen aggressiven Tech-Investor empfohlen?", "source": "Infineon Investment Idea.md"}
+{"chunk_id": "a6271067483f1566", "question": "Wie hoch ist die maximale Notional Exposure für Derivate-Trader?", "source": "Infineon Investment Idea.md"}
+{"chunk_id": "a6271067483f1566", "question": "Wann sollten Trader gehebelte Positionen vermeiden?", "source": "Infineon Investment Idea.md"}
+{"chunk_id": "08cafb3fd11c3774", "question": "Was ist der ungefähre aktuelle Aktienkurs?", "source": "Infineon Investment Idea.md"}
+{"chunk_id": "c7cafaf02e830bda", "question": "Was ist die Genauigkeit von pdfplumber bei Text-Extraktion?", "source": "Python PDF Libraries Deep Comparison.md"}
+{"chunk_id": "c7cafaf02e830bda", "question": "Welche Bibliothek wird für komplexe Bildextraktion empfohlen?", "source": "Python PDF Libraries Deep Comparison.md"}
+{"chunk_id": "c7cafaf02e830bda", "question": "Welche Bibliothek fehlt die Tabellendetektion?", "source": "Python PDF Libraries Deep Comparison.md"}
+{"chunk_id": "c7cafaf02e830bda", "question": "Welche CVE-Schwachstelle wurde in pypdf gepatcht?", "source": "Python PDF Libraries Deep Comparison.md"}
+{"chunk_id": "452d517894c7ab96", "question": "Welche Bibliothek eignet sich für LLM-Ingestion kommerziell?", "source": "Python PDF Libraries Deep Comparison.md"}
+{"chunk_id": "b9167da334025ac4", "question": "Was ist der aktuelle Abschlussgrad der S/4HANA Migration?", "source": "SAP SE Investment Research Overview.md"}
+{"chunk_id": "b9167da334025ac4", "question": "Welche Wachstumsrate wird für die Cloud ERP Suite im Vergleich zu Peers beobachtet?", "source": "SAP SE Investment Research Overview.md"}
+{"chunk_id": "b9167da334025ac4", "question": "Welche Faktoren begrenzen die Kapazität der Systemintegratoren?", "source": "SAP SE Investment Research Overview.md"}
+{"chunk_id": "b9167da334025ac4", "question": "Welche Win Rates werden für Oracle und Microsoft Cloud ERP gemessen?", "source": "SAP SE Investment Research Overview.md"}
+{"chunk_id": "0c60cdc58a5d8ff0", "question": "Wie hoch war der Umsatz von SAP im Jahr 2025?", "source": "SAP SE Investment Research Overview.md"}
+{"chunk_id": "c7ab970567a9113d", "question": "Was bestätigt ein EBIT margin von über 4.5%?", "source": "Schaeffler AG – Investment Overview.md"}
+{"chunk_id": "c7ab970567a9113d", "question": "Bis wann muss der E-Mobility margin break-even sein?", "source": "Schaeffler AG – Investment Overview.md"}
+{"chunk_id": "c7ab970567a9113d", "question": "Wie niedrig sollte das Debt/EBITDA bis 2026 fallen?", "source": "Schaeffler AG – Investment Overview.md"}
+{"chunk_id": "c7ab970567a9113d", "question": "Was ist ein positives Zeichen für den Free cash flow?", "source": "Schaeffler AG – Investment Overview.md"}
+{"chunk_id": "c64dd5422e3f067b", "question": "Was ist Schaeffler's Edge gegenüber SKF?", "source": "Schaeffler AG – Investment Overview.md"}
+{"chunk_id": "620085308a677441", "question": "Welche Berichte werden für die Analyse verwendet?", "source": "Siemens AG — Investment Research Overview.md"}
+{"chunk_id": "620085308a677441", "question": "Woher stammen die Marktdaten?", "source": "Siemens AG — Investment Research Overview.md"}
+{"chunk_id": "620085308a677441", "question": "Welche Ratingagenturen werden für ESG-Bewertungen genutzt?", "source": "Siemens AG — Investment Research Overview.md"}
+{"chunk_id": "620085308a677441", "question": "Welche Art von Berichten deckt die Analyse ab?", "source": "Siemens AG — Investment Research Overview.md"}
+{"chunk_id": "420186a489f52596", "question": "Wie hoch ist die aktuelle Marktkapitalisierung von Siemens?", "source": "Siemens AG — Investment Research Overview.md"}
