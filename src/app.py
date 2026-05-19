@@ -423,6 +423,13 @@ elif page == "Chat":
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 if msg["role"] == "assistant" and msg.get("steps"):
+                    st.download_button(
+                        "Download answer",
+                        data=msg["content"],
+                        file_name="answer.md",
+                        mime="text/markdown",
+                        key=f"dl_answer_{i}",
+                    )
                     with st.expander("Agent trace", expanded=False):
                         for step in msg["steps"]:
                             stype = step["type"]
@@ -464,13 +471,23 @@ elif page == "Chat":
             steps: list[dict] = []
             answer = ""
             raw_sources: list[str] = []
-            with st.spinner("Deep chat — agent is searching originals…"):
-                for step in chat_agent.run_chat_agent(prompt):
-                    steps.append(step)
-                    if step["type"] == "final_answer":
+            _live = st.container()
+            for step in chat_agent.run_chat_agent(prompt):
+                steps.append(step)
+                stype = step["type"]
+                with _live:
+                    if stype == "thought":
+                        with st.expander("Thought", expanded=False):
+                            st.markdown(step["content"])
+                    elif stype == "tool_call":
+                        st.info(f"**{step['name']}** — `{step['args']}`")
+                    elif stype == "tool_result":
+                        with st.expander(f"Result: {step['name']}", expanded=False):
+                            st.text(step["result"][:800])
+                    elif stype == "final_answer":
                         answer = step["content"]
                         raw_sources = step.get("sources", []) or []
-                    elif step["type"] == "error" and not answer:
+                    elif stype == "error" and not answer:
                         answer = f"Error: {step['content']}"
             st.session_state["messages"].append(
                 {"role": "assistant", "content": answer or "(no answer)", "question": prompt,
@@ -549,9 +566,16 @@ elif page == "Research":
             _report_filename = _rp.split("comparisons/")[-1]
             _report_rel = f"comparisons/{_report_filename}"
             st.markdown(f"Report saved: `{_report_rel}`")
-            if st.button(_report_filename, key="view_report"):
-                _parsed = wiki_engine.read_page_parsed(_report_rel)
-                _show_md_dialog(_report_filename, _parsed["content"])
+            _parsed = wiki_engine.read_page_parsed(_report_rel)
+            st.markdown("---")
+            st.markdown(_parsed["content"])
+            st.download_button(
+                "Download report",
+                data=_parsed["content"],
+                file_name=_report_filename,
+                mime="text/markdown",
+                key="dl_report",
+            )
 
 
 elif page == "Maintenance":

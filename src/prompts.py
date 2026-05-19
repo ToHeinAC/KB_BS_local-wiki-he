@@ -245,3 +245,18 @@ SUBMIT_CHAT_DESCRIPTION = (
     "Submit the final chat answer. Validates >= min_words and >= min_sources unique [Source: filename] "
     "citations. On accept, returns the answer to the UI (no file is written; the user saves manually)."
 )
+
+DEEP_CALCULATE_DESCRIPTION = (
+    "Evaluate one or more arithmetic expressions over named numerical variables. "
+    "Use whenever you need to compute totals, products, ratios, or percentage breakdowns "
+    "from numbers found in source documents — do NOT compute these mentally or inside think_tool.\n\n"
+    "Parameters:\n"
+    '  variables (dict): named float/int values, e.g. {"dose_rate_mSv": 2.5, "hours": 8}\n'
+    "  expressions (list of dicts): each dict has:\n"
+    '    "label" (str): human-readable name for this result\n'
+    '    "expr"  (str): arithmetic using variable names and +, -, *, / only\n'
+    '                   e.g. "dose_rate_mSv * hours"\n\n'
+    "Only +, -, *, / are allowed. Variable names must match keys in `variables` exactly. "
+    "Returns a table of variables, each labeled result, and (for 2+ numeric results) "
+    "percentage shares relative to their sum."
+)

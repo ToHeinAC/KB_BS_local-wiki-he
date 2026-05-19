@@ -6,6 +6,8 @@ ThreadPoolExecutor. LLM calls remain sequential at the agent layer.
 
 from __future__ import annotations
 
+import ast
+import operator as _op
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -18,6 +20,7 @@ from langchain_core.tools import tool
 import lex_index
 import wiki_engine
 from prompts import (
+    DEEP_CALCULATE_DESCRIPTION,
     FETCH_WEBPAGE_DESCRIPTION,
     RAW_READ_DESCRIPTION,
     RAW_SEARCH_DESCRIPTION,
@@ -333,6 +336,93 @@ def submit_chat_answer(answer: str, sources: list[str] | None = None) -> str:
     return _submit_chat_impl(answer, sources)
 
 
+# --- deep_calculate -----------------------------------------------------------
+
+_SAFE_OPS: dict = {
+    ast.Add: _op.add,
+    ast.Sub: _op.sub,
+    ast.Mult: _op.mul,
+    ast.Div: _op.truediv,
+    ast.UAdd: _op.pos,
+    ast.USub: _op.neg,
+}
+
+
+class _SafeEval(ast.NodeVisitor):
+    def __init__(self, variables: dict) -> None:
+        self._vars = variables
+
+    def visit_Expression(self, node: ast.Expression):  # type: ignore[override]
+        return self.visit(node.body)
+
+    def visit_Constant(self, node: ast.Constant):  # type: ignore[override]
+        if not isinstance(node.value, (int, float)):
+            raise ValueError(f"Non-numeric constant: {node.value!r}")
+        return float(node.value)
+
+    def visit_Name(self, node: ast.Name):  # type: ignore[override]
+        if node.id not in self._vars:
+            raise ValueError(f"Unknown variable: {node.id!r}")
+        return float(self._vars[node.id])
+
+    def visit_BinOp(self, node: ast.BinOp):  # type: ignore[override]
+        fn = _SAFE_OPS.get(type(node.op))
+        if fn is None:
+            raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
+        return fn(self.visit(node.left), self.visit(node.right))
+
+    def visit_UnaryOp(self, node: ast.UnaryOp):  # type: ignore[override]
+        fn = _SAFE_OPS.get(type(node.op))
+        if fn is None:
+            raise ValueError(f"Unsupported unary: {type(node.op).__name__}")
+        return fn(self.visit(node.operand))
+
+    def generic_visit(self, node: ast.AST):  # type: ignore[override]
+        raise ValueError(f"Forbidden AST node: {type(node).__name__}")
+
+
+def _safe_eval(expr: str, variables: dict) -> float:
+    return _SafeEval(variables).visit(ast.parse(expr.strip(), mode="eval"))
+
+
+def _deep_calculate_impl(variables: dict, expressions: list) -> str:
+    if not variables:
+        return "Error: `variables` must be a non-empty dict."
+    if not expressions:
+        return "Error: `expressions` must be a non-empty list."
+    lines = ["## Variables", ""]
+    for k, v in variables.items():
+        lines.append(f"  {k} = {v:g}")
+    results: list[tuple[str, str, float | str]] = []
+    for item in expressions:
+        label = item.get("label", "(unlabeled)")
+        expr = item.get("expr", "")
+        try:
+            results.append((label, expr, _safe_eval(expr, variables)))
+        except ZeroDivisionError:
+            results.append((label, expr, "Error: division by zero"))
+        except Exception as exc:
+            results.append((label, expr, f"Error: {exc}"))
+    lines += ["", "## Results", ""]
+    for label, expr, value in results:
+        if isinstance(value, float):
+            lines.append(f"  {label}: {expr} = {value:g}")
+        else:
+            lines.append(f"  {label}: {expr} => {value}")
+    numeric = [(lbl, v) for lbl, _, v in results if isinstance(v, float)]
+    total = sum(v for _, v in numeric)
+    if len(numeric) > 1 and total != 0.0:
+        lines += ["", "## Relative shares (% of sum)", ""]
+        for lbl, v in numeric:
+            lines.append(f"  {lbl}: {100 * v / total:.1f}%")
+    return "\n".join(lines)
+
+
+@tool(description=DEEP_CALCULATE_DESCRIPTION)
+def deep_calculate(variables: dict, expressions: list) -> str:
+    return _deep_calculate_impl(variables, expressions)
+
+
 TOOLS = [
     wiki_search,
     wiki_read,
@@ -340,6 +430,7 @@ TOOLS = [
     fetch_webpage_content,
     think_tool,
     submit_final_answer,
+    deep_calculate,
 ]
 
 CHAT_TOOLS = [
@@ -347,6 +438,7 @@ CHAT_TOOLS = [
     raw_read,
     think_tool,
     submit_chat_answer,
+    deep_calculate,
 ]
 
 # Plain-callable map (used by tests and the LangGraph ToolNode fallback path).
@@ -360,4 +452,5 @@ TOOL_FUNCTIONS = {
     "raw_search": _raw_search_impl,
     "raw_read": _raw_read_impl,
     "submit_chat_answer": _submit_chat_impl,
+    "deep_calculate": _deep_calculate_impl,
 }
