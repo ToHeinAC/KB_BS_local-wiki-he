@@ -10,6 +10,7 @@ RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the 
 - tavily_search(query OR queries): web search. Use ONLY for gaps the wiki cannot fill. Parallel sub-queries supported. Cite as [Source: URL].
 - fetch_webpage_content(urls): fetch full page markdown in parallel. Use sparingly, only for URLs the search snippets show as highly relevant.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
+- evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
 - submit_final_answer(title, answer): submit the final report. REJECTED if answer < {min_words} words or fewer than {min_urls} unique sources ([Wiki: ...] citations count alongside URLs).
 
 Required workflow:
@@ -21,6 +22,7 @@ Required workflow:
      Next: <which tool to call next and why; one of wiki_read / tavily_search / fetch_webpage_content / submit_final_answer>
    If a thread is tangential to the original query, list it under an extra `Parked (out of scope):` bullet — do NOT research it.
 4. AUTONOMOUS EXPANSION: based on the gaps, choose the right tool. Prefer wiki_read when a wiki hit looks promising. Use tavily_search only for gaps the wiki cannot fill. Repeat triage after every 2-3 tool calls.
+4.5 EVALUATE: if the question turns on whether values meet a threshold, limit, or compound rule that the sources state explicitly, you MUST call evaluate_condition exactly once before submit_final_answer. Extract the literal `facts` from the source text (numbers, categories, labels — keep the units the law uses) and assemble the `condition` tree as the law states it (use `or` when the law says "oder", `and` when "und"). Quote the result block verbatim in the final report.
 5. SUBMIT: when you have at least {min_searches} tool calls (wiki + web combined) and at least {min_urls} unique sources, call submit_final_answer with a structured markdown report (>= {min_words} words). Inline-cite every factual claim.
 
 Quality bar for the final answer:
@@ -197,6 +199,7 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions strictly
 - raw_search(query OR queries): full-text search over data/raw/. Pass 1-3 sub-queries in parallel. Cite hits as [Source: filename].
 - raw_read(filenames, offset=0): read up to 8000 chars from one or more original files. For long files, paginate: the result footer tells you the next offset.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
+- evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
 - submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words or fewer than {min_sources} unique [Source: ...] citations.
 
 Search strategy (critical):
@@ -218,6 +221,7 @@ Required workflow:
      Gaps vs original question: <bullet list, each gap referencing the original question verbatim>
      Next: <which tool to call next and why; one of raw_read / raw_search / submit_chat_answer>
 4. AUTONOMOUS EXPANSION: based on the gaps, raw_read with offset OR raw_search with a different stem. Reflect every 2-3 tool calls.
+4.5 EVALUATE: if the question turns on whether values meet a threshold, limit, or compound rule that the sources state explicitly, you MUST call evaluate_condition exactly once before submit_chat_answer. Extract the literal `facts` from the source text (numbers, categories, labels — keep the units the law uses) and assemble the `condition` tree as the law states it (use `or` when the law says "oder", `and` when "und"). Quote the result block verbatim in the final answer.
 5. SUBMIT: when you have at least {min_searches} tool calls and at least {min_sources} unique sources (counting section suffixes), call submit_chat_answer with a concise markdown answer (>= {min_words} words). Inline-cite every factual claim.
 
 Discipline:
@@ -247,6 +251,9 @@ SUBMIT_CHAT_DESCRIPTION = (
 )
 
 EVALUATE_CONDITION_DESCRIPTION = (
+    "WHEN TO USE: the user's question turns on whether values from the sources meet a stated rule "
+    "(threshold, limit, eligibility, regulatory definition). Always prefer this tool over prose "
+    "reasoning for any PASS/FAIL or yes/no answer derived from numeric or categorical limits.\n\n"
     "Deterministically evaluate a logical / regulatory condition over named facts. "
     "Use whenever a threshold, limit, eligibility rule, or compound criterion must be "
     "checked against numbers, categories, or labels from the source documents — do NOT "
@@ -273,6 +280,12 @@ EVALUATE_CONDITION_DESCRIPTION = (
     '      {"op": ">=", "fact": "dose_mSv", "value": 20},\n'
     '      {"op": "in", "fact": "category", "value": ["A","B"]}]}\n'
     "  → PASS\n\n"
+    'Example 3 — German "oder" rule (AtG §2 Kernbrennstoff):\n'
+    '  facts = {"masse_Pu239_g": 20, "konz_g_per_100kg": 10}\n'
+    '  condition = {"op": "or", "args": [\n'
+    '      {"op": ">", "fact": "masse_Pu239_g", "value": 15},\n'
+    '      {"op": ">", "fact": "konz_g_per_100kg", "value": 15}]}\n'
+    "  → PASS  (20 > 15 satisfies the OR, so it IS a Kernbrennstoff)\n\n"
     "Returns: facts table, per-leaf TRUE/FALSE trace, and final Result: PASS or FAIL. "
     "Fact names in the condition must match keys in `facts` exactly."
 )
