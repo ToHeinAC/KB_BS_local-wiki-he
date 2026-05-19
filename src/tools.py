@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from langchain_core.tools import tool
 
 import lex_index
+import run_memory
 import wiki_engine
 from prompts import (
     EVALUATE_CONDITION_DESCRIPTION,
@@ -300,14 +301,69 @@ def fetch_webpage_content(urls: list[str]) -> str:
     return _fetch_webpage_impl(urls)
 
 
+def _dedup_search(prefix: str, qs: list[str]) -> tuple[list[str], list[str]]:
+    """Split queries into (fresh, stub_lines) using current RunMemory."""
+    mem = run_memory.current()
+    if mem is None:
+        return qs, []
+    mem.tick()
+    fresh: list[str] = []
+    stubs: list[str] = []
+    for q in qs:
+        key = f"{prefix}:{(q or '').strip().lower()}"
+        prior = mem.seen_search(key)
+        if prior is not None:
+            stubs.append(
+                f"## {prefix} query: {q}\n[memory] Already searched at step {prior} — "
+                "do not repeat. Try a different phrasing, or move on to reading a hit."
+            )
+        else:
+            fresh.append(q)
+            mem.mark_search(key)
+    return fresh, stubs
+
+
 @tool(description=WIKI_SEARCH_DESCRIPTION)
 def wiki_search(query: str = "", queries: list[str] | None = None, max_results: int = 8) -> str:
-    return _wiki_search_impl(query=query, queries=queries, max_results=max_results)
+    qs = queries if queries else ([query] if query else [])
+    qs = [q for q in qs if q]
+    if not qs:
+        return _wiki_search_impl(query=query, queries=queries, max_results=max_results)
+    fresh, stubs = _dedup_search("wiki_search", qs)
+    if not fresh:
+        return "\n\n".join(stubs)
+    body = _wiki_search_impl(queries=fresh, max_results=max_results)
+    return "\n\n".join(stubs + [body]) if stubs else body
 
 
 @tool(description=WIKI_READ_DESCRIPTION)
 def wiki_read(filenames: list[str]) -> str:
-    return _wiki_read_impl(filenames)
+    mem = run_memory.current()
+    if mem is None:
+        return _wiki_read_impl(filenames)
+    mem.tick()
+    if isinstance(filenames, str):
+        filenames = [filenames]
+    filenames = [f for f in (filenames or []) if f]
+    if not filenames:
+        return _wiki_read_impl(filenames)
+    out: list[str] = []
+    fresh: list[str] = []
+    for f in filenames:
+        key = f"wiki:{f.strip()}"
+        prior = mem.seen_read(key)
+        if prior is not None:
+            out.append(
+                f"## Wiki page: {f}\n[memory] Already read at step {prior} — "
+                "do not re-fetch. Use think_tool, pick a different page, or move on."
+            )
+        else:
+            fresh.append(f)
+    if fresh:
+        out.append(_wiki_read_impl(fresh))
+        for f in fresh:
+            mem.mark_read(f"wiki:{f.strip()}")
+    return "\n\n".join(out)
 
 
 @tool(description=THINK_TOOL_DESCRIPTION)
@@ -322,12 +378,48 @@ def submit_final_answer(title: str, answer: str) -> str:
 
 @tool(description=RAW_SEARCH_DESCRIPTION)
 def raw_search(query: str = "", queries: list[str] | None = None, max_results: int = 6) -> str:
-    return _raw_search_impl(query=query, queries=queries, max_results=max_results)
+    qs = queries if queries else ([query] if query else [])
+    qs = [q for q in qs if q]
+    if not qs:
+        return _raw_search_impl(query=query, queries=queries, max_results=max_results)
+    fresh, stubs = _dedup_search("raw_search", qs)
+    if not fresh:
+        return "\n\n".join(stubs)
+    body = _raw_search_impl(queries=fresh, max_results=max_results)
+    return "\n\n".join(stubs + [body]) if stubs else body
 
 
 @tool(description=RAW_READ_DESCRIPTION)
 def raw_read(filenames: list[str], offset: int = 0) -> str:
-    return _raw_read_impl(filenames, offset=offset)
+    mem = run_memory.current()
+    if mem is None:
+        return _raw_read_impl(filenames, offset=offset)
+    mem.tick()
+    if isinstance(filenames, str):
+        filenames = [filenames]
+    filenames = [f for f in (filenames or []) if f]
+    if not filenames:
+        return _raw_read_impl(filenames, offset=offset)
+    out: list[str] = []
+    fresh: list[str] = []
+    for f in filenames:
+        base = re.sub(r"\s*[§#].*$", "", f).strip()
+        key = f"raw:{base}:{int(offset or 0)}"
+        prior = mem.seen_read(key)
+        if prior is not None:
+            out.append(
+                f"## Raw file: {base} (offset {int(offset or 0)})\n"
+                f"[memory] Already read at step {prior} — do not re-fetch. "
+                "Paginate with a new offset, pick a different file, or use think_tool."
+            )
+        else:
+            fresh.append(f)
+    if fresh:
+        out.append(_raw_read_impl(fresh, offset=offset))
+        for f in fresh:
+            base = re.sub(r"\s*[§#].*$", "", f).strip()
+            mem.mark_read(f"raw:{base}:{int(offset or 0)}")
+    return "\n\n".join(out)
 
 
 @tool(description=SUBMIT_CHAT_DESCRIPTION)

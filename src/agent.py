@@ -22,6 +22,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 import ollama_client
+import run_memory
 import tools as tool_module
 from prompts import RESEARCHER_INSTRUCTIONS
 
@@ -121,6 +122,7 @@ def _tool_to_result(msg: ToolMessage):
 
 
 def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict, None, None]:
+    run_memory.begin_run()
     try:
         llm = _build_llm()
         graph = _build_graph(llm)

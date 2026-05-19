@@ -25,6 +25,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 import ollama_client
+import run_memory
 import tools as tool_module
 from prompts import CHAT_AGENT_SYSTEM
 
@@ -153,6 +154,7 @@ def _extract_submitted_answer(messages) -> tuple[str, list[str]] | None:
 
 
 def run_chat_agent(question: str) -> Generator[dict, None, None]:
+    run_memory.begin_run()
     try:
         llm = _build_llm()
         graph = _build_graph(llm)
