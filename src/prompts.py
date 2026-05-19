@@ -246,17 +246,33 @@ SUBMIT_CHAT_DESCRIPTION = (
     "citations. On accept, returns the answer to the UI (no file is written; the user saves manually)."
 )
 
-DEEP_CALCULATE_DESCRIPTION = (
-    "Evaluate one or more arithmetic expressions over named numerical variables. "
-    "Use whenever you need to compute totals, products, ratios, or percentage breakdowns "
-    "from numbers found in source documents — do NOT compute these mentally or inside think_tool.\n\n"
+EVALUATE_CONDITION_DESCRIPTION = (
+    "Deterministically evaluate a logical / regulatory condition over named facts. "
+    "Use whenever a threshold, limit, eligibility rule, or compound criterion must be "
+    "checked against numbers, categories, or labels from the source documents — do NOT "
+    "decide PASS/FAIL mentally or inside think_tool.\n\n"
     "Parameters:\n"
-    '  variables (dict): named float/int values, e.g. {"dose_rate_mSv": 2.5, "hours": 8}\n'
-    "  expressions (list of dicts): each dict has:\n"
-    '    "label" (str): human-readable name for this result\n'
-    '    "expr"  (str): arithmetic using variable names and +, -, *, / only\n'
-    '                   e.g. "dose_rate_mSv * hours"\n\n'
-    "Only +, -, *, / are allowed. Variable names must match keys in `variables` exactly. "
-    "Returns a table of variables, each labeled result, and (for 2+ numeric results) "
-    "percentage shares relative to their sum."
+    '  facts (dict): named values you extracted from the text, e.g.\n'
+    '                {"dose_mSv": 25, "category": "A", "label": "warning level"}\n'
+    "  condition (dict): a nested logical tree. Each node is ONE of:\n"
+    '    comparison : {"op": ">=", "fact": "dose_mSv", "value": 20}\n'
+    '                 op ∈ {">", ">=", "<", "<=", "==", "!="}\n'
+    '    membership : {"op": "in", "fact": "category", "value": ["A","B"]}\n'
+    '    substring  : {"op": "contains", "fact": "label", "value": "warning"}\n'
+    '    range      : {"op": "between", "fact": "temp_c", "low": 0, "high": 100}\n'
+    '    negation   : {"op": "not", "arg": <condition>}\n'
+    '    compound   : {"op": "and", "args": [<condition>, <condition>, ...]}\n'
+    '                 {"op": "or",  "args": [<condition>, <condition>, ...]}\n\n'
+    "Example 1 — single threshold:\n"
+    '  facts = {"dose_mSv": 25}\n'
+    '  condition = {"op": ">=", "fact": "dose_mSv", "value": 20}\n'
+    "  → PASS (25 ≥ 20)\n\n"
+    "Example 2 — nested AND:\n"
+    '  facts = {"dose_mSv": 25, "category": "A"}\n'
+    '  condition = {"op": "and", "args": [\n'
+    '      {"op": ">=", "fact": "dose_mSv", "value": 20},\n'
+    '      {"op": "in", "fact": "category", "value": ["A","B"]}]}\n'
+    "  → PASS\n\n"
+    "Returns: facts table, per-leaf TRUE/FALSE trace, and final Result: PASS or FAIL. "
+    "Fact names in the condition must match keys in `facts` exactly."
 )

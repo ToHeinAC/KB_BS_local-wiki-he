@@ -6,7 +6,6 @@ ThreadPoolExecutor. LLM calls remain sequential at the agent layer.
 
 from __future__ import annotations
 
-import ast
 import operator as _op
 import os
 import re
@@ -20,7 +19,7 @@ from langchain_core.tools import tool
 import lex_index
 import wiki_engine
 from prompts import (
-    DEEP_CALCULATE_DESCRIPTION,
+    EVALUATE_CONDITION_DESCRIPTION,
     FETCH_WEBPAGE_DESCRIPTION,
     RAW_READ_DESCRIPTION,
     RAW_SEARCH_DESCRIPTION,
@@ -336,91 +335,100 @@ def submit_chat_answer(answer: str, sources: list[str] | None = None) -> str:
     return _submit_chat_impl(answer, sources)
 
 
-# --- deep_calculate -----------------------------------------------------------
+# --- evaluate_condition -------------------------------------------------------
+#
+# Deterministic logical-condition evaluator. The LLM extracts `facts` from
+# natural-language source text and assembles a nested-dict `condition` tree;
+# Python evaluates the tree without any further LLM judgement, eliminating
+# hallucinations on threshold comparisons.
 
-_SAFE_OPS: dict = {
-    ast.Add: _op.add,
-    ast.Sub: _op.sub,
-    ast.Mult: _op.mul,
-    ast.Div: _op.truediv,
-    ast.UAdd: _op.pos,
-    ast.USub: _op.neg,
+_CMP_OPS = {
+    ">": _op.gt, ">=": _op.ge, "<": _op.lt, "<=": _op.le,
+    "==": _op.eq, "!=": _op.ne,
 }
 
 
-class _SafeEval(ast.NodeVisitor):
-    def __init__(self, variables: dict) -> None:
-        self._vars = variables
-
-    def visit_Expression(self, node: ast.Expression):  # type: ignore[override]
-        return self.visit(node.body)
-
-    def visit_Constant(self, node: ast.Constant):  # type: ignore[override]
-        if not isinstance(node.value, (int, float)):
-            raise ValueError(f"Non-numeric constant: {node.value!r}")
-        return float(node.value)
-
-    def visit_Name(self, node: ast.Name):  # type: ignore[override]
-        if node.id not in self._vars:
-            raise ValueError(f"Unknown variable: {node.id!r}")
-        return float(self._vars[node.id])
-
-    def visit_BinOp(self, node: ast.BinOp):  # type: ignore[override]
-        fn = _SAFE_OPS.get(type(node.op))
-        if fn is None:
-            raise ValueError(f"Unsupported operator: {type(node.op).__name__}")
-        return fn(self.visit(node.left), self.visit(node.right))
-
-    def visit_UnaryOp(self, node: ast.UnaryOp):  # type: ignore[override]
-        fn = _SAFE_OPS.get(type(node.op))
-        if fn is None:
-            raise ValueError(f"Unsupported unary: {type(node.op).__name__}")
-        return fn(self.visit(node.operand))
-
-    def generic_visit(self, node: ast.AST):  # type: ignore[override]
-        raise ValueError(f"Forbidden AST node: {type(node).__name__}")
+def _fmt_val(v) -> str:
+    if isinstance(v, str):
+        return repr(v)
+    return str(v)
 
 
-def _safe_eval(expr: str, variables: dict) -> float:
-    return _SafeEval(variables).visit(ast.parse(expr.strip(), mode="eval"))
+def _eval_node(node, facts: dict, trace: list) -> bool:
+    if not isinstance(node, dict):
+        trace.append((False, f"Error: condition node not a dict: {node!r}"))
+        return False
+    o = node.get("op")
+    try:
+        if o in _CMP_OPS:
+            name = node["fact"]
+            v = facts[name]
+            t = node["value"]
+            r = bool(_CMP_OPS[o](v, t))
+            trace.append((r, f"{name} {o} {_fmt_val(t)}  (= {_fmt_val(v)})"))
+            return r
+        if o == "in":
+            name = node["fact"]
+            v = facts[name]
+            t = list(node["value"])
+            r = v in t
+            trace.append((r, f"{name} in {t}  (= {_fmt_val(v)})"))
+            return r
+        if o == "contains":
+            name = node["fact"]
+            v = facts[name]
+            t = node["value"]
+            r = str(t) in str(v)
+            trace.append((r, f"{name} contains {_fmt_val(t)}  (= {_fmt_val(v)})"))
+            return r
+        if o == "between":
+            name = node["fact"]
+            v = facts[name]
+            low, high = node["low"], node["high"]
+            r = low <= v <= high
+            trace.append((r, f"{name} between {_fmt_val(low)} and {_fmt_val(high)}  (= {_fmt_val(v)})"))
+            return r
+        if o == "not":
+            inner = _eval_node(node["arg"], facts, trace)
+            r = not inner
+            trace.append((r, f"NOT  → {r}"))
+            return r
+        if o in ("and", "or"):
+            results = [_eval_node(a, facts, trace) for a in node["args"]]
+            r = all(results) if o == "and" else any(results)
+            trace.append((r, f"{o.upper()}  → {r}"))
+            return r
+    except KeyError as exc:
+        trace.append((False, f"Error: missing fact {exc}"))
+        return False
+    except TypeError as exc:
+        trace.append((False, f"Error: type mismatch in op {o!r}: {exc}"))
+        return False
+    trace.append((False, f"Error: unknown op {o!r}"))
+    return False
 
 
-def _deep_calculate_impl(variables: dict, expressions: list) -> str:
-    if not variables:
-        return "Error: `variables` must be a non-empty dict."
-    if not expressions:
-        return "Error: `expressions` must be a non-empty list."
-    lines = ["## Variables", ""]
-    for k, v in variables.items():
-        lines.append(f"  {k} = {v:g}")
-    results: list[tuple[str, str, float | str]] = []
-    for item in expressions:
-        label = item.get("label", "(unlabeled)")
-        expr = item.get("expr", "")
-        try:
-            results.append((label, expr, _safe_eval(expr, variables)))
-        except ZeroDivisionError:
-            results.append((label, expr, "Error: division by zero"))
-        except Exception as exc:
-            results.append((label, expr, f"Error: {exc}"))
-    lines += ["", "## Results", ""]
-    for label, expr, value in results:
-        if isinstance(value, float):
-            lines.append(f"  {label}: {expr} = {value:g}")
-        else:
-            lines.append(f"  {label}: {expr} => {value}")
-    numeric = [(lbl, v) for lbl, _, v in results if isinstance(v, float)]
-    total = sum(v for _, v in numeric)
-    if len(numeric) > 1 and total != 0.0:
-        lines += ["", "## Relative shares (% of sum)", ""]
-        for lbl, v in numeric:
-            lines.append(f"  {lbl}: {100 * v / total:.1f}%")
+def _evaluate_condition_impl(facts: dict, condition: dict) -> str:
+    if not isinstance(facts, dict) or not facts:
+        return "Error: `facts` must be a non-empty dict."
+    if not isinstance(condition, dict) or not condition:
+        return "Error: `condition` must be a non-empty dict."
+    lines = ["## Facts", ""]
+    for k, v in facts.items():
+        lines.append(f"  {k} = {_fmt_val(v)}")
+    trace: list[tuple[bool, str]] = []
+    result = _eval_node(condition, facts, trace)
+    lines += ["", "## Condition trace", ""]
+    for ok, text in trace:
+        tag = "TRUE " if ok else "FALSE"
+        lines.append(f"  [{tag}] {text}")
+    lines += ["", f"## Result: {'PASS' if result else 'FAIL'}"]
     return "\n".join(lines)
 
 
-@tool(description=DEEP_CALCULATE_DESCRIPTION)
-def deep_calculate(variables: dict, expressions: list) -> str:
-    return _deep_calculate_impl(variables, expressions)
+@tool(description=EVALUATE_CONDITION_DESCRIPTION)
+def evaluate_condition(facts: dict, condition: dict) -> str:
+    return _evaluate_condition_impl(facts, condition)
 
 
 TOOLS = [
@@ -430,7 +438,7 @@ TOOLS = [
     fetch_webpage_content,
     think_tool,
     submit_final_answer,
-    deep_calculate,
+    evaluate_condition,
 ]
 
 CHAT_TOOLS = [
@@ -438,7 +446,7 @@ CHAT_TOOLS = [
     raw_read,
     think_tool,
     submit_chat_answer,
-    deep_calculate,
+    evaluate_condition,
 ]
 
 # Plain-callable map (used by tests and the LangGraph ToolNode fallback path).
@@ -452,5 +460,5 @@ TOOL_FUNCTIONS = {
     "raw_search": _raw_search_impl,
     "raw_read": _raw_read_impl,
     "submit_chat_answer": _submit_chat_impl,
-    "deep_calculate": _deep_calculate_impl,
+    "evaluate_condition": _evaluate_condition_impl,
 }
