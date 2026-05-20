@@ -455,6 +455,7 @@ elif page == "Chat":
     if prompt := st.chat_input("Ask something…"):
         st.session_state["messages"].append({"role": "user", "content": prompt})
         if st.session_state.get("chat_mode", "Fast") == "Fast":
+            st.markdown(f"**You:** {prompt}")
             with st.spinner("Thinking…"):
                 try:
                     res = wiki_engine.query_with_sources(prompt)
@@ -471,6 +472,7 @@ elif page == "Chat":
             steps: list[dict] = []
             answer = ""
             raw_sources: list[str] = []
+            st.markdown(f"**You:** {prompt}")
             _live = st.container()
             for step in chat_agent.run_chat_agent(prompt):
                 steps.append(step)
@@ -526,6 +528,7 @@ elif page == "Research":
 
         if st.button("Start research", type="primary", disabled=not (tavily_key and question)):
             st.session_state["research_sources"] = []
+            st.markdown(f"**Research question:** {question}")
             steps_container = st.container()
             with steps_container:
                 for step in research_agent.run_research_agent(question, wiki_context or ""):
@@ -584,7 +587,7 @@ elif page == "Maintenance":
     c1, c2, c3 = st.columns(3)
     c1.metric("Wiki pages", s["pages"])
     c2.metric("Raw sources", s["raw_files"])
-    c3.metric("Log size (bytes)", s["log_bytes"])
+    c3.metric("Data size (MB)", round(s["data_bytes"] / 1_048_576, 2))
 
     st.markdown("---")
     st.subheader("Link graph health")

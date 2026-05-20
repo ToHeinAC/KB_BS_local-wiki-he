@@ -813,9 +813,13 @@ def resolve_contradiction(description: str, page_filenames: list[str], user_guid
 def stats() -> dict:
     pages = list_pages()
     raw_count = len(list(RAW_DIR.glob("*"))) - 1 if RAW_DIR.exists() else 0  # exclude manifest
-    log_size = _LOG.stat().st_size if _LOG.exists() else 0
+    data_bytes = (
+        sum(p.stat().st_size for p in WIKI_DIR.rglob("*") if p.is_file()) if WIKI_DIR.exists() else 0
+    ) + (
+        sum(p.stat().st_size for p in RAW_DIR.rglob("*") if p.is_file()) if RAW_DIR.exists() else 0
+    )
     return {
         "pages": len(pages),
         "raw_files": max(0, raw_count),
-        "log_bytes": log_size,
+        "data_bytes": data_bytes,
     }

@@ -7,7 +7,7 @@ RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the 
 {wiki_block}Tools available:
 - wiki_search(query OR queries): full-text search over the local wiki (data/wiki/). Pass 2-4 sub-queries in parallel for speed. Cite hits as [Wiki: filename.md].
 - wiki_read(filenames): read full body of one or more wiki pages in parallel. Use after wiki_search surfaced a promising page.
-- tavily_search(query OR queries): web search. Use ONLY for gaps the wiki cannot fill. Parallel sub-queries supported. Cite as [Source: URL].
+- tavily_search(query OR queries): web search. Use ONLY for gaps the wiki cannot fill. Parallel sub-queries supported. Cite as [Source: <full URL>] — copy the exact URL from the "Cite as:" line in each result, never use the result number.
 - fetch_webpage_content(urls): fetch full page markdown in parallel. Use sparingly, only for URLs the search snippets show as highly relevant.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
@@ -27,7 +27,7 @@ Required workflow:
 
 Quality bar for the final answer:
 - Structured markdown with ## headings.
-- Every factual claim cited as [Wiki: filename.md] or [Source: URL].
+- Every factual claim cited as [Wiki: filename.md] or [Source: <full URL>] — bare URL only, never a result number.
 - Trade-offs / contradictions surfaced explicitly.
 - No hand-waving. If evidence is missing, say so and list it as a remaining gap.
 

@@ -60,10 +60,10 @@ def _slug(text: str) -> str:
 
 def _format_tavily_result(idx: int, r: dict) -> str:
     content = (r.get("content") or "")[:CONTENT_TRUNCATE]
+    url = r.get("url", "")
     return (
-        f"[Result {idx}]\n"
-        f"Title: {r.get('title', '')}\n"
-        f"URL: {r.get('url', '')}\n"
+        f"Result {idx}: {r.get('title', '')}\n"
+        f"Cite as: [Source: {url}]\n"
         f"Content: {content}\n---"
     )
 
