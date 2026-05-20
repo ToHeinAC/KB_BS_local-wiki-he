@@ -4,6 +4,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import chunker
+import run_memory
 import tools
 
 
@@ -146,6 +148,65 @@ def test_wiki_read_returns_body(monkeypatch):
 
 def test_wiki_read_empty_input():
     assert "Error" in tools._wiki_read_impl([])
+
+
+# --- raw_read section resolution ------------------------------------------
+
+
+def _ingest_source(name: str, text: str):
+    """Write a raw source + its chunks so section-aware raw_read can resolve."""
+    (tools.wiki_engine.RAW_DIR / name).write_text(text, encoding="utf-8")
+    chunker.write_chunks(name, chunker.split(text))
+
+
+_LEGAL_DOC = (
+    "# StrlSchG\n\n"
+    "## § 61 Anfall und Lagerung\n"
+    + "Regelungen zum Anfall ueberwachungsbeduerftiger Rueckstaende. " * 5 + "\n\n"
+    "## § 62 Entlassung aus der Ueberwachung\n"
+    + "Entlassung von Rueckstaenden aus der Ueberwachung erfolgt auf Antrag. " * 5 + "\n\n"
+    "## § 63 Verbleibende Rueckstaende\n"
+    + "In der Ueberwachung verbleibende Rueckstaende unterliegen Auflagen. " * 5 + "\n"
+)
+
+_MD_DOC = (
+    "# Guide\n\n"
+    "## Overview\n"
+    + "This guide gives a broad overview of the monitoring process and scope. " * 4 + "\n\n"
+    "## Release Procedure\n"
+    + "The release procedure describes how items leave monitoring on request. " * 4 + "\n\n"
+    "## Limits\n"
+    + "Limits define the numeric thresholds applied during the assessment phase. " * 4 + "\n"
+)
+
+
+def test_raw_read_resolves_legal_section(wiki_dir):
+    _ingest_source("StrlSchG.md", _LEGAL_DOC)
+    out62 = tools._raw_read_one("StrlSchG.md § 62")
+    out63 = tools._raw_read_one("StrlSchG.md § 63")
+    assert "§ 62" in out62 and "Entlassung" in out62
+    assert "§ 63" in out63 and "verbleibende" in out63
+    assert out62 != out63  # distinct sections, not the same offset-0 window
+
+
+def test_raw_read_resolves_markdown_heading(wiki_dir):
+    _ingest_source("guide.md", _MD_DOC)
+    out = tools._raw_read_one("guide.md ## Release Procedure")
+    assert "Release Procedure" in out and "release procedure" in out
+    assert "Overview" not in out.split("\n", 1)[1]  # not the wrong section body
+
+
+def test_raw_read_section_memory_keys_distinct(wiki_dir):
+    _ingest_source("StrlSchG.md", _LEGAL_DOC)
+    run_memory.begin_run()
+    a = tools.raw_read.invoke({"filenames": ["StrlSchG.md § 61"]})
+    b = tools.raw_read.invoke({"filenames": ["StrlSchG.md § 62"]})
+    assert "[memory] Already read" not in a
+    assert "[memory] Already read" not in b  # different section is a fresh read
+    again = tools.raw_read.invoke({"filenames": ["StrlSchG.md § 61"]})
+    assert "[memory] Already read this section" in again
+    # menu lists only sections not yet read this run (§61, §62 already read)
+    assert "§ 63" in again and "§ 62" not in again
 
 
 # --- think_tool -----------------------------------------------------------

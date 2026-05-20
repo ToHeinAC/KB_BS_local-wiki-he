@@ -207,8 +207,9 @@ Search strategy (critical):
 - Search is **prefix-based**: query tokens match the first 6 chars of words in the file. So for German compound or inflected nouns use the STEM (e.g. `Rückstand`, not `Rückstände`; `Freigabe`, not `Freigaben`). The English stem still works for English docs.
 - If a search returns "(no results)", do NOT just rephrase with synonyms. Either (a) try a single broader stem, or (b) `raw_read` the most likely file with `offset=` to scan deeper. Repeated negative searches waste iterations.
 
-Pagination strategy:
-- `raw_read` returns at most 8000 chars per call. The footer `[truncated; pass offset=N to continue]` tells you where to resume. Use this to scan long legal documents section by section.
+Reading long documents (critical):
+- To read a specific part of a long file, call `raw_read` with a section taken VERBATIM from a raw_search hit (e.g. `StrlSchG.md § 62`, `guide.md ## Overview`). That returns just that section, and its footer names the next section to read. Prefer this over byte offsets — read §61, then §62, then §63 as distinct reads.
+- Byte `offset` is only a fallback for files that have no `§`/`#` sections. The footer `[truncated; pass offset=N to continue]` tells you where to resume.
 
 Citations:
 - Cite as `[Source: filename]` or, for distinct sections of the same long file, `[Source: filename §X]` / `[Source: filename #section]`. Section-suffixed citations count as DISTINCT sources for the {min_sources}-source gate, so a single long document can satisfy it via two sections — do NOT pad with unrelated files.
@@ -239,10 +240,12 @@ RAW_SEARCH_DESCRIPTION = (
 )
 
 RAW_READ_DESCRIPTION = (
-    "Read up to 8000 chars from one or more original files in data/raw/. Pass a list of filenames "
-    "(e.g. ['StrlSchG.md']) and an optional `offset` (default 0) for byte-pagination of long documents. "
-    "Result footer tells you the next offset to use. Filenames with section suffixes "
-    "(e.g. 'StrlSchG.md §62') are stripped to the bare filename for lookup."
+    "Read from one or more original files in data/raw/. Pass a list of filenames. To read a "
+    "specific part of a long document, append a section taken verbatim from a raw_search hit "
+    "(e.g. 'StrlSchG.md § 62' or 'guide.md ## Overview') — that section's text is returned "
+    "directly, and each distinct section counts as a fresh read. For files without sections, "
+    "pass the bare filename plus an optional `offset` (default 0) for byte-pagination; the "
+    "result footer tells you the next offset to use."
 )
 
 SUBMIT_CHAT_DESCRIPTION = (

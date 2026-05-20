@@ -16,6 +16,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 
+import chunker
 import lex_index
 import run_memory
 import wiki_engine
@@ -204,9 +205,93 @@ def _raw_search_impl(query=None, queries=None, max_results: int = 6) -> str:
     return "\n\n".join(outs)
 
 
+def _split_filename(filename: str) -> tuple[str, str]:
+    """Split a possibly section-qualified filename into (base_file, section).
+
+    Handles legal '§' citations, markdown '#' headings, and bare markdown
+    heading titles with no prefix (the form raw_search emits, since markdown
+    chunk anchors store the heading title without '#').
+    """
+    f = filename.strip()
+    m = re.search(r"\s*[§#]", f)
+    if m:  # explicit section marker
+        return f[: m.start()].strip(), f[m.start():].strip()
+    if wiki_engine.read_raw_source(f) is not None:  # bare file (may contain spaces)
+        return f, ""
+    m = re.match(r"^(\S+\.\w{1,5})\s+(.+)$", f)  # peel a trailing heading title
+    if m and wiki_engine.read_raw_source(m.group(1)) is not None:
+        return m.group(1), m.group(2).strip()
+    return f, ""
+
+
+def _norm_anchor(s: str) -> str:
+    """Normalize an anchor/section for matching: drop leading #/§, fold case."""
+    s = re.sub(r"^[#§\s]+", "", s)
+    return re.sub(r"\s+", " ", s).strip().casefold()
+
+
+def _section_anchors(base: str) -> list[str]:
+    """Distinct section anchors of a source, in document order."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for ch in chunker.load_chunks(base):
+        a = ch.get("anchor", "")
+        if a and a not in seen:
+            seen.add(a)
+            out.append(a)
+    return out
+
+
+def _resolve_section(base: str, section: str) -> dict | None:
+    """Find the chunk in `base` whose anchor matches `section`, or None."""
+    want = _norm_anchor(section)
+    if not want:
+        return None
+    chunks = chunker.load_chunks(base)
+    for ch in chunks:  # exact
+        if _norm_anchor(ch.get("anchor", "")) == want:
+            return ch
+    for ch in chunks:  # prefix either direction (tolerate '(Teil n)' / title variants)
+        a = _norm_anchor(ch.get("anchor", ""))
+        if a and (a.startswith(want) or want.startswith(a)):
+            return ch
+    return None
+
+
+def _format_section(base: str, ch: dict) -> str:
+    anchor = ch.get("anchor", "")
+    text = ch.get("text", "")
+    if len(text) > RAW_READ_CAP:
+        text = text[:RAW_READ_CAP] + "\n…[section truncated]"
+    anchors = _section_anchors(base)
+    nxt = None
+    if anchor in anchors:
+        i = anchors.index(anchor)
+        nxt = anchors[i + 1] if i + 1 < len(anchors) else None
+    footer = f"\n\n…[next section: read '{base} {nxt}']" if nxt else ""
+    return f"## Raw file: {base} {anchor}\n{text}{footer}"
+
+
+def _read_key(base: str, canon: str, offset: int) -> str:
+    """Visited-memory key. Distinct sections (canon) get distinct keys so the
+    guard no longer collapses every section read to the base file at offset 0."""
+    if canon:
+        return f"raw:{base}|sec={canon}:{int(offset or 0)}"
+    return f"raw:{base}:{int(offset or 0)}"
+
+
+def _read_canons(mem, base: str) -> set[str]:
+    """Normalized section anchors of `base` already read this run."""
+    prefix = f"raw:{base}|sec="
+    return {k[len(prefix):].rsplit(":", 1)[0] for k in mem.reads if k.startswith(prefix)}
+
+
 def _raw_read_one(filename: str, offset: int = 0) -> str:
-    # Strip optional " §..." / " #..." section suffix used in citations.
-    base = re.sub(r"\s*[§#].*$", "", filename).strip()
+    base, section = _split_filename(filename)
+    if section:
+        ch = _resolve_section(base, section)
+        if ch is not None:
+            return _format_section(base, ch)
     data = wiki_engine.read_raw_source(base)
     if data is None:
         return f"## Raw file: {filename}\n(not found)"
@@ -403,22 +488,34 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
     out: list[str] = []
     fresh: list[str] = []
     for f in filenames:
-        base = re.sub(r"\s*[§#].*$", "", f).strip()
-        key = f"raw:{base}:{int(offset or 0)}"
+        base, section = _split_filename(f)
+        canon = _norm_anchor(section) if section else ""
+        key = _read_key(base, canon, offset)
         prior = mem.seen_read(key)
-        if prior is not None:
+        if prior is None:
+            fresh.append(f)
+        elif canon:
+            unread = [a for a in _section_anchors(base)
+                      if _norm_anchor(a) not in _read_canons(mem, base)]
+            menu = ", ".join(unread[:6]) if unread else "none left — pick a different file"
+            out.append(
+                f"## Raw file: {base} {section}\n"
+                f"[memory] Already read this section at step {prior}. "
+                f"Unread sections in {base}: {menu}. "
+                "Read one of those, pick a different file, or call think_tool."
+            )
+        else:
             out.append(
                 f"## Raw file: {base} (offset {int(offset or 0)})\n"
                 f"[memory] Already read at step {prior} — do not re-fetch. "
                 "Paginate with a new offset, pick a different file, or use think_tool."
             )
-        else:
-            fresh.append(f)
     if fresh:
         out.append(_raw_read_impl(fresh, offset=offset))
         for f in fresh:
-            base = re.sub(r"\s*[§#].*$", "", f).strip()
-            mem.mark_read(f"raw:{base}:{int(offset or 0)}")
+            base, section = _split_filename(f)
+            canon = _norm_anchor(section) if section else ""
+            mem.mark_read(_read_key(base, canon, offset))
     return "\n\n".join(out)
 
 
