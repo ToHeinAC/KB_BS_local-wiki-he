@@ -151,29 +151,31 @@ Question: {question}
 Answer:
 {answer}"""
 
-CONDENSE_PROMPT = """Rewrite the user's follow-up into ONE standalone question that can be answered without seeing the previous exchange.
-Rules:
-- Carry over the concrete subject, named entities, substances, quantities and the TYPE of question from the previous exchange. The follow-up usually only changes ONE detail — keep everything else explicit.
-- Resolve pronouns and ellipsis ("it", "that", "what if", "und bei …?") using the previous question and answer.
-- Keep the original language. Output ONLY the rewritten question, no preamble, no quotes.
+CONDENSE_PROMPT = """You are given a PREVIOUS QUESTION, an excerpt of its ANSWER, and a FOLLOW-UP. Produce the user's CURRENT question as ONE self-contained question.
+
+How to build it:
+- Start from the PREVIOUS QUESTION and apply ONLY the change the follow-up describes (a different value, unit, quantity or constraint). Keep the subject, named entities (substances, isotopes, laws) and what is being ASKED exactly the same unless the follow-up explicitly changes them.
+- If the follow-up asks something genuinely new, keep the previous subject and entities as context and append the new ask.
+- Use the answer excerpt only to resolve references ("it", "that", "the limit").
+- Keep the original language. Output ONLY the resulting question — no preamble, no quotes.
 
 Example
-Previous question: Ich habe einen Stoff mit 20 g Pu-239. Ist dies ein Kernbrennstoff?
-Previous answer (excerpt): Kernbrennstoffe nach § 2 AtG umfassen Plutonium-239 …
-Follow-up: wie wäre es, wenn wir 20 Bq/g hätten?
-Standalone question: Ist ein Stoff mit Pu-239 bei einer Aktivitätskonzentration von 20 Bq/g ein Kernbrennstoff?
+Previous question: Ich habe einen Stoff mit 20 g Pu-239 und einer Konzentration von 10 g pro 100 kg. Ist dies ein Kernbrennstoff?
+Answer excerpt: Kernbrennstoffe nach § 2 AtG umfassen Plutonium-239 …
+Follow-up: Was wäre, wenn es 20 Bq/100 kg wären?
+Current question: Ich habe einen Stoff mit Pu-239 in einer Konzentration von 20 Bq pro 100 kg. Ist dies ein Kernbrennstoff?
 
 Now do the same for:
 Previous question:
 {prev_q}
 
-Previous answer (excerpt):
+Answer excerpt:
 {prev_a}
 
 Follow-up:
 {followup}
 
-Standalone question:"""
+Current question:"""
 
 SELECT_PROMPT = """Wiki index:
 {index_text}
