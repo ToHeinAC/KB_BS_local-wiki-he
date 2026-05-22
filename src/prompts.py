@@ -151,6 +151,19 @@ Question: {question}
 Answer:
 {answer}"""
 
+CONDENSE_PROMPT = """Rewrite the user's follow-up into ONE standalone question that can be answered without seeing the previous exchange. Resolve pronouns and references ("it", "that", "the limit") using the previous Q&A. Keep it in the original language. Output ONLY the rewritten question, no preamble.
+
+Previous question:
+{prev_q}
+
+Previous answer (excerpt):
+{prev_a}
+
+Follow-up:
+{followup}
+
+Standalone question:"""
+
 SELECT_PROMPT = """Wiki index:
 {index_text}
 

@@ -17,6 +17,7 @@ import qa_gen
 import schema_loader
 from prompts import (
     ANSWER_PROMPT,
+    CONDENSE_PROMPT,
     FILE_ANSWER_PROMPT,
     INGEST_PROMPT,
     LINT_PROMPT,
@@ -448,6 +449,21 @@ def reset_all_data() -> dict:
 def query(question: str) -> str:
     """Answer a question using wiki content (string form, kept for back-compat)."""
     return query_with_sources(question)["answer"]
+
+
+def condense_followup(prev_q: str, prev_a: str, followup: str) -> str:
+    """Rewrite a follow-up into a standalone question. Falls back to the raw
+    follow-up if the model errors or returns empty."""
+    try:
+        out = ollama_client.generate(
+            system="You rewrite follow-up questions into standalone ones.",
+            prompt=CONDENSE_PROMPT.format(
+                prev_q=prev_q, prev_a=(prev_a or "")[:900], followup=followup),
+            temperature=0.1,
+        ).strip()
+        return out or followup
+    except Exception:
+        return followup
 
 
 def query_with_sources(question: str) -> dict:

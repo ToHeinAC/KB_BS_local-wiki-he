@@ -134,6 +134,49 @@ def _render_research_sources_panel() -> None:
             st.markdown("---")
 
 
+def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str, auto_save: bool) -> None:
+    st.session_state["research_sources"] = []
+    st.session_state["last_research_q"] = display_q
+    st.markdown(f"**Research question:** {display_q}")
+    steps_container = st.container()
+    with steps_container:
+        for step in research_agent.run_research_agent(question_to_run, wiki_context):
+            stype = step["type"]
+            if stype == "thought":
+                with st.expander("Thought", expanded=False):
+                    st.markdown(step["content"])
+            elif stype == "tool_call":
+                st.info(f"**{step['name']}** — `{step['args']}`")
+                st.session_state.setdefault("research_sources", []).append(
+                    {"tool": step["name"], "query": str(step["args"])[:80]}
+                )
+            elif stype == "tool_result":
+                with st.expander(f"Result: {step['name']}", expanded=False):
+                    st.text(step["result"][:800])
+            elif stype == "final_answer":
+                st.success("Research complete.")
+                if step.get("report_path"):
+                    st.session_state["last_report"] = step["report_path"]
+                    if auto_save:
+                        try:
+                            from pathlib import Path as _P
+                            import os as _os
+                            wiki_dir = _P(_os.getenv("WIKI_DIR", "data/wiki"))
+                            report_path = wiki_dir / "comparisons" / _P(step["report_path"].split("comparisons/")[-1])
+                            if report_path.exists():
+                                wiki_engine.ingest(report_path.read_text(), f"Research: {display_q[:60]}")
+                                st.success("Report also ingested into wiki.")
+                        except Exception as exc:
+                            st.warning(f"Auto-save to wiki failed: {exc}")
+                else:
+                    if step.get("content", "").strip():
+                        st.markdown(step["content"])
+                    else:
+                        st.warning("Agent completed but produced no answer text.")
+            elif stype == "error":
+                st.error(step["content"])
+
+
 def _render_chat_sources(sources: list[str], raw_sources: list[str], key_prefix: str) -> None:
     if not (sources or raw_sources):
         return
@@ -422,6 +465,10 @@ elif page == "Chat":
         for i, msg in enumerate(st.session_state["messages"]):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
+                if msg["role"] == "assistant" and msg.get("question") and not msg["content"].startswith("Error:"):
+                    if st.button("↪ Follow up", key=f"followup_{i}"):
+                        st.session_state["chat_followup"] = {"q": msg["question"], "a": msg["content"]}
+                        st.rerun()
                 if msg["role"] == "assistant" and msg.get("steps"):
                     st.download_button(
                         "Download answer",
@@ -451,14 +498,31 @@ elif page == "Chat":
                 except RuntimeError as e:
                     st.error(str(e))
 
+    _followup = st.session_state.get("chat_followup")
+    if _followup:
+        with st.container(border=True):
+            st.markdown("**↪ Follow-up — original question:**")
+            st.markdown(f"> {_followup['q']}")
+            c1, c2 = st.columns([5, 1])
+            c1.caption("⬇ Type your follow-up below — the original Q&A is used as context.")
+            if c2.button("Cancel", key="clear_chat_followup"):
+                st.session_state.pop("chat_followup", None)
+                st.rerun()
+
     # chat_input at root level for sticky-bottom behavior
     if prompt := st.chat_input("Ask something…"):
+        fu = st.session_state.pop("chat_followup", None)
+        if fu:
+            with st.spinner("Rephrasing follow-up…"):
+                q_to_ask = wiki_engine.condense_followup(fu["q"], fu["a"], prompt)
+        else:
+            q_to_ask = prompt
         st.session_state["messages"].append({"role": "user", "content": prompt})
         if st.session_state.get("chat_mode", "Fast") == "Fast":
             st.markdown(f"**You:** {prompt}")
             with st.spinner("Thinking…"):
                 try:
-                    res = wiki_engine.query_with_sources(prompt)
+                    res = wiki_engine.query_with_sources(q_to_ask)
                     answer = res["answer"]
                     sources = res["sources"]
                     raw_sources = res["raw_sources"]
@@ -474,7 +538,7 @@ elif page == "Chat":
             raw_sources: list[str] = []
             st.markdown(f"**You:** {prompt}")
             _live = st.container()
-            for step in chat_agent.run_chat_agent(prompt):
+            for step in chat_agent.run_chat_agent(q_to_ask):
                 steps.append(step)
                 stype = step["type"]
                 with _live:
@@ -527,45 +591,7 @@ elif page == "Research":
         auto_save = st.checkbox("Auto-save final report to wiki", value=True)
 
         if st.button("Start research", type="primary", disabled=not (tavily_key and question)):
-            st.session_state["research_sources"] = []
-            st.markdown(f"**Research question:** {question}")
-            steps_container = st.container()
-            with steps_container:
-                for step in research_agent.run_research_agent(question, wiki_context or ""):
-                    stype = step["type"]
-                    if stype == "thought":
-                        with st.expander("Thought", expanded=False):
-                            st.markdown(step["content"])
-                    elif stype == "tool_call":
-                        st.info(f"**{step['name']}** — `{step['args']}`")
-                        st.session_state.setdefault("research_sources", []).append(
-                            {"tool": step["name"], "query": str(step["args"])[:80]}
-                        )
-                    elif stype == "tool_result":
-                        with st.expander(f"Result: {step['name']}", expanded=False):
-                            st.text(step["result"][:800])
-                    elif stype == "final_answer":
-                        st.success("Research complete.")
-                        if step.get("report_path"):
-                            st.session_state["last_report"] = step["report_path"]
-                            if auto_save:
-                                try:
-                                    from pathlib import Path as _P
-                                    import os as _os
-                                    wiki_dir = _P(_os.getenv("WIKI_DIR", "data/wiki"))
-                                    report_path = wiki_dir / "comparisons" / _P(step["report_path"].split("comparisons/")[-1])
-                                    if report_path.exists():
-                                        wiki_engine.ingest(report_path.read_text(), f"Research: {question[:60]}")
-                                        st.success("Report also ingested into wiki.")
-                                except Exception as exc:
-                                    st.warning(f"Auto-save to wiki failed: {exc}")
-                        else:
-                            if step.get("content", "").strip():
-                                st.markdown(step["content"])
-                            else:
-                                st.warning("Agent completed but produced no answer text.")
-                    elif stype == "error":
-                        st.error(step["content"])
+            _run_research_stream(question, question, wiki_context or "", auto_save)
 
         if st.session_state.get("last_report"):
             _rp = st.session_state["last_report"]
@@ -582,6 +608,15 @@ elif page == "Research":
                 mime="text/markdown",
                 key="dl_report",
             )
+            if st.session_state.get("last_research_q"):
+                st.markdown("---")
+                st.markdown("**↪ Follow-up research**")
+                fq = st.text_input("Ask a follow-up about this report", key="research_followup_input")
+                if st.button("Ask follow-up", key="research_followup_go", disabled=not (tavily_key and fq)):
+                    with st.spinner("Rephrasing follow-up…"):
+                        standalone = wiki_engine.condense_followup(
+                            st.session_state["last_research_q"], _parsed["content"], fq)
+                    _run_research_stream(standalone, fq, "", auto_save)
 
 
 elif page == "Maintenance":
