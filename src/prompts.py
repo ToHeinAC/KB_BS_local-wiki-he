@@ -151,8 +151,19 @@ Question: {question}
 Answer:
 {answer}"""
 
-CONDENSE_PROMPT = """Rewrite the user's follow-up into ONE standalone question that can be answered without seeing the previous exchange. Resolve pronouns and references ("it", "that", "the limit") using the previous Q&A. Keep it in the original language. Output ONLY the rewritten question, no preamble.
+CONDENSE_PROMPT = """Rewrite the user's follow-up into ONE standalone question that can be answered without seeing the previous exchange.
+Rules:
+- Carry over the concrete subject, named entities, substances, quantities and the TYPE of question from the previous exchange. The follow-up usually only changes ONE detail — keep everything else explicit.
+- Resolve pronouns and ellipsis ("it", "that", "what if", "und bei …?") using the previous question and answer.
+- Keep the original language. Output ONLY the rewritten question, no preamble, no quotes.
 
+Example
+Previous question: Ich habe einen Stoff mit 20 g Pu-239. Ist dies ein Kernbrennstoff?
+Previous answer (excerpt): Kernbrennstoffe nach § 2 AtG umfassen Plutonium-239 …
+Follow-up: wie wäre es, wenn wir 20 Bq/g hätten?
+Standalone question: Ist ein Stoff mit Pu-239 bei einer Aktivitätskonzentration von 20 Bq/g ein Kernbrennstoff?
+
+Now do the same for:
 Previous question:
 {prev_q}
 

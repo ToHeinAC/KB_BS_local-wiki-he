@@ -458,7 +458,7 @@ def condense_followup(prev_q: str, prev_a: str, followup: str) -> str:
         out = ollama_client.generate(
             system="You rewrite follow-up questions into standalone ones.",
             prompt=CONDENSE_PROMPT.format(
-                prev_q=prev_q, prev_a=(prev_a or "")[:900], followup=followup),
+                prev_q=prev_q, prev_a=(prev_a or "")[:1600], followup=followup),
             temperature=0.1,
         ).strip()
         return out or followup

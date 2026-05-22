@@ -137,6 +137,8 @@ def _render_research_sources_panel() -> None:
 def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str, auto_save: bool) -> None:
     st.session_state["research_sources"] = []
     st.session_state["last_research_q"] = display_q
+    _interpreted = question_to_run if question_to_run.strip() != display_q.strip() else None
+    st.session_state["last_research_interpreted"] = _interpreted
     st.markdown(f"**Research question:** {display_q}")
     steps_container = st.container()
     with steps_container:
@@ -180,6 +182,7 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                 st.session_state.setdefault("research_history", []).append({
                     "q": display_q,
                     "a": st.session_state.get("last_research_answer", ""),
+                    "interpreted": _interpreted,
                     "report": (("comparisons/" + step["report_path"].split("comparisons/")[-1])
                                if step.get("report_path") else None),
                 })
@@ -483,6 +486,8 @@ elif page == "Wiki Chat":
             with st.expander(f"📜 Conversation history ({_current_start // 2} earlier turn(s))", expanded=False):
                 for _m in _msgs[:_current_start]:
                     _role = "You" if _m["role"] == "user" else "Assistant"
+                    if _m["role"] == "assistant" and _m.get("interpreted"):
+                        st.caption(f"🔎 Interpreted as: {_m['interpreted']}")
                     st.markdown(f"**{_role}:** {_m['content']}")
                     if _m["role"] == "assistant":
                         st.markdown("---")
@@ -490,6 +495,8 @@ elif page == "Wiki Chat":
         for i in range(_current_start, len(_msgs)):
             msg = _msgs[i]
             with st.chat_message(msg["role"]):
+                if msg["role"] == "assistant" and msg.get("interpreted"):
+                    st.caption(f"🔎 Interpreted as: {msg['interpreted']}")
                 st.markdown(msg["content"])
                 if msg["role"] == "assistant" and msg.get("question") and not msg["content"].startswith("Error:"):
                     if st.button("↪ Follow up", key=f"followup_{i}"):
@@ -543,6 +550,7 @@ elif page == "Wiki Chat":
                 q_to_ask = wiki_engine.condense_followup(fu["q"], fu["a"], prompt)
         else:
             q_to_ask = prompt
+        interpreted = q_to_ask if (fu and q_to_ask.strip() != prompt.strip()) else None
         st.session_state["messages"].append({"role": "user", "content": prompt})
         if st.session_state.get("chat_mode", "Fast") == "Fast":
             st.markdown(f"**You:** {prompt}")
@@ -556,7 +564,7 @@ elif page == "Wiki Chat":
                     answer, sources, raw_sources = f"Error: {e}", [], []
             st.session_state["messages"].append(
                 {"role": "assistant", "content": answer, "question": prompt,
-                 "sources": sources, "raw_sources": raw_sources}
+                 "sources": sources, "raw_sources": raw_sources, "interpreted": interpreted}
             )
         else:
             steps: list[dict] = []
@@ -583,7 +591,7 @@ elif page == "Wiki Chat":
                         answer = f"Error: {step['content']}"
             st.session_state["messages"].append(
                 {"role": "assistant", "content": answer or "(no answer)", "question": prompt,
-                 "sources": [], "raw_sources": raw_sources, "steps": steps}
+                 "sources": [], "raw_sources": raw_sources, "steps": steps, "interpreted": interpreted}
             )
         st.rerun()
 
@@ -607,7 +615,8 @@ elif page == "Research":
     with main_col:
         if st.button("🆕 New research", key="new_research"):
             for _k in ("research_history", "last_research_q", "last_research_answer",
-                       "last_report", "research_sources", "research_followup_input"):
+                       "last_research_interpreted", "last_report", "research_sources",
+                       "research_followup_input"):
                 st.session_state.pop(_k, None)
             st.rerun()
 
@@ -631,6 +640,8 @@ elif page == "Research":
             with st.expander(f"📜 Conversation history ({len(_rhist) - 1} earlier turn(s))", expanded=False):
                 for _h in _rhist[:-1]:
                     st.markdown(f"**Q:** {_h['q']}")
+                    if _h.get("interpreted"):
+                        st.caption(f"🔎 Interpreted as: {_h['interpreted']}")
                     if _h.get("report"):
                         st.caption(f"Report: `{_h['report']}`")
                     st.markdown(_h["a"])
@@ -638,6 +649,8 @@ elif page == "Research":
 
         if st.session_state.get("last_research_answer"):
             st.markdown("---")
+            if st.session_state.get("last_research_interpreted"):
+                st.caption(f"🔎 Interpreted as: {st.session_state['last_research_interpreted']}")
             if st.session_state.get("last_report"):
                 _rel = "comparisons/" + st.session_state["last_report"].split("comparisons/")[-1]
                 st.markdown(f"Report saved: `{_rel}`")

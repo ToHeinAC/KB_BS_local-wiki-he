@@ -148,6 +148,7 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
     report_path: str | None = None
     last_submit_args: dict | None = None
     all_messages: list = []
+    recursion_hit = False
 
     try:
         for chunk in graph.stream(init, config=config, stream_mode="values"):
@@ -170,8 +171,14 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
                         report_path = body.split(" ", 1)[0]
             seen = len(messages)
     except Exception as exc:
-        yield {"type": "error", "content": str(exc)}
-        return
+        msg = str(exc)
+        if "recursion" in msg.lower() or "GRAPH_RECURSION_LIMIT" in msg:
+            recursion_hit = True
+            yield {"type": "error",
+                   "content": f"Iteration limit ({MAX_ITER}) reached for this run — returning best-effort answer."}
+        else:
+            yield {"type": "error", "content": msg}
+            return
 
     if report_path:
         yield {"type": "final_answer", "content": "Report submitted.", "report_path": report_path}
@@ -183,10 +190,12 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
             yield {"type": "final_answer", "content": text, "report_path": None}
             return
 
+    _prefix = "(partial — iteration limit hit)" if recursion_hit else "(best-effort — quality gate not met)"
+
     if last_submit_args and last_submit_args.get("answer"):
         yield {
             "type": "final_answer",
-            "content": last_submit_args["answer"],
+            "content": f"{_prefix}\n\n{last_submit_args['answer']}",
             "report_path": None,
             "note": "Submission did not meet quality bar; returning best-effort draft.",
         }
@@ -198,9 +207,16 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
             if t.strip():
                 yield {
                     "type": "final_answer",
-                    "content": f"(best-effort — quality gate not met)\n\n{t}",
+                    "content": f"{_prefix}\n\n{t}",
                     "report_path": None,
                 }
                 return
 
-    yield {"type": "error", "content": f"Reached max iterations ({MAX_ITER}) without a final answer."}
+    if recursion_hit:
+        yield {"type": "final_answer",
+               "content": "(no answer — iteration limit reached before any draft was produced)",
+               "report_path": None}
+        return
+
+    yield {"type": "error",
+           "content": "The agent ended without producing an answer — try rephrasing or click 🆕 New research."}
