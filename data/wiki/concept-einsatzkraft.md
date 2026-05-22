@@ -1,27 +1,19 @@
 ---
-confidence: high
-created: '2026-05-17'
 related:
-- concept-emergency-planning.md
 - concept-radiation-protection-law.md
-- concept-radiation-dose-limits.md
+- concept-strahlenschutzverordnung-strlschv.md
 sources:
-- StrlSchV.md [Teil 1/15]
-- StrlSchG.md [Teil 12/13]
-- StrlSchV.md
+- DIN 25422_2026-04.PDF [Teil 1/3]
+- DIN 25422_2026-04.PDF
 title: Einsatzkraft
 type: concept
-updated: '2026-05-17'
+updated: '2026-05-21'
 ---
 
-# Einsatzkraft (Emergency Response Personnel)
+*Einsatzkräfte* refers to personnel involved in emergency response, particularly in the context of radiation safety and fire fighting.
 
-*Einsatzkräfte* refers to personnel involved in emergency response, particularly in the context of radiological accidents or incidents. Their protection and monitoring are governed by strict protocols outlined in the Radiation Protection Law (StrlSchG) and the StrlSchV.
+### Role in Radiation Safety
+In the context of radioactive materials storage and handling, the safety protocols established by DIN 25422 require that the accessibility for emergency personnel (*Einsatzkräfte*) must be ensured during fire fighting preparations (§ 54 StrlSchV) [DIN 25422_2026-04.PDF [Teil 1/3].md].
 
-## Dose Monitoring and Medical Oversight
-The StrlSchV mandates specific measures for personnel involved in emergency response:
-*   **Dosimetry:** Dosimetry must be performed for emergency response personnel (*Einsatzkräfte*) (§ 150) [StrlSchV.md [Teil 3/184].md].
-*   **Medical Monitoring:** Special medical monitoring is required for these personnel (§ 151) [StrlSchV.md [Teil 3/184].md].
-
-## Role in Emergency Planning
-Emergency planning protocols must account for the specific needs and limitations of *Einsatzkräfte* to ensure their safety during radiological emergencies [StrlSchV.md [Teil 3/184].md].
+### Fire Safety Context
+The DIN 25422 standard mandates that fire protection measures must ensure the safety of personnel involved in fire fighting (e.g., Fire Department units in ABC incidents) [DIN 25422_2026-04.PDF [Teil 1/3].md].

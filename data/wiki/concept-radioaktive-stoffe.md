@@ -1,27 +1,27 @@
 ---
-confidence: high
-created: '2026-05-18'
 related:
 - concept-radiation-protection-law.md
-- concept-radioaktive-altlasten.md
+- concept-kontaminierte-abfaelle.md
 sources:
-- StrlSchG.md [Teil 12/13]
-- AtG.md [Teil 4/5]
-- AtG.md
+- StrlSchG.md [Teil 11/13]
+- DIN 25422_2026-04.PDF [Teil 2/3]
+- DIN 25422_2026-04.PDF
 title: Radioactive Substances
 type: concept
-updated: '2026-05-18'
+updated: '2026-05-21'
 ---
 
-Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more radioactive elements [StrlSchG.md [Teil 12/13].md].
+Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more radioactive elements [summary-strlschg-md-teil-1-13.md]. The handling, storage, and security of these substances are governed by detailed technical standards, including those set forth in DIN 25422.
 
-## Legal Context and Handling
-The management and handling of these substances are strictly regulated under German law:
-*   **Definition:** The *Strahlenschutzgesetz* (StrlSchG) governs the protection against the harmful effects of ionizing radiation, which includes the definition of radioactive substances [StrlSchG.md [Teil 12/13].md].
-*   **Waste Management:** The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under the *Atomrechtliche Entsorgungsverordnung* (AtEV) [AtEV.md [Teil 1/2].md].
-*   **Liability:** In the context of damage, the owner of radioactive substances is liable for resulting damage, supplementing international conventions [AtG.md [Teil 4/5].md].
+## General Handling and Storage Requirements
+The storage of other radioactive substances requires adherence to detailed security protocols based on the substance's activity, as outlined in DIN 25422 [DIN 25422_2026-04.PDF [Teil 2/3].md].
 
-## Oversight and Disposal
-The AtG details specific oversight mechanisms for these materials:
-*   **Supervisory Authority Powers:** The supervisory authority can order the storage or keeping of radioactive substances at a location it determines [AtG.md [Teil 4/5].md].
-*   **Disposal:** The *Bundesamt für die Sicherheit der nuklearen Entsorgung* is responsible for the planning and permitting for the disposal of radioactive waste [AtG.md [Teil 4/5].md].
+*   **Storage Rooms:** Rooms must be designed to prevent the storage of easily flammable furniture, and special protective facilities are required if substances prone to spontaneous ignition or exothermic reactions are stored [DIN 25422_2026-04.PDF [Teil 2/3].md].
+*   **Containment:** Radioactive substances must be kept in closed containers that ensure containment under normal operating conditions. If necessary, they must be placed in easily removable containers, such as catchment basins or lead containers [DIN 25422_2026-04.PDF [Teil 2/3].md].
+*   **Hot Cells:** When hot cells are used for storage, DIN 25460 must be observed [DIN 25422_2026-04.PDF [Teil 2/3].md].
+
+## Security and Theft Protection (DIN 25422)
+The DIN 25422 standard details specific technical requirements for the storage and warehousing of other radioactive substances:
+*   **Security Concept:** The required protection is ensured by suitable and coordinated structural-technical, administrative-organizational, and purely personnel measures. Generally, structural-technical measures should precede administrative measures, which in turn should precede personnel measures [DIN 25422_2026-04.PDF [Teil 2/3].md].
+*   **Theft Protection:** Measures are determined by the activity relative to radionuclide-specific HRQ values and limits according to the StrlSchV [DIN 25422_2026-04.PDF [Teil 2/3].md].
+*   **Barriers:** Specific barrier requirements are set for rooms (DR1-DR5) and containers (DB1-DB2), detailing required resistance classes for openings and enclosures [DIN 25422_2026-04.PDF [Teil 2/3].md].

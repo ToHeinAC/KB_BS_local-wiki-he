@@ -1,34 +1,40 @@
 # Wiki Index
-Updated: 2026-05-18 | Pages: 100
+Updated: 2026-05-21 | Pages: 116
 
 ## Pages
 - [Berufliche Exposition](berufliche-exposition.md) — Professional exposure refers to the radiation dose received by an individual due to their employment or professional act
 - [Bestehende Expositionssituation](bestehende-expositionssituation.md) — An existing exposure situation is defined as an exposure situation that already exists when a decision regarding its con
 - [Atomgesetz - AtG](concept-atomgesetz-atg.md) — The *Atomgesetz* (AtG), or Law on the Peaceful Use of Nuclear Energy and Protection Against its Dangers, is the foundati
 - [Cloud Applications](concept-cloud-applications.md) — # Cloud Applications  Cloud applications refer to software solutions delivered and operated over the internet, allowing 
+- [Decontamination of Surfaces](concept-decontamination-of-surfaces.md) — # Decontamination of Surfaces  Decontamination of surfaces in radionuclide laboratories is a highly regulated process go
 - [Digital Industries](concept-digital-industries.md) — # Digital Industries  Digital Industries refers to the segment of industrial technology focused on industrial automation
 - [Radiation Dose Limits](concept-dosisbegrenzung.md) — # Radiation Dose Limits  Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab
-- [Einsatzkraft](concept-einsatzkraft.md) — # Einsatzkraft (Emergency Response Personnel)  *Einsatzkräfte* refers to personnel involved in emergency response, parti
+- [Einsatzkraft](concept-einsatzkraft.md) — *Einsatzkräfte* refers to personnel involved in emergency response, particularly in the context of radiation safety and 
 - [Emergency Planning](concept-emergency-planning.md) — Emergency planning, within the context of radiation protection, refers to the structured preparation and protocols estab
 - [Health Record (Radiation)](concept-health-record-radiation.md) — # Health Record (Radiation)  A Health Record specific to radiation exposure is a mandatory, detailed document used to tr
-- [Kontaminierte Abfälle](concept-kontaminierte-abfaelle.md) — The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under Ge
+- [concept-kontaminierte-abfaelle.md](concept-kontaminierte-abfaelle.md) — The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under Ge
 - [Medizinphysik-Experte](concept-medizinphysik-experte.md) — # Medizinphysik-Experte  A Medizinphysik-Experte is defined as a person with a Master's degree in medical physics. Withi
 - [Mobility Sector](concept-mobility-sector.md) — # Mobility Sector  The Mobility Sector, within the context of industrial technology, refers to the division responsible 
 - [Notfall](concept-notfall.md) — # Notfall  Ein Notfall ist ein Ereignis, bei dem sich durch ionisierende Strahlung erhebliche nachteilige Auswirkungen a
 - [Professional Exposure](concept-professional-exposure.md) — # Professional Exposure  Professional exposure refers to the occupational exposure of individuals to ionizing radiation 
-- [Public Exposure](concept-public-exposure.md) — # Public Exposure  Public exposure refers to the incidental or planned exposure of individuals in the general population
+- [concept-public-exposure.md](concept-public-exposure.md) — Public exposure refers to the incidental or planned exposure of individuals in the general population [concept-public-ex
 - [Radiation Dose Limits](concept-radiation-dose-limits.md) — # Radiation Dose Limits  Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab
 - [Radiation Dose Limits](concept-radiation-protection-dose-limits.md) — # Radiation Dose Limits  Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab
-- [Radiation Protection Law](concept-radiation-protection-law.md) — The Radiation Protection Law (Strahlenschutzgesetz - StrlSchG) is the comprehensive legal framework governing the protec
+- [concept-radiation-protection-law.md](concept-radiation-protection-law.md) — The Radiation Protection Law (Strahlenschutzgesetz - StrlSchG) is the German federal law governing the protection agains
 - [Radiation Protection](concept-radiation-protection.md) — # Radiation Protection  Radiation Protection refers to the set of legal, technical, and organizational measures designed
 - [Radioactive Residues](concept-radioactive-residues.md) — Radioactive residues are materials defined under the Radiation Protection Act (StrlSchG) that result from various indust
+- [concept-radioactive-stoffe.md](concept-radioactive-stoffe.md) — Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more
 - [Radioaktive Altlasten](concept-radioaktive-altlasten.md) — # Radioaktive Altlasten (Radioactive Contaminated Sites)  Radioactive contaminated sites (*radioaktive Altlasten*) are d
 - [Radioactive Substances](concept-radioaktive-stoffe.md) — Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more
-- [Rechtfertigung von Tätigkeitsarten](concept-rechtfertigung-tätigkeitsarten.md) — # Rechtfertigung von Tätigkeitsarten  The justification of activities (*Rechtfertigung von Tätigkeitsarten*) is a centra
+- [Radionuclide Laboratories](concept-radionuklidlaboratoratoratorien.md) — # Radionuclide Laboratories  A radionuclide laboratory is a highly specialized facility designed for the safe handling o
+- [Radionuclide Laboratories](concept-radionuklidlaboratoratorien.md) — # Radionuclide Laboratories  A radionuclide laboratory is a highly specialized facility designed for the safe handling o
+- [Radionuclide Laboratories](concept-radionuklidlaboratorien.md) — # Radionuclide Laboratories  A radionuclide laboratory is a highly specialized facility designed for the safe handling o
+- [concept-rechtfertigung-tätigkeitsarten.md](concept-rechtfertigung-tätigkeitsarten.md) — The justification of activities (*Rechtfertigung von Tätigkeitsarten*) is a central principle in radiation protection [c
 - [Röntgeneinrichtung](concept-röntgeneinrichtung.md) — Eine Röntgeneinrichtung ist eine Vorrichtung oder ein Gerät, in der oder dem Röntgenstrahlung mit [StrlSchG.md [Teil 12/
 - [Smart Infrastructure](concept-smart-infrastructure.md) — # Smart Infrastructure  Smart Infrastructure is a business segment dedicated to modernizing and optimizing physical and 
 - [Staatliche Aufsicht](concept-staatliche-aufsicht.md) — State supervision (*staatliche Aufsicht*) is the mandatory regulatory oversight mechanism governing all activities invol
-- [Strahlenschutzverordnung - StrlSchV](concept-strahlenschutzverordnung-strlschv.md) — # Strahlenschutzverordnung - StrlSchV  The *Strahlenschutzverordnung* (StrlSchV) is a detailed implementing regulation t
+- [Strahlenschutzanweisung](concept-strahlenschutzanweisung.md) — # Strahlenschutzanweisung (Radiation Protection Directive)  A *Strahlenschutzanweisung* is a mandatory, comprehensive wr
+- [concept-strahlenschutzverordnung-strlschv.md](concept-strahlenschutzverordnung-strlschv.md) — The *Strahlenschutzverordnung* (StrlSchV) is the detailed implementing regulation for the *Strahlenschutzgesetz* (StrlSc
 - [Veränderungssperre](concept-veränderungssperre.md) — A *Veränderungssperre* (Change Restriction) is a legal mechanism established under the *Atomgesetz* (AtG) to protect sit
 - [Vorkommnis](concept-vorkommnis.md) — # Vorkommnis (Incident)  In the context of radiation safety, a *Vorkommnis* (Incident) is a defined event that triggers 
 - [E-Mobility](e-mobility.md) — # E-Mobility  E-Mobility refers to the segment of the automotive industry focused on electric vehicle (EV) technology an
@@ -43,14 +49,14 @@ Updated: 2026-05-18 | Pages: 100
 - [Notfall-Expositionssituation](notfall-expositionssituation.md) — An emergency exposure situation is defined as an exposure situation that arises from an emergency, provided the situatio
 - [Notfallvorsorge](notfallvorsorge.md) — Emergency preparedness concerning ionizing radiation is governed by a hierarchical and multi-layered system detailed wit
 - [Private Credit](private-credit.md) — # Private Credit  Private credit refers to debt financing provided directly to private companies or assets, bypassing tr
-- [Strahlenschutzgesetz (StrlSchG)](radiation-protection-law.md) — The *Strahlenschutzgesetz* (StrlSchG) is the German federal law governing the protection against the harmful effects of 
+- [Strahlenschutzgesetz (StrlSchG)](radiation-protection-law.md) — The *Strahlenschutzgesetz* (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is t
 - [Radioaktive Altlasten](radioaktive-altlasten.md) — # Radioaktive Altlasten  Radioactive contaminated sites (radioaktive Altlasten) are defined under the Strahlenschutzgese
 - [Radioaktive Stoffe](radioaktive-stoffe.md) — Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more
 - [Reinsurance](reinsurance.md) — # Reinsurance  Reinsurance is a concept within the insurance industry where a reinsurer (a company that sells insurance 
 - [Sanierungsplan](sanierungsplan.md) — # Sanierungsplan (Remediation Plan)  A Sanierungsplan is a mandatory, comprehensive document required when dealing with 
 - [SAP SE](sap-se.md) — # SAP SE  SAP SE is a German multinational software corporation specializing in enterprise resource planning (ERP) softw
 - [Schaeffler AG](schaeffler-ag.md) — # Schaeffler AG  Schaeffler AG is a German multinational corporation specializing in motion technology and industrial co
-- [Strahlenschutzgesetz - StrlSchG](strahlenschutzgesetz-strlschg.md) — The Strahlenschutzgesetz (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is the
+- [strahlenschutzgesetz-strlschg.md](strahlenschutzgesetz-strlschg.md) — The Strahlenschutzgesetz (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is the
 - [Strahlenschutzrechtliche Genehmigungen](strahlenschutzrechtliche-genehmigungen.md) — Radiation protection permits (Strahlenschutzrechtliche Genehmigungen) are formal authorizations required under the Germa
 - [Strahlenschutzregister](strahlenschutzregister.md) — The Radiation Protection Register (Strahlenschutzregister) is a central repository established under the *Strahlenschutz
 - [Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV](summary-atdeckv-md-teil-1-2.md) — The *Atomrechtliche Deckungsvorsorge-Verordnung* (AtDeckV) is a regulation concerning the financial security provision f
@@ -62,6 +68,16 @@ Updated: 2026-05-18 | Pages: 100
 - [Atomgesetz - AtG (Teil 3/5)](summary-atg-md-teil-3-5.md) — This document provides excerpts from the *Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihr
 - [Atomgesetz - AtG](summary-atg-md-teil-4-5.md) — The *Atomgesetz* (AtG), or Law for the Peaceful Use of Nuclear Energy and Protection Against its Dangers, is a foundatio
 - [Atomgesetz - AtG](summary-atg-md-teil-5-5.md) — # Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihre Gefahren (Atomgesetz)  This document p
+- [DIN 25422 Aufbewahrung und Lagerung sonstiger radioaktiver Stoffe](summary-din-25422-2026-04-pdf-teil-1-3.md) — This document, DIN 25422:2026-04, provides technical safety specifications for the storage and keeping of other radioact
+- [DIN 25422 Aufbewahrung und Lagerung sonstiger radioaktiver Stoffe](summary-din-25422-2026-04-pdf-teil-2-3.md) — # DIN 25422 Aufbewahrung und Lagerung sonstiger radioaktiver Stoffe  This document outlines the technical and organizati
+- [DIN 25422 Aufbewahrung und Lagerung sonstiger radioaktiver Stoffe](summary-din-25422-2026-04-pdf-teil-3-3.md) — The document DIN 25422:2026-04, titled *DIN 25422 Aufbewahrung und Lagerung sonstiger radioaktiver Stoffe*, provides tec
+- [DIN 25425-1 Radionuklidlaboratorien – Teil 1: Regeln für die Auslegung](summary-din-25425-1-2021-05-md-teil-1-2.md) — The DIN 25425-1:2021-05 standard, titled *Radionuklidlaboratorien – Teil 1: Regeln für die Auslegung* (Rules for the des
+- [DIN 25425-1 Radionuklidlaboratorien – Teil 1: Regeln für die Auslegung](summary-din-25425-1-2021-05-md-teil-2-2.md) — The document DIN 25425-1:2021-05 provides detailed technical rules for the design and layout of radionuclide laboratorie
+- [DIN 25425-3:2019-12](summary-din-25425-3-2019-12-md.md) — # DIN 25425-3:2019-12 Radionuklidlaboratorien – Teil 3: Regeln für den vorbeugenden Brandschutz  This document, DIN 2542
+- [DIN 25425-4-1 Radionuklidlaboratoratorien – Teil 4: Regeln für den Personenschutz; Beiblatt 1: Hinweise für die Erstellung einer Strahlenschutzanweisung](summary-din-25425-4-1-2013-06-md.md) — # DIN 25425-4-1:2013-06 Radionuklidlaboratoratorien – Teil 4: Regeln für den Personenschutz; Beiblatt 1: Hinweise für di
+- [DIN 25425-4 Radionuklidlaboratoratorien – Teil 4: Regeln für den Personenschutz](summary-din-25425-4-2019-12-md-teil-1-2.md) — # DIN 25425-4:2019-12 Radionuklidlaboratoratoratorien – Teil 4: Regeln für den Personenschutz  This document summarizes 
+- [DIN 25425-4 Radionuklidlaboratoratorien – Teil 4: Regeln für den Personenschutz](summary-din-25425-4-2019-12-md-teil-2-2.md) — # DIN 25425-4 Radionuklidlaboratoratorien – Teil 4: Regeln für den Personenschutz  This document, DIN 25425-4, provides 
+- [DIN 25425-5:2024-12](summary-din-25425-5-2024-12.md) — # DIN 25425-5:2024-12: Radionuclide Laboratories – Part 5: Rules for the Decontamination of Surfaces  This document, DIN
 - [Infineon AG Investment Idea](summary-infineon-investment-idea-md.md) — # Infineon AG Investment Idea  This document provides a structured, investment-grade due diligence on Infineon Technolog
 - [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-1-2.md) — # Munich Re (MUV2) — Full Deep-Dive Investment Report  This document summarizes the findings from the "Munich Re (MUV2) 
 - [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-2-2.md) — Munich Re (MUV2) — Full Deep-Dive Investment Report vom 16.05.2026

@@ -13,9 +13,11 @@ sources:
 - AtEV.md
 - AtG.md [Teil 2/5]
 - AtG.md
+- DIN 25422_2026-04.PDF [Teil 3/3]
+- DIN 25422_2026-04.PDF
 title: Radioaktive Altlasten
 type: concept
-updated: '2026-05-18'
+updated: '2026-05-21'
 ---
 
 # Radioaktive Altlasten (Radioactive Contaminated Sites)
@@ -40,3 +42,8 @@ The AtG provides detailed requirements for the disposal of radioactive waste gen
 
 ## Disposal Context (AtEV)
 The AtEV reinforces the structured management of waste derived from such sites by detailing the mandatory procedures for the disposal of radioactive waste generated during or related to these activities, requiring specific reporting and delivery protocols to federal facilities [AtEV.md [Teil 1/2].md].
+
+## Technical Standards and Guidelines
+The management of radioactive waste and contaminated sites is supported by detailed technical standards, including:
+*   **Waste Storage:** Guidelines for the interim storage of radioactive waste with negligible heat development are provided [DIN 25422_2026-04.PDF [Teil 3/3].md].
+*   **Shielding:** Specific standards dictate the construction of shielding walls against ionizing radiation, such as DIN 25407-1, DIN 25407-2, and DIN 25407-3 [DIN 25422_2026-04.PDF [Teil 3/3].md].

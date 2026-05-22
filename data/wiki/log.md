@@ -105,3 +105,59 @@ Affected: []
 Created: ['summary-siemens-ag-investment-research-overview-md.md', 'entity-siemens-ag.md', 'concept-digital-industries.md', 'concept-smart-infrastructure.md', 'concept-mobility-sector.md']
 Updated: []
 Contradictions: []
+
+## 2026-05-20 13:38 — Lint
+## Programmatic checks
+
+**Orphans (no in-links from `related` frontmatter):**
+- concept-notfall.md
+- concept-radiation-protection-dose-limits.md
+- concept-radiation-protection.md
+- concept-staatliche-aufsicht.md
+- concept-veränderungssperre.md
+- filename.md
+- summary-atdeckv-md-teil-1-2.md
+- summary-atev-md-teil-1-2.md
+- summary-atev-md-teil-2-2.md
+- summary-atg-md-teil-1-5.md
+- summary-atg-md-teil-2-5.md
+- summary-atg-md-teil-3-5.md
+- summary-atg-md-teil-4-5.md
+- summary-atg-md-teil-5-5.md
+- su
+
+## 2026-05-21 14:17 — Ingest: DIN 25422_2026-04.PDF
+Affected: ['concept-kontaminierte-abfaelle.md', 'concept-radioaktive-altlasten.md', 'strahlenschutzgesetz-strlschg.md', 'concept-strahlenschutzverordnung-strlschv.md']
+Created: ['summary-din-25422-2026-04-pdf-teil-1-3.md', 'summary-din-25422-2026-04-pdf-teil-2-3.md', 'summary-din-25422-2026-04-pdf-teil-3-3.md', 'concept-radioactive-stoffe.md']
+Updated: ['concept-kontaminierte-abfaelle.md', 'concept-radioaktive-altlasten.md', 'strahlenschutzgesetz-strlschg.md', 'concept-strahlenschutzverordnung-strlschv.md', 'concept-radiation-protection-law.md', 'concept-einsatzkraft.md', 'concept-radioaktive-stoffe.md', 'index.md']
+Contradictions: ['No direct contradictions found. The new source (DIN 25422) provides highly specific technical requirements for *storage facilities* (fire/theft/radiation) that supplement the general legal frameworks already established on the wiki.']
+
+## 2026-05-21 14:25 — Ingest: DIN 25425-1_2021-05 .md
+Affected: ['concept-strahlenschutzverordnung-strlschv.md', 'concept-radioactive-stoffe.md', 'concept-kontaminierte-abfaelle.md', 'concept-radiation-protection.md']
+Created: ['summary-din-25425-1-2021-05-md-teil-1-2.md', 'concept-radionuklidlaboratorien.md', 'concept-radionuklidlaboratoratorien.md', 'summary-din-25425-1-2021-05-md-teil-2-2.md']
+Updated: ['concept-strahlenschutzverordnung-strlschv.md', 'concept-radioactive-stoffe.md', 'concept-kontaminierte-abfaelle.md', 'concept-radiation-protection.md', 'index.md', 'concept-radiation-protection-law.md', 'concept-professional-exposure.md', 'concept-radiation-dose-limits.md']
+Contradictions: []
+
+## 2026-05-21 14:53 — Ingest: DIN 25425-3_2019-12.md
+Affected: ['concept-radionuklidlaboratorien.md', 'radiation-protection-law.md', 'strahlenschutzgesetz-strlschg.md', 'concept-strahlenschutzverordnung-strlschv.md', 'concept-kontaminierte-abfaelle.md']
+Created: ['summary-din-25425-3-2019-12-md.md']
+Updated: ['concept-radionuklidlaboratoratorien.md', 'radiation-protection-law.md', 'strahlenschutzgesetz-strlschg.md', 'concept-strahlenschutzverordnung-strlschv.md', 'concept-kontaminierte-abfaelle.md', 'concept-radioactive-stoffe.md', 'concept-professional-exposure.md', 'concept-radiation-dose-limits.md', 'index.md']
+Contradictions: []
+
+## 2026-05-21 14:57 — Ingest: DIN 25425-4_2019-12.md
+Affected: ['concept-radionuklidlaboratoratorien.md', 'concept-radiation-protection-law.md', 'concept-strahlenschutzverordnung-strlschv.md', 'concept-radiation-protection.md', 'summary-din-25425-1-2021-05-md-teil-1-2.md']
+Created: ['summary-din-25425-4-2019-12-md-teil-1-2.md', 'concept-radionuklidlaboratoratoratorien.md', 'summary-din-25425-4-2019-12-md-teil-2-2.md']
+Updated: ['concept-radiation-protection-law.md', 'concept-strahlenschutzverordnung-strlschv.md', 'concept-professional-exposure.md', 'concept-kontaminierte-abfaelle.md', 'concept-radiation-dose-limits.md', 'concept-rechtfertigung-tätigkeitsarten.md', 'concept-public-exposure.md', 'concept-radioactive-stoffe.md', 'concept-radiation-protection.md', 'concept-radionuklidlaboratoratorien.md']
+Contradictions: []
+
+## 2026-05-21 15:01 — Ingest: DIN 25425-4-1_2013-06.md
+Affected: ['summary-din-25425-4-2019-12-md-teil-1-2.md', 'summary-din-25425-4-2019-12-md-teil-2-2.md', 'concept-radionuklidlaboratoratorien.md', 'concept-radiation-protection.md', 'concept-radioactive-stoffe.md']
+Created: ['summary-din-25425-4-1-2013-06-md.md', 'concept-strahlenschutzanweisung.md']
+Updated: ['summary-din-25425-4-2019-12-md-teil-1-2.md', 'summary-din-25425-4-2019-12-md-teil-2-2.md']
+Contradictions: []
+
+## 2026-05-21 15:06 — Ingest: DIN 25425-5_2024-12.md
+Affected: ['concept-radionuklidlaboratoratoratorien.md', 'concept-radionuklidlaboratorien.md', 'concept-kontaminierte-abfaelle.md', 'concept-radiation-protection.md', 'concept-rechtfertigung-tätigkeitsarten.md']
+Created: ['summary-din-25425-5-2024-12.md', 'concept-decontamination-of-surfaces.md']
+Updated: ['concept-radionuklidlaboratoratoratorien.md', 'index.md']
+Contradictions: []

@@ -2,24 +2,39 @@
 confidence: high
 created: '2026-05-17'
 related:
-- summary-strlschg-md-teil-13-13.md
+- concept-strahlenschutzverordnung-strlschv.md
+- concept-radionuklidlaboratoratorien.md
 sources:
 - StrlSchG.md [Teil 13/13]
-- StrlSchG.md
+- summary-strlschg-md-teil-13-13.md
+- summary-strlschg-md-teil-12-13.md
+- summary-strlschg-md-teil-11-13.md
+- summary-strlschg-md-teil-10-13.md
+- summary-strlschg-md-teil-9-13.md
+- summary-strlschg-md-teil-8-13.md
+- summary-strlschg-md-teil-7-13.md
+- summary-strlschg-md-teil-6-13.md
+- summary-strlschg-md-teil-5-13.md
+- summary-strlschg-md-teil-4-13.md
+- summary-strlschg-md-teil-3-13.md
+- summary-strlschg-md-teil-2-13.md
+- DIN 25425-3_2019-12.md
 title: Strahlenschutzgesetz (StrlSchG)
 type: concept
-updated: '2026-05-17'
+updated: '2026-05-21'
 ---
 
-The *Strahlenschutzgesetz* (StrlSchG) is the German federal law governing the protection against the harmful effects of ionizing radiation [StrlSchG.md [Teil 13/13].md]. It establishes comprehensive legal frameworks for managing risks associated with radiation exposure, covering everything from emergency response planning to the material composition of building resources.
+The *Strahlenschutzgesetz* (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is the German federal law governing the protection against the harmful effects of ionizing radiation [StrlSchG.md [Teil 13/13].md]. It establishes comprehensive legal frameworks for managing risks associated with radiation exposure, covering everything from emergency response planning to the material composition of building resources.
 
-## Core Principles and Scope
-The law mandates detailed planning for various scenarios, including:
-*   **Emergency Response:** It defines the legal foundations, tasks, and jurisdictions for the Federal and State governments, responsible authorities, and cooperating private and public organizations during emergency response [StrlSchG.md [Teil 13/13].md].
-*   **Information Management:** It dictates procedures for information exchange, cooperation, assistance, and coordination during emergencies, both nationally and internationally [StrlSchG.md [Teil 13/13].md].
+### Scope and Purpose
+The primary purpose of the StrlSchG is to protect against the harmful effects of ionizing radiation [StrlSchG.md [Teil 13/13].md]. The law details administrative requirements, including the necessity for permits, notifications, and adherence to strict safety standards across various sectors, such as medical research, industrial applications, and waste management [StrlSchG.md [Teil 11/13].md].
 
-## Key Areas of Regulation
-The StrlSchG addresses several critical areas:
+### Key Regulatory Areas
+The Act establishes specific competencies among several federal authorities:
+*   **Federal Radiation Protection Agency ($\S 185$):** This agency is responsible for critical areas, including granting permits for the application of radioactive substances or ionizing radiation to humans for medical research, managing registers of ethics committees and professional exposures, and overseeing high-radioactive sources [StrlSchG.md [Teil 11/13].md].
+*   **Federal Office for the Safety of Nuclear Waste ($\S 186$):** This office manages the permitting and transport control for large sources of radioactive material [StrlSchG.md [Teil 11/13].md].
+*   **Federal Physical-Technical Institute ($\S 187$):** This institute is tasked with type approval for scatter sources and providing radioactivity standards for comparison measurements [StrlSchG.md [Teil 11/13].md].
+*   **Jurisdictional Distribution:** Competencies are distributed among various bodies, including the State Authorities ($\S 184$), the Federal Aviation Office (…[truncated] [StrlSchG.md [Teil 11/13].md]).
 
 ### Emergency Planning and Response
 The law provides detailed guidelines for emergency planning, including:

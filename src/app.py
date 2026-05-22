@@ -157,6 +157,11 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                 st.success("Research complete.")
                 if step.get("report_path"):
                     st.session_state["last_report"] = step["report_path"]
+                    try:
+                        _rel = "comparisons/" + step["report_path"].split("comparisons/")[-1]
+                        st.session_state["last_research_answer"] = wiki_engine.read_page_parsed(_rel)["content"]
+                    except Exception:
+                        st.session_state["last_research_answer"] = ""
                     if auto_save:
                         try:
                             from pathlib import Path as _P
@@ -169,10 +174,15 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                         except Exception as exc:
                             st.warning(f"Auto-save to wiki failed: {exc}")
                 else:
-                    if step.get("content", "").strip():
-                        st.markdown(step["content"])
-                    else:
+                    st.session_state["last_research_answer"] = step.get("content", "")
+                    if not step.get("content", "").strip():
                         st.warning("Agent completed but produced no answer text.")
+                st.session_state.setdefault("research_history", []).append({
+                    "q": display_q,
+                    "a": st.session_state.get("last_research_answer", ""),
+                    "report": (("comparisons/" + step["report_path"].split("comparisons/")[-1])
+                               if step.get("report_path") else None),
+                })
             elif stype == "error":
                 st.error(step["content"])
 
@@ -228,7 +238,7 @@ _ollama_badge()
 
 page = st.sidebar.radio(
     "Navigate",
-    ["Upload", "Wiki Explorer", "Chat", "Research", "Maintenance"],
+    ["Upload", "Wiki Explorer", "Wiki Chat", "Research", "Maintenance"],
     label_visibility="collapsed",
     key="page_nav",
 )
@@ -443,8 +453,8 @@ var net=new vis.Network(document.getElementById('g'),
                     st.error(f"Graph render failed: {exc}")
 
 
-elif page == "Chat":
-    st.title("Chat with the Wiki")
+elif page == "Wiki Chat":
+    st.title("Wiki Chat")
     st.caption("Ask questions — Fast mode reads wiki pages; Deep mode reasons over the original documents.")
 
     if "messages" not in st.session_state:
@@ -457,12 +467,28 @@ elif page == "Chat":
         _render_chat_sources_panel()
 
     with main_col:
+        if st.button("🆕 New chat", key="new_chat"):
+            st.session_state.pop("messages", None)
+            st.session_state.pop("chat_followup", None)
+            st.rerun()
+
         mode = st.radio(
             "Mode", ["Fast", "Deep"], horizontal=True, key="chat_mode",
             help="Fast: one-shot retrieval over wiki pages. Deep: agentic loop over data/raw/ originals (~2x slower than Research, but more grounded).",
         )
 
-        for i, msg in enumerate(st.session_state["messages"]):
+        _msgs = st.session_state["messages"]
+        _current_start = len(_msgs) - 2 if len(_msgs) > 2 else 0
+        if _current_start > 0:
+            with st.expander(f"📜 Conversation history ({_current_start // 2} earlier turn(s))", expanded=False):
+                for _m in _msgs[:_current_start]:
+                    _role = "You" if _m["role"] == "user" else "Assistant"
+                    st.markdown(f"**{_role}:** {_m['content']}")
+                    if _m["role"] == "assistant":
+                        st.markdown("---")
+
+        for i in range(_current_start, len(_msgs)):
+            msg = _msgs[i]
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 if msg["role"] == "assistant" and msg.get("question") and not msg["content"].startswith("Error:"):
@@ -579,6 +605,12 @@ elif page == "Research":
         _render_research_sources_panel()
 
     with main_col:
+        if st.button("🆕 New research", key="new_research"):
+            for _k in ("research_history", "last_research_q", "last_research_answer",
+                       "last_report", "research_sources", "research_followup_input"):
+                st.session_state.pop(_k, None)
+            st.rerun()
+
         question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
 
         with st.expander("Extra wiki paste (optional — the agent browses the wiki on its own)"):
@@ -592,31 +624,45 @@ elif page == "Research":
 
         if st.button("Start research", type="primary", disabled=not (tavily_key and question)):
             _run_research_stream(question, question, wiki_context or "", auto_save)
+            st.rerun()
 
-        if st.session_state.get("last_report"):
-            _rp = st.session_state["last_report"]
-            _report_filename = _rp.split("comparisons/")[-1]
-            _report_rel = f"comparisons/{_report_filename}"
-            st.markdown(f"Report saved: `{_report_rel}`")
-            _parsed = wiki_engine.read_page_parsed(_report_rel)
+        _rhist = st.session_state.get("research_history", [])
+        if len(_rhist) > 1:
+            with st.expander(f"📜 Conversation history ({len(_rhist) - 1} earlier turn(s))", expanded=False):
+                for _h in _rhist[:-1]:
+                    st.markdown(f"**Q:** {_h['q']}")
+                    if _h.get("report"):
+                        st.caption(f"Report: `{_h['report']}`")
+                    st.markdown(_h["a"])
+                    st.markdown("---")
+
+        if st.session_state.get("last_research_answer"):
             st.markdown("---")
-            st.markdown(_parsed["content"])
+            if st.session_state.get("last_report"):
+                _rel = "comparisons/" + st.session_state["last_report"].split("comparisons/")[-1]
+                st.markdown(f"Report saved: `{_rel}`")
+            _ans = st.session_state["last_research_answer"]
+            st.markdown(_ans)
             st.download_button(
                 "Download report",
-                data=_parsed["content"],
-                file_name=_report_filename,
+                data=_ans,
+                file_name=(st.session_state["last_report"].split("comparisons/")[-1]
+                           if st.session_state.get("last_report") else "research-answer.md"),
                 mime="text/markdown",
                 key="dl_report",
             )
-            if st.session_state.get("last_research_q"):
-                st.markdown("---")
-                st.markdown("**↪ Follow-up research**")
-                fq = st.text_input("Ask a follow-up about this report", key="research_followup_input")
-                if st.button("Ask follow-up", key="research_followup_go", disabled=not (tavily_key and fq)):
-                    with st.spinner("Rephrasing follow-up…"):
-                        standalone = wiki_engine.condense_followup(
-                            st.session_state["last_research_q"], _parsed["content"], fq)
-                    _run_research_stream(standalone, fq, "", auto_save)
+
+        if st.session_state.get("last_research_q"):
+            st.markdown("---")
+            st.markdown("**↪ Follow-up research**")
+            fq = st.text_input("Ask a follow-up about the last research answer", key="research_followup_input")
+            if st.button("Ask follow-up", key="research_followup_go", disabled=not (tavily_key and fq)):
+                with st.spinner("Rephrasing follow-up…"):
+                    standalone = wiki_engine.condense_followup(
+                        st.session_state["last_research_q"],
+                        st.session_state.get("last_research_answer", ""), fq)
+                _run_research_stream(standalone, fq, "", auto_save)
+                st.rerun()
 
 
 elif page == "Maintenance":

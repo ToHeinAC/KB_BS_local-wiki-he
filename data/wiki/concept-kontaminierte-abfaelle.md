@@ -1,27 +1,21 @@
 ---
+confidence: high
+created: '2026-05-21'
 related:
 - concept-radiation-protection-law.md
-- concept-radioaktive-altlasten.md
 sources:
-- StrlSchV.md [Teil 1/15]
-- AtEV.md [Teil 1/2]
-- AtG.md [Teil 2/5]
-- AtG.md
-title: Kontaminierte Abfälle
-type: concept
-updated: '2026-05-18'
+- DIN 25425-4_2019-12.md
+updated: '2026-05-21'
 ---
 
-The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under German law, involving multiple regulatory frameworks including the *Strahlenschutzgesetz* (StrlSchG), the *Strahlenschutzverordnung* (StrlSchV), and the *Atomrechtliche Entsorgungsverordnung* (AtEV).
+The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under German law [concept-kontaminierte-abfaelle.md].
 
-## General Management Principles
-The management of such waste is strictly regulated under the overarching radiation protection laws [StrlSchV.md [Teil 1/15].md].
+## Handling and Documentation
+The handling of radioactive residual materials (*Reststoffe*) must be managed according to specific regulations [summary-din-25425-1-2021-05-md-teil-1-2.md].
 
-## Specific Requirements for Nuclear Waste (AtG)
-The AtG provides detailed procedural requirements for waste generated from nuclear facilities:
-*   **Disposal Pathway:** Operators must ensure that radioactive residues and dismantled components are safely recycled or disposed of as radioactive waste (direct final disposal) according to the specified purposes [AtG.md [Teil 2/5].md].
-*   **Intermediate Storage:** Proof of adequate interim storage capacity is required for irradiated nuclear fuel and waste requiring retrieval from processing facilities until delivery to a final disposal facility [AtG.md [Teil 2/5].md].
-*   **National Infrastructure:** The system mandates that states establish state collection points for radioactive waste, while the federal government must establish facilities for the securing and final disposal of radioactive waste [AtG.md [Teil 2/5].md].
+According to DIN 25425-4, radioactive residual materials must be stored in non-combustible, tightly sealed storage facilities during interim storage until handover to the regional collection point or third parties [summary-din-25425-3-2019-12-md.md].
 
-## Disposal Context (AtEV)
-The AtEV reinforces the structured management of waste derived from such sites by detailing the mandatory procedures for the disposal of radioactive waste generated during or related to these activities, requiring specific reporting and delivery protocols to federal facilities [AtEV.md [Teil 1/2].md].
+### Documentation Requirements
+The documentation of radioactive waste and residues is critical:
+*   **Record Keeping:** The documentation of radioactive waste, radioactive residues, or substances released from the atomic law must be maintained for 30 years [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   **Procedure:** The transfer of materials requires documentation including the radionuclide, activity, specific activity, mass or volume of the container, recipient, date of handover, and internal labeling [summary-din-25425-4-2019-12-md-teil-1-2.md].
