@@ -209,23 +209,38 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
         yield {"type": "final_answer", "content": answer, "sources": cited}
         return
 
+    # Clean exit: the final assistant message carries non-empty answer text.
     if isinstance(final_msg, AIMessage) and not getattr(final_msg, "tool_calls", None):
         text = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
-        cited = sorted(set(_RAW_CITE_RE.findall(text)))
-        yield {"type": "final_answer", "content": text, "sources": cited}
-        return
+        if text.strip():
+            cited = sorted(set(_RAW_CITE_RE.findall(text)))
+            yield {"type": "final_answer", "content": text, "sources": cited}
+            return
+
+    _prefix = "(partial — recursion limit hit)" if recursion_hit else "(best-effort — quality gate not met)"
+
+    # Best-effort: a submit_chat_answer draft that did not clear the quality gate.
+    for m in reversed(all_messages):
+        if isinstance(m, AIMessage):
+            for tc in getattr(m, "tool_calls", None) or []:
+                if tc.get("name") == "submit_chat_answer":
+                    draft = ((tc.get("args") or {}).get("answer") or "").strip()
+                    if draft:
+                        cited = sorted(set(_RAW_CITE_RE.findall(draft))
+                                       | set((tc.get("args") or {}).get("sources") or []))
+                        yield {"type": "final_answer", "content": f"{_prefix}\n\n{draft}", "sources": cited}
+                        return
+
+    # Best-effort: the last non-empty assistant message (usually a reflection).
+    for m in reversed(all_messages):
+        if isinstance(m, AIMessage):
+            text = m.content if isinstance(m.content, str) else str(m.content or "")
+            if text.strip():
+                cited = sorted(set(_RAW_CITE_RE.findall(text)))
+                yield {"type": "final_answer", "content": f"{_prefix}\n\n{text}", "sources": cited}
+                return
 
     if recursion_hit:
-        # Surface the last AIMessage text (likely a partial reflection) as a partial answer
-        for m in reversed(all_messages):
-            if isinstance(m, AIMessage):
-                text = m.content if isinstance(m.content, str) else str(m.content or "")
-                if text.strip():
-                    cited = sorted(set(_RAW_CITE_RE.findall(text)))
-                    yield {"type": "final_answer",
-                           "content": f"(partial — recursion limit hit)\n\n{text}",
-                           "sources": cited}
-                    return
         yield {"type": "final_answer",
                "content": "(no answer — recursion limit hit before any reflection was emitted)",
                "sources": []}
