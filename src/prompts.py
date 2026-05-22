@@ -292,3 +292,19 @@ EVALUATE_CONDITION_DESCRIPTION = (
     "Returns: facts table, per-leaf TRUE/FALSE trace, and final Result: PASS or FAIL. "
     "Fact names in the condition must match keys in `facts` exactly."
 )
+
+CHAT_BUDGET_NUDGE = (
+    "STEP BUDGET: you have used most of your step budget. "
+    "Do NOT write prose — call submit_chat_answer right now. "
+    "Use `answer` = all findings gathered so far in full markdown "
+    "(aim for 300+ words, cite every source as [Source: filename]). "
+    "This is your only remaining action."
+)
+
+RESEARCH_BUDGET_NUDGE = (
+    "STEP BUDGET: you have used most of your step budget. "
+    "Do NOT write prose — call submit_final_answer right now. "
+    "Use `title` = a short report title, `answer` = all findings gathered so far "
+    "in full markdown (aim for 600+ words, cite every source). "
+    "This is your only remaining action."
+)

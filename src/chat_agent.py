@@ -27,7 +27,7 @@ from langgraph.prebuilt import ToolNode
 import ollama_client
 import run_memory
 import tools as tool_module
-from prompts import CHAT_AGENT_SYSTEM
+from prompts import CHAT_AGENT_SYSTEM, CHAT_BUDGET_NUDGE
 
 load_dotenv()
 
@@ -35,6 +35,7 @@ MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
 MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "300"))
 MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 MAX_ITER = int(os.getenv("CHAT_MAX_ITERATIONS", "25"))
+NUDGE_AT = int(os.getenv("CHAT_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 LLM_TIMEOUT = int(os.getenv("CHAT_LLM_TIMEOUT", "180"))
 
 RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
@@ -53,7 +54,11 @@ def _build_llm():
 
 def _build_graph(llm):
     def agent_node(state: MessagesState) -> dict:
-        return {"messages": [llm.invoke(state["messages"])]}
+        msgs = list(state["messages"])
+        ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
+        if ai_count >= NUDGE_AT:
+            msgs = msgs + [HumanMessage(content=CHAT_BUDGET_NUDGE)]
+        return {"messages": [llm.invoke(msgs)]}
 
     def should_continue(state: MessagesState) -> str:
         last = state["messages"][-1]

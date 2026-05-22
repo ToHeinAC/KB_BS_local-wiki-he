@@ -24,7 +24,7 @@ from langgraph.prebuilt import ToolNode
 import ollama_client
 import run_memory
 import tools as tool_module
-from prompts import RESEARCHER_INSTRUCTIONS
+from prompts import RESEARCHER_INSTRUCTIONS, RESEARCH_BUDGET_NUDGE
 
 load_dotenv()
 
@@ -32,6 +32,7 @@ MIN_SEARCHES = int(os.getenv("RESEARCH_MIN_SEARCHES", "6"))
 MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
 MAX_ITER = int(os.getenv("RESEARCH_MAX_ITERATIONS", "40"))
+NUDGE_AT = int(os.getenv("RESEARCH_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 MAX_SUBMIT_ATTEMPTS = int(os.getenv("RESEARCH_MAX_SUBMIT_ATTEMPTS", "3"))
 LLM_TIMEOUT = int(os.getenv("RESEARCH_LLM_TIMEOUT", "300"))
 
@@ -47,7 +48,11 @@ def _build_llm():
 
 def _build_graph(llm):
     def agent_node(state: MessagesState) -> dict:
-        return {"messages": [llm.invoke(state["messages"])]}
+        msgs = list(state["messages"])
+        ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
+        if ai_count >= NUDGE_AT:
+            msgs = msgs + [HumanMessage(content=RESEARCH_BUDGET_NUDGE)]
+        return {"messages": [llm.invoke(msgs)]}
 
     def should_continue(state: MessagesState) -> str:
         last = state["messages"][-1]
@@ -142,10 +147,12 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
     final_msg: ToolMessage | AIMessage | None = None
     report_path: str | None = None
     last_submit_args: dict | None = None
+    all_messages: list = []
 
     try:
         for chunk in graph.stream(init, config=config, stream_mode="values"):
             messages = chunk.get("messages", [])
+            all_messages = messages
             for msg in messages[seen:]:
                 if isinstance(msg, AIMessage):
                     for tc in getattr(msg, "tool_calls", None) or []:
@@ -172,7 +179,7 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
 
     if isinstance(final_msg, AIMessage):
         text = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
-        if not getattr(final_msg, "tool_calls", None):
+        if not getattr(final_msg, "tool_calls", None) and text.strip():
             yield {"type": "final_answer", "content": text, "report_path": None}
             return
 
@@ -185,4 +192,15 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
         }
         return
 
-    yield {"type": "error", "content": f"Reached max iterations ({MAX_ITER}) without submitting a final report."}
+    for m in reversed(all_messages):
+        if isinstance(m, AIMessage):
+            t = m.content if isinstance(m.content, str) else str(m.content or "")
+            if t.strip():
+                yield {
+                    "type": "final_answer",
+                    "content": f"(best-effort — quality gate not met)\n\n{t}",
+                    "report_path": None,
+                }
+                return
+
+    yield {"type": "error", "content": f"Reached max iterations ({MAX_ITER}) without a final answer."}

@@ -560,7 +560,10 @@ elif page == "Research":
                                 except Exception as exc:
                                     st.warning(f"Auto-save to wiki failed: {exc}")
                         else:
-                            st.markdown(step["content"])
+                            if step.get("content", "").strip():
+                                st.markdown(step["content"])
+                            else:
+                                st.warning("Agent completed but produced no answer text.")
                     elif stype == "error":
                         st.error(step["content"])
 
