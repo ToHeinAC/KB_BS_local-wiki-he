@@ -2,15 +2,11 @@
 confidence: high
 created: '2026-05-21'
 related:
-- concept-strahlenschutzverordnung-strlschv.md
 - concept-radionuklidlaboratoratorien.md
 sources:
 - StrlSchG.md [Teil 11/13]
 - StrlSchG.md
-- DIN 25422_2026-04.PDF [Teil 1/3]
-- DIN 25422_2026-04.PDF
-- DIN 25425-3_2019-12.md
-updated: '2026-05-21'
+updated: '2026-05-27'
 ---
 
 The Strahlenschutzgesetz (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is the comprehensive German legislation governing the protection of humans and the environment from ionizing radiation. The law, effective as of June 27, 2017, establishes detailed rules for the handling, use, and disposal of radioactive substances and the control of radiation exposure.

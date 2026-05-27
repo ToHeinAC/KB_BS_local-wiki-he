@@ -2,14 +2,13 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
 - concept-radioactive-residues.md
 sources:
 - StrlSchV.md [Teil 11/15]
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV (Teil 11/15)
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 This document provides excerpts from the *Strahlenschutzverordnung* (StrlSchV), which is the implementing ordinance detailing specific technical regulations for the protection against the harmful effects of ionizing radiation. The content primarily consists of extensive tables detailing various radioactive isotopes, their physical properties, and decay characteristics.

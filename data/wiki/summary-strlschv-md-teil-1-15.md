@@ -2,19 +2,15 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
-- concept-rechtfertigung-tätigkeitsarten.md
 - concept-vorkommnis.md
-- concept-einsatzkraft.md
 - concept-radioaktive-altlasten.md
-- concept-kontaminierte-abfaelle.md
 - concept-dosisbegrenzung.md
 sources:
 - StrlSchV.md [Teil 1/15]
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 The *Strahlenschutzverordnung* (StrlSchV) is the German regulation titled *Verordnung zum Schutz vor der schädlichen Wirkung ionisierender Strahlung*. It serves as the implementing legislation for the protection against the harmful effects of ionizing radiation, updating previous directives to align with the EU Directive 2013/59/Euratom [StrlSchV.md [Teil 1/15].md].

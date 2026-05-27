@@ -2,16 +2,14 @@
 confidence: high
 created: '2026-05-18'
 related:
-- concept-radiation-protection-law.md
 - concept-radioaktive-stoffe.md
-- concept-kontaminierte-abfaelle.md
 - concept-radioaktive-altlasten.md
 sources:
 - AtG.md [Teil 1/5]
 - AtG.md
 title: Atomgesetz - AtG
 type: source-summary
-updated: '2026-05-18'
+updated: '2026-05-27'
 ---
 
 # Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihre Gefahren (Atomgesetz)

@@ -161,3 +161,65 @@ Affected: ['concept-radionuklidlaboratoratoratorien.md', 'concept-radionuklidlab
 Created: ['summary-din-25425-5-2024-12.md', 'concept-decontamination-of-surfaces.md']
 Updated: ['concept-radionuklidlaboratoratoratorien.md', 'index.md']
 Contradictions: []
+
+## 2026-05-27 06:12 — Source deleted
+Source: DIN 25422_2026-04.PDF
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 4
+Wiki pages removed: ['concept-einsatzkraft.md', 'summary-din-25422-2026-04-pdf-teil-1-3.md', 'summary-din-25422-2026-04-pdf-teil-2-3.md', 'summary-din-25422-2026-04-pdf-teil-3-3.md']
+Related scrubbed: 1
+
+## 2026-05-27 06:12 — Source deleted
+Source: DIN 25425-1_2021-05 .md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['concept-radionuklidlaboratorien.md', 'summary-din-25425-1-2021-05-md-teil-1-2.md', 'summary-din-25425-1-2021-05-md-teil-2-2.md']
+Related scrubbed: 0
+
+## 2026-05-27 06:13 — Source deleted
+Source: DIN 25425-1 Beiblatt 1_2022-06.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: []
+Related scrubbed: 0
+
+## 2026-05-27 06:13 — Source deleted
+Source: DIN 25425-3_2019-12.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['summary-din-25425-3-2019-12-md.md']
+Related scrubbed: 0
+
+## 2026-05-27 06:13 — Source deleted
+Source: DIN 25425-4_2019-12.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['concept-kontaminierte-abfaelle.md', 'concept-public-exposure.md', 'concept-radiation-protection-law.md', 'concept-radioactive-stoffe.md', 'concept-rechtfertigung-tätigkeitsarten.md', 'concept-strahlenschutzverordnung-strlschv.md']
+Related scrubbed: 44
+
+## 2026-05-27 06:13 — Source deleted
+Source: DIN 25425-4-1_2013-06.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['concept-strahlenschutzanweisung.md', 'summary-din-25425-4-1-2013-06-md.md', 'summary-din-25425-4-2019-12-md-teil-1-2.md', 'summary-din-25425-4-2019-12-md-teil-2-2.md']
+Related scrubbed: 0
+
+## 2026-05-27 06:13 — Source deleted
+Source: DIN 25425-5_2024-12.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['concept-decontamination-of-surfaces.md', 'summary-din-25425-5-2024-12.md']
+Related scrubbed: 0
+
+## 2026-05-27 08:22 — Ingest: jc_8_bericht_deutschland_atomenergie_bf.md
+Affected: ['concept-radioaktive-altlasten.md', 'concept-atomgesetz-atg.md', 'concept-radiation-protection.md', 'strahlenschutzgesetz-strlschg.md']
+Created: ['summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-1-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-2-25.md', 'concept-source-summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-2-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-3-25.md', 'concept-joint-convention-deutschland.md', 'concept-spent-fuel-management.md', 'concept-radioactive-waste-management.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-4-25.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-5-25.md', 'concept-kontaminierte-abfaelle.md', 'concept-endlager-konrad.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-6-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-7-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-8-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-9-25.md', 'concept-radiation-protection-law.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-10-25.md', 'concept-radioactive-stoffe.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-11-25.md', 'concept-radioactive-altlasten.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-12-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-13-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-14-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-15-25.md', 'summary-jc-8-bericht-deutschland-atomenergie_bf-md-teil-16-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-17-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-18-25.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-19-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-20-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-21-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-22-25.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-23-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-24-25.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-25-25.md', 'concept-joint-convention.md', 'concept-spent-fuel.md', 'concept-radioactive-waste.md']
+Updated: ['concept-radioaktive-altlasten.md', 'concept-atomgesetz-atg.md', 'concept-radiation-protection.md', 'concept-professional-exposure.md', 'concept-emergency-planning.md', 'concept-radioactive-residues.md', 'concept-veränderungssperre.md', 'concept-sanierungsplan.md', 'concept-radioaktive-stoffe.md', 'index.md', 'concept-strahlenschutzverordnung-strlschv.md', 'concept-strahlenschutzgesetz-strlschg.md', 'concept-notfallvorsorge.md', 'concept-radiation-dose-limits.md', 'concept-radiation-protection-dose-limits.md']
+Contradictions: []

@@ -2,15 +2,13 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
-- concept-public-exposure.md
 - concept-radioactive-residues.md
 sources:
 - StrlSchV.md [Teil 13/15]
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV (Teil 13/15)
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 The source document provides excerpts and detailed appendices from the *Verordnung zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahlenschutzverordnung - StrlSchV), detailing technical aspects of radiation protection, dose calculation methodologies, and specific regulations for radioactive materials.

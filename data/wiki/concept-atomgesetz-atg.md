@@ -1,19 +1,14 @@
 ---
-confidence: high
-created: '2026-05-18'
-related:
-- concept-radiation-protection-law.md
-- concept-radioaktive-altlasten.md
-- concept-rechtfertigung-tätigkeitsarten.md
-- summary-atdeckv-md-teil-2-2.md
+related: []
 sources:
 - AtG.md [Teil 3/5]
 - AtG.md
 - AtDeckV.md [Teil 2/2]
 - AtDeckV.md
+- jc_8_bericht_deutschland_atomenergie_bf.md
 title: Atomgesetz - AtG
 type: concept
-updated: '2026-05-18'
+updated: '2026-05-27'
 ---
 
 The *Atomgesetz* (AtG), or Law on the Peaceful Use of Nuclear Energy and Protection Against its Dangers, is the foundational German federal law governing the entire lifecycle of nuclear energy use, from research and development to waste management and emergency response [AtG.md [Teil 3/5].md].
@@ -46,5 +41,3 @@ The AtG establishes mechanisms to ensure financial accountability for potential 
 
 ## Relationship to Other Laws
 The AtG works in conjunction with the *Strahlenschutzgesetz* (StrlSchG), which provides the overarching technical and procedural rules for radiation protection [concept-radiation-protection-law.md].
-
----

@@ -2,7 +2,6 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
 - concept-radiation-dose-limits.md
 - concept-professional-exposure.md
 - concept-radioactive-residues.md
@@ -11,7 +10,7 @@ sources:
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV (Teil 10/15)
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 This document provides excerpts from the *Verordnung zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahlenschutzverordnung - StrlSchV), which is the detailed ordinance implementing the German Radiation Protection Act (StrlSchG). The content heavily focuses on transitional provisions, technical requirements, and specific exemption/limitation values effective around the end of 2018 and the start of 2021.

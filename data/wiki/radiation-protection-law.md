@@ -2,7 +2,6 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-strahlenschutzverordnung-strlschv.md
 - concept-radionuklidlaboratoratorien.md
 sources:
 - StrlSchG.md [Teil 13/13]
@@ -18,10 +17,9 @@ sources:
 - summary-strlschg-md-teil-4-13.md
 - summary-strlschg-md-teil-3-13.md
 - summary-strlschg-md-teil-2-13.md
-- DIN 25425-3_2019-12.md
 title: Strahlenschutzgesetz (StrlSchG)
 type: concept
-updated: '2026-05-21'
+updated: '2026-05-27'
 ---
 
 The *Strahlenschutzgesetz* (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is the German federal law governing the protection against the harmful effects of ionizing radiation [StrlSchG.md [Teil 13/13].md]. It establishes comprehensive legal frameworks for managing risks associated with radiation exposure, covering everything from emergency response planning to the material composition of building resources.

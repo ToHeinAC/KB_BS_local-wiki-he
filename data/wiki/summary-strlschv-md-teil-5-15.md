@@ -8,7 +8,6 @@ fullname: Verordnung zum Schutz vor der schädlichen Wirkung ionisierender Strah
   (Strahlenschutzverordnung - StrlSchV)
 name: Strahlenschutzverordnung - StrlSchV
 related:
-- concept-radiation-protection-law.md
 - concept-professional-exposure.md
 - concept-röntgeneinrichtung.md
 - concept-radiation-dose-limits.md
@@ -18,7 +17,7 @@ sources:
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 The *Strahlenschutzverordnung* (StrlSchV) is a detailed administrative regulation concerning the protection against the harmful effects of ionizing radiation, supplementing the main *Strahlenschutzgesetz* (StrlSchG). This source summary details various mandatory procedures for radiation protection, including record keeping, equipment maintenance, and environmental monitoring.

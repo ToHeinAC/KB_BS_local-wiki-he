@@ -1,17 +1,19 @@
 ---
-confidence: high
-created: '2026-05-21'
-related:
-- concept-radiation-protection-law.md
+related: []
 sources:
-- DIN 25425-4_2019-12.md
-updated: '2026-05-21'
+- StrlSchG.md [Teil 12/13]
+- concept-radioaktive-altlasten.md
+- jc_8_bericht_deutschland_atomenergie_bf.md [Teil 10/25]
+- jc_8_bericht_deutschland_atomenergie_bf.md
+title: Radioactive Substances
+type: concept
+updated: '2026-05-27'
 ---
 
-Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more radioactive elements.
+Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more radioactive elements [StrlSchG.md [Teil 12/13].md].
 
-## Control and Handling
-The handling of these substances is strictly controlled by the *Strahlenschutzgesetz* (StrlSchG) [summary-strlschg-md-teil-12-13.md].
+## Scope and Regulation
+The handling, transport, and disposal of these substances are governed by strict national laws, including the *Strahlenschutzverordnung* (StrlSchV) [StrlSchG.md [Teil 12/13].md].
 
-## Waste Management
-The disposal and management of waste contaminated by radioactive substances are governed by specific regulations, including the *Strahlenschutzverordnung* (StrlSchV) [summary-din-25425-4-2019-12-md-teil-1-2.md].
+## International Context
+The Joint Convention on the Safety of Management of Spent Fuel and Radioactive Waste provides an international benchmark for the safe management of these materials, particularly spent fuel and high-level radioactive waste [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 10/25].md].

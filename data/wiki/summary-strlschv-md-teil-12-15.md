@@ -2,15 +2,13 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
-- concept-kontaminierte-abfaelle.md
 - concept-radiation-dose-limits.md
 sources:
 - StrlSchV.md [Teil 12/15]
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 # Strahlenschutzverordnung - StrlSchV (Teil 12/15)

@@ -2,7 +2,6 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
 - concept-radiation-dose-limits.md
 - concept-medizinphysik-experte.md
 sources:
@@ -11,7 +10,7 @@ sources:
 - StrlSchV.md
 title: Röntgeneinrichtung
 type: concept
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 Eine Röntgeneinrichtung ist eine Vorrichtung oder ein Gerät, in der oder dem Röntgenstrahlung mit [StrlSchG.md [Teil 12/13].md].

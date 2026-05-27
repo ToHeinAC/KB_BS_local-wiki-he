@@ -1,10 +1,7 @@
 ---
-confidence: high
 created: '2026-05-18'
 related:
-- concept-radiation-protection-law.md
 - concept-radioactive-residues.md
-- concept-kontaminierte-abfaelle.md
 sources:
 - StrlSchV.md [Teil 1/15]
 - StrlSchG.md [Teil 12/13]
@@ -13,11 +10,11 @@ sources:
 - AtEV.md
 - AtG.md [Teil 2/5]
 - AtG.md
-- DIN 25422_2026-04.PDF [Teil 3/3]
-- DIN 25422_2026-04.PDF
+- jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25]
+- jc_8_bericht_deutschland_atomenergie_bf.md
 title: Radioaktive Altlasten
 type: concept
-updated: '2026-05-21'
+updated: '2026-05-27'
 ---
 
 # Radioaktive Altlasten (Radioactive Contaminated Sites)
@@ -39,6 +36,9 @@ The AtG provides detailed requirements for the disposal of radioactive waste gen
 *   **Waste Disposal:** Operators must ensure that radioactive residues and dismantled components are safely recycled or disposed of as radioactive waste (direct final disposal) according to the specified purposes [AtG.md [Teil 2/5].md].
 *   **Intermediate Storage:** Operators must provide proof of adequate interim storage capacity for irradiated nuclear fuel and waste requiring retrieval from processing facilities until delivery to a final disposal facility [AtG.md [Teil 2/5].md].
 *   **National Infrastructure:** The states are responsible for establishing state collection points for radioactive waste generated in their territory, while the federal government must establish facilities for the securing and final disposal of radioactive waste [AtG.md [Teil 2/5].md].
+
+## Joint Convention Context
+The management of radioactive waste and contaminated sites is further guided by international agreements, wie das Gemeinsame Übereinkommen über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle, welches die sichere Behandlung abgebrannter Brennelemente und radioaktiver Abfälle adressiert [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25].md].
 
 ## Disposal Context (AtEV)
 The AtEV reinforces the structured management of waste derived from such sites by detailing the mandatory procedures for the disposal of radioactive waste generated during or related to these activities, requiring specific reporting and delivery protocols to federal facilities [AtEV.md [Teil 1/2].md].

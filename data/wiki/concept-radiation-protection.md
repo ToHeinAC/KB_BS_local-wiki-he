@@ -1,20 +1,17 @@
 ---
 related:
-- concept-radiation-protection-law.md
 - concept-professional-exposure.md
-- concept-public-exposure.md
 - concept-radiation-dose-limits.md
 sources:
 - StrlSchG.md [Teil 12/13]
 - StrlSchV.md [Teil 3/15]
-- DIN 25425-1_2021-05 .md [Teil 1/2]
 - summary-din-25425-3-2019-12-md.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
-- DIN 25425-4_2019-12.md [Teil 2/2]
-- DIN 25425-4_2019-12.md
+- jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25]
+- jc_8_bericht_deutschland_atomenergie_bf.md
 title: Radiation Protection
 type: concept
-updated: '2026-05-21'
+updated: '2026-05-27'
 ---
 
 # Radiation Protection
@@ -26,18 +23,13 @@ The overarching legal basis is the *Strahlenschutzgesetz* (StrlSchG) [summary-st
 
 ## Core Principles
 The principles of radiation protection mandate that:
-1.  **Justification:** Any activity involving ionizing radiation must be justified [concept-rechtfertigung-tätigkeitsarten.md].
-2.  **Dose Limitation:** Exposure must adhere to the principle of keeping doses As Low As Reasonably Achievable (ALARA) and must not exceed legally defined limits [concept-radiation-dose-limits.md].
-3.  **Protection:** Protection must be ensured for both humans and the environment [summary-strlschg-md-teil-12-13.md].
+1.  **Justification:*
+…[truncated]
 
-## Technical Implementation
-Technical measures are critical for achieving protection. These measures are highly standardized, particularly in specialized facilities:
-*   **Laboratory Design:** Radionuclide laboratories must adhere to strict design rules covering structural integrity, ventilation, and waste management, as detailed in DIN 25425-1 [summary-din-25425-1-2021-05-md-teil-1-2.md].
-*   **Fire Safety:** Specific fire protection measures are required, detailed in DIN 25425-3 [summary-din-25425-3-2019-12-md.md].
-*   **Personal Safety:** Personal protection rules are further specified in DIN 25425-4, which addresses operational protocols, PPE, and monitoring for personnel working in these facilities [summary-din-25425-4-2019-12-md-teil-2-2.md].
+## Waste and Fuel Cycle Management
+The scope of radiation protection extends critically to the management of radioactive materials, including:
+*   **Radioactive Waste:** The handling of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under the *Strahlenschutzgesetz* (StrlSchG) [kontaminierte-abfaelle.md].
+*   **Spent Fuel and Waste Disposal:** International guidelines, wie das Gemeinsame Übereinkommen über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle, definieren die Anforderungen an die sichere Behandlung abgebrannter Brennelemente und radioaktiver Abfälle [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25].md].
 
-## Scope of Control
-The scope covers:
-*   **Sources:** Control over radioactive substances and residues [concept-radioactive-stoffe.md].
-*   **Exposure:** Differentiation between professional exposure [concept-professional-exposure.md] and public exposure [concept-public-exposure.md] [summary-strlschg-md-teil-12-13.md].
-*   **Waste:** Management of contaminated waste [concept-kontaminierte-abfaelle.md].
+## International Commitments
+The German approach to radiation safety is guided by international treaties, including the Joint Convention on the Safety of Spent Fuel Management and on the Safety of Radioactive Waste Management [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25].md].

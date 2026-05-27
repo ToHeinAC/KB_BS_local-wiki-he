@@ -3,14 +3,13 @@ confidence: high
 created: '2026-05-17'
 related:
 - concept-professional-exposure.md
-- concept-radiation-protection-law.md
 sources:
 - StrlSchG.md [Teil 6/13]
 - StrlSchV.md [Teil 9/15]
 - StrlSchV.md
 title: Medizinphysik-Experte
 type: concept
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 # Medizinphysik-Experte

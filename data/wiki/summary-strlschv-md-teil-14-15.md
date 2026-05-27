@@ -2,7 +2,6 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
 - concept-radiation-dose-limits.md
 - concept-emergency-planning.md
 sources:
@@ -10,7 +9,7 @@ sources:
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 The *Strahlenschutzverordnung* (StrlSchV) is the Ordinance concerning the protection against the harmful effects of ionizing radiation, effective as of November 29, 2018 [StrlSchV.md [Teil 14/15].md]. This document details numerous technical appendices and tables, including criteria for determining the significance of incidents, dose measurement methodologies, and activity concentrations of radionuclides.

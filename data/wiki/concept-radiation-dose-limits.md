@@ -1,29 +1,28 @@
 ---
-related:
-- concept-radiation-protection-law.md
-- concept-radionuklidlaboratoratorien.md
-- concept-professional-exposure.md
+confidence: high
+created: '2026-05-27'
+related: []
 sources:
 - StrlSchG.md [Teil 12/13]
+- StrlSchV.md [Teil 3/15]
+- summary-din-25425-3-2019-12-md.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
-- DIN 25425-4_2019-12.md [Teil 2/2]
-- DIN 25425-4_2019-12.md
+- jc_8_bericht_deutschland_atomenergie_bf.md [Teil 23/25]
+- jc_8_bericht_deutschland_atomenergie_bf.md
 title: Radiation Dose Limits
 type: concept
-updated: '2026-05-21'
+updated: '2026-05-27'
 ---
 
 # Radiation Dose Limits
 
-Radiation Dose Limits are legally established maximum permissible levels of radiation energy absorption [concept-radiation-dose-limits.md]. These limits form a cornerstone of radiation safety regulation.
+Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab [summary-strlschg-md-teil-12-13.md].
 
-## Legal Basis and Purpose
-The establishment of these limits is mandated by the German federal law governing radiation protection, the *Strahlenschutzgesetz* (StrlSchG) [summary-strlschg-md-teil-12-13.md]. The purpose is to ensure that exposure remains below levels deemed harmful to human health.
+## Legal Basis
+These limits are codified within the *Strahlenschutzgesetz* (StrlSchG) [summary-strlschg-md-teil-12-13.md] and further specified in the *Strahlenschutzverordnung* (StrlSchV) [summary-strlschg-md-teil-12-13.md].
 
-## Application in Practice
-The adherence to dose limits dictates operational procedures across various sectors:
-*   **Occupational Safety:** For professional exposure, strict adherence to dose limits is enforced. Specific facilities, such as radionuclide laboratories, must incorporate personal dosimetry systems to track cumulative doses received by individuals [summary-din-25425-4-2019-12-md-teil-2-2.md].
-*   **Facility Design:** The design of facilities, including the structural and operational planning of radionuclide laboratories, must account for dose control measures [summary-din-25425-1-2021-05-md-teil-1-2.md].
+## Application in Waste Management
+Die Einhaltung dieser Grenzwerte ist ein fundamentales Ziel bei der Behandlung radioaktiver Abfälle. Die detaillierten Inventare von Zwischen- und Endlagern, wie sie im Bericht 8. Joint Convention Deutschland dargestellt sind, sind darauf ausgelegt, die Exposition der Umwelt und des Personals unterhalb dieser gesetzlichen Grenzwerte zu halten [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 23/25].md].
 
-## Relationship to Protection
-The concept of dose limits is intrinsically linked to the overall goal of Radiation Protection, requiring that all activities be justified and that exposure is kept As Low As Reasonably Achievable (ALARA) [summary-strlschg-md-teil-12-13.md].
+## Relation to Professional Exposure
+Die Einhaltung der Dosisgrenzwerte ist eng mit dem Schutz des Personals verbunden, da die berufliche Exposition (Professional Exposure) direkt durch die Einhaltung dieser Limits gesteuert wird [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 23/25].md].

@@ -1,15 +1,13 @@
 ---
 confidence: high
 created: '2026-05-18'
-related:
-- concept-kontaminierte-abfaelle.md
-- concept-strahlenschutzverordnung-strlschv.md
+related: []
 sources:
 - AtEV.md [Teil 1/2]
 - AtEV.md
 title: Atomrechtliche Entsorgungsverordnung - AtEV
 type: source-summary
-updated: '2026-05-18'
+updated: '2026-05-27'
 ---
 
 # Atomrechtliche Entsorgungsverordnung - AtEV

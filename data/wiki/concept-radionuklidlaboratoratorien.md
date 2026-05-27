@@ -1,23 +1,14 @@
 ---
 related:
-- concept-radiation-protection-law.md
-- concept-strahlenschutzverordnung-strlschv.md
-- concept-kontaminierte-abfaelle.md
-- concept-radioactive-stoffe.md
 - concept-radiation-protection.md
 - concept-professional-exposure.md
 - concept-radiation-dose-limits.md
 sources:
-- DIN 25425-1_2021-05 .md [Teil 1/2]
-- DIN 25425-1_2021-05 .md
 - summary-din-25425-3-2019-12-md.md
-- DIN 25425-3_2019-12.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
-- DIN 25425-4_2019-12.md [Teil 2/2]
-- DIN 25425-4_2019-12.md
 title: Radionuclide Laboratories
 type: concept
-updated: '2026-05-21'
+updated: '2026-05-27'
 ---
 
 # Radionuclide Laboratories

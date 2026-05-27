@@ -2,16 +2,14 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
 - concept-radiation-dose-limits.md
-- concept-public-exposure.md
 sources:
 - StrlSchV.md [Teil 1/15]
 - StrlSchG.md [Teil 12/13]
 - StrlSchV.md
 title: Vorkommnis
 type: concept
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 # Vorkommnis (Incident)

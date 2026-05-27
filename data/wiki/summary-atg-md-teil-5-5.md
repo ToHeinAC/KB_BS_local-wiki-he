@@ -2,14 +2,13 @@
 confidence: high
 created: '2026-05-18'
 related:
-- concept-radiation-protection-law.md
 - concept-emergency-planning.md
 sources:
 - AtG.md [Teil 5/5]
 - AtG.md
 title: Atomgesetz - AtG
 type: source-summary
-updated: '2026-05-18'
+updated: '2026-05-27'
 ---
 
 # Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihre Gefahren (Atomgesetz)

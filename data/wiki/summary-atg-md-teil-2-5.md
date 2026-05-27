@@ -2,15 +2,13 @@
 confidence: high
 created: '2026-05-18'
 related:
-- concept-radiation-protection-law.md
 - concept-radioaktive-altlasten.md
-- concept-kontaminierte-abfaelle.md
 sources:
 - AtG.md [Teil 2/5]
 - AtG.md
 title: Atomgesetz - AtG
 type: source-summary
-updated: '2026-05-18'
+updated: '2026-05-27'
 ---
 
 The *Atomgesetz* (AtG), or Law for the Peaceful Use of Nuclear Energy and Protection Against Its Dangers, is a comprehensive German federal law governing the nuclear energy sector. This summary details specific regulatory aspects concerning licensing, decommissioning, waste management, and financial provisions as outlined in the source text [AtG.md [Teil 2/5].md].

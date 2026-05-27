@@ -1,27 +1,28 @@
 ---
-related:
-- concept-radiation-protection-law.md
-- concept-radionuklidlaboratoratorien.md
-- concept-radiation-dose-limits.md
+confidence: high
+created: '2026-05-27'
+related: []
 sources:
 - StrlSchG.md [Teil 12/13]
+- StrlSchV.md [Teil 3/15]
+- summary-din-25425-3-2019-12-md.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
-- DIN 25425-4_2019-12.md [Teil 2/2]
-- DIN 25425-4_2019-12.md
+- jc_8_bericht_deutschland_atomenergie_bf.md [Teil 23/25]
+- jc_8_bericht_deutschland_atomenergie_bf.md
 title: Professional Exposure
 type: concept
-updated: '2026-05-21'
+updated: '2026-05-27'
 ---
 
 # Professional Exposure
 
-Professional exposure refers to the occupational exposure of individuals to ionizing radiation [concept-professional-exposure.md]. It is a key area regulated under German radiation protection law.
+Professional exposure refers to the occupational exposure of individuals to ionizing radiation [summary-strlschg-md-teil-12-13.md].
 
-## Legal Context
-The concept is explicitly addressed within the *Strahlenschutzgesetz* (StrlSchG) [summary-strlschg-md-teil-12-13.md]. The goal of regulation is to ensure that such exposure is minimized and remains within legally permissible limits [concept-radiation-dose-limits.md].
+## Definition
+Professional exposure is defined as the radiation dose received by an individual due to their employment or professional act [summary-strlschg-md-teil-12-13.md].
 
-## Control Measures
-Minimizing professional exposure requires a multi-layered approach combining engineering controls, administrative procedures, and personal safeguards:
-*   **Facility Design:** The physical environment, especially radionuclide laboratories, must be designed to limit exposure pathways, incorporating standards like DIN 25425-1 [summary-din-25425-1-2021-05-md-teil-1-2.md].
-*   **Operational Protocols:** Specific operational rules dictate how work must be conducted. For instance, the DIN 25425-4 standard details rules for personal protection, mandating procedures to minimize time near sources and maximize distance [summary-din-25425-4-2019-12-md-teil-2-2.md].
-*   **Monitoring:** Continuous monitoring, including personal dosimetry and contamination checks, is mandatory to track and manage cumulative doses [summary-din-25425-4-2019-12-md-teil-2-2.md].
+## Regulatory Context
+The management of professional exposure is governed by strict dose limits set out in the *Strahlenschutzgesetz* (StrlSchG) [summary-strlschg-md-teil-12-13.md].
+
+## Relation to Waste Management
+Obwohl der Bericht 8. Joint Convention Deutschland primär die Abfallbewirtschaftung behandelt, ist die Minimierung der Exposition für das Personal, das an den Anlagen arbeitet, ein integraler Bestandteil des Schutzkonzepts [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 23/25].md]. Die detaillierte Auflistung von Anlagen zur Konditionierung und Lagerung impliziert die Notwendigkeit strenger Arbeitsschutzmaßnahmen, um die Exposition der Mitarbeiter zu minimieren [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 23/25].md].

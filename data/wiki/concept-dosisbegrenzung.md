@@ -3,7 +3,6 @@ confidence: high
 created: '2026-05-17'
 related:
 - concept-professional-exposure.md
-- concept-public-exposure.md
 - concept-radiation-dose-limits.md
 sources:
 - StrlSchG.md [Teil 6/13]
@@ -11,7 +10,7 @@ sources:
 - StrlSchV.md
 title: Radiation Dose Limits
 type: concept
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 # Radiation Dose Limits

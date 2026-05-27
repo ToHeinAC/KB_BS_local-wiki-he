@@ -4,13 +4,12 @@ created: '2026-05-17'
 related:
 - concept-radioactive-residues.md
 - concept-röntgeneinrichtung.md
-- concept-radiation-protection-law.md
 sources:
 - StrlSchV.md [Teil 2/15]
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 The *Strahlenschutzverordnung* (StrlSchV) is the ordinance detailing the implementation of the German Radiation Protection Act (StrlSchG). This summary provides excerpts covering cross-border transport, technical requirements for equipment type approval, and detailed procedures for the management and release of radioactive residues.

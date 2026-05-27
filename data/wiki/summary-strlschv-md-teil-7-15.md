@@ -2,7 +2,6 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
 - concept-medizinphysik-experte.md
 - concept-professional-exposure.md
 sources:
@@ -10,7 +9,7 @@ sources:
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 This document provides excerpts from the *Strahlenschutzverordnung* (StrlSchV), which details specific operational and procedural requirements for the application of ionizing radiation and radioactive substances in medicine and research.

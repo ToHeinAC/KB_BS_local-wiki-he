@@ -2,7 +2,6 @@
 confidence: high
 created: '2026-05-17'
 related:
-- concept-radiation-protection-law.md
 - concept-emergency-planning.md
 - concept-radiation-dose-limits.md
 - concept-röntgeneinrichtung.md
@@ -13,7 +12,7 @@ sources:
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV (Teil 6/15)
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 This document provides excerpts from the *Strahlenschutzverordnung* (StrlSchV), which details specific technical and organizational requirements for radiation protection, particularly concerning accident planning, medical applications, and equipment quality assurance.

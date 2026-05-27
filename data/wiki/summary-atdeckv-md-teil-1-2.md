@@ -3,13 +3,12 @@ confidence: high
 created: '2026-05-18'
 related:
 - concept-atomgesetz-atg.md
-- concept-radiation-protection-law.md
 sources:
 - AtDeckV.md [Teil 1/2]
 - AtDeckV.md
 title: Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV
 type: source-summary
-updated: '2026-05-18'
+updated: '2026-05-27'
 ---
 
 The *Atomrechtliche Deckungsvorsorge-Verordnung* (AtDeckV) is a regulation concerning the financial security provision for activities and facilities where atomic law liability under international treaties or the *Atomgesetz* (AtG) may apply [AtDeckV.md [Teil 1/2].md]. The regulation was issued with an effective date of 25.01.1977 [AtDeckV.md [Teil 1/2].md].

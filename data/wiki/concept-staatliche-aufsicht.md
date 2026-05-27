@@ -2,14 +2,13 @@
 confidence: high
 created: '2026-05-18'
 related:
-- concept-radiation-protection-law.md
 - concept-atomgesetz-atg.md
 sources:
 - AtG.md [Teil 3/5]
 - AtG.md
 title: Staatliche Aufsicht
 type: concept
-updated: '2026-05-18'
+updated: '2026-05-27'
 ---
 
 State supervision (*staatliche Aufsicht*) is the mandatory regulatory oversight mechanism governing all activities involving radioactive substances and facilities under the *Atomgesetz* (AtG) [AtG.md [Teil 3/5].md].

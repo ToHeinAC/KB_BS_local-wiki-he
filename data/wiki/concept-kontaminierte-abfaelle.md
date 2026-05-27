@@ -1,21 +1,22 @@
 ---
 confidence: high
-created: '2026-05-21'
+created: '2026-05-27'
 related:
-- concept-radiation-protection-law.md
+- concept-radiation-protection.md
 sources:
-- DIN 25425-4_2019-12.md
-updated: '2026-05-21'
+- jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25]
+- jc_8_bericht_deutschland_atomenergie_bf.md
+title: Kontaminierte Abfälle
+type: concept
+updated: '2026-05-27'
 ---
 
-The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under German law [concept-kontaminierte-abfaelle.md].
+# Kontaminierte Abfälle
 
-## Handling and Documentation
-The handling of radioactive residual materials (*Reststoffe*) must be managed according to specific regulations [summary-din-25425-1-2021-05-md-teil-1-2.md].
+The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under the *Strahlenschutzgesetz* (StrlSchG) [kontaminierte-abfaelle.md].
 
-According to DIN 25425-4, radioactive residual materials must be stored in non-combustible, tightly sealed storage facilities during interim storage until handover to the regional collection point or third parties [summary-din-25425-3-2019-12-md.md].
+## Regulatory Oversight
+The handling of such materials requires adherence to both national German law and international best practices.
 
-### Documentation Requirements
-The documentation of radioactive waste and residues is critical:
-*   **Record Keeping:** The documentation of radioactive waste, radioactive residues, or substances released from the atomic law must be maintained for 30 years [summary-din-25425-4-2019-12-md-teil-1-2.md].
-*   **Procedure:** The transfer of materials requires documentation including the radionuclide, activity, specific activity, mass or volume of the container, recipient, date of handover, and internal labeling [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   **Safety Requirements:** The principles of radiation protection mandate rigorous control over the entire lifecycle of contaminated waste, from identification to final disposal [concept-radiation-protection.md].
+*   **International Standards:** The safe treatment of radioactive waste, einschließlich der Behandlung abgebrannter Brennelemente, wird durch das Gemeinsame Übereinkommen über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle geregelt [jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25].md].

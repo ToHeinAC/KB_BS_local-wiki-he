@@ -2,15 +2,13 @@
 confidence: high
 created: '2026-05-18'
 related:
-- concept-radiation-protection-law.md
 - concept-radioaktive-altlasten.md
-- concept-rechtfertigung-tätigkeitsarten.md
 sources:
 - AtG.md [Teil 3/5]
 - AtG.md
 title: Atomgesetz - AtG (Teil 3/5)
 type: source-summary
-updated: '2026-05-18'
+updated: '2026-05-27'
 ---
 
 This document provides excerpts from the *Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihre Gefahren* (Atomgesetz - AtG), detailing various regulatory aspects concerning nuclear energy use, site management, and state supervision.

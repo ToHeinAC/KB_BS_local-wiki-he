@@ -6,14 +6,12 @@ related:
 - concept-notfall-expositionssituation.md
 - concept-radioaktive-altlasten.md
 - concept-professional-exposure.md
-- concept-public-exposure.md
-- concept-radiation-protection-law.md
 sources:
 - StrlSchV.md [Teil 8/15]
 - StrlSchV.md
 title: Strahlenschutzverordnung - StrlSchV (Teil 8/15)
 type: source-summary
-updated: '2026-05-17'
+updated: '2026-05-27'
 ---
 
 This document provides excerpts from the *Verordnung zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (Strahlenschutzverordnung - StrlSchV), which details specific technical and procedural requirements for radiation protection in Germany. The source covers topics ranging from emergency response protocols and radon mitigation to the handling of lost radioactive materials and the assessment of contaminated sites.
