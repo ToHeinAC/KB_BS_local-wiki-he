@@ -3,11 +3,6 @@
 {"chunk_id": "bc81afc075a5211e", "question": "Welche Gremien nahmen die Empfehlung zur Kenntnis?", "source": "StrlSchG.md"}
 {"chunk_id": "4028feb31a623c0e", "question": "Was ist ein Notfall durch ionisierende Strahlung?", "source": "StrlSchG.md"}
 {"chunk_id": "4028feb31a623c0e", "question": "Wann liegt kein Notfall vor?", "source": "StrlSchG.md"}
-{"chunk_id": "736bac85649aeeda", "question": "Wie hoch ist die private Kredit-Exposition von Munich Re?", "source": "Munich Re (MUV2) — Full Deep-Dive Investment Report.md"}
-{"chunk_id": "736bac85649aeeda", "question": "In welchen Währungen wird die private Kredit-Investition angegeben?", "source": "Munich Re (MUV2) — Full Deep-Dive Investment Report.md"}
-{"chunk_id": "736bac85649aeeda", "question": "Was ist die Investition von Munich Re in Private Credit?", "source": "Munich Re (MUV2) — Full Deep-Dive Investment Report.md"}
-{"chunk_id": "4ee4c4b7bef39e70", "question": "Welchen kritischen Cyber-Schutz-Gap zeigt die Munich Re Studie?", "source": "Munich Re (MUV2) — Full Deep-Dive Investment Report.md"}
-{"chunk_id": "4ee4c4b7bef39e70", "question": "Welche Themen flags der Tech Radar von Munich Re?", "source": "Munich Re (MUV2) — Full Deep-Dive Investment Report.md"}
 {"chunk_id": "a909d189e51b55cd", "question": "Welche Kriterien bestimmen die Bedeutsamkeit eines Vorkommnisses?", "source": "StrlSchV.md"}
 {"chunk_id": "a909d189e51b55cd", "question": "Was regelt Anlage 16 bezüglich des Risikos?", "source": "StrlSchV.md"}
 {"chunk_id": "a909d189e51b55cd", "question": "Welche Werte dürfen nach § 135 Absatz 1 Satz 3 nicht überschritten werden?", "source": "StrlSchV.md"}
@@ -28,31 +23,11 @@
 {"chunk_id": "438897f4f8626797", "question": "Gilt diese Werte nur für unbestrahltes Uran?", "source": "AtDeckV.md"}
 {"chunk_id": "438897f4f8626797", "question": "Welche Verbindungen sind in (a) und (b) aufgeführt?", "source": "AtDeckV.md"}
 {"chunk_id": "fce006be0c539160", "question": "Wann muss die Deckungsvorsorge neu festgesetzt werden?", "source": "AtDeckV.md"}
-{"chunk_id": "a6271067483f1566", "question": "Wie viel Prozent des Portfolios für einen konservativen Investor?", "source": "Infineon Investment Idea.md"}
-{"chunk_id": "a6271067483f1566", "question": "Welcher Anteil wird für einen aggressiven Tech-Investor empfohlen?", "source": "Infineon Investment Idea.md"}
-{"chunk_id": "a6271067483f1566", "question": "Wie hoch ist die maximale Notional Exposure für Derivate-Trader?", "source": "Infineon Investment Idea.md"}
-{"chunk_id": "a6271067483f1566", "question": "Wann sollten Trader gehebelte Positionen vermeiden?", "source": "Infineon Investment Idea.md"}
-{"chunk_id": "08cafb3fd11c3774", "question": "Was ist der ungefähre aktuelle Aktienkurs?", "source": "Infineon Investment Idea.md"}
 {"chunk_id": "c7cafaf02e830bda", "question": "Was ist die Genauigkeit von pdfplumber bei Text-Extraktion?", "source": "Python PDF Libraries Deep Comparison.md"}
 {"chunk_id": "c7cafaf02e830bda", "question": "Welche Bibliothek wird für komplexe Bildextraktion empfohlen?", "source": "Python PDF Libraries Deep Comparison.md"}
 {"chunk_id": "c7cafaf02e830bda", "question": "Welche Bibliothek fehlt die Tabellendetektion?", "source": "Python PDF Libraries Deep Comparison.md"}
 {"chunk_id": "c7cafaf02e830bda", "question": "Welche CVE-Schwachstelle wurde in pypdf gepatcht?", "source": "Python PDF Libraries Deep Comparison.md"}
 {"chunk_id": "452d517894c7ab96", "question": "Welche Bibliothek eignet sich für LLM-Ingestion kommerziell?", "source": "Python PDF Libraries Deep Comparison.md"}
-{"chunk_id": "b9167da334025ac4", "question": "Was ist der aktuelle Abschlussgrad der S/4HANA Migration?", "source": "SAP SE Investment Research Overview.md"}
-{"chunk_id": "b9167da334025ac4", "question": "Welche Wachstumsrate wird für die Cloud ERP Suite im Vergleich zu Peers beobachtet?", "source": "SAP SE Investment Research Overview.md"}
-{"chunk_id": "b9167da334025ac4", "question": "Welche Faktoren begrenzen die Kapazität der Systemintegratoren?", "source": "SAP SE Investment Research Overview.md"}
-{"chunk_id": "b9167da334025ac4", "question": "Welche Win Rates werden für Oracle und Microsoft Cloud ERP gemessen?", "source": "SAP SE Investment Research Overview.md"}
-{"chunk_id": "0c60cdc58a5d8ff0", "question": "Wie hoch war der Umsatz von SAP im Jahr 2025?", "source": "SAP SE Investment Research Overview.md"}
-{"chunk_id": "c7ab970567a9113d", "question": "Was bestätigt ein EBIT margin von über 4.5%?", "source": "Schaeffler AG – Investment Overview.md"}
-{"chunk_id": "c7ab970567a9113d", "question": "Bis wann muss der E-Mobility margin break-even sein?", "source": "Schaeffler AG – Investment Overview.md"}
-{"chunk_id": "c7ab970567a9113d", "question": "Wie niedrig sollte das Debt/EBITDA bis 2026 fallen?", "source": "Schaeffler AG – Investment Overview.md"}
-{"chunk_id": "c7ab970567a9113d", "question": "Was ist ein positives Zeichen für den Free cash flow?", "source": "Schaeffler AG – Investment Overview.md"}
-{"chunk_id": "c64dd5422e3f067b", "question": "Was ist Schaeffler's Edge gegenüber SKF?", "source": "Schaeffler AG – Investment Overview.md"}
-{"chunk_id": "620085308a677441", "question": "Welche Berichte werden für die Analyse verwendet?", "source": "Siemens AG — Investment Research Overview.md"}
-{"chunk_id": "620085308a677441", "question": "Woher stammen die Marktdaten?", "source": "Siemens AG — Investment Research Overview.md"}
-{"chunk_id": "620085308a677441", "question": "Welche Ratingagenturen werden für ESG-Bewertungen genutzt?", "source": "Siemens AG — Investment Research Overview.md"}
-{"chunk_id": "620085308a677441", "question": "Welche Art von Berichten deckt die Analyse ab?", "source": "Siemens AG — Investment Research Overview.md"}
-{"chunk_id": "420186a489f52596", "question": "Wie hoch ist die aktuelle Marktkapitalisierung von Siemens?", "source": "Siemens AG — Investment Research Overview.md"}
 {"chunk_id": "dbbf0eddb5e73295", "question": "Welche Sicherheitsanforderungen gelten für Kernkraftwerke?", "source": "jc_8_bericht_deutschland_atomenergie_bf.md"}
 {"chunk_id": "dbbf0eddb5e73295", "question": "Welche Richtlinie regelt den Fachkundenachweis von Personal?", "source": "jc_8_bericht_deutschland_atomenergie_bf.md"}
 {"chunk_id": "dbbf0eddb5e73295", "question": "Wann wurde die Richtlinie für Kernkraftwerkspersonal angepasst?", "source": "jc_8_bericht_deutschland_atomenergie_bf.md"}

@@ -36,7 +36,7 @@ _LOG = WIKI_DIR / "log.md"
 _INSIGHTS_DIR = "insights"
 _MAX_AFFECTED_PAGES = 5
 _MAX_EXISTING_CHARS = 8000  # cap injected existing-content per ingest call
-_TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*$")
+_TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*(?:\.md)?\s*$")
 
 
 def init_wiki() -> None:
@@ -760,7 +760,13 @@ def build_typed_graph() -> dict:
                         edges.append({"from": page_id, "to": r, "type": "related-to"})
             for s in sources:
                 raw = _raw_source(s)
-                if not raw or raw == "chat" or raw.startswith("summary-"):
+                if (
+                    not raw
+                    or raw == "chat"
+                    or raw.startswith("summary-")
+                    or raw.startswith("concept-")
+                    or raw.startswith("entity-")
+                ):
                     continue
                 source_id = f"source::{raw}"
                 source_set.add(raw)

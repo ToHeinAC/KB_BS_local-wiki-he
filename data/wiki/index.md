@@ -1,12 +1,10 @@
 # Wiki Index
-Updated: 2026-05-27 | Pages: 133
+Updated: 2026-05-28 | Pages: 113
 
 ## Pages
 - [Berufliche Exposition](berufliche-exposition.md) — Professional exposure refers to the radiation dose received by an individual due to their employment or professional act
 - [Bestehende Expositionssituation](bestehende-expositionssituation.md) — An existing exposure situation is defined as an exposure situation that already exists when a decision regarding its con
 - [Atomgesetz - AtG](concept-atomgesetz-atg.md) — The *Atomgesetz* (AtG), or Law on the Peaceful Use of Nuclear Energy and Protection Against its Dangers, is the foundati
-- [Cloud Applications](concept-cloud-applications.md) — # Cloud Applications  Cloud applications refer to software solutions delivered and operated over the internet, allowing 
-- [Digital Industries](concept-digital-industries.md) — # Digital Industries  Digital Industries refers to the segment of industrial technology focused on industrial automation
 - [Radiation Dose Limits](concept-dosisbegrenzung.md) — # Radiation Dose Limits  Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab
 - [Emergency Planning](concept-emergency-planning.md) — # Emergency Planning  Emergency planning, within the context of radiation protection, refers to the structured preparati
 - [Endlager Konrad](concept-endlager-konrad.md) — # Endlager Konrad  Das Endlager Konrad ist ein geplantes Endlager für radioaktive Abfälle in Deutschland, das in einem e
@@ -15,7 +13,6 @@ Updated: 2026-05-27 | Pages: 133
 - [Joint Convention](concept-joint-convention.md) — # Joint Convention  Die Joint Convention ist ein internationaler Rechtsrahmen, der die Sicherheit der Behandlung abgebra
 - [Kontaminierte Abfälle](concept-kontaminierte-abfaelle.md) — # Kontaminierte Abfälle  The management of waste contaminated by or potentially contaminated by ionizing radiation is st
 - [Medizinphysik-Experte](concept-medizinphysik-experte.md) — # Medizinphysik-Experte  A Medizinphysik-Experte is defined as a person with a Master's degree in medical physics. Withi
-- [Mobility Sector](concept-mobility-sector.md) — # Mobility Sector  The Mobility Sector, within the context of industrial technology, refers to the division responsible 
 - [Notfall](concept-notfall.md) — # Notfall  Ein Notfall ist ein Ereignis, bei dem sich durch ionisierende Strahlung erhebliche nachteilige Auswirkungen a
 - [Professional Exposure](concept-professional-exposure.md) — # Professional Exposure  Professional exposure refers to the occupational exposure of individuals to ionizing radiation 
 - [Radiation Dose Limits](concept-radiation-dose-limits.md) — # Radiation Dose Limits  Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab
@@ -32,32 +29,23 @@ Updated: 2026-05-27 | Pages: 133
 - [Radionuclide Laboratories](concept-radionuklidlaboratoratoratorien.md) — # Radionuclide Laboratories  A radionuclide laboratory is a highly specialized facility designed for the safe handling o
 - [Radionuclide Laboratories](concept-radionuklidlaboratoratorien.md) — # Radionuclide Laboratories  A radionuclide laboratory is a highly specialized facility designed for the safe handling o
 - [Röntgeneinrichtung](concept-röntgeneinrichtung.md) — Eine Röntgeneinrichtung ist eine Vorrichtung oder ein Gerät, in der oder dem Röntgenstrahlung mit [StrlSchG.md [Teil 12/
-- [Smart Infrastructure](concept-smart-infrastructure.md) — # Smart Infrastructure  Smart Infrastructure is a business segment dedicated to modernizing and optimizing physical and 
 - [Bericht 8. Joint Convention Deutschland](concept-source-summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-2-25.md) — # Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Br
 - [Spent Fuel Management](concept-spent-fuel-management.md) — # Spent Fuel Management  Spent fuel management encompasses the entire process, from the operational phase of nuclear pow
 - [Spent Fuel](concept-spent-fuel.md) — # Spent Fuel  Abgebrannte Brennelemente (*Spent Fuel*) sind ein zentrales Thema im Rahmen des internationalen Abfallmana
 - [Staatliche Aufsicht](concept-staatliche-aufsicht.md) — State supervision (*staatliche Aufsicht*) is the mandatory regulatory oversight mechanism governing all activities invol
 - [Veränderungssperre](concept-veränderungssperre.md) — A *Veränderungssperre* (Change Restriction) is a legal mechanism established under the *Atomgesetz* (AtG) to protect sit
 - [Vorkommnis](concept-vorkommnis.md) — # Vorkommnis (Incident)  In the context of radiation safety, a *Vorkommnis* (Incident) is a defined event that triggers 
-- [E-Mobility](e-mobility.md) — # E-Mobility  E-Mobility refers to the segment of the automotive industry focused on electric vehicle (EV) technology an
-- [Siemens AG](entity-siemens-ag.md) — # Siemens AG  Siemens Aktiengesellschaft is a German multinational conglomerate and industrial technology leader [Siemen
 - [Exposition (Radiation)](exposition.md) — # Exposition (Radiation)  In the context of radiation safety, "Exposition" refers to the potential dose received by indi
-- [Infineon Technologies AG](filename.md) — # Infineon Technologies AG  Infineon Technologies AG is a German semiconductor manufacturer recognized for its focus on 
 - [Geplante Expositionssituation](geplante-expositionssituation.md) — A planned exposure situation is defined as an exposure situation that arises from activities and in which an exposure is
 - [Ionisierende Strahlung](ionisierende-strahlung.md) — Ionizing radiation refers to electromagnetic radiation or particulate radiation that possesses sufficient energy to caus
 - [Ionisierende Strahlung](ionisierender-strahlung.md) — Ionizing radiation refers to radiation that has enough energy to remove electrons from atoms or molecules, thereby ioniz
 - [Kontaminierte Abfälle](kontaminierte-abfaelle.md) — The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under th
-- [Munich Re](munich-re.md) — # Munich Re  Munich Re, formally Münchner Rückversicherungsgesellschaft, is a major global reinsurance company. The enti
 - [Notfall-Expositionssituation](notfall-expositionssituation.md) — An emergency exposure situation is defined as an exposure situation that arises from an emergency, provided the situatio
 - [Notfallvorsorge](notfallvorsorge.md) — Emergency preparedness concerning ionizing radiation is governed by a hierarchical and multi-layered system detailed wit
-- [Private Credit](private-credit.md) — # Private Credit  Private credit refers to debt financing provided directly to private companies or assets, bypassing tr
 - [Strahlenschutzgesetz (StrlSchG)](radiation-protection-law.md) — The *Strahlenschutzgesetz* (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is t
 - [Radioaktive Altlasten](radioaktive-altlasten.md) — # Radioaktive Altlasten  Radioactive contaminated sites (radioaktive Altlasten) are defined under the Strahlenschutzgese
 - [Radioaktive Stoffe](radioaktive-stoffe.md) — Radioactive substances are defined within the *Strahlenschutzgesetz* (StrlSchG) as all substances containing one or more
-- [Reinsurance](reinsurance.md) — # Reinsurance  Reinsurance is a concept within the insurance industry where a reinsurer (a company that sells insurance 
 - [Sanierungsplan](sanierungsplan.md) — # Sanierungsplan (Remediation Plan)  A Sanierungsplan is a mandatory, comprehensive document required when dealing with 
-- [SAP SE](sap-se.md) — # SAP SE  SAP SE is a German multinational software corporation specializing in enterprise resource planning (ERP) softw
-- [Schaeffler AG](schaeffler-ag.md) — # Schaeffler AG  Schaeffler AG is a German multinational corporation specializing in motion technology and industrial co
 - [strahlenschutzgesetz-strlschg.md](strahlenschutzgesetz-strlschg.md) — The Strahlenschutzgesetz (StrlSchG), or Law for the Protection against the Harmful Effects of Ionizing Radiation, is the
 - [Strahlenschutzrechtliche Genehmigungen](strahlenschutzrechtliche-genehmigungen.md) — Radiation protection permits (Strahlenschutzrechtliche Genehmigungen) are formal authorizations required under the Germa
 - [Strahlenschutzregister](strahlenschutzregister.md) — The Radiation Protection Register (Strahlenschutzregister) is a central repository established under the *Strahlenschutz
@@ -70,7 +58,6 @@ Updated: 2026-05-27 | Pages: 133
 - [Atomgesetz - AtG (Teil 3/5)](summary-atg-md-teil-3-5.md) — This document provides excerpts from the *Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihr
 - [Atomgesetz - AtG](summary-atg-md-teil-4-5.md) — The *Atomgesetz* (AtG), or Law for the Peaceful Use of Nuclear Energy and Protection Against its Dangers, is a foundatio
 - [Atomgesetz - AtG](summary-atg-md-teil-5-5.md) — # Gesetz über die friedliche Verwendung der Kernenergie und den Schutz gegen ihre Gefahren (Atomgesetz)  This document p
-- [Infineon AG Investment Idea](summary-infineon-investment-idea-md.md) — # Infineon AG Investment Idea  This document provides a structured, investment-grade due diligence on Infineon Technolog
 - [Bericht 8. Joint Convention Deutschland](summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-1-25.md) — Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle vom 19.06.2024
 - [Bericht 8. Joint Convention Deutschland](summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-10-25.md) — # Bericht 8. Joint Convention Deutschland: Gemeinsames Übereinkommen über die Sicherheit der Behandlung abgebrannter Bre
 - [Bericht 8. Joint Convention Deutschland](summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-11-25.md) — Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle vom 19.06.2024
@@ -96,13 +83,8 @@ Updated: 2026-05-27 | Pages: 133
 - [Bericht 8. Joint Convention Deutschland](summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-4-25.md) — Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle vom 19.06.2024
 - [Bericht 8. Joint Convention Deutschland](summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-5-25.md) — # Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Br
 - [Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle](summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-6-25.md) — # Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Br
-- [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-1-2.md) — # Munich Re (MUV2) — Full Deep-Dive Investment Report  This document summarizes the findings from the "Munich Re (MUV2) 
-- [Munich Re (MUV2) — Full Deep-Dive Investment Report](summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-2-2.md) — Munich Re (MUV2) — Full Deep-Dive Investment Report vom 16.05.2026
 - [PDF Document](summary-pdf-document.md) — # PDF Document  A PDF (Portable Document Format) is a file format designed to present documents, including text, graphic
 - [Python PDF Libraries Deep Comparison](summary-python-pdf-libraries-deep-comparison-md.md) — Python PDF Libraries Deep Comparison vom 07.05.2026
-- [SAP SE Investment Research Overview](summary-sap-se-investment-research-overview-md.md) — # SAP SE Investment Research Overview  This document provides a comprehensive investment research overview of SAP SE, de
-- [Schaeffler AG – Investment Overview](summary-schaeffler-ag-investment-overview-md.md) — # Schaeffler AG – Investment Overview  This document provides a comprehensive investment overview of Schaeffler AG, deta
-- [Siemens AG — Investment Research Overview](summary-siemens-ag-investment-research-overview-md.md) — # Siemens AG — Investment Research Overview  This document provides a comprehensive investment research overview of Siem
 - [Software Licensing](summary-software-licensing.md) — # Software Licensing  Software licensing defines the legal terms under which software can be used, modified, and distrib
 - [Strahlenschutzgesetz - StrlSchG](summary-strlschg-md-teil-1-13.md) — The *Strahlenschutzgesetz* (StrlSchG) is the German law concerning the protection against the harmful effects of ionizin
 - [Strahlenschutzgesetz - StrlSchG (Teil 10/13)](summary-strlschg-md-teil-10-13.md) — The source document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (
@@ -133,5 +115,3 @@ Updated: 2026-05-27 | Pages: 133
 - [Strahlenschutzverordnung - StrlSchV (Teil 8/15)](summary-strlschv-md-teil-8-15.md) — This document provides excerpts from the *Verordnung zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (St
 - [Strahlenschutzverordnung - StrlSchV (Teil 9/15)](summary-strlschv-md-teil-9-15.md) — This document provides excerpts from the *Strahlenschutzverordnung* (StrlSchV), which details the administrative and pro
 - [Umweltradioaktivität](umweltradioaktivitaet.md) — Environmental radioactivity refers to the presence and measurement of radioactive substances in the natural environment,
-- [Vitesco Technologies](vitesco-technologies.md) — # Vitesco Technologies  Vitesco Technologies is an entity that underwent a merger with Schaeffler AG.  ## Merger Context
-- [War Risk Insurance](war-risk-insurance.md) — # War Risk Insurance  War risk insurance is a specialized form of coverage designed to protect insured assets or operati

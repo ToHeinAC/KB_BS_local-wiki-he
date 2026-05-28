@@ -223,3 +223,43 @@ Affected: ['concept-radioaktive-altlasten.md', 'concept-atomgesetz-atg.md', 'con
 Created: ['summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-1-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-2-25.md', 'concept-source-summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-2-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-3-25.md', 'concept-joint-convention-deutschland.md', 'concept-spent-fuel-management.md', 'concept-radioactive-waste-management.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-4-25.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-5-25.md', 'concept-kontaminierte-abfaelle.md', 'concept-endlager-konrad.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-6-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-7-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-8-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-9-25.md', 'concept-radiation-protection-law.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-10-25.md', 'concept-radioactive-stoffe.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-11-25.md', 'concept-radioactive-altlasten.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-12-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-13-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-14-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-15-25.md', 'summary-jc-8-bericht-deutschland-atomenergie_bf-md-teil-16-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-17-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-18-25.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-19-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-20-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-21-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-22-25.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-23-25.md', 'summary-jc-8-bericht-deutschland-atomenergie-bf-md-teil-24-25.md', 'summary-jc-8-bericht-deutschland_atomenergie_bf-md-teil-25-25.md', 'concept-joint-convention.md', 'concept-spent-fuel.md', 'concept-radioactive-waste.md']
 Updated: ['concept-radioaktive-altlasten.md', 'concept-atomgesetz-atg.md', 'concept-radiation-protection.md', 'concept-professional-exposure.md', 'concept-emergency-planning.md', 'concept-radioactive-residues.md', 'concept-veränderungssperre.md', 'concept-sanierungsplan.md', 'concept-radioaktive-stoffe.md', 'index.md', 'concept-strahlenschutzverordnung-strlschv.md', 'concept-strahlenschutzgesetz-strlschg.md', 'concept-notfallvorsorge.md', 'concept-radiation-dose-limits.md', 'concept-radiation-protection-dose-limits.md']
 Contradictions: []
+
+## 2026-05-28 06:11 — Source deleted
+Source: Munich Re (MUV2) — Full Deep-Dive Investment Report.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['munich-re.md', 'private-credit.md', 'reinsurance.md', 'summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-1-2.md', 'summary-munich-re-muv2-full-deep-dive-investment-report-md-teil-2-2.md', 'war-risk-insurance.md']
+Related scrubbed: 0
+
+## 2026-05-28 06:11 — Source deleted
+Source: Infineon Investment Idea.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['filename.md', 'summary-infineon-investment-idea-md.md']
+Related scrubbed: 0
+
+## 2026-05-28 06:11 — Source deleted
+Source: SAP SE Investment Research Overview.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['concept-cloud-applications.md', 'sap-se.md', 'summary-sap-se-investment-research-overview-md.md']
+Related scrubbed: 0
+
+## 2026-05-28 06:11 — Source deleted
+Source: Schaeffler AG – Investment Overview.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['e-mobility.md', 'schaeffler-ag.md', 'summary-schaeffler-ag-investment-overview-md.md', 'vitesco-technologies.md']
+Related scrubbed: 0
+
+## 2026-05-28 06:11 — Source deleted
+Source: Siemens AG — Investment Research Overview.md
+Raw file removed: True
+Chunks removed: True
+QA rows removed: 5
+Wiki pages removed: ['concept-digital-industries.md', 'concept-mobility-sector.md', 'concept-smart-infrastructure.md', 'entity-siemens-ag.md', 'summary-siemens-ag-investment-research-overview-md.md']
+Related scrubbed: 0
