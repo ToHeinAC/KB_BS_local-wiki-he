@@ -10,26 +10,23 @@ import wiki_engine
 
 # --- init_wiki ---
 
+def _patch_root(monkeypatch, tmp_path):
+    import db_context
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("t")
+    return tmp_path / "t"
+
+
 def test_init_wiki_creates_wiki_dir(tmp_path, monkeypatch):
-    wiki = tmp_path / "wiki"
-    raw = tmp_path / "raw"
-    monkeypatch.setattr(wiki_engine, "WIKI_DIR", wiki)
-    monkeypatch.setattr(wiki_engine, "RAW_DIR", raw)
-    monkeypatch.setattr(wiki_engine, "_INDEX", wiki / "index.md")
-    monkeypatch.setattr(wiki_engine, "_LOG", wiki / "log.md")
+    root = _patch_root(monkeypatch, tmp_path)
     wiki_engine.init_wiki()
-    assert wiki.exists()
+    assert (root / "wiki").exists()
 
 
 def test_init_wiki_creates_raw_dir(tmp_path, monkeypatch):
-    wiki = tmp_path / "wiki"
-    raw = tmp_path / "raw"
-    monkeypatch.setattr(wiki_engine, "WIKI_DIR", wiki)
-    monkeypatch.setattr(wiki_engine, "RAW_DIR", raw)
-    monkeypatch.setattr(wiki_engine, "_INDEX", wiki / "index.md")
-    monkeypatch.setattr(wiki_engine, "_LOG", wiki / "log.md")
+    root = _patch_root(monkeypatch, tmp_path)
     wiki_engine.init_wiki()
-    assert raw.exists()
+    assert (root / "raw").exists()
 
 
 def test_init_wiki_creates_index(wiki_dir):
@@ -412,10 +409,10 @@ def test_ingest_back_compat_wrapper_still_works(wiki_dir, monkeypatch):
     assert "summary-mysrc.md" in result["created"]
 
 
-def test_stats_excludes_manifest_from_raw_count(wiki_dir, monkeypatch):
-    raw = wiki_dir.parent / "raw"
-    monkeypatch.setattr(wiki_engine, "RAW_DIR", raw)
-    raw.mkdir(exist_ok=True)
+def test_stats_excludes_manifest_from_raw_count(wiki_dir):
+    import db_context
+    raw = db_context.raw_dir()
+    raw.mkdir(parents=True, exist_ok=True)
     (raw / "manifest.json").write_text("{}")
     (raw / "file.txt").write_bytes(b"x")
     s = wiki_engine.stats()

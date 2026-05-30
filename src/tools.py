@@ -17,6 +17,7 @@ from dotenv import load_dotenv
 from langchain_core.tools import tool
 
 import chunker
+import db_context
 import lex_index
 import run_memory
 import wiki_engine
@@ -35,8 +36,6 @@ from prompts import (
 
 load_dotenv()
 
-WIKI_DIR = Path(os.getenv("WIKI_DIR", "data/wiki"))
-RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
 PARALLELISM = int(os.getenv("RESEARCH_PARALLELISM", "4"))
 MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
@@ -358,7 +357,7 @@ def _submit_final_impl(title: str, answer: str) -> str:
             f"(URLs + [Wiki: ...] citations), minimum is {MIN_URLS}. "
             "Run more searches and cite additional sources."
         )
-    dest_dir = WIKI_DIR / "comparisons"
+    dest_dir = db_context.wiki_dir() / "comparisons"
     dest_dir.mkdir(parents=True, exist_ok=True)
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     filename = f"report-{_slug(title)}.md"

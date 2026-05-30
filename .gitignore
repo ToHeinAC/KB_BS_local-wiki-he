@@ -20,6 +20,9 @@ uv.lock
 .env.*
 !.env.example
 
+# User store (bcrypt password hashes)
+data/users.json
+
 # IDEs
 .idea/
 .vscode/

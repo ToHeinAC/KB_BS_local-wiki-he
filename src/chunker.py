@@ -26,9 +26,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+import db_context
+
 load_dotenv()
 
-CHUNKS_DIR = Path(os.getenv("CHUNKS_DIR", "data/chunks"))
+
+def _chunks_dir() -> Path:
+    return db_context.chunks_dir()
 
 MAX_CHUNK_CHARS = 4000
 MIN_CHUNK_CHARS = 80
@@ -191,8 +195,8 @@ def split(text: str) -> list[dict]:
 
 def write_chunks(source_name: str, chunks: list[dict]) -> Path:
     """Persist chunks for a source as JSONL. Returns the file path."""
-    CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
-    out = CHUNKS_DIR / f"{_slug(source_name)}.jsonl"
+    _chunks_dir().mkdir(parents=True, exist_ok=True)
+    out = _chunks_dir() / f"{_slug(source_name)}.jsonl"
     with out.open("w") as f:
         for ch in chunks:
             record = dict(ch)
@@ -202,7 +206,7 @@ def write_chunks(source_name: str, chunks: list[dict]) -> Path:
 
 
 def load_chunks(source_name: str) -> list[dict]:
-    path = CHUNKS_DIR / f"{_slug(source_name)}.jsonl"
+    path = _chunks_dir() / f"{_slug(source_name)}.jsonl"
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
@@ -210,10 +214,10 @@ def load_chunks(source_name: str) -> list[dict]:
 
 def all_chunks() -> list[dict]:
     """Load every chunk across every source. Used for index rebuilds."""
-    if not CHUNKS_DIR.exists():
+    if not _chunks_dir().exists():
         return []
     out: list[dict] = []
-    for p in sorted(CHUNKS_DIR.glob("*.jsonl")):
+    for p in sorted(_chunks_dir().glob("*.jsonl")):
         for line in p.read_text().splitlines():
             if line.strip():
                 out.append(json.loads(line))

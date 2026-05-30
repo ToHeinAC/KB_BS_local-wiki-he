@@ -19,14 +19,20 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+import db_context
 import ollama_client
 import schema_loader
 from prompts import GENERATE_QUESTIONS_PROMPT
 
 load_dotenv()
 
-INDEX_DIR = Path(os.getenv("INDEX_DIR", "data/index"))
-QA_PATH = INDEX_DIR / "qa.jsonl"
+
+def _index_dir() -> Path:
+    return db_context.index_dir()
+
+
+def _qa_path() -> Path:
+    return _index_dir() / "qa.jsonl"
 
 # Larger batches → fewer Ollama round-trips. 12 chunks × ~500 chars ≈ 6 KB
 # context, comfortable for any local model.
@@ -173,8 +179,8 @@ def generate(chunks: list[dict], source: str = "") -> list[tuple[str, str]]:
 def persist(items: list[tuple[str, str]], source: str) -> None:
     if not items:
         return
-    INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    with QA_PATH.open("a") as f:
+    _index_dir().mkdir(parents=True, exist_ok=True)
+    with _qa_path().open("a") as f:
         for cid, q in items:
             f.write(json.dumps({"chunk_id": cid, "question": q, "source": source},
                                ensure_ascii=False) + "\n")
@@ -182,10 +188,10 @@ def persist(items: list[tuple[str, str]], source: str) -> None:
 
 def delete_source_entries(source_name: str) -> int:
     """Remove all QA entries for a source. Returns number of rows deleted."""
-    if not QA_PATH.exists():
+    if not _qa_path().exists():
         return 0
     kept, removed = [], 0
-    for line in QA_PATH.read_text().splitlines():
+    for line in _qa_path().read_text().splitlines():
         if not line.strip():
             continue
         try:
@@ -197,16 +203,16 @@ def delete_source_entries(source_name: str) -> int:
             removed += 1
         else:
             kept.append(line)
-    QA_PATH.write_text("\n".join(kept) + ("\n" if kept else ""))
+    _qa_path().write_text("\n".join(kept) + ("\n" if kept else ""))
     return removed
 
 
 def load() -> dict[str, list[str]]:
     """Return {chunk_id: [questions]} from qa.jsonl."""
-    if not QA_PATH.exists():
+    if not _qa_path().exists():
         return {}
     out: dict[str, list[str]] = {}
-    for line in QA_PATH.read_text().splitlines():
+    for line in _qa_path().read_text().splitlines():
         line = line.strip()
         if not line:
             continue

@@ -84,7 +84,9 @@ def test_empty_input_returns_empty():
 
 
 def test_persistence_roundtrip(tmp_path, monkeypatch):
-    monkeypatch.setattr(chunker, "CHUNKS_DIR", tmp_path / "chunks")
+    import db_context
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
     chunks = chunker.split(LEGAL_SAMPLE)
     chunker.write_chunks("StrlSchG.md", chunks)
     loaded = chunker.load_chunks("StrlSchG.md")

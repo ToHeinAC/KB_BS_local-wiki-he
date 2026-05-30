@@ -12,12 +12,9 @@ import qa_gen
 
 @pytest.fixture()
 def isolated(tmp_path, monkeypatch):
-    monkeypatch.setattr(chunker, "CHUNKS_DIR", tmp_path / "chunks")
-    monkeypatch.setattr(lex_index, "INDEX_DIR", tmp_path / "index")
-    monkeypatch.setattr(lex_index, "POSTINGS_PATH", tmp_path / "index" / "postings.json")
-    monkeypatch.setattr(lex_index, "STATS_PATH", tmp_path / "index" / "stats.json")
-    monkeypatch.setattr(qa_gen, "INDEX_DIR", tmp_path / "index")
-    monkeypatch.setattr(qa_gen, "QA_PATH", tmp_path / "index" / "qa.jsonl")
+    import db_context
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
     return tmp_path
 
 

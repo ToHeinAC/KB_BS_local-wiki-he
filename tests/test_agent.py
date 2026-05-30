@@ -54,8 +54,9 @@ def test_tool_call_emits_tool_call_and_tool_result(monkeypatch):
 
 
 def test_submit_final_answer_accepted_yields_report_path(monkeypatch, tmp_path):
-    import tools
-    monkeypatch.setattr(tools, "WIKI_DIR", tmp_path)
+    import db_context
+    import tools  # noqa: F401
+    monkeypatch.setattr(db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
     monkeypatch.setattr(tools, "MIN_URLS", 1)
     body = "alpha beta gamma delta http://example.com/x"

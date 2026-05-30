@@ -21,6 +21,7 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
+import db_context
 import ollama_client
 import run_memory
 import tools as tool_module
@@ -80,8 +81,7 @@ def _build_graph(llm):
 
 
 def _load_wiki_index() -> str:
-    wiki_dir = Path(os.getenv("WIKI_DIR", "data/wiki"))
-    index = wiki_dir / "index.md"
+    index = db_context.wiki_dir() / "index.md"
     if not index.exists():
         return ""
     try:

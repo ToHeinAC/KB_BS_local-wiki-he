@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import auth
+import db_context
 import dedup
 import file_processor
 import ollama_client
@@ -201,7 +203,7 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                         try:
                             from pathlib import Path as _P
                             import os as _os
-                            wiki_dir = _P(_os.getenv("WIKI_DIR", "data/wiki"))
+                            wiki_dir = db_context.wiki_dir()
                             report_path = wiki_dir / "comparisons" / _P(step["report_path"].split("comparisons/")[-1])
                             if report_path.exists():
                                 wiki_engine.ingest(report_path.read_text(), f"Research: {display_q[:60]}")
@@ -267,10 +269,75 @@ def _ollama_badge() -> None:
     )
 
 
+# --- bootstrap: migrate legacy data layout + seed default user ---
+db_context.migrate_legacy_layout()
+auth.ensure_seeded()
+
+# --- login gate ---
+if not st.session_state.get("user"):
+    st.title("📖 LocalWiki — Sign in")
+    with st.form("login_form"):
+        u = st.text_input("Username")
+        p = st.text_input("Password", type="password")
+        ok = st.form_submit_button("Sign in", type="primary")
+    if ok:
+        if auth.verify(u, p):
+            dbs = auth.user_dbs(u)
+            if not dbs:
+                st.error("This account has no database access. Ask an admin.")
+                st.stop()
+            st.session_state["user"] = u
+            st.session_state["active_db"] = dbs[0]
+            st.rerun()
+        else:
+            st.error("Invalid username or password.")
+    st.stop()
+
+_user = st.session_state["user"]
+_allowed_dbs = auth.user_dbs(_user)
+if not _allowed_dbs:
+    st.error("Your account has no database access. Contact an admin.")
+    if st.button("Logout"):
+        st.session_state.pop("user", None)
+        st.rerun()
+    st.stop()
+
+# Keep active_db consistent with the allowlist
+if st.session_state.get("active_db") not in _allowed_dbs:
+    st.session_state["active_db"] = _allowed_dbs[0]
+
+# Apply the active DB to the ContextVar BEFORE any page handler reads paths.
+db_context.set_active_db(st.session_state["active_db"])
 wiki_engine.init_wiki()
 
 st.sidebar.markdown("## 📖 LocalWiki")
 _ollama_badge()
+
+st.sidebar.caption(f"Signed in as **{_user}**")
+if st.sidebar.button("Logout", key="logout_btn"):
+    for _k in ("user", "active_db", "messages", "chat_followup",
+               "research_history", "last_research_q", "last_research_answer",
+               "last_report", "research_sources"):
+        st.session_state.pop(_k, None)
+    st.rerun()
+
+_db_choice = st.sidebar.selectbox(
+    "Database",
+    options=_allowed_dbs,
+    index=_allowed_dbs.index(st.session_state["active_db"]),
+    key="db_selector",
+)
+if _db_choice != st.session_state["active_db"]:
+    st.session_state["active_db"] = _db_choice
+    db_context.set_active_db(_db_choice)
+    # Clear per-DB session state to avoid cross-DB leakage.
+    for _k in ("messages", "chat_followup", "research_history",
+               "last_research_q", "last_research_answer", "last_report",
+               "research_sources", "explorer_selected_page", "last_contradictions"):
+        st.session_state.pop(_k, None)
+    st.rerun()
+
+st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigate",
@@ -789,3 +856,68 @@ elif page == "Maintenance":
     st.markdown("---")
     st.subheader("Activity Log")
     st.code(wiki_engine.read_log(), language=None)
+
+    if auth.is_admin(_user):
+        st.markdown("---")
+        st.subheader("Databases (admin)")
+        _existing_dbs = db_context.list_dbs()
+        st.markdown("**Existing:** " + (", ".join(f"`{d}`" for d in _existing_dbs) or "(none)"))
+        with st.form("create_db_form"):
+            _new_db = st.text_input("New database name (letters, digits, _ - space)")
+            _create_db = st.form_submit_button("Create database")
+        if _create_db:
+            try:
+                db_context.create_db(_new_db.strip())
+                # Auto-grant access to the creator.
+                _current = set(auth.user_dbs(_user))
+                _current.add(_new_db.strip())
+                auth.set_user_dbs(_user, sorted(_current))
+                st.success(f"Created `{_new_db.strip()}` and granted access.")
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
+
+        st.markdown("---")
+        st.subheader("Users (admin)")
+        _users = auth.list_users()
+        for _ud in _users:
+            with st.expander(f"{_ud['username']}  ·  dbs: {_ud['dbs']}  ·  admin: {_ud['is_admin']}"):
+                _all_dbs = db_context.list_dbs()
+                _new_dbs = st.multiselect(
+                    "Allowed databases",
+                    options=_all_dbs,
+                    default=[d for d in _ud["dbs"] if d in _all_dbs],
+                    key=f"udbs_{_ud['username']}",
+                )
+                _new_pw = st.text_input(
+                    "New password (leave blank to keep)",
+                    type="password",
+                    key=f"upw_{_ud['username']}",
+                )
+                c1, c2, c3 = st.columns(3)
+                if c1.button("Save", key=f"usave_{_ud['username']}"):
+                    auth.set_user_dbs(_ud["username"], _new_dbs)
+                    if _new_pw:
+                        auth.change_password(_ud["username"], _new_pw)
+                    st.success("Updated.")
+                    st.rerun()
+                if c2.button("Delete", key=f"udel_{_ud['username']}",
+                             disabled=_ud["username"] == _user):
+                    auth.delete_user(_ud["username"])
+                    st.success(f"Deleted {_ud['username']}.")
+                    st.rerun()
+
+        st.markdown("**Add user**")
+        with st.form("add_user_form"):
+            _nu = st.text_input("Username")
+            _np = st.text_input("Password", type="password")
+            _ndbs = st.multiselect("Allowed databases", options=db_context.list_dbs())
+            _nadm = st.checkbox("Admin")
+            _add = st.form_submit_button("Add user")
+        if _add:
+            try:
+                auth.add_user(_nu.strip(), _np, _ndbs, is_admin=_nadm)
+                st.success(f"Added user `{_nu.strip()}`.")
+                st.rerun()
+            except ValueError as e:
+                st.error(str(e))
