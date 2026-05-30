@@ -52,6 +52,39 @@ def _show_md_dialog(title: str, content: str) -> None:
     st.markdown(content)
 
 
+@st.dialog("Concept", width="large")
+def _show_node_details(node_id: str, graph: dict) -> None:
+    nodes_by_id = {n["id"]: n for n in graph["nodes"]}
+    node = nodes_by_id.get(node_id)
+    if not node:
+        st.error(f"Unknown node: {node_id}")
+        return
+    st.subheader(node["label"])
+    if node["type"] == "page":
+        try:
+            parsed = wiki_engine.read_page_parsed(node_id)
+            st.markdown(parsed["content"])
+        except Exception as exc:
+            st.warning(f"Could not load page body: {exc}")
+    else:
+        st.caption(f"Raw source document: `{node['label']}`")
+    st.markdown("### Connections")
+    rows = []
+    for e in graph["edges"]:
+        if e["from"] == node_id:
+            other = nodes_by_id.get(e["to"], {}).get("label", e["to"])
+            arrow = "→" if e["type"] == "derived-from" else "↔"
+            rows.append(f"- {arrow} **{other}** — `{e['type']}`")
+        elif e["to"] == node_id:
+            other = nodes_by_id.get(e["from"], {}).get("label", e["from"])
+            arrow = "←" if e["type"] == "derived-from" else "↔"
+            rows.append(f"- {arrow} **{other}** — `{e['type']}`")
+    if rows:
+        st.markdown("\n".join(rows))
+    else:
+        st.caption("No connections.")
+
+
 def _raw_source_button(filename: str, key: str) -> None:
     base = _CHUNK_SUFFIX_RE.sub("", filename)
     base = _CITE_SECTION_SUFFIX_RE.sub("", base).strip()
@@ -259,9 +292,9 @@ if st.sidebar.button("Reset session", type="secondary",
 
 if page == "Upload":
     st.title("Upload a Document")
-    st.markdown("Upload a PDF, Word document, Markdown, or plain-text file to ingest into the wiki.")
+    st.markdown("Upload a Markdown (.md) file to ingest into the wiki.")
     uploaded = st.file_uploader(
-        "Choose file", type=["pdf", "docx", "md", "txt", "html"], label_visibility="collapsed"
+        "Choose file", type=["md"], label_visibility="collapsed"
     )
     if uploaded:
         raw = uploaded.read()
@@ -452,6 +485,17 @@ var net=new vis.Network(document.getElementById('g'),
                     orphans = wiki_engine.find_orphans()
                     if orphans:
                         st.caption(f"**{len(orphans)} orphan(s)** (no in-links): " + ", ".join(f"`{o}`" for o in orphans[:20]))
+
+                    st.markdown("### Inspect a node")
+                    node_options = {n["label"]: n["id"] for n in graph["nodes"]}
+                    picked_label = st.selectbox(
+                        "Open details for a node",
+                        options=["—"] + sorted(node_options.keys()),
+                        key="explorer_inspect_pick",
+                        label_visibility="collapsed",
+                    )
+                    if picked_label and picked_label != "—":
+                        _show_node_details(node_options[picked_label], graph)
                 except Exception as exc:
                     st.error(f"Graph render failed: {exc}")
 
