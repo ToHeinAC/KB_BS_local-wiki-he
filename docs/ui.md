@@ -50,6 +50,8 @@ Admins (`is_admin`) manage users/databases in the Maintenance admin panels: main
 
 Logo + nav + live wiki stats (`N pages | N sources | last updated`) + Ollama connectivity indicator. PRD §3.9.1.
 
+The sidebar Ollama indicator (`_ollama_badge()`) shows a green/red badge ("Ollama online / offline") followed by a `st.sidebar.caption` with the active model name (e.g. `Model: gemma4:e4b` from `ollama_client._MODEL`).
+
 ## Error states (UI surface)
 
 Connectivity and config errors must be visible, not silent (PRD §4.2): Ollama down → offline indicator + `ollama serve` hint; missing model → `ollama pull gemma4:e4b`; missing `TAVILY_API_KEY` → Research page disabled with setup steps; partial PDF extraction → `Partial extraction: N pages read`.

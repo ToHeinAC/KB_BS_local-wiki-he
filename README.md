@@ -45,10 +45,7 @@ Edit `.env` (copied from `.env.example`):
 | `OLLAMA_MODEL` | `gemma4:e4b` | Ollama model to use |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `MAX_INGEST_CHARS` | `40000` | Chunk size for ingest; large documents are split into sequential chunks |
-| `WIKI_DIR` | `data/wiki` | Wiki page storage |
-| `RAW_DIR` | `data/raw` | Uploaded source storage |
-| `CHUNKS_DIR` | `data/chunks` | Chunk store (one JSONL per source) |
-| `INDEX_DIR` | `data/index` | BM25 lexical index (`postings.json`, `stats.json`) + hypothetical questions (`qa.jsonl`) |
+| `DATA_ROOT` | `data` | Root for all databases; each DB is an isolated subtree `$DATA_ROOT/<db>/{raw,chunks,index,wiki}`; `users.json` lives at `$DATA_ROOT/users.json` |
 | `INGEST_QA` | `1` | Run hypothetical-question generator during ingest (`0` to disable) |
 | `QA_BATCH_SIZE` | `12` | Chunks per QA-generator LLM batch |
 | `QA_MAX_PAIRS_PER_SOURCE` | `5` | Max hypothetical-question pairs persisted per source (caps `qa_gen` cost) |
@@ -64,6 +61,14 @@ Edit `.env` (copied from `.env.example`):
 | `CHAT_MIN_SOURCES` | `2` | Deep chat: min unique `[Source: ...]` citations (section-suffixed forms count distinctly) |
 | `CHAT_MAX_ITERATIONS` | `25` | Deep chat: LangGraph recursion cap |
 | `CHAT_LLM_TIMEOUT` | `180` | Deep chat: per-LLM-call timeout (seconds) |
+
+## Remote access (Cloudflare quick tunnel)
+
+```bash
+./tunnel.sh
+```
+
+Starts a temporary `*.trycloudflare.com` public URL for port 8520 — no Cloudflare account required. The tunnel stays up until port 8520 stops listening (or Ctrl-C). Requires [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
 
 ## License
 

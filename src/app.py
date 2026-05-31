@@ -267,6 +267,7 @@ def _ollama_badge() -> None:
         f'<span style="background:{color};color:#fff;padding:2px 8px;border-radius:2px;font-size:0.75rem;font-weight:600">{label}</span>',
         unsafe_allow_html=True,
     )
+    st.sidebar.caption(f"Model: {ollama_client._MODEL}")
 
 
 # --- bootstrap: migrate legacy data layout + seed default user ---
