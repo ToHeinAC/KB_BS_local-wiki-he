@@ -29,7 +29,8 @@ author: Tobias Hein
 6. **`qa_gen.py`** — JSON parse, unknown-chunk-id rejection, batching, end-to-end rank lift when questions are folded into BM25.
 7. **`ollama_client.py`** — `is_available()` behaviour, error raised on failure, temperature defaults.
 8. **`wiki_engine.py`** — ingest parses LLM output and writes files; query loads relevant pages; lint produces a report; helpers (`get_wiki_stats`, `search_wiki`, etc.).
-9. **Critical error handling** — Ollama down, model missing, `TAVILY_API_KEY` missing, malformed LLM output, extractor/qa-gen failures must never break ingest.
+9. **`auth.py`** — maintainer layer: `is_maintainer` true only for an assigned DB (admin is not implicit), `grant_maintainer` adds to both `dbs` + `maintains`, `backfill_maintainers` is idempotent and backfills admins only.
+10. **Critical error handling** — Ollama down, model missing, `TAVILY_API_KEY` missing, malformed LLM output, extractor/qa-gen failures must never break ingest.
 
 ## What to avoid
 

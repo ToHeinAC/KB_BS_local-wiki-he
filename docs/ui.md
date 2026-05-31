@@ -27,15 +27,24 @@ The UI must feel like a premium digital publication, not a SaaS dashboard. Concr
 uv run streamlit run app.py --server.port 8520
 ```
 
+## Access model (login + maintainer layer)
+
+A login gate fronts every page; the sidebar DB selector is scoped to the signed-in user's `dbs` allowlist, and the chosen DB is applied to `db_context` before any page handler runs. Two write-access tiers per DB:
+
+- **Reader** (DB in `dbs`): Wiki Explorer, Chat, Research only.
+- **Maintainer** (DB in `maintains`): also sees **Upload** and the Maintenance **Delete Source** / **Reset all data** actions. Maintainer rights are explicit per DB — admin alone does **not** grant them.
+
+Admins (`is_admin`) manage users/databases in the Maintenance admin panels: maintainers are assigned at DB creation (maintainers multiselect) and per user ("Maintained databases" multiselect). Non-maintainers simply don't see the Upload nav entry or the destructive Maintenance sections (read-only tools stay visible).
+
 ## Pages (primary navigation)
 
 | Page | Purpose | PRD §§ |
 |---|---|---|
-| **Upload** | Drag-and-drop ingest with explicit dedup confirmation. Before ingesting, shows an optional metadata form (fields from `templates/insert.md`: name, fullname, description, effective as of, part of) to make LLM output more precise. Shows ingest summary (created / updated / contradictions). Never auto-ingest. | 3.9.2 |
+| **Upload** | *Maintainer-only.* Drag-and-drop ingest with explicit dedup confirmation. Before ingesting, shows an optional metadata form (fields from `templates/insert.md`: name, fullname, description, effective as of, part of) to make LLM output more precise. Shows ingest summary (created / updated / contradictions). Never auto-ingest. | 3.9.2 |
 | **Wiki Explorer** | Tree-by-`type` navigator (Concepts / Entities / Source Summaries / Comparisons / Other) when search is empty; full-text search across titles, filenames, and page bodies (excerpt highlighted) when active. Rendered Markdown viewer: body rendered clean (no YAML frontmatter); collapsible **Sources** expander at the bottom lists original `data/raw/` documents and related wiki pages. Graph view: interactive vis.js network rendered inline (no pyvis dependency); two toggles — **Node names** (shows page title, up to 5 words) and **Edge themes** (shows first 3 words of linked page's title as edge label). Orphan count shown below graph. | 3.9.3 |
 | **Chat** | Chatbot with a **Fast | Deep** mode toggle. **Fast** (default): one-shot 2-stage RAG over wiki pages (`wiki_engine.query_with_sources`); answer appears with a Sources panel listing the wiki pages and original `data/raw/` documents used. **Deep**: agentic LangGraph loop over `data/raw/` originals only (`chat_agent.run_chat_agent`) — no web, halved quality gates vs Research for ~2× speed, paginated reads of long docs, section-suffixed citations (e.g. `[Source: StrlSchG.md §62]`); each Deep answer renders an Agent trace expander with the step-by-step tool feed. Both modes share the same "Save answer to wiki" button (`insights/insight-*.md`). Each answer also has a **"↪ Follow up"** button: it opens a bordered panel showing the original question with a downward connector to the input, and the next message is rewritten into a standalone question (`wiki_engine.condense_followup`) using the prior Q&A before being sent. | 3.9.4 |
 | **Research** | Run the ReAct agent (max 8 iterations); show step-by-step progress; gate behind `TAVILY_API_KEY`. Optional wiki context injection; auto-save final report to wiki. A **follow-up input** is rendered directly below the saved report (no scroll-up); the entered question is condensed against the prior question + report before a new run. | 3.9.5 |
-| **Maintenance** | Wiki stats, link-graph health (orphan check), lint, **Delete Source** (selectbox of registered sources + irreversibility warning + confirmation checkbox → cascading delete of raw file, chunks, QA rows, wiki pages, then index rebuild), activity log. | 3.9.6 |
+| **Maintenance** | Wiki stats, link-graph health (orphan check), lint, activity log (all readers). *Maintainer-only:* **Delete Source** (selectbox of registered sources + irreversibility warning + confirmation checkbox → cascading delete of raw file, chunks, QA rows, wiki pages, then index rebuild) and **Reset all data**. *Admin-only:* Users / Databases management (create DB + assign maintainers, edit per-user access + maintained DBs). | 3.9.6 |
 
 ## Top-bar / chrome
 
