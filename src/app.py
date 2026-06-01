@@ -730,62 +730,61 @@ elif page == "Maintenance":
     c2.metric("Raw sources", s["raw_files"])
     c3.metric("Data size (MB)", round(s["data_bytes"] / 1_048_576, 2))
 
-    st.markdown("---")
-    st.subheader("Link graph health")
-    orphans = wiki_engine.find_orphans()
-    if orphans:
-        st.warning(f"**{len(orphans)} orphan(s)** — pages with no `related` in-links.")
-        st.code("\n".join(orphans), language=None)
-    else:
-        st.success("No orphans — every page is linked from at least one other page.")
-
-    st.markdown("---")
-    st.subheader("Lint")
-    st.caption("Ask the LLM to review wiki quality: contradictions, orphans, gaps, suggestions.")
-    if st.button("Run lint", type="primary"):
-        with st.spinner("Running lint (may take a minute)…"):
-            try:
-                report = wiki_engine.lint()
-                st.markdown(report)
-            except RuntimeError as e:
-                st.error(str(e))
-
-    st.markdown("---")
-    st.subheader("Delete Source")
-    _sources = dedup.list_sources()
-    if not _sources:
-        st.info("No sources ingested yet.")
-    else:
-        _selected = st.selectbox("Source to delete", _sources)
-        st.warning(
-            "Deletes the raw file, all chunks, QA pairs, and **all wiki pages** "
-            "that reference this source. This cannot be undone."
-        )
-        _confirmed = st.checkbox("I understand this is irreversible")
-        if st.button("Delete source", disabled=not _confirmed, type="primary"):
-            with st.spinner("Deleting…"):
-                _result = wiki_engine.delete_source(_selected)
-            st.success(
-                f"Deleted **{_selected}**. "
-                f"Wiki pages removed: {len(_result['wiki_pages'])}. "
-                f"QA rows removed: {_result['qa_rows']}. "
-                "Index rebuilt."
-            )
-            st.rerun()
-
-    st.markdown("---")
-    st.subheader("Reset all data")
-    st.error(
-        "Deletes EVERY raw source, chunk, QA pair, lexical index entry, and "
-        "wiki page. Wiki is re-initialised empty. Used to start tests fresh."
+    tab_del, tab_lint, tab_graph, tab_log, tab_reset = st.tabs(
+        ["Delete source", "Lint", "Link graph health", "Activity log", "Reset all data"]
     )
-    _reset_ok = st.checkbox("I understand this wipes all ingested data")
-    if st.button("Reset all data", disabled=not _reset_ok):
-        with st.spinner("Wiping…"):
-            _counts = wiki_engine.reset_all_data()
-        st.success(f"Cleared: {_counts}")
-        st.rerun()
 
-    st.markdown("---")
-    st.subheader("Activity Log")
-    st.code(wiki_engine.read_log(), language=None)
+    with tab_del:
+        _sources = dedup.list_sources()
+        if not _sources:
+            st.info("No sources ingested yet.")
+        else:
+            _selected = st.selectbox("Source to delete", _sources)
+            st.warning(
+                "Deletes the raw file, all chunks, QA pairs, and **all wiki pages** "
+                "that reference this source. This cannot be undone."
+            )
+            _confirmed = st.checkbox("I understand this is irreversible")
+            if st.button("Delete source", disabled=not _confirmed, type="primary"):
+                with st.spinner("Deleting…"):
+                    _result = wiki_engine.delete_source(_selected)
+                st.success(
+                    f"Deleted **{_selected}**. "
+                    f"Wiki pages removed: {len(_result['wiki_pages'])}. "
+                    f"QA rows removed: {_result['qa_rows']}. "
+                    "Index rebuilt."
+                )
+                st.rerun()
+
+    with tab_lint:
+        st.caption("Ask the LLM to review wiki quality: contradictions, orphans, gaps, suggestions.")
+        if st.button("Run lint", type="primary"):
+            with st.spinner("Running lint (may take a minute)…"):
+                try:
+                    report = wiki_engine.lint()
+                    st.markdown(report)
+                except RuntimeError as e:
+                    st.error(str(e))
+
+    with tab_graph:
+        orphans = wiki_engine.find_orphans()
+        if orphans:
+            st.warning(f"**{len(orphans)} orphan(s)** — pages with no `related` in-links.")
+            st.code("\n".join(orphans), language=None)
+        else:
+            st.success("No orphans — every page is linked from at least one other page.")
+
+    with tab_log:
+        st.code(wiki_engine.read_log(), language=None)
+
+    with tab_reset:
+        st.error(
+            "Deletes EVERY raw source, chunk, QA pair, lexical index entry, and "
+            "wiki page. Wiki is re-initialised empty. Used to start tests fresh."
+        )
+        _reset_ok = st.checkbox("I understand this wipes all ingested data")
+        if st.button("Reset all data", disabled=not _reset_ok):
+            with st.spinner("Wiping…"):
+                _counts = wiki_engine.reset_all_data()
+            st.success(f"Cleared: {_counts}")
+            st.rerun()
