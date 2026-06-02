@@ -19,6 +19,8 @@ import schema_loader
 from prompts import (
     ANSWER_PROMPT,
     CONDENSE_PROMPT,
+    DESCRIPTION_BUILD_PROMPT,
+    DESCRIPTION_UPDATE_PROMPT,
     FILE_ANSWER_PROMPT,
     INGEST_PROMPT,
     LINT_PROMPT,
@@ -46,7 +48,13 @@ def _log_path() -> Path:
     return _wiki() / "log.md"
 
 
+def _description_path() -> Path:
+    return _wiki() / "DESCRIPTION.md"
+
+
 _INSIGHTS_DIR = "insights"
+_SYSTEM_PAGES = ("index.md", "log.md", "DESCRIPTION.md")  # not real wiki pages
+_DESCRIPTION_MAX_CHARS = 1800  # ~half a page; hard cap on the DB overview
 _MAX_AFFECTED_PAGES = 5
 _MAX_EXISTING_CHARS = 8000  # cap injected existing-content per ingest call
 _TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*(?:\.md)?\s*$")
@@ -59,6 +67,8 @@ def init_wiki() -> None:
         _index_path().write_text("# Wiki Index\nUpdated: — | Pages: 0\n\n## Pages\n")
     if not _log_path().exists():
         _log_path().write_text("# Wiki Log\n")
+    if not _description_path().exists():
+        _description_path().write_text("")
 
 
 def _now() -> str:
@@ -125,7 +135,7 @@ def _select_affected_pages(system: str, source_name: str, index_text: str, text:
         s = ln.strip().strip("-• ").strip()
         if s.lower() == "none":
             return []
-        if s.endswith(".md") and s not in ("index.md", "log.md"):
+        if s.endswith(".md") and s not in _SYSTEM_PAGES:
             if (_wiki() / s).exists() and s not in candidates:
                 candidates.append(s)
         if len(candidates) >= _MAX_AFFECTED_PAGES:
@@ -323,6 +333,11 @@ def ingest_end(ctx: dict) -> dict:
     if ctx["chunks"]:
         lex_index.build()
     _rebuild_index()
+    if os.getenv("INGEST_DESCRIPTION", "1") == "1":
+        try:
+            update_description(ctx)
+        except Exception:
+            pass  # best-effort; never fail ingest on the overview refresh
     _append_log(
         f"Ingest: {ctx['source_name']}",
         f"Affected: {ctx['affected']}\nCreated: {ctx['created']}\n"
@@ -377,7 +392,7 @@ def delete_source(source_name: str) -> dict:
     # Cascade through wiki pages: drop this source from every page's
     # frontmatter; delete pages whose `sources:` becomes empty; then scrub
     # surviving pages' `related:` lists of any references to deleted pages.
-    _SKIP = {"index.md", "log.md"}
+    _SKIP = set(_SYSTEM_PAGES)
     insights = _wiki() / _INSIGHTS_DIR
 
     def _all_pages() -> list[Path]:
@@ -520,7 +535,7 @@ def lint() -> str:
     system = schema_loader.get_system_prompt()
     all_pages = ""
     for md in sorted(_wiki().glob("*.md")):
-        if md.name in ("index.md", "log.md"):
+        if md.name in _SYSTEM_PAGES:
             continue
         all_pages += f"\n\n--- {md.name} ---\n{md.read_text()}"
 
@@ -544,7 +559,7 @@ def list_pages() -> list[dict]:
     """Return metadata for all non-system wiki pages."""
     results = []
     for md in sorted(_wiki().glob("*.md")):
-        if md.name in ("index.md", "log.md"):
+        if md.name in _SYSTEM_PAGES:
             continue
         try:
             post = frontmatter.load(str(md))
@@ -582,6 +597,74 @@ def read_raw_source(filename: str) -> bytes | None:
     return path.read_bytes() if path.exists() else None
 
 
+# --- DESCRIPTION.md: half-page high-level overview of the whole database ----
+
+def _cap_description(text: str) -> str:
+    """Trim the overview to _DESCRIPTION_MAX_CHARS on a paragraph/sentence break."""
+    text = text.strip()
+    if len(text) <= _DESCRIPTION_MAX_CHARS:
+        return text
+    cut = text[:_DESCRIPTION_MAX_CHARS]
+    for sep in ("\n\n", ". ", " "):
+        idx = cut.rfind(sep)
+        if idx > _DESCRIPTION_MAX_CHARS // 2:
+            return cut[:idx].strip()
+    return cut.strip()
+
+
+def read_description() -> str:
+    """Return the database overview text, or '' if missing/empty."""
+    path = _description_path()
+    return path.read_text().strip() if path.exists() else ""
+
+
+def build_description() -> str:
+    """Synthesize the database overview from the current wiki index and persist it."""
+    system = schema_loader.get_system_prompt()
+    index_text = _index_path().read_text() if _index_path().exists() else ""
+    prompt = DESCRIPTION_BUILD_PROMPT.format(
+        db_name=db_context.get_active_db(), index_text=index_text
+    )
+    text = _cap_description(ollama_client.generate(system, prompt, temperature=0.3))
+    _description_path().write_text(text)
+    return text
+
+
+def ensure_description() -> None:
+    """One-time seed: build the overview if it's missing and the wiki has pages."""
+    if read_description() or not list_pages():
+        return
+    try:
+        build_description()
+    except Exception:
+        pass  # best-effort; never block the page render on it
+
+
+def update_description(ctx: dict) -> None:
+    """Conditionally refresh the overview after an ingest (LLM decides via NO_CHANGE)."""
+    current = read_description()
+    if not current:
+        if list_pages():
+            build_description()
+        return
+    titles = ctx.get("created", []) + ctx.get("updated", [])
+    change_summary = (
+        f"Source: {ctx['source_name']}\n"
+        f"Pages created/updated: {', '.join(titles) if titles else '(none)'}"
+    )
+    system = schema_loader.get_system_prompt()
+    index_text = _index_path().read_text() if _index_path().exists() else ""
+    prompt = DESCRIPTION_UPDATE_PROMPT.format(
+        db_name=db_context.get_active_db(),
+        current=current,
+        change_summary=change_summary,
+        index_text=index_text,
+    )
+    response = ollama_client.generate(system, prompt, temperature=0.3).strip()
+    if response and response != "NO_CHANGE":
+        _description_path().write_text(_cap_description(response))
+
+
 _TYPE_GROUPS = ("concept", "entity", "source-summary", "comparison")
 
 
@@ -597,7 +680,7 @@ def search_wiki(query: str) -> list[dict]:
         return []
     results = []
     for md in sorted(_wiki().glob("*.md")):
-        if md.name in ("index.md", "log.md"):
+        if md.name in _SYSTEM_PAGES:
             continue
         try:
             post = frontmatter.load(str(md))
@@ -700,7 +783,7 @@ def build_link_graph() -> dict[str, set[str]]:
 
     for src_iter in targets:
         for md in src_iter:
-            if md.name in ("index.md", "log.md"):
+            if md.name in _SYSTEM_PAGES:
                 continue
             try:
                 post = frontmatter.load(str(md))
@@ -711,7 +794,7 @@ def build_link_graph() -> dict[str, set[str]]:
             edges = set()
             for r in rel:
                 r = str(r).strip()
-                if r and r != key and r in existing and r not in ("index.md", "log.md"):
+                if r and r != key and r in existing and r not in _SYSTEM_PAGES:
                     edges.add(r)
             graph[key] = edges
     return graph
@@ -750,7 +833,7 @@ def build_typed_graph() -> dict:
 
     for src_iter in targets:
         for md in src_iter:
-            if md.name in ("index.md", "log.md"):
+            if md.name in _SYSTEM_PAGES:
                 continue
             try:
                 post = frontmatter.load(str(md))
@@ -766,7 +849,7 @@ def build_typed_graph() -> dict:
             nodes[page_id] = {"id": page_id, "type": "page", "label": title}
             for r in related:
                 r = str(r).strip()
-                if r and r != page_id and r in existing and r not in ("index.md", "log.md"):
+                if r and r != page_id and r in existing and r not in _SYSTEM_PAGES:
                     pair = frozenset({page_id, r})
                     if pair not in related_pairs:
                         related_pairs.add(pair)

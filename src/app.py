@@ -486,6 +486,11 @@ elif page == "Wiki Explorer":
                                         _show_md_dialog(r, parsed["content"])
                 else:
                     st.info("Select a page from the navigation panel on the right.")
+                    wiki_engine.ensure_description()
+                    overview = wiki_engine.read_description()
+                    if overview:
+                        st.markdown("---")
+                        st.markdown(overview)
 
         else:  # Graph
             main_col, nav_col = st.columns([3, 1])

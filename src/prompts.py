@@ -121,6 +121,26 @@ List pages you would UPDATE (already in index): UPDATE: filename.md
 List contradictions found: CONTRADICTION: <brief description>
 """
 
+DESCRIPTION_BUILD_PROMPT = """Write a concise high-level overview of the knowledge base "{db_name}".
+
+Wiki index (filename — description):
+{index_text}
+
+Write ONE plain-markdown overview (no YAML frontmatter, no bullet list of page filenames) that tells a first-time visitor what this database covers: its subject area, the main topics and entities it documents, and the kinds of sources it draws on. Prose with at most a few short paragraphs. Hard limit: 250 words. Output only the overview text."""
+
+DESCRIPTION_UPDATE_PROMPT = """You maintain a short high-level overview of the knowledge base "{db_name}".
+
+Current overview:
+{current}
+
+A new source was just ingested:
+{change_summary}
+
+Wiki index (filename — description):
+{index_text}
+
+If this source adds substantial NEW scope that the current overview should mention to stay representative, rewrite and output the FULL revised overview (plain markdown, no frontmatter, at most 250 words). If the current overview already represents the database well and the new source only adds detail within existing scope, reply with exactly NO_CHANGE and nothing else."""
+
 SELECT_AFFECTED_PROMPT = """A new source is being ingested. Identify which existing wiki pages it most likely updates.
 
 Source name: {source_name}
