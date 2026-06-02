@@ -9,47 +9,35 @@ import pytest
 # Ensure src/ is on sys.path so bare module imports work
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-import chunker
-import dedup
-import lex_index
-import qa_gen
-import wiki_engine
+import db_context
 import ollama_client
+import wiki_engine
+
+
+def _patch_data_root(monkeypatch, tmp_path: Path, db_name: str = "test") -> Path:
+    """Point db_context at an isolated data root + active DB. Returns the DB root."""
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db(db_name)
+    root = tmp_path / db_name
+    for sub in ("raw", "chunks", "index", "wiki"):
+        (root / sub).mkdir(parents=True, exist_ok=True)
+    return root
 
 
 @pytest.fixture()
 def raw_dir(tmp_path, monkeypatch):
-    """Isolated raw directory; patches dedup module attrs."""
-    raw = tmp_path / "raw"
-    raw.mkdir()
-    monkeypatch.setattr(dedup, "RAW_DIR", raw)
-    monkeypatch.setattr(dedup, "MANIFEST", raw / "manifest.json")
-    return raw
+    """Isolated raw directory."""
+    root = _patch_data_root(monkeypatch, tmp_path)
+    return root / "raw"
 
 
 @pytest.fixture()
 def wiki_dir(tmp_path, monkeypatch):
-    """Isolated wiki + raw directories; inits wiki state."""
-    wiki = tmp_path / "wiki"
-    raw = tmp_path / "raw"
-    wiki.mkdir()
-    raw.mkdir()
-    monkeypatch.setattr(wiki_engine, "WIKI_DIR", wiki)
-    monkeypatch.setattr(wiki_engine, "RAW_DIR", raw)
-    monkeypatch.setattr(wiki_engine, "_INDEX", wiki / "index.md")
-    monkeypatch.setattr(wiki_engine, "_LOG", wiki / "log.md")
-    # Isolate chunker + lexical index writes from real data/ dirs.
-    monkeypatch.setattr(chunker, "CHUNKS_DIR", tmp_path / "chunks")
-    monkeypatch.setattr(lex_index, "INDEX_DIR", tmp_path / "index")
-    monkeypatch.setattr(lex_index, "POSTINGS_PATH", tmp_path / "index" / "postings.json")
-    monkeypatch.setattr(lex_index, "STATS_PATH", tmp_path / "index" / "stats.json")
-    monkeypatch.setattr(qa_gen, "INDEX_DIR", tmp_path / "index")
-    monkeypatch.setattr(qa_gen, "QA_PATH", tmp_path / "index" / "qa.jsonl")
-    # qa-gen is gated; disable in the shared wiki fixture so existing tests'
-    # Ollama mocks aren't affected.
+    """Isolated wiki + raw + chunks + index dirs; inits wiki state."""
+    root = _patch_data_root(monkeypatch, tmp_path)
     monkeypatch.setenv("INGEST_QA", "0")
     wiki_engine.init_wiki()
-    return wiki
+    return root / "wiki"
 
 
 @pytest.fixture()

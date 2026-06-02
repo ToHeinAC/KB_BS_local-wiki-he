@@ -69,7 +69,7 @@ def test_fetch_webpage_handles_failure(monkeypatch):
 # --- submit_final_answer --------------------------------------------------
 
 def test_submit_rejects_short_answer(tmp_path, monkeypatch):
-    monkeypatch.setattr(tools, "WIKI_DIR", tmp_path)
+    monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 100)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     out = tools._submit_final_impl("T", "too short http://a.com")
@@ -77,7 +77,7 @@ def test_submit_rejects_short_answer(tmp_path, monkeypatch):
 
 
 def test_submit_rejects_few_sources(tmp_path, monkeypatch):
-    monkeypatch.setattr(tools, "WIKI_DIR", tmp_path)
+    monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
     monkeypatch.setattr(tools, "MIN_URLS", 3)
     out = tools._submit_final_impl("T", "one two three http://a.com")
@@ -85,7 +85,7 @@ def test_submit_rejects_few_sources(tmp_path, monkeypatch):
 
 
 def test_submit_accepts_and_writes_file(tmp_path, monkeypatch):
-    monkeypatch.setattr(tools, "WIKI_DIR", tmp_path)
+    monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     out = tools._submit_final_impl(
@@ -97,7 +97,7 @@ def test_submit_accepts_and_writes_file(tmp_path, monkeypatch):
 
 
 def test_submit_accepts_wiki_citations_as_sources(tmp_path, monkeypatch):
-    monkeypatch.setattr(tools, "WIKI_DIR", tmp_path)
+    monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     out = tools._submit_final_impl(
@@ -155,7 +155,7 @@ def test_wiki_read_empty_input():
 
 def _ingest_source(name: str, text: str):
     """Write a raw source + its chunks so section-aware raw_read can resolve."""
-    (tools.wiki_engine.RAW_DIR / name).write_text(text, encoding="utf-8")
+    (tools.db_context.raw_dir() / name).write_text(text, encoding="utf-8")
     chunker.write_chunks(name, chunker.split(text))
 
 

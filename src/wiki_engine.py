@@ -10,6 +10,7 @@ import frontmatter
 from dotenv import load_dotenv
 
 import chunker
+import db_context
 import dedup
 import lex_index
 import ollama_client
@@ -28,11 +29,23 @@ from prompts import (
 
 load_dotenv()
 
-WIKI_DIR = Path(os.getenv("WIKI_DIR", "data/wiki"))
-RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
 
-_INDEX = WIKI_DIR / "index.md"
-_LOG = WIKI_DIR / "log.md"
+def _wiki() -> Path:
+    return db_context.wiki_dir()
+
+
+def _raw() -> Path:
+    return db_context.raw_dir()
+
+
+def _index_path() -> Path:
+    return _wiki() / "index.md"
+
+
+def _log_path() -> Path:
+    return _wiki() / "log.md"
+
+
 _INSIGHTS_DIR = "insights"
 _MAX_AFFECTED_PAGES = 5
 _MAX_EXISTING_CHARS = 8000  # cap injected existing-content per ingest call
@@ -40,12 +53,12 @@ _TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*(?:\.md)?\s*$")
 
 
 def init_wiki() -> None:
-    WIKI_DIR.mkdir(parents=True, exist_ok=True)
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
-    if not _INDEX.exists():
-        _INDEX.write_text("# Wiki Index\nUpdated: — | Pages: 0\n\n## Pages\n")
-    if not _LOG.exists():
-        _LOG.write_text("# Wiki Log\n")
+    _wiki().mkdir(parents=True, exist_ok=True)
+    _raw().mkdir(parents=True, exist_ok=True)
+    if not _index_path().exists():
+        _index_path().write_text("# Wiki Index\nUpdated: — | Pages: 0\n\n## Pages\n")
+    if not _log_path().exists():
+        _log_path().write_text("# Wiki Log\n")
 
 
 def _now() -> str:
@@ -58,7 +71,7 @@ def _date() -> str:
 
 def _append_log(action: str, detail: str) -> None:
     entry = f"\n## {_now()} — {action}\n{detail}\n"
-    with _LOG.open("a") as f:
+    with _log_path().open("a") as f:
         f.write(entry)
 
 
@@ -69,7 +82,7 @@ def _rebuild_index() -> None:
         title = p.get("title", p["filename"])
         desc = p.get("description", "")
         lines.append(f"- [{title}]({p['filename']}) — {desc}\n")
-    _INDEX.write_text("".join(lines))
+    _index_path().write_text("".join(lines))
 
 
 def _title_to_filename(title: str) -> str:
@@ -113,7 +126,7 @@ def _select_affected_pages(system: str, source_name: str, index_text: str, text:
         if s.lower() == "none":
             return []
         if s.endswith(".md") and s not in ("index.md", "log.md"):
-            if (WIKI_DIR / s).exists() and s not in candidates:
+            if (_wiki() / s).exists() and s not in candidates:
                 candidates.append(s)
         if len(candidates) >= _MAX_AFFECTED_PAGES:
             break
@@ -127,7 +140,7 @@ def _build_existing_block(filenames: list[str]) -> str:
     parts = ["\nExisting page content (MERGE; do not overwrite-erase):\n"]
     budget = _MAX_EXISTING_CHARS
     for fname in filenames:
-        path = WIKI_DIR / fname
+        path = _wiki() / fname
         if not path.exists():
             continue
         body = path.read_text()
@@ -206,7 +219,7 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
     `lex_index.build()` is deferred to `ingest_end`.
     """
     system = schema_loader.get_system_prompt()
-    index_text = _INDEX.read_text() if _INDEX.exists() else ""
+    index_text = _index_path().read_text() if _index_path().exists() else ""
 
     clean_meta = {k: v for k, v in (user_meta or {}).items() if v and str(v).strip()}
     if clean_meta:
@@ -281,7 +294,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
         pages = _parse_llm_pages(response)
 
     for page in pages:
-        dest = WIKI_DIR / page["filename"]
+        dest = _wiki() / page["filename"]
         content = _ensure_frontmatter(page["content"], page["filename"])
         # Merge current source into frontmatter `sources:` so the graph viz can
         # draw `derived-from` edges (source → page) without trusting the LLM
@@ -347,14 +360,14 @@ def delete_source(source_name: str) -> dict:
     """
     result: dict = {"raw": False, "manifest": False, "chunks": False, "qa_rows": 0, "wiki_pages": []}
 
-    raw_file = RAW_DIR / source_name
+    raw_file = _raw() / source_name
     if raw_file.exists():
         raw_file.unlink()
         result["raw"] = True
 
     result["manifest"] = dedup.deregister_source(source_name)
 
-    chunk_file = chunker.CHUNKS_DIR / f"{chunker._slug(source_name)}.jsonl"
+    chunk_file = db_context.chunks_dir() / f"{chunker._slug(source_name)}.jsonl"
     if chunk_file.exists():
         chunk_file.unlink()
         result["chunks"] = True
@@ -365,16 +378,16 @@ def delete_source(source_name: str) -> dict:
     # frontmatter; delete pages whose `sources:` becomes empty; then scrub
     # surviving pages' `related:` lists of any references to deleted pages.
     _SKIP = {"index.md", "log.md"}
-    insights = WIKI_DIR / _INSIGHTS_DIR
+    insights = _wiki() / _INSIGHTS_DIR
 
     def _all_pages() -> list[Path]:
-        out = [p for p in WIKI_DIR.glob("*.md") if p.name not in _SKIP]
+        out = [p for p in _wiki().glob("*.md") if p.name not in _SKIP]
         if insights.exists():
             out.extend(p for p in insights.glob("*.md") if p.name not in _SKIP)
         return out
 
     def _rel(md: Path) -> str:
-        return md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
+        return md.name if md.parent == _wiki() else f"{_INSIGHTS_DIR}/{md.name}"
 
     removed_pages: set[str] = set()
     for md in _all_pages():
@@ -430,7 +443,7 @@ def reset_all_data() -> dict:
     Re-initialises the wiki to its empty bootstrap state. Returns a count
     of files removed per top-level data directory.
     """
-    targets = [RAW_DIR, chunker.CHUNKS_DIR, lex_index.INDEX_DIR, WIKI_DIR]
+    targets = [_raw(), db_context.chunks_dir(), db_context.index_dir(), _wiki()]
     counts: dict[str, int] = {}
     for d in targets:
         if d.exists():
@@ -439,8 +452,8 @@ def reset_all_data() -> dict:
         else:
             counts[d.name] = 0
     init_wiki()
-    chunker.CHUNKS_DIR.mkdir(parents=True, exist_ok=True)
-    lex_index.INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    db_context.chunks_dir().mkdir(parents=True, exist_ok=True)
+    db_context.index_dir().mkdir(parents=True, exist_ok=True)
     lex_index.build()
     _append_log("Reset all data", f"Files removed per dir: {counts}")
     return counts
@@ -469,7 +482,7 @@ def condense_followup(prev_q: str, prev_a: str, followup: str) -> str:
 def query_with_sources(question: str) -> dict:
     """Answer a question using wiki content. Returns {answer, sources, raw_sources}."""
     system = schema_loader.get_system_prompt()
-    index_text = _INDEX.read_text() if _INDEX.exists() else "(empty wiki)"
+    index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
 
     select_prompt = SELECT_PROMPT.format(index_text=index_text, question=question)
     selected_raw = ollama_client.generate(system, select_prompt, temperature=0.1)
@@ -483,7 +496,7 @@ def query_with_sources(question: str) -> dict:
     used_sources = []
     raw_sources_set: set[str] = set()
     for fname in selected:
-        path = WIKI_DIR / fname
+        path = _wiki() / fname
         if path.exists():
             text = path.read_text()
             pages_text += f"\n\n--- {fname} ---\n{text}"
@@ -506,7 +519,7 @@ def lint() -> str:
     """Run wiki health check. Returns the lint report."""
     system = schema_loader.get_system_prompt()
     all_pages = ""
-    for md in sorted(WIKI_DIR.glob("*.md")):
+    for md in sorted(_wiki().glob("*.md")):
         if md.name in ("index.md", "log.md"):
             continue
         all_pages += f"\n\n--- {md.name} ---\n{md.read_text()}"
@@ -530,7 +543,7 @@ def lint() -> str:
 def list_pages() -> list[dict]:
     """Return metadata for all non-system wiki pages."""
     results = []
-    for md in sorted(WIKI_DIR.glob("*.md")):
+    for md in sorted(_wiki().glob("*.md")):
         if md.name in ("index.md", "log.md"):
             continue
         try:
@@ -545,7 +558,7 @@ def list_pages() -> list[dict]:
 
 
 def read_page(filename: str) -> str:
-    path = WIKI_DIR / filename
+    path = _wiki() / filename
     if not path.exists():
         return f"Page not found: {filename}"
     return path.read_text()
@@ -553,7 +566,7 @@ def read_page(filename: str) -> str:
 
 def read_page_parsed(filename: str) -> dict:
     """Return body content and frontmatter sources/related without the YAML header."""
-    path = WIKI_DIR / filename
+    path = _wiki() / filename
     if not path.exists():
         return {"content": f"Page not found: {filename}", "sources": [], "related": []}
     post = frontmatter.load(str(path))
@@ -565,7 +578,7 @@ def read_page_parsed(filename: str) -> dict:
 
 
 def read_raw_source(filename: str) -> bytes | None:
-    path = RAW_DIR / filename
+    path = _raw() / filename
     return path.read_bytes() if path.exists() else None
 
 
@@ -583,7 +596,7 @@ def search_wiki(query: str) -> list[dict]:
     if not q:
         return []
     results = []
-    for md in sorted(WIKI_DIR.glob("*.md")):
+    for md in sorted(_wiki().glob("*.md")):
         if md.name in ("index.md", "log.md"):
             continue
         try:
@@ -626,7 +639,7 @@ def get_wiki_tree() -> dict[str, list[dict]]:
 
 
 def read_log() -> str:
-    return _LOG.read_text() if _LOG.exists() else "(no log yet)"
+    return _log_path().read_text() if _log_path().exists() else "(no log yet)"
 
 
 def file_answer(question: str, answer: str, related: list[str] | None = None) -> str:
@@ -634,7 +647,7 @@ def file_answer(question: str, answer: str, related: list[str] | None = None) ->
 
     Returns the relative filename written under data/wiki/insights/.
     """
-    insights_dir = WIKI_DIR / _INSIGHTS_DIR
+    insights_dir = _wiki() / _INSIGHTS_DIR
     insights_dir.mkdir(parents=True, exist_ok=True)
 
     slug_source = (question[:80] or "insight").strip()
@@ -675,13 +688,13 @@ def build_link_graph() -> dict[str, set[str]]:
     """
     existing = {p["filename"] for p in list_pages()}
     # Insights live in a subdir — include them too.
-    insights = WIKI_DIR / _INSIGHTS_DIR
+    insights = _wiki() / _INSIGHTS_DIR
     if insights.exists():
         for md in insights.glob("*.md"):
             existing.add(f"{_INSIGHTS_DIR}/{md.name}")
 
     graph: dict[str, set[str]] = {}
-    targets = [WIKI_DIR.glob("*.md")]
+    targets = [_wiki().glob("*.md")]
     if insights.exists():
         targets.append(insights.glob("*.md"))
 
@@ -694,7 +707,7 @@ def build_link_graph() -> dict[str, set[str]]:
                 rel = post.metadata.get("related", []) or []
             except Exception:
                 rel = []
-            key = md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
+            key = md.name if md.parent == _wiki() else f"{_INSIGHTS_DIR}/{md.name}"
             edges = set()
             for r in rel:
                 r = str(r).strip()
@@ -716,7 +729,7 @@ def build_typed_graph() -> dict:
       - `derived-from`: page → source, from frontmatter `sources:`
     """
     existing = {p["filename"] for p in list_pages()}
-    insights = WIKI_DIR / _INSIGHTS_DIR
+    insights = _wiki() / _INSIGHTS_DIR
     if insights.exists():
         for md in insights.glob("*.md"):
             existing.add(f"{_INSIGHTS_DIR}/{md.name}")
@@ -731,7 +744,7 @@ def build_typed_graph() -> dict:
     source_set: set[str] = set()
 
 
-    targets = [WIKI_DIR.glob("*.md")]
+    targets = [_wiki().glob("*.md")]
     if insights.exists():
         targets.append(insights.glob("*.md"))
 
@@ -749,7 +762,7 @@ def build_typed_graph() -> dict:
                 related, sources, title, ptype = [], [], md.stem, "other"
             if ptype not in ("concept", "entity"):
                 continue
-            page_id = md.name if md.parent == WIKI_DIR else f"{_INSIGHTS_DIR}/{md.name}"
+            page_id = md.name if md.parent == _wiki() else f"{_INSIGHTS_DIR}/{md.name}"
             nodes[page_id] = {"id": page_id, "type": "page", "label": title}
             for r in related:
                 r = str(r).strip()
@@ -802,7 +815,7 @@ def resolve_contradiction(description: str, page_filenames: list[str], user_guid
     system = schema_loader.get_system_prompt()
     pages_text = ""
     for fname in page_filenames:
-        path = WIKI_DIR / fname
+        path = _wiki() / fname
         if path.exists():
             pages_text += f"\n--- {fname} ---\n{path.read_text()}\n"
     if not pages_text:
@@ -818,7 +831,7 @@ def resolve_contradiction(description: str, page_filenames: list[str], user_guid
 
     updated = []
     for page in pages:
-        dest = WIKI_DIR / page["filename"]
+        dest = _wiki() / page["filename"]
         if not dest.exists():
             continue
         dest.write_text(_ensure_frontmatter(page["content"], page["filename"]))
@@ -834,11 +847,11 @@ def resolve_contradiction(description: str, page_filenames: list[str], user_guid
 
 def stats() -> dict:
     pages = list_pages()
-    raw_count = len(list(RAW_DIR.glob("*"))) - 1 if RAW_DIR.exists() else 0  # exclude manifest
+    raw_count = len(list(_raw().glob("*"))) - 1 if _raw().exists() else 0  # exclude manifest
     data_bytes = (
-        sum(p.stat().st_size for p in WIKI_DIR.rglob("*") if p.is_file()) if WIKI_DIR.exists() else 0
+        sum(p.stat().st_size for p in _wiki().rglob("*") if p.is_file()) if _wiki().exists() else 0
     ) + (
-        sum(p.stat().st_size for p in RAW_DIR.rglob("*") if p.is_file()) if RAW_DIR.exists() else 0
+        sum(p.stat().st_size for p in _raw().rglob("*") if p.is_file()) if _raw().exists() else 0
     )
     return {
         "pages": len(pages),

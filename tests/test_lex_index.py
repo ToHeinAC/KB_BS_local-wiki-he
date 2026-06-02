@@ -26,10 +26,9 @@ The primary risk is regulatory uncertainty in cloud markets.
 
 @pytest.fixture()
 def fresh_index(tmp_path, monkeypatch):
-    monkeypatch.setattr(chunker, "CHUNKS_DIR", tmp_path / "chunks")
-    monkeypatch.setattr(lex_index, "INDEX_DIR", tmp_path / "index")
-    monkeypatch.setattr(lex_index, "POSTINGS_PATH", tmp_path / "index" / "postings.json")
-    monkeypatch.setattr(lex_index, "STATS_PATH", tmp_path / "index" / "stats.json")
+    import db_context
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
 
     chunks_de = chunker.split(SAMPLE_LEGAL)
     chunker.write_chunks("StrlSchG.md", chunks_de)

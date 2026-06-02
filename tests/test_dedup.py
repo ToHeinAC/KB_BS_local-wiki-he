@@ -87,11 +87,11 @@ def test_register_file_name_collision_appends_hash(raw_dir):
 
 
 def test_register_file_creates_raw_dir_if_absent(tmp_path, monkeypatch):
-    raw = tmp_path / "new_raw"
-    monkeypatch.setattr(dedup, "RAW_DIR", raw)
-    monkeypatch.setattr(dedup, "MANIFEST", raw / "manifest.json")
+    import db_context
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
     dedup.register_file(b"x", "x.txt")
-    assert raw.exists()
+    assert (tmp_path / "d" / "raw").exists()
 
 
 def test_duplicate_after_second_call(raw_dir):

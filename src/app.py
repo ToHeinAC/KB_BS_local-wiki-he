@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import auth
+import db_context
 import dedup
 import file_processor
 import ollama_client
@@ -201,7 +203,7 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                         try:
                             from pathlib import Path as _P
                             import os as _os
-                            wiki_dir = _P(_os.getenv("WIKI_DIR", "data/wiki"))
+                            wiki_dir = db_context.wiki_dir()
                             report_path = wiki_dir / "comparisons" / _P(step["report_path"].split("comparisons/")[-1])
                             if report_path.exists():
                                 wiki_engine.ingest(report_path.read_text(), f"Research: {display_q[:60]}")
@@ -265,16 +267,87 @@ def _ollama_badge() -> None:
         f'<span style="background:{color};color:#fff;padding:2px 8px;border-radius:2px;font-size:0.75rem;font-weight:600">{label}</span>',
         unsafe_allow_html=True,
     )
+    st.sidebar.caption(f"Model: {ollama_client._MODEL}")
 
 
+# --- bootstrap: migrate legacy data layout + seed default user ---
+db_context.migrate_legacy_layout()
+auth.ensure_seeded()
+auth.backfill_maintainers()
+
+# --- login gate ---
+if not st.session_state.get("user"):
+    st.title("📖 LocalWiki — Sign in")
+    with st.form("login_form"):
+        u = st.text_input("Username")
+        p = st.text_input("Password", type="password")
+        ok = st.form_submit_button("Sign in", type="primary")
+    if ok:
+        if auth.verify(u, p):
+            dbs = auth.user_dbs(u)
+            if not dbs:
+                st.error("This account has no database access. Ask an admin.")
+                st.stop()
+            st.session_state["user"] = u
+            st.session_state["active_db"] = dbs[0]
+            st.rerun()
+        else:
+            st.error("Invalid username or password.")
+    st.stop()
+
+_user = st.session_state["user"]
+_allowed_dbs = auth.user_dbs(_user)
+if not _allowed_dbs:
+    st.error("Your account has no database access. Contact an admin.")
+    if st.button("Logout"):
+        st.session_state.pop("user", None)
+        st.rerun()
+    st.stop()
+
+# Keep active_db consistent with the allowlist
+if st.session_state.get("active_db") not in _allowed_dbs:
+    st.session_state["active_db"] = _allowed_dbs[0]
+
+# Apply the active DB to the ContextVar BEFORE any page handler reads paths.
+db_context.set_active_db(st.session_state["active_db"])
+_can_maintain = auth.is_maintainer(_user, st.session_state["active_db"])
 wiki_engine.init_wiki()
 
 st.sidebar.markdown("## 📖 LocalWiki")
 _ollama_badge()
 
+st.sidebar.caption(f"Signed in as **{_user}**")
+if st.sidebar.button("Logout", key="logout_btn"):
+    for _k in ("user", "active_db", "messages", "chat_followup",
+               "research_history", "last_research_q", "last_research_answer",
+               "last_report", "research_sources"):
+        st.session_state.pop(_k, None)
+    st.rerun()
+
+_db_choice = st.sidebar.selectbox(
+    "Database",
+    options=_allowed_dbs,
+    index=_allowed_dbs.index(st.session_state["active_db"]),
+    key="db_selector",
+)
+if _db_choice != st.session_state["active_db"]:
+    st.session_state["active_db"] = _db_choice
+    db_context.set_active_db(_db_choice)
+    # Clear per-DB session state to avoid cross-DB leakage.
+    for _k in ("messages", "chat_followup", "research_history",
+               "last_research_q", "last_research_answer", "last_report",
+               "research_sources", "explorer_selected_page", "last_contradictions"):
+        st.session_state.pop(_k, None)
+    st.rerun()
+
+st.sidebar.markdown("---")
+
+_nav_options = ["Wiki Explorer", "Wiki Chat", "Research", "Maintenance"]
+if _can_maintain:
+    _nav_options.insert(0, "Upload")
 page = st.sidebar.radio(
     "Navigate",
-    ["Upload", "Wiki Explorer", "Wiki Chat", "Research", "Maintenance"],
+    _nav_options,
     label_visibility="collapsed",
     key="page_nav",
 )
@@ -292,6 +365,9 @@ if st.sidebar.button("Reset session", type="secondary",
 
 if page == "Upload":
     st.title("Upload a Document")
+    if not _can_maintain:
+        st.error("You are not a maintainer of this database. Ask an admin for maintainer rights.")
+        st.stop()
     st.markdown("Upload a Markdown (.md) file to ingest into the wiki.")
     uploaded = st.file_uploader(
         "Choose file", type=["md"], label_visibility="collapsed"
@@ -730,31 +806,19 @@ elif page == "Maintenance":
     c2.metric("Raw sources", s["raw_files"])
     c3.metric("Data size (MB)", round(s["data_bytes"] / 1_048_576, 2))
 
-    tab_del, tab_lint, tab_graph, tab_log, tab_reset = st.tabs(
-        ["Delete source", "Lint", "Link graph health", "Activity log", "Reset all data"]
-    )
+    _tab_labels = ["Link graph health", "Lint", "Delete source", "Reset all data", "Activity log"]
+    if auth.is_admin(_user):
+        _tab_labels.append("Admin")
+    _tabs = st.tabs(_tab_labels)
+    tab_graph, tab_lint, tab_del, tab_reset, tab_log = _tabs[:5]
 
-    with tab_del:
-        _sources = dedup.list_sources()
-        if not _sources:
-            st.info("No sources ingested yet.")
+    with tab_graph:
+        orphans = wiki_engine.find_orphans()
+        if orphans:
+            st.warning(f"**{len(orphans)} orphan(s)** — pages with no `related` in-links.")
+            st.code("\n".join(orphans), language=None)
         else:
-            _selected = st.selectbox("Source to delete", _sources)
-            st.warning(
-                "Deletes the raw file, all chunks, QA pairs, and **all wiki pages** "
-                "that reference this source. This cannot be undone."
-            )
-            _confirmed = st.checkbox("I understand this is irreversible")
-            if st.button("Delete source", disabled=not _confirmed, type="primary"):
-                with st.spinner("Deleting…"):
-                    _result = wiki_engine.delete_source(_selected)
-                st.success(
-                    f"Deleted **{_selected}**. "
-                    f"Wiki pages removed: {len(_result['wiki_pages'])}. "
-                    f"QA rows removed: {_result['qa_rows']}. "
-                    "Index rebuilt."
-                )
-                st.rerun()
+            st.success("No orphans — every page is linked from at least one other page.")
 
     with tab_lint:
         st.caption("Ask the LLM to review wiki quality: contradictions, orphans, gaps, suggestions.")
@@ -766,25 +830,128 @@ elif page == "Maintenance":
                 except RuntimeError as e:
                     st.error(str(e))
 
-    with tab_graph:
-        orphans = wiki_engine.find_orphans()
-        if orphans:
-            st.warning(f"**{len(orphans)} orphan(s)** — pages with no `related` in-links.")
-            st.code("\n".join(orphans), language=None)
+    with tab_del:
+        if _can_maintain:
+            _sources = dedup.list_sources()
+            if not _sources:
+                st.info("No sources ingested yet.")
+            else:
+                _selected = st.selectbox("Source to delete", _sources)
+                st.warning(
+                    "Deletes the raw file, all chunks, QA pairs, and **all wiki pages** "
+                    "that reference this source. This cannot be undone."
+                )
+                _confirmed = st.checkbox("I understand this is irreversible")
+                if st.button("Delete source", disabled=not _confirmed, type="primary"):
+                    with st.spinner("Deleting…"):
+                        _result = wiki_engine.delete_source(_selected)
+                    st.success(
+                        f"Deleted **{_selected}**. "
+                        f"Wiki pages removed: {len(_result['wiki_pages'])}. "
+                        f"QA rows removed: {_result['qa_rows']}. "
+                        "Index rebuilt."
+                    )
+                    st.rerun()
         else:
-            st.success("No orphans — every page is linked from at least one other page.")
+            st.info("Delete actions require maintainer rights for this database.")
+
+    with tab_reset:
+        if _can_maintain:
+            st.error(
+                "Deletes EVERY raw source, chunk, QA pair, lexical index entry, and "
+                "wiki page. Wiki is re-initialised empty. Used to start tests fresh."
+            )
+            _reset_ok = st.checkbox("I understand this wipes all ingested data")
+            if st.button("Reset all data", disabled=not _reset_ok):
+                with st.spinner("Wiping…"):
+                    _counts = wiki_engine.reset_all_data()
+                st.success(f"Cleared: {_counts}")
+                st.rerun()
+        else:
+            st.info("Reset actions require maintainer rights for this database.")
 
     with tab_log:
         st.code(wiki_engine.read_log(), language=None)
 
-    with tab_reset:
-        st.error(
-            "Deletes EVERY raw source, chunk, QA pair, lexical index entry, and "
-            "wiki page. Wiki is re-initialised empty. Used to start tests fresh."
-        )
-        _reset_ok = st.checkbox("I understand this wipes all ingested data")
-        if st.button("Reset all data", disabled=not _reset_ok):
-            with st.spinner("Wiping…"):
-                _counts = wiki_engine.reset_all_data()
-            st.success(f"Cleared: {_counts}")
-            st.rerun()
+    if auth.is_admin(_user):
+        with _tabs[5]:
+            st.subheader("Databases (admin)")
+            _existing_dbs = db_context.list_dbs()
+            st.markdown("**Existing:** " + (", ".join(f"`{d}`" for d in _existing_dbs) or "(none)"))
+            _all_usernames = [u["username"] for u in auth.list_users()]
+            with st.form("create_db_form"):
+                _new_db = st.text_input("New database name (letters, digits, _ - space)")
+                _new_maintainers = st.multiselect(
+                    "Maintainers (may upload/delete in this database)",
+                    options=_all_usernames,
+                    default=[_user],
+                )
+                _create_db = st.form_submit_button("Create database")
+            if _create_db:
+                try:
+                    _name = _new_db.strip()
+                    db_context.create_db(_name)
+                    for _m in {_user, *_new_maintainers}:
+                        auth.grant_maintainer(_m, _name)
+                    st.success(f"Created `{_name}` and assigned maintainers.")
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
+
+            st.markdown("---")
+            st.subheader("Users (admin)")
+            _users = auth.list_users()
+            for _ud in _users:
+                with st.expander(f"{_ud['username']}  ·  dbs: {_ud['dbs']}  ·  admin: {_ud['is_admin']}"):
+                    _all_dbs = db_context.list_dbs()
+                    _new_dbs = st.multiselect(
+                        "Allowed databases",
+                        options=_all_dbs,
+                        default=[d for d in _ud["dbs"] if d in _all_dbs],
+                        key=f"udbs_{_ud['username']}",
+                    )
+                    _new_maint = st.multiselect(
+                        "Maintained databases (may upload/delete)",
+                        options=_new_dbs,
+                        default=[d for d in _ud["maintains"] if d in _new_dbs],
+                        key=f"umaint_{_ud['username']}",
+                    )
+                    _new_pw = st.text_input(
+                        "New password (leave blank to keep)",
+                        type="password",
+                        key=f"upw_{_ud['username']}",
+                    )
+                    c1, c2, c3 = st.columns(3)
+                    if c1.button("Save", key=f"usave_{_ud['username']}"):
+                        auth.set_user_dbs(_ud["username"], _new_dbs)
+                        auth.set_user_maintains(
+                            _ud["username"], [d for d in _new_maint if d in _new_dbs]
+                        )
+                        if _new_pw:
+                            auth.change_password(_ud["username"], _new_pw)
+                        st.success("Updated.")
+                        st.rerun()
+                    if c2.button("Delete", key=f"udel_{_ud['username']}",
+                                 disabled=_ud["username"] == _user):
+                        auth.delete_user(_ud["username"])
+                        st.success(f"Deleted {_ud['username']}.")
+                        st.rerun()
+
+            st.markdown("**Add user**")
+            with st.form("add_user_form"):
+                _nu = st.text_input("Username")
+                _np = st.text_input("Password", type="password")
+                _ndbs = st.multiselect("Allowed databases", options=db_context.list_dbs())
+                _nmaint = st.multiselect(
+                    "Maintained databases (may upload/delete)", options=db_context.list_dbs()
+                )
+                _nadm = st.checkbox("Admin")
+                _add = st.form_submit_button("Add user")
+            if _add:
+                try:
+                    _maint = [d for d in _nmaint if d in _ndbs]
+                    auth.add_user(_nu.strip(), _np, _ndbs, is_admin=_nadm, maintains=_maint)
+                    st.success(f"Added user `{_nu.strip()}`.")
+                    st.rerun()
+                except ValueError as e:
+                    st.error(str(e))

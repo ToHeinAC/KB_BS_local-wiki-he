@@ -26,13 +26,22 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import chunker
+import db_context
 import qa_gen
 
 load_dotenv()
 
-INDEX_DIR = Path(os.getenv("INDEX_DIR", "data/index"))
-POSTINGS_PATH = INDEX_DIR / "postings.json"
-STATS_PATH = INDEX_DIR / "stats.json"
+
+def _index_dir() -> Path:
+    return db_context.index_dir()
+
+
+def _postings_path() -> Path:
+    return _index_dir() / "postings.json"
+
+
+def _stats_path() -> Path:
+    return _index_dir() / "stats.json"
 
 BM25_K1 = 1.5
 BM25_B = 0.75
@@ -167,17 +176,17 @@ def build(chunks: list[dict] | None = None) -> dict:
         "chunk_meta": chunk_meta,
     }
 
-    INDEX_DIR.mkdir(parents=True, exist_ok=True)
-    POSTINGS_PATH.write_text(json.dumps(postings, ensure_ascii=False))
-    STATS_PATH.write_text(json.dumps(stats, ensure_ascii=False))
+    _index_dir().mkdir(parents=True, exist_ok=True)
+    _postings_path().write_text(json.dumps(postings, ensure_ascii=False))
+    _stats_path().write_text(json.dumps(stats, ensure_ascii=False))
     return {"chunks": n, "tokens": len(postings), "avg_dl": avg_dl}
 
 
 def _load() -> tuple[dict, dict]:
-    if not POSTINGS_PATH.exists() or not STATS_PATH.exists():
+    if not _postings_path().exists() or not _stats_path().exists():
         return {}, {"n": 0, "avg_dl": 0.0, "df": {}, "chunk_dl": {}, "chunk_meta": {}}
-    postings = json.loads(POSTINGS_PATH.read_text())
-    stats = json.loads(STATS_PATH.read_text())
+    postings = json.loads(_postings_path().read_text())
+    stats = json.loads(_stats_path().read_text())
     return postings, stats
 
 

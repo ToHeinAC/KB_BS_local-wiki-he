@@ -24,6 +24,7 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
+import db_context
 import ollama_client
 import run_memory
 import tools as tool_module
@@ -38,7 +39,6 @@ MAX_ITER = int(os.getenv("CHAT_MAX_ITERATIONS", "25"))
 NUDGE_AT = int(os.getenv("CHAT_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 LLM_TIMEOUT = int(os.getenv("CHAT_LLM_TIMEOUT", "180"))
 
-RAW_DIR = Path(os.getenv("RAW_DIR", "data/raw"))
 _RAW_TEXT_EXTS = {".md", ".txt", ".html"}
 _RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]]+\.(?:md|txt|html))\s*\]")
 
@@ -81,10 +81,11 @@ def _build_graph(llm):
 
 
 def _build_raw_index() -> str:
-    if not RAW_DIR.exists():
+    raw = db_context.raw_dir()
+    if not raw.exists():
         return ""
     lines = []
-    for p in sorted(RAW_DIR.iterdir()):
+    for p in sorted(raw.iterdir()):
         if not (p.is_file() and p.suffix.lower() in _RAW_TEXT_EXTS):
             continue
         hint = ""
