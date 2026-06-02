@@ -29,16 +29,273 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# NYT-inspired editorial style
+if "theme" not in st.session_state:
+    st.session_state["theme"] = "Forest"
+
+_THEMES = {
+    "Forest": {
+        "bg": "#f6f7f2",
+        "sidebar_bg": "#eaf0ec",
+        "widget_bg": "#ffffff",
+        "text": "#1a1f1c",
+        "text_muted": "#5a6b5e",
+        "primary": "#234637",
+        "border": "#d4dbd6",
+        "hover": "rgba(35,70,55,0.10)",
+        "metric_bg": "#ffffff",
+    },
+    "Slate": {
+        "bg": "#0f1117",
+        "sidebar_bg": "#1a1d27",
+        "widget_bg": "#262b3a",
+        "text": "#e8ecf0",
+        "text_muted": "#8892a4",
+        "primary": "#4f9cf9",
+        "border": "#2e3347",
+        "hover": "rgba(79,156,249,0.12)",
+        "metric_bg": "#1e2233",
+    },
+}
+
+_t = _THEMES.get(st.session_state.get("theme", "Forest"))
+
 st.markdown(
-    """
+    f"""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:wght@400;600&display=swap');
-    html, body, [class*="css"] { font-family: 'Source Sans 3', sans-serif; }
-    h1, h2, h3 { font-family: 'Libre Baskerville', Georgia, serif; font-weight: 700; }
-    .block-container { padding-top: 2rem; }
-    .stButton>button { border-radius: 2px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; font-size: 0.8rem; }
-    hr { border-top: 2px solid #234637; margin: 1.5rem 0; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
+
+    /* ── Global text & font ── */
+    html, body {{
+        font-family: 'Inter', system-ui, sans-serif;
+        font-size: 15px;
+    }}
+    /* Catch ALL elements' color — overrides Streamlit's inline textColor from config.toml.
+       Do NOT set font-family here: it breaks Material icon ligatures. */
+    .stApp, .stApp * {{
+        color: {_t['text']} !important;
+    }}
+    /* Re-assert the Material icon font so ligatures render as glyphs, not text */
+    [data-testid="stIconMaterial"],
+    span.material-icons,
+    span.material-icons-outlined,
+    .material-symbols-rounded,
+    .material-symbols-outlined,
+    [class*="material-symbols"] {{
+        font-family: 'Material Symbols Rounded', 'Material Icons' !important;
+    }}
+
+    /* ── Backgrounds ── */
+    .stApp {{
+        background-color: {_t['bg']} !important;
+    }}
+    [data-testid="stSidebar"] {{
+        background-color: {_t['sidebar_bg']} !important;
+    }}
+    /* Main content area & block containers */
+    [data-testid="block-container"],
+    [data-testid="stVerticalBlock"],
+    section.main > div {{
+        background-color: {_t['bg']} !important;
+    }}
+
+    /* ── Headings ── */
+    h1, h2, h3 {{
+        font-family: 'Libre Baskerville', Georgia, serif !important;
+        font-weight: 700;
+    }}
+    h1 {{ font-size: 1.75rem; margin-bottom: 0.25rem; }}
+    [data-testid="stSidebar"] h2 {{ white-space: nowrap; font-size: 1.25rem; }}
+
+    /* ── Input widgets ── */
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea {{
+        background-color: {_t['widget_bg']} !important;
+        color: {_t['text']} !important;
+        border-color: {_t['border']} !important;
+        border-radius: 6px !important;
+    }}
+    .stTextInput > div > div > input::placeholder,
+    .stTextArea > div > div > textarea::placeholder {{
+        color: {_t['text_muted']} !important;
+        opacity: 1 !important;
+    }}
+    /* Selectbox */
+    .stSelectbox > div > div,
+    .stSelectbox > div > div > div {{
+        background-color: {_t['widget_bg']} !important;
+        color: {_t['text']} !important;
+        border-color: {_t['border']} !important;
+        border-radius: 6px !important;
+    }}
+
+    /* ── Buttons ── */
+    .stButton > button {{
+        border-radius: 6px !important;
+        font-weight: 500 !important;
+        text-transform: none !important;
+        font-size: 0.875rem !important;
+        border: 1px solid {_t['border']} !important;
+        background-color: {_t['widget_bg']} !important;
+        color: {_t['text']} !important;
+        transition: background-color 0.15s ease, box-shadow 0.15s ease !important;
+    }}
+    .stButton > button:hover {{
+        background-color: {_t['hover']} !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
+    }}
+    .stButton > button[kind="primary"],
+    .stButton > button[kind="primary"]:hover {{
+        background-color: {_t['primary']} !important;
+        color: #ffffff !important;
+        border-color: {_t['primary']} !important;
+    }}
+    /* Form submit buttons (not caught by .stButton) */
+    [data-testid="stFormSubmitButton"] button {{
+        border-radius: 6px !important;
+        font-weight: 500 !important;
+        border: 1px solid {_t['border']} !important;
+        background-color: {_t['widget_bg']} !important;
+        color: {_t['text']} !important;
+    }}
+    [data-testid="stFormSubmitButton"] button[kind="primary"],
+    [data-testid="stFormSubmitButton"] button[kind="primary"]:hover {{
+        background-color: {_t['primary']} !important;
+        color: #ffffff !important;
+        border-color: {_t['primary']} !important;
+    }}
+    /* Download buttons */
+    .stDownloadButton > button {{
+        background-color: {_t['widget_bg']} !important;
+        color: {_t['text']} !important;
+        border: 1px solid {_t['border']} !important;
+        border-radius: 6px !important;
+    }}
+
+    /* ── File uploader (dropzone uses config secondaryBackgroundColor — force theme) ── */
+    [data-testid="stFileUploaderDropzone"],
+    [data-testid="stFileUploader"] section {{
+        background-color: {_t['widget_bg']} !important;
+        border: 1px solid {_t['border']} !important;
+    }}
+    [data-testid="stFileUploaderDropzoneInstructions"],
+    [data-testid="stFileUploaderDropzoneInstructions"] * {{
+        color: {_t['text_muted']} !important;
+    }}
+    [data-testid="stFileUploader"] button {{
+        background-color: {_t['bg']} !important;
+        color: {_t['text']} !important;
+        border: 1px solid {_t['border']} !important;
+    }}
+
+    /* ── Sidebar buttons (nav style) ── */
+    [data-testid="stSidebar"] .stButton > button {{
+        background: transparent !important;
+        border: none !important;
+        text-align: left !important;
+        padding: 0.3rem 0.5rem !important;
+        border-radius: 4px !important;
+        width: 100% !important;
+        color: {_t['text']} !important;
+    }}
+    [data-testid="stSidebar"] .stButton > button:hover,
+    [data-testid="stSidebar"] .stButton > button:focus,
+    [data-testid="stSidebar"] .stButton > button:active {{
+        background: {_t['hover']} !important;
+        color: {_t['text']} !important;
+        box-shadow: none !important;
+    }}
+    /* Reset & Logout: identical boxed buttons (override transparent nav style) */
+    [data-testid="stSidebar"] .st-key-reset_btn button,
+    [data-testid="stSidebar"] .st-key-logout_btn button {{
+        background-color: {_t['widget_bg']} !important;
+        border: 1px solid {_t['border']} !important;
+        text-align: center !important;
+        padding: 0.35rem 0.75rem !important;
+        border-radius: 6px !important;
+    }}
+    [data-testid="stSidebar"] .st-key-reset_btn button:hover,
+    [data-testid="stSidebar"] .st-key-logout_btn button:hover {{
+        background-color: {_t['hover']} !important;
+        border-color: {_t['primary']} !important;
+    }}
+
+    /* ── Radio / Checkbox / Toggle ── */
+    .stRadio > div, .stCheckbox > label, .stRadio label {{
+        color: {_t['text']} !important;
+    }}
+
+    /* ── Tabs ── */
+    [data-testid="stTabs"] button,
+    [data-testid="stTabs"] button p {{
+        color: {_t['text']} !important;
+    }}
+    [data-testid="stTabs"] [data-baseweb="tab-list"] {{
+        background-color: {_t['bg']} !important;
+    }}
+
+    /* ── Expanders (use page bg so widget-bg buttons inside stand out as boxes) ── */
+    [data-testid="stExpander"] {{
+        border: 1px solid {_t['border']} !important;
+        background-color: {_t['bg']} !important;
+        border-radius: 6px !important;
+    }}
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary p,
+    [data-testid="stExpander"] summary span {{
+        color: {_t['text']} !important;
+    }}
+    /* Nav/list buttons inside expanders: lighter than the expander, clear border */
+    [data-testid="stExpander"] .stButton > button {{
+        background-color: {_t['widget_bg']} !important;
+        color: {_t['text']} !important;
+        border: 1px solid {_t['border']} !important;
+        margin-bottom: 0.25rem !important;
+    }}
+    [data-testid="stExpander"] .stButton > button:hover {{
+        background-color: {_t['hover']} !important;
+        border-color: {_t['primary']} !important;
+    }}
+
+    /* ── Chat messages ── */
+    [data-testid="stChatMessage"],
+    [data-testid="stChatMessage"] * {{
+        background-color: {_t['widget_bg']} !important;
+        color: {_t['text']} !important;
+    }}
+
+    /* ── Alert / info / warning / error boxes ── */
+    [data-testid="stAlert"],
+    [data-testid="stAlert"] * {{
+        color: {_t['text']} !important;
+    }}
+
+    /* ── Metric cards ── */
+    [data-testid="stMetric"] {{
+        background: {_t['metric_bg']} !important;
+        border: 1px solid {_t['border']};
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+    }}
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricLabel"] {{
+        color: {_t['text']} !important;
+    }}
+
+    /* ── Dividers ── */
+    hr {{ border: none; border-top: 1px solid {_t['border']}; margin: 1.25rem 0; }}
+
+    /* ── Container borders (st.container(border=True)) ── */
+    [data-testid="stVerticalBlockBorderWrapper"] > div {{
+        border-color: {_t['border']} !important;
+        background-color: {_t['widget_bg']} !important;
+    }}
+
+    /* ── Spinner ── */
+    .stSpinner > div {{
+        border-top-color: {_t['primary']} !important;
+    }}
+
+    .block-container {{ padding-top: 1.5rem; padding-bottom: 2rem; }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -226,6 +483,13 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                 st.error(step["content"])
 
 
+def _page_header(title: str, subtitle: str = "") -> None:
+    st.markdown(f"## {title}")
+    if subtitle:
+        st.caption(subtitle)
+    st.markdown("---")
+
+
 def _render_chat_sources(sources: list[str], raw_sources: list[str], key_prefix: str) -> None:
     if not (sources or raw_sources):
         return
@@ -278,22 +542,25 @@ auth.backfill_maintainers()
 
 # --- login gate ---
 if not st.session_state.get("user"):
-    st.title("📖 LocalWiki — Sign in")
-    with st.form("login_form"):
-        u = st.text_input("Username")
-        p = st.text_input("Password", type="password")
-        ok = st.form_submit_button("Sign in", type="primary")
-    if ok:
-        if auth.verify(u, p):
-            dbs = auth.user_dbs(u)
-            if not dbs:
-                st.error("This account has no database access. Ask an admin.")
-                st.stop()
-            st.session_state["user"] = u
-            st.session_state["active_db"] = dbs[0]
-            st.rerun()
-        else:
-            st.error("Invalid username or password.")
+    _lc, _mid, _rc = st.columns([1, 1.4, 1])
+    with _mid:
+        st.markdown("## 📖 LocalWiki")
+        st.caption("Sign in to continue")
+        with st.form("login_form"):
+            u = st.text_input("Username")
+            p = st.text_input("Password", type="password")
+            ok = st.form_submit_button("Sign in", type="primary", use_container_width=True)
+        if ok:
+            if auth.verify(u, p):
+                dbs = auth.user_dbs(u)
+                if not dbs:
+                    st.error("This account has no database access. Ask an admin.")
+                    st.stop()
+                st.session_state["user"] = u
+                st.session_state["active_db"] = dbs[0]
+                st.rerun()
+            else:
+                st.error("Invalid username or password.")
     st.stop()
 
 _user = st.session_state["user"]
@@ -314,14 +581,23 @@ db_context.set_active_db(st.session_state["active_db"])
 _can_maintain = auth.is_maintainer(_user, st.session_state["active_db"])
 wiki_engine.init_wiki()
 
-st.sidebar.markdown("## 📖 LocalWiki")
-_ollama_badge()
+_logo_col, _badge_col = st.sidebar.columns([2, 1])
+_logo_col.markdown("## 📖 LocalWiki")
+with _badge_col:
+    _ollama_badge()
 
+_next_theme = "🌙 Dark" if st.session_state["theme"] == "Forest" else "☀️ Light"
+if st.sidebar.button(_next_theme, key="theme_toggle"):
+    st.session_state["theme"] = "Slate" if st.session_state["theme"] == "Forest" else "Forest"
+    st.rerun()
+
+st.sidebar.caption("DATABASE")
 _db_choice = st.sidebar.selectbox(
     "Database",
     options=_allowed_dbs,
     index=_allowed_dbs.index(st.session_state["active_db"]),
     key="db_selector",
+    label_visibility="collapsed",
 )
 if _db_choice != st.session_state["active_db"]:
     st.session_state["active_db"] = _db_choice
@@ -333,12 +609,9 @@ if _db_choice != st.session_state["active_db"]:
         st.session_state.pop(_k, None)
     st.rerun()
 
-if st.sidebar.button("Reset session", type="secondary",
-                     help="Unload model from VRAM and reset session. Server stays running."):
-    _safe_reset()
-
 st.sidebar.markdown("---")
 
+st.sidebar.caption("NAVIGATION")
 _nav_options = ["Wiki Explorer", "Wiki Chat", "Research", "Maintenance"]
 if _can_maintain:
     _nav_options.insert(0, "Upload")
@@ -354,7 +627,10 @@ st.sidebar.markdown(f"**{s['pages']}** pages &nbsp;·&nbsp; **{s['raw_files']}**
 
 st.sidebar.markdown("---")
 st.sidebar.caption(f"Signed in as **{_user}**")
-if st.sidebar.button("Logout", key="logout_btn"):
+_rst_col, _logout_col = st.sidebar.columns(2)
+if _rst_col.button("Reset", key="reset_btn", help="Unload model from VRAM and reset session. Server stays running."):
+    _safe_reset()
+if _logout_col.button("Logout", key="logout_btn"):
     for _k in ("user", "active_db", "messages", "chat_followup",
                "research_history", "last_research_q", "last_research_answer",
                "last_report", "research_sources"):
@@ -365,14 +641,10 @@ if st.sidebar.button("Logout", key="logout_btn"):
 # --- pages ---
 
 if page == "Upload":
-    st.title("Upload a Document")
+    _page_header("Upload a Document", "Markdown, PDF, DOCX, and images — non-Markdown files are auto-converted before ingest.")
     if not _can_maintain:
         st.error("You are not a maintainer of this database. Ask an admin for maintainer rights.")
         st.stop()
-    st.markdown(
-        "Upload a Markdown (.md) file, or a PDF / DOCX / image — non-Markdown "
-        "files are automatically converted to Markdown before ingest."
-    )
     uploaded = st.file_uploader(
         "Choose file",
         type=["md", "pdf", "docx", "png", "jpg", "jpeg", "tiff", "tif", "bmp"],
@@ -494,7 +766,7 @@ if page == "Upload":
 
 
 elif page == "Wiki Explorer":
-    st.title("Wiki Explorer")
+    _page_header("Wiki Explorer")
     pages = wiki_engine.list_pages()
     if not pages:
         st.info("No wiki pages yet. Upload a document to get started.")
@@ -626,8 +898,7 @@ var net=new vis.Network(document.getElementById('g'),
 
 
 elif page == "Wiki Chat":
-    st.title("Wiki Chat")
-    st.caption("Ask questions — Fast mode reads wiki pages; Deep mode reasons over the original documents.")
+    _page_header("Wiki Chat", "Fast mode reads wiki pages; Deep mode reasons over original documents.")
 
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
@@ -649,6 +920,8 @@ elif page == "Wiki Chat":
             help="Fast: one-shot retrieval over wiki pages. Deep: agentic loop over data/raw/ originals (~2x slower than Research, but more grounded).",
         )
 
+        st.markdown("---")
+
         _msgs = st.session_state["messages"]
         _current_start = len(_msgs) - 2 if len(_msgs) > 2 else 0
         if _current_start > 0:
@@ -668,7 +941,7 @@ elif page == "Wiki Chat":
                     st.caption(f"🔎 Interpreted as: {msg['interpreted']}")
                 st.markdown(msg["content"])
                 if msg["role"] == "assistant" and msg.get("question") and not msg["content"].startswith("Error:"):
-                    if st.button("↪ Follow up", key=f"followup_{i}"):
+                    if st.button("↪ Follow up", key=f"followup_{i}", help="Continue from this answer"):
                         st.session_state["chat_followup"] = {"q": msg["question"], "a": msg["content"]}
                         st.rerun()
                 if msg["role"] == "assistant" and msg.get("steps"):
@@ -722,7 +995,6 @@ elif page == "Wiki Chat":
         interpreted = q_to_ask if (fu and q_to_ask.strip() != prompt.strip()) else None
         st.session_state["messages"].append({"role": "user", "content": prompt})
         if st.session_state.get("chat_mode", "Fast") == "Fast":
-            st.markdown(f"**You:** {prompt}")
             with st.spinner("Thinking…"):
                 try:
                     res = wiki_engine.query_with_sources(q_to_ask)
@@ -739,7 +1011,6 @@ elif page == "Wiki Chat":
             steps: list[dict] = []
             answer = ""
             raw_sources: list[str] = []
-            st.markdown(f"**You:** {prompt}")
             _live = st.container()
             for step in chat_agent.run_chat_agent(q_to_ask):
                 steps.append(step)
@@ -766,7 +1037,7 @@ elif page == "Wiki Chat":
 
 
 elif page == "Research":
-    st.title("Research Agent")
+    _page_header("Research Agent")
     tavily_key = os.getenv("TAVILY_API_KEY", "")
 
     if not tavily_key:
@@ -789,7 +1060,9 @@ elif page == "Research":
                 st.session_state.pop(_k, None)
             st.rerun()
 
-        question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
+        _q_col, _chk_col = st.columns([4, 2])
+        question = _q_col.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
+        auto_save = _chk_col.checkbox("Auto-save to wiki", value=True)
 
         with st.expander("Extra wiki paste (optional — the agent browses the wiki on its own)"):
             wiki_context = st.text_area(
@@ -798,9 +1071,7 @@ elif page == "Research":
                 label_visibility="collapsed",
             )
 
-        auto_save = st.checkbox("Auto-save final report to wiki", value=True)
-
-        if st.button("Start research", type="primary", disabled=not (tavily_key and question)):
+        if st.button("Start research", type="primary", use_container_width=True, disabled=not (tavily_key and question)):
             _run_research_stream(question, question, wiki_context or "", auto_save)
             st.rerun()
 
@@ -848,7 +1119,7 @@ elif page == "Research":
 
 
 elif page == "Maintenance":
-    st.title("Maintenance")
+    _page_header("Maintenance")
     s = wiki_engine.stats()
     c1, c2, c3 = st.columns(3)
     c1.metric("Wiki pages", s["pages"])

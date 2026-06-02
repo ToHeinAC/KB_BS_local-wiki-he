@@ -1,7 +1,7 @@
 ---
 name: ui.md
 description: comprehensive documentation of the project´s user interfaces (graphical, etc.)
-version: 1.0.0
+version: 1.1.0
 author: Tobias Hein
 ---
 
@@ -18,6 +18,24 @@ The UI must feel like a premium digital publication, not a SaaS dashboard. Concr
 - **Restrained monochrome palette.** Emphasis comes from spacing/scale/rules — not bright accents or dense card grids.
 - **No SaaS aesthetics.** No neon, no overly rounded chrome, no playful tone.
 - **Documents/citations/research read like articles.** Whatever framework is chosen must be re-styled to this language; the framework's default look is not acceptable.
+
+### Theme system (implementation)
+
+The editorial language is delivered through a single theme-aware CSS block injected at the top of `src/app.py` (an f-string keyed on `_THEMES[st.session_state["theme"]]`). Two palettes:
+
+| Token | **Forest** (default, light) | **Slate** (dark) |
+|---|---|---|
+| `bg` | `#f6f7f2` | `#0f1117` |
+| `sidebar_bg` | `#eaf0ec` | `#1a1d27` |
+| `widget_bg` | `#ffffff` | `#262b3a` |
+| `text` | `#1a1f1c` | `#e8ecf0` |
+| `primary` | `#234637` | `#4f9cf9` |
+| `border` | `#d4dbd6` | `#2e3347` |
+
+- **Typography:** **Inter** body (Google Fonts) + **Libre Baskerville** serif headings (the editorial pairing). Buttons are sentence-case with a subtle 6 px radius and hover transition (replacing the earlier all-caps treatment).
+- **Toggle:** a sidebar button (`🌙 Dark` / `☀️ Light`, key `theme_toggle`) flips `st.session_state["theme"]` between `Forest` and `Slate` and reruns. Default is `Forest`.
+- **`config.toml`:** `.streamlit/config.toml` sets the static base palette (`textColor=#1a1f1c`, `secondaryBackgroundColor=#eaf0ec`); the injected CSS overrides per-surface for dark mode because config theme values are not runtime-switchable. The wildcard rule sets only `color` (never `font-family`, which would break Material icon ligatures); an explicit rule re-asserts the Material Symbols font on icon spans. Component surfaces that pull from `secondaryBackgroundColor` (file-uploader dropzone, expanders, form-submit buttons) get explicit theme overrides so neither theme shows low-contrast text.
+- **Expanders** use the page `bg` so the lighter `widget_bg` list buttons inside (e.g. the Wiki Explorer nav panel) stand out as distinct boxes.
 
 ## Framework choice
 
@@ -51,6 +69,10 @@ Admins (`is_admin`) manage users/databases in the Maintenance admin panels: main
 Logo + nav + live wiki stats (`N pages | N sources | last updated`) + Ollama connectivity indicator. PRD §3.9.1.
 
 The sidebar Ollama indicator (`_ollama_badge()`) shows a green/red badge ("Ollama online / offline") followed by a `st.sidebar.caption` with the active model name (e.g. `Model: gemma4:e4b` from `ollama_client._MODEL`).
+
+**Sidebar layout (top → bottom):** logo + Ollama badge in a row; the theme toggle; a `DATABASE` caption + DB selectbox (label collapsed); divider; a `NAVIGATION` caption + the page radio; live `N pages · M sources` stats; divider; `Signed in as …` + matching boxed **Reset** / **Logout** buttons side-by-side (`st.columns(2)`, styled via their `.st-key-reset_btn` / `.st-key-logout_btn` classes to override the transparent nav-button style).
+
+The **login gate** is centered in a constrained middle column (`st.columns([1, 1.4, 1])`) with a `## 📖 LocalWiki` heading, a "Sign in to continue" caption, and a full-width primary submit button.
 
 ## Error states (UI surface)
 
