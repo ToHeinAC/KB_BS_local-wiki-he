@@ -42,8 +42,14 @@ def is_duplicate(file_bytes: bytes) -> bool:
     return sha256(file_bytes) in _load_manifest()
 
 
-def register_file(file_bytes: bytes, filename: str) -> Path:
-    """Save file to raw dir and record in manifest. Returns saved path."""
+def register_file(file_bytes: bytes, filename: str, content: bytes | None = None) -> Path:
+    """Save a file to the raw dir and record it in the manifest. Returns saved path.
+
+    The manifest is keyed by sha256(file_bytes) — pass the *original* upload here
+    so re-uploading the same source is detected as a duplicate. When ``content``
+    is given (e.g. Markdown converted from a PDF), it is what gets written to disk
+    while the dedup key still tracks the original bytes.
+    """
     raw = _raw_dir()
     raw.mkdir(parents=True, exist_ok=True)
     digest = sha256(file_bytes)
@@ -53,7 +59,7 @@ def register_file(file_bytes: bytes, filename: str) -> Path:
         stem = Path(filename).stem
         suffix = Path(filename).suffix
         dest = raw / f"{stem}_{digest[:8]}{suffix}"
-    dest.write_bytes(file_bytes)
+    dest.write_bytes(content if content is not None else file_bytes)
     manifest = _load_manifest()
     manifest[digest] = {
         "filename": dest.name,

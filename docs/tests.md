@@ -11,7 +11,7 @@ author: Tobias Hein
 
 ## Cap (relaxed)
 
-**Originally 100 tests, current: 140.** The original cap was relaxed in 2026-05 when the retrieval layer (chunker, lex_index, extractor, qa_gen) added 30 high-signal unit + end-to-end tests; Tier A ingest speedup added 5 more (qa_gen cap, anchored-preference selection, begin/piece/end roundtrip, single-select assertion, back-compat wrapper). The relaxation principle: the cap exists to discourage low-value proliferation; whole new modules with verifiable behaviour are exempt.
+**Originally 100 tests, current: ~170.** The original cap was relaxed in 2026-05 when the retrieval layer (chunker, lex_index, extractor, qa_gen) added 30 high-signal unit + end-to-end tests; Tier A ingest speedup added 5 more (qa_gen cap, anchored-preference selection, begin/piece/end roundtrip, single-select assertion, back-compat wrapper); the non-Markdown upload converter (`md_convert`) added 10 (plus a `dedup` content-param test). The relaxation principle: the cap exists to discourage low-value proliferation; whole new modules with verifiable behaviour are exempt.
 
 ## Allocation
 
@@ -23,6 +23,7 @@ author: Tobias Hein
 
 1. **`dedup.py`** — hash determinism, manifest atomicity, duplicate detection edges.
 2. **`file_processor.py`** — per-format extraction (TXT, MD, PDF, DOCX, HTML), unsupported-type error, partial-extraction tolerance.
+2b. **`md_convert.py`** — `is_convertible` extension map; deterministic DOCX→Markdown (headings + tables); PDF page routing (text→rewrite vs image→OCR) and progress callback with conversion fns monkeypatched; image→OCR dispatch; per-model OCR prompt selection; unsupported-type error. No real Ollama / pypdfium2 needed.
 3. **`chunker.py`** — boundary detection per strategy (legal `§`, markdown, paragraph fallback); `chunk_id` content-addressability and stability.
 4. **`lex_index.py`** — BM25 ranking, 4-variant token recall (NFKD vs. umlaut digraph vs. stem), trigram fuzzy fallback Jaccard threshold, query expansion via aliases/acronyms, `facts_lookup`.
 5. **`extractor.py`** — JSON parse + fence stripping, swallow on LLM failure, idempotent merge across re-ingests, digest path for large sources.

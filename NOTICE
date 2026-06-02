@@ -1,0 +1,13 @@
+localwiki
+Copyright 2026 Tobias Hein
+
+This product includes software adapted from:
+
+  MD-maker (https://github.com/ToHeinAC/MD-maker)
+  Copyright the MD-maker authors
+  Licensed under the Apache License, Version 2.0.
+
+  The document-to-Markdown conversion pipeline in src/md_convert.py
+  (PDF page routing, DOCX extraction, image/OCR helpers) and the
+  conversion prompts in src/prompts.py (OCR_SYSTEM_PROMPT, OCR_USER_PROMPT,
+  OCR_DEEPSEEK_PROMPT, MD_REWRITE_PROMPT) are derived from MD-maker.

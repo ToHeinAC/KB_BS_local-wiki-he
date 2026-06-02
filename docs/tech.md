@@ -26,7 +26,9 @@ author: Tobias Hein
 | Deep researcher core | `langchain-core` | 0.3 |
 | Webpage fetch (research) | `httpx` | 0.27 |
 | HTML→Markdown (research) | `markdownify` | 0.13 |
-| PDF extraction | `pypdf` | 4.0 |
+| PDF extraction (text path) | `pypdf` | 4.0 |
+| PDF rasterization (OCR path) | `pypdfium2` | 4.0 |
+| Image handling (OCR path) | `pillow` | 10.0 |
 | DOCX extraction | `python-docx` | 1.1 |
 | YAML frontmatter | `python-frontmatter` | 1.1 |
 | Env variables | `python-dotenv` | 1.0 |

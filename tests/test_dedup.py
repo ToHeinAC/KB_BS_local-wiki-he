@@ -113,6 +113,16 @@ def test_two_files_same_name_get_different_paths(raw_dir):
     assert p1 != p2
 
 
+def test_register_file_content_param_writes_content_not_original(raw_dir):
+    original = b"%PDF original bytes"
+    converted = b"# Converted Markdown"
+    path = dedup.register_file(original, "doc.md", content=converted)
+    assert path.read_bytes() == converted
+    # dedup key is the ORIGINAL bytes, so re-upload of the source is caught
+    assert dedup.is_duplicate(original) is True
+    assert dedup.is_duplicate(converted) is False
+
+
 def test_manifest_persists_across_reads(raw_dir):
     data = b"persist"
     dedup.register_file(data, "p.txt")

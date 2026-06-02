@@ -15,6 +15,7 @@ import auth
 import db_context
 import dedup
 import file_processor
+import md_convert
 import ollama_client
 import template_loader
 import wiki_engine
@@ -316,14 +317,6 @@ wiki_engine.init_wiki()
 st.sidebar.markdown("## 📖 LocalWiki")
 _ollama_badge()
 
-st.sidebar.caption(f"Signed in as **{_user}**")
-if st.sidebar.button("Logout", key="logout_btn"):
-    for _k in ("user", "active_db", "messages", "chat_followup",
-               "research_history", "last_research_q", "last_research_answer",
-               "last_report", "research_sources"):
-        st.session_state.pop(_k, None)
-    st.rerun()
-
 _db_choice = st.sidebar.selectbox(
     "Database",
     options=_allowed_dbs,
@@ -339,6 +332,10 @@ if _db_choice != st.session_state["active_db"]:
                "research_sources", "explorer_selected_page", "last_contradictions"):
         st.session_state.pop(_k, None)
     st.rerun()
+
+if st.sidebar.button("Reset session", type="secondary",
+                     help="Unload model from VRAM and reset session. Server stays running."):
+    _safe_reset()
 
 st.sidebar.markdown("---")
 
@@ -356,9 +353,13 @@ s = wiki_engine.stats()
 st.sidebar.markdown(f"**{s['pages']}** pages &nbsp;·&nbsp; **{s['raw_files']}** sources", unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
-if st.sidebar.button("Reset session", type="secondary",
-                     help="Unload model from VRAM and reset session. Server stays running."):
-    _safe_reset()
+st.sidebar.caption(f"Signed in as **{_user}**")
+if st.sidebar.button("Logout", key="logout_btn"):
+    for _k in ("user", "active_db", "messages", "chat_followup",
+               "research_history", "last_research_q", "last_research_answer",
+               "last_report", "research_sources"):
+        st.session_state.pop(_k, None)
+    st.rerun()
 
 
 # --- pages ---
@@ -368,9 +369,14 @@ if page == "Upload":
     if not _can_maintain:
         st.error("You are not a maintainer of this database. Ask an admin for maintainer rights.")
         st.stop()
-    st.markdown("Upload a Markdown (.md) file to ingest into the wiki.")
+    st.markdown(
+        "Upload a Markdown (.md) file, or a PDF / DOCX / image — non-Markdown "
+        "files are automatically converted to Markdown before ingest."
+    )
     uploaded = st.file_uploader(
-        "Choose file", type=["md"], label_visibility="collapsed"
+        "Choose file",
+        type=["md", "pdf", "docx", "png", "jpg", "jpeg", "tiff", "tif", "bmp"],
+        label_visibility="collapsed",
     )
     if uploaded:
         raw = uploaded.read()
@@ -378,6 +384,37 @@ if page == "Upload":
             st.warning(f"**{uploaded.name}** has already been ingested (duplicate detected).")
         else:
             st.info(f"New file: **{uploaded.name}** ({len(raw):,} bytes)")
+            convertible = md_convert.is_convertible(uploaded.name)
+            converted_md = None
+            if convertible:
+                key = dedup.sha256(raw)
+                if st.session_state.get("convert_key") != key:
+                    if not ollama_client.is_available():
+                        st.error(
+                            "Ollama is not reachable. Start it and run "
+                            "`ollama pull deepseek-ocr:3b` to convert non-Markdown files."
+                        )
+                        st.stop()
+                    prog = st.progress(0.0, text="Converting to Markdown…")
+
+                    def _cb(done: int, total: int, label: str) -> None:
+                        prog.progress(min(done / total, 1.0) if total else 1.0, text=label)
+
+                    try:
+                        md_text = md_convert.convert_to_markdown(raw, uploaded.name, _cb)
+                    except (RuntimeError, ValueError) as e:
+                        st.error(f"Conversion failed: {e}")
+                        st.stop()
+                    st.session_state["convert_key"] = key
+                    st.session_state["convert_md"] = md_text
+                st.markdown("**Converted Markdown** — review and edit before ingest.")
+                converted_md = st.text_area(
+                    "Converted Markdown",
+                    value=st.session_state.get("convert_md", ""),
+                    height=300,
+                    label_visibility="collapsed",
+                    key="convert_editor",
+                )
             st.markdown("**Optional metadata** — fill in to make the ingest more reliable.")
             fields = template_loader.load_insert_template()
             with st.form("ingest_form"):
@@ -385,10 +422,17 @@ if page == "Upload":
                 submitted = st.form_submit_button("Ingest into wiki", type="primary")
             if submitted:
                 user_meta = {k: v.strip() for k, v in values.items() if v and v.strip()}
-                with st.spinner("Saving file…"):
-                    saved = dedup.register_file(raw, uploaded.name)
-                with st.spinner("Extracting text…"):
-                    text = file_processor.extract_text(saved)
+                if convertible:
+                    md_name = Path(uploaded.name).stem + ".md"
+                    with st.spinner("Saving file…"):
+                        saved = dedup.register_file(raw, md_name, content=converted_md.encode())
+                    text = converted_md
+                else:
+                    with st.spinner("Saving file…"):
+                        saved = dedup.register_file(raw, uploaded.name)
+                    with st.spinner("Extracting text…"):
+                        text = file_processor.extract_text(saved)
+                source_name = saved.name
                 chunks = file_processor.chunk_text(text)
                 n = len(chunks)
                 try:
@@ -396,7 +440,7 @@ if page == "Upload":
                         st.info(f"Dokument aufgeteilt in {n} Teile — jeder Teil wird separat verarbeitet.")
                         progress = st.progress(0)
                     with st.spinner("Indexing document (chunker, lexical index, sidecars)…"):
-                        ctx = wiki_engine.ingest_begin(text, uploaded.name, user_meta or None)
+                        ctx = wiki_engine.ingest_begin(text, source_name, user_meta or None)
                     for i, chunk in enumerate(chunks):
                         label = "Running LLM ingest (this may take a minute)…" if n == 1 else f"Teil {i + 1}/{n} wird verarbeitet…"
                         with st.spinner(label):

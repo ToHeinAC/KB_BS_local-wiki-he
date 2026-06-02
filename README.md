@@ -1,6 +1,6 @@
 # LocalWiki
 
-A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in; a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
+A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in — Markdown, or PDF / DOCX / images that are auto-converted to Markdown (local OCR + rewrite, vendored from [MD-maker](https://github.com/ToHeinAC/MD-maker)) — and a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
 > **Status:** All pages implemented — three-stage ingest (`ingest_begin` / `ingest_piece` / `ingest_end`) drives a structural chunk store + BM25 lexical index + 1–5 hypothetical questions per source (folded into BM25 TF) under `data/chunks/` and `data/index/` → wiki (tree-by-type + full-text search + typed-graph viz with `derived-from` source edges) → chat (Fast: one-shot RAG over wiki pages; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25; live trace + download) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report; inline report + download). Both agent modes include an `evaluate_condition` tool that deterministically evaluates logical / regulatory conditions (thresholds, membership, ranges, AND/OR/NOT trees) over LLM-extracted facts — Python does the comparison, not the model. Long-source ingest (e.g. 488 KB legal docs): ~7 min. 130-test suite.
 
@@ -25,6 +25,7 @@ git clone https://github.com/ToHeinAC/KB_BS_local-wiki-he
 cd KB_BS_local-wiki-he
 uv sync
 ollama pull gemma4:e4b          # or any model — set OLLAMA_MODEL in .env
+ollama pull deepseek-ocr:3b     # only needed to upload non-Markdown files (PDF/DOCX/images)
 cp .env.example .env
 ```
 
@@ -45,6 +46,9 @@ Edit `.env` (copied from `.env.example`):
 | `OLLAMA_MODEL` | `gemma4:e4b` | Ollama model to use |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `MAX_INGEST_CHARS` | `40000` | Chunk size for ingest; large documents are split into sequential chunks |
+| `OCR_MODEL` | `deepseek-ocr:3b` | Vision model for OCR of scanned PDF pages / images (Upload conversion) |
+| `REWRITE_MODEL` | `OLLAMA_MODEL` | Model that reformats extracted PDF text into Markdown |
+| `PDF_DPI` | `150` | Rasterization DPI for scanned PDF pages sent to OCR |
 | `DATA_ROOT` | `data` | Root for all databases; each DB is an isolated subtree `$DATA_ROOT/<db>/{raw,chunks,index,wiki}`; `users.json` lives at `$DATA_ROOT/users.json` |
 | `INGEST_QA` | `1` | Run hypothetical-question generator during ingest (`0` to disable) |
 | `QA_BATCH_SIZE` | `12` | Chunks per QA-generator LLM batch |
