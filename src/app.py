@@ -806,11 +806,11 @@ elif page == "Maintenance":
     c2.metric("Raw sources", s["raw_files"])
     c3.metric("Data size (MB)", round(s["data_bytes"] / 1_048_576, 2))
 
-    _tab_labels = ["Link graph health", "Lint", "Delete source", "Reset all data", "Activity log"]
+    _tab_labels = ["Delete source", "Link graph health", "Lint", "Activity log", "Reset all data"]
     if auth.is_admin(_user):
         _tab_labels.append("Admin")
     _tabs = st.tabs(_tab_labels)
-    tab_graph, tab_lint, tab_del, tab_reset, tab_log = _tabs[:5]
+    tab_del, tab_graph, tab_lint, tab_log, tab_reset = _tabs[:5]
 
     with tab_graph:
         orphans = wiki_engine.find_orphans()
