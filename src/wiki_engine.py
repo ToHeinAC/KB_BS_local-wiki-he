@@ -20,6 +20,7 @@ from prompts import (
     ANSWER_PROMPT,
     CONDENSE_PROMPT,
     DESCRIPTION_BUILD_PROMPT,
+    DESCRIPTION_DELETE_PROMPT,
     DESCRIPTION_UPDATE_PROMPT,
     FILE_ANSWER_PROMPT,
     INGEST_PROMPT,
@@ -440,6 +441,11 @@ def delete_source(source_name: str) -> dict:
 
     lex_index.build()
     _rebuild_index()
+    if os.getenv("INGEST_DESCRIPTION", "1") == "1":
+        try:
+            refresh_description_after_delete(source_name, result["wiki_pages"])
+        except Exception:
+            pass  # best-effort; never fail deletion on the overview refresh
     _append_log(
         "Source deleted",
         f"Source: {source_name}\n"
@@ -655,6 +661,33 @@ def update_description(ctx: dict) -> None:
     system = schema_loader.get_system_prompt()
     index_text = _index_path().read_text() if _index_path().exists() else ""
     prompt = DESCRIPTION_UPDATE_PROMPT.format(
+        db_name=db_context.get_active_db(),
+        current=current,
+        change_summary=change_summary,
+        index_text=index_text,
+    )
+    response = ollama_client.generate(system, prompt, temperature=0.3).strip()
+    if response and response != "NO_CHANGE":
+        _description_path().write_text(_cap_description(response))
+
+
+def refresh_description_after_delete(source_name: str, removed_pages: list[str]) -> None:
+    """Conditionally refresh the overview after a source deletion."""
+    if not list_pages():
+        _description_path().write_text("")  # nothing left to describe
+        return
+    if not removed_pages:
+        return  # page set unchanged → overview still representative
+    current = read_description()
+    if not current:
+        return  # nothing to update; ensure_description() seeds it lazily on render
+    change_summary = (
+        f"Deleted source: {source_name}\n"
+        f"Wiki pages removed: {', '.join(removed_pages)}"
+    )
+    system = schema_loader.get_system_prompt()
+    index_text = _index_path().read_text() if _index_path().exists() else ""
+    prompt = DESCRIPTION_DELETE_PROMPT.format(
         db_name=db_context.get_active_db(),
         current=current,
         change_summary=change_summary,

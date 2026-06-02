@@ -141,6 +141,19 @@ Wiki index (filename — description):
 
 If this source adds substantial NEW scope that the current overview should mention to stay representative, rewrite and output the FULL revised overview (plain markdown, no frontmatter, at most 250 words). If the current overview already represents the database well and the new source only adds detail within existing scope, reply with exactly NO_CHANGE and nothing else."""
 
+DESCRIPTION_DELETE_PROMPT = """You maintain a short high-level overview of the knowledge base "{db_name}".
+
+Current overview:
+{current}
+
+A source was just deleted:
+{change_summary}
+
+Wiki index (filename — description) AFTER the deletion:
+{index_text}
+
+If the current overview now describes scope, topics, or sources that no longer exist in the database, rewrite and output the FULL revised overview (plain markdown, no frontmatter, at most 250 words). If the current overview still represents the remaining database well, reply with exactly NO_CHANGE and nothing else."""
+
 SELECT_AFFECTED_PROMPT = """A new source is being ingested. Identify which existing wiki pages it most likely updates.
 
 Source name: {source_name}
