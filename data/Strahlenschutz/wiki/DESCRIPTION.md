@@ -1,0 +1,7 @@
+This knowledge base provides a comprehensive, technical, and legally grounded overview of the management and regulation of ionizing radiation and radioactive materials within the German context. Its core subject matter centers on fundamental German legal frameworks, primarily the *Strahlenschutzgesetz* (StrlSchG) and the *Atomgesetz* (AtG).
+
+Key topics covered include the systematic management of radioactive waste (*Radioactive Waste Management*), the assessment and remediation of environmental contamination (*Radioactive Altlasten*), and the detailed evaluation of professional and environmental exposure situations.
+
+A significant area of technical depth is provided through specialized guidance on indoor air quality, particularly the management of Radon ($\text{Rn}-222$). This includes detailed protocols for assessing gas ingress pathways, implementing structural sealing (*Building Sealing*), and deploying advanced ventilation systems (*Ventilation Systems*) to mitigate risks in residential and subterranean areas.
+
+The resource supports regulatory compliance by detailing dose limits, required permits, and emergency planning procedures. The structure is designed to serve regulators, physicists, and technical experts needing to understand the full lifecycle of radiation hazards, from source control to final disposal, ensuring adherence to German and international safety standards.

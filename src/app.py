@@ -310,6 +310,13 @@ _CITE_SECTION_SUFFIX_RE = re.compile(r"\s*[§#].*$")
 def _show_md_dialog(title: str, content: str) -> None:
     st.subheader(title)
     st.markdown(content)
+    st.download_button(
+        "Download",
+        data=content,
+        file_name=title,
+        mime="text/markdown",
+        key=f"dl_src_{title}",
+    )
 
 
 @st.dialog("Concept", width="large")
@@ -786,6 +793,13 @@ elif page == "Wiki Explorer":
                     st.markdown(f"### {selected_file}")
                     parsed = wiki_engine.read_page_parsed(selected_file)
                     st.markdown(parsed["content"])
+                    st.download_button(
+                        "Download page",
+                        data=parsed["content"],
+                        file_name=selected_file,
+                        mime="text/markdown",
+                        key=f"dl_wiki_page_{selected_file}",
+                    )
                     raw_sources = parsed["sources"]
                     related = parsed["related"]
                     if raw_sources or related:

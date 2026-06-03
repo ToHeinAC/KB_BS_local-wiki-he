@@ -1,0 +1,33 @@
+---
+confidence: high
+created: '2026-06-02'
+related: []
+sources:
+- pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5]
+- pwc-semiconductor-and-beyond-2026-full-report.md
+title: Wafer Testing
+type: concept
+updated: '2026-06-02'
+---
+
+# Wafer Testing
+
+Wafer testing is a critical process in semiconductor manufacturing that assesses the quality of individual dies *before* they undergo advanced packaging or assembly. Its importance has grown significantly due to the industry's shift toward heterogeneous integration and multi-die packaging [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+
+## Role in Yield Enhancement
+Wafer testing is highlighted as having the highest correlation with yield enhancement among semiconductor testing stages [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+*   **Early Defect Detection:** Unlike packaging test, which occurs later, wafer testing screens defects at the die level, preventing faulty components from advancing down the manufacturing line [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+*   **Impact of Failure:** In multi-die packages, even a single defective die can render the entire package unusable, making early screening essential [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+
+## Evolution of Testing Methods
+As manufacturing processes advance, testing methods must adapt:
+*   **Non-Contact Inspection:** Due to wafers becoming thinner, contact-based testing faces limitations, leading to the adoption of non-contact optical inspection methods, such as OCT and IR [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+*   **Miniaturization:** Probe Cards are miniaturizing to enable precise electrical testing as process nodes shrink [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+
+## Testing Stages
+The testing process is highly modular, encompassing several stages:
+1.  **Wafer Test:** Performed at the wafer pre-dicing stage [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+2.  **Known-Good-Die Test:** Testing individual dies after singulation [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+3.  **Packaging Test:** Testing after the assembly process [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+4.  **Module Test:** Testing at the module level [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].
+5.  **Burn-in / Component Test:** Final reliability checks [pwc-semiconductor-and-beyond-2026-full-report.md [Teil 4/5].md].

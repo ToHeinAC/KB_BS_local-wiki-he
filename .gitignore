@@ -48,4 +48,4 @@ tmp/
 .claude/settings.local.json
 
 # Data folder
-data/
+#data/

@@ -1,0 +1,14 @@
+{
+  "users": {
+    "T. Hein": {
+      "pw_hash": "$2b$12$SiRur..JUhduZpgfhJyePuOETlC7fUnmkUWoi2Mk7bNNN3jSczl2m",
+      "dbs": [
+        "Strahlenschutz"
+      ],
+      "is_admin": true,
+      "maintains": [
+        "Strahlenschutz"
+      ]
+    }
+  }
+}

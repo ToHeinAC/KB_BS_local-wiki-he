@@ -876,17 +876,19 @@ def build_typed_graph() -> dict:
                 ptype = str(post.metadata.get("type", "other")).strip().lower()
             except Exception:
                 related, sources, title, ptype = [], [], md.stem, "other"
-            if ptype not in ("concept", "entity"):
+            if ptype not in ("concept", "entity", "source-summary"):
                 continue
+            is_page = ptype in ("concept", "entity")
             page_id = md.name if md.parent == _wiki() else f"{_INSIGHTS_DIR}/{md.name}"
-            nodes[page_id] = {"id": page_id, "type": "page", "label": title}
-            for r in related:
-                r = str(r).strip()
-                if r and r != page_id and r in existing and r not in _SYSTEM_PAGES:
-                    pair = frozenset({page_id, r})
-                    if pair not in related_pairs:
-                        related_pairs.add(pair)
-                        edges.append({"from": page_id, "to": r, "type": "related-to"})
+            if is_page:
+                nodes[page_id] = {"id": page_id, "type": "page", "label": title}
+                for r in related:
+                    r = str(r).strip()
+                    if r and r != page_id and r in existing and r not in _SYSTEM_PAGES:
+                        pair = frozenset({page_id, r})
+                        if pair not in related_pairs:
+                            related_pairs.add(pair)
+                            edges.append({"from": page_id, "to": r, "type": "related-to"})
             for s in sources:
                 raw = _raw_source(s)
                 if (
@@ -899,6 +901,9 @@ def build_typed_graph() -> dict:
                     continue
                 source_id = f"source::{raw}"
                 source_set.add(raw)
+                if not is_page:
+                    # source-summary: register source node but emit no page→source edge
+                    continue
                 pair = (page_id, source_id)
                 if pair in derived_pairs:
                     continue
