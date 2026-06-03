@@ -218,6 +218,23 @@ st.markdown(
         background-color: {_t['hover']} !important;
         border-color: {_t['primary']} !important;
     }}
+    /* Lint, Delete source, Start research: same boxed style as Reset/Logout */
+    .st-key-run_lint_btn button,
+    .st-key-delete_source_btn button,
+    .st-key-start_research_btn button {{
+        background-color: {_t['widget_bg']} !important;
+        border: 1px solid {_t['border']} !important;
+        text-align: center !important;
+        padding: 0.35rem 0.75rem !important;
+        border-radius: 6px !important;
+        color: {_t['text']} !important;
+    }}
+    .st-key-run_lint_btn button:hover,
+    .st-key-delete_source_btn button:hover,
+    .st-key-start_research_btn button:hover {{
+        background-color: {_t['hover']} !important;
+        border-color: {_t['primary']} !important;
+    }}
 
     /* ── Radio / Checkbox / Toggle ── */
     .stRadio > div, .stCheckbox > label, .stRadio label {{
@@ -296,6 +313,14 @@ st.markdown(
     }}
 
     .block-container {{ padding-top: 1.5rem; padding-bottom: 2rem; }}
+
+    /* Multiselect selected-item tags: orange */
+    [data-baseweb="tag"] {{
+        background-color: #e07b20 !important;
+    }}
+    [data-baseweb="tag"] span {{
+        color: #ffffff !important;
+    }}
     </style>
     """,
     unsafe_allow_html=True,
@@ -1085,7 +1110,7 @@ elif page == "Research":
                 label_visibility="collapsed",
             )
 
-        if st.button("Start research", type="primary", use_container_width=True, disabled=not (tavily_key and question)):
+        if st.button("Start research", key="start_research_btn", use_container_width=True, disabled=not (tavily_key and question)):
             _run_research_stream(question, question, wiki_context or "", auto_save)
             st.rerun()
 
@@ -1156,7 +1181,7 @@ elif page == "Maintenance":
 
     with tab_lint:
         st.caption("Ask the LLM to review wiki quality: contradictions, orphans, gaps, suggestions.")
-        if st.button("Run lint", type="primary"):
+        if st.button("Run lint", key="run_lint_btn"):
             with st.spinner("Running lint (may take a minute)…"):
                 try:
                     report = wiki_engine.lint()
@@ -1176,7 +1201,7 @@ elif page == "Maintenance":
                     "that reference this source. This cannot be undone."
                 )
                 _confirmed = st.checkbox("I understand this is irreversible")
-                if st.button("Delete source", disabled=not _confirmed, type="primary"):
+                if st.button("Delete source", key="delete_source_btn", disabled=not _confirmed):
                     with st.spinner("Deleting…"):
                         _result = wiki_engine.delete_source(_selected)
                     st.success(
