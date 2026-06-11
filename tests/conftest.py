@@ -36,6 +36,7 @@ def wiki_dir(tmp_path, monkeypatch):
     """Isolated wiki + raw + chunks + index dirs; inits wiki state."""
     root = _patch_data_root(monkeypatch, tmp_path)
     monkeypatch.setenv("INGEST_QA", "0")
+    monkeypatch.setenv("INGEST_DESCRIPTION", "0")  # no LLM overview pass during ingest tests
     wiki_engine.init_wiki()
     return root / "wiki"
 

@@ -26,7 +26,6 @@ from prompts import (
     INGEST_PROMPT,
     LINT_PROMPT,
     RESOLVE_CONTRADICTION_PROMPT,
-    SELECT_AFFECTED_PROMPT,
     SELECT_PROMPT,
 )
 
@@ -57,7 +56,11 @@ _INSIGHTS_DIR = "insights"
 _SYSTEM_PAGES = ("index.md", "log.md", "DESCRIPTION.md")  # not real wiki pages
 _DESCRIPTION_MAX_CHARS = 1800  # ~half a page; hard cap on the DB overview
 _MAX_AFFECTED_PAGES = 5
-_MAX_EXISTING_CHARS = 8000  # cap injected existing-content per ingest call
+_AFFECTED_QUERY_TOPK = 20  # BM25 chunk hits considered when mapping to wiki pages
+# Per-page existing-content budget by BM25 rank: the most-relevant page gets the
+# largest merge window so its merge stays accurate; tail pages get just enough
+# for the LLM to recognise and link them. Index = rank (0 = top hit).
+_EXISTING_BUDGET_BY_RANK = (4000, 2000, 2000, 800, 800)
 _TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*(?:\.md)?\s*$")
 
 
@@ -119,48 +122,70 @@ def _parse_llm_pages(response: str) -> list[dict]:
     return pages
 
 
-def _select_affected_pages(system: str, source_name: str, index_text: str, text: str) -> list[str]:
-    """Ask the LLM which existing pages a new source likely updates."""
-    if not index_text.strip():
+def _source_to_pages() -> dict[str, list[str]]:
+    """Reverse map: raw-source filename → wiki pages derived from it.
+
+    Built from each page's `sources:` frontmatter so BM25 hits (which carry a
+    `source` field) can be mapped back to the wiki pages a new source touches.
+    """
+    mapping: dict[str, list[str]] = {}
+    for page in list_pages():
+        for src in (page.get("sources") or []):
+            key = str(src).strip()
+            if key:
+                mapping.setdefault(key, []).append(page["filename"])
+    return mapping
+
+
+def _select_affected_pages(query_text: str, src_to_pages: dict[str, list[str]],
+                           exclude_source: str = "") -> list[str]:
+    """Rank existing wiki pages a new source likely updates, via BM25.
+
+    Queries the pre-existing lexical index with the new source text, maps each
+    hit's `source` back to the wiki pages derived from it, and returns those
+    pages ranked by summed hit score (most relevant first), capped at
+    `_MAX_AFFECTED_PAGES`. No LLM call. Returns [] when the index or map is empty
+    (e.g. the first ingest into a fresh wiki).
+    """
+    if not src_to_pages or not query_text.strip():
         return []
-    excerpt = text[:2000]
-    prompt = SELECT_AFFECTED_PROMPT.format(
-        source_name=source_name, index_text=index_text, excerpt=excerpt
-    )
     try:
-        raw = ollama_client.generate(system, prompt, temperature=0.1, model_id=ollama_client._QUERY_MODEL)
-    except RuntimeError:
+        hits = lex_index.query(query_text, top_k=_AFFECTED_QUERY_TOPK)
+    except Exception:
         return []
-    candidates = []
-    for ln in raw.splitlines():
-        s = ln.strip().strip("-• ").strip()
-        if s.lower() == "none":
-            return []
-        if s.endswith(".md") and s not in _SYSTEM_PAGES:
-            if (_wiki() / s).exists() and s not in candidates:
-                candidates.append(s)
-        if len(candidates) >= _MAX_AFFECTED_PAGES:
-            break
-    return candidates
+    page_score: dict[str, float] = {}
+    for h in hits:
+        src = (h.get("source") or "").strip()
+        if not src or src == exclude_source:
+            continue
+        for page in src_to_pages.get(src, []):
+            page_score[page] = page_score.get(page, 0.0) + float(h.get("score", 0.0))
+    ranked = sorted(page_score, key=lambda p: (-page_score[p], p))
+    return ranked[:_MAX_AFFECTED_PAGES]
 
 
 def _build_existing_block(filenames: list[str]) -> str:
-    """Render an 'Existing page content' block bounded by _MAX_EXISTING_CHARS."""
+    """Render an 'Existing page content' block with rank-weighted per-page budgets.
+
+    `filenames` is ordered most-relevant-first (BM25 rank). The top page gets the
+    largest character window so its merge stays faithful; tail pages get a smaller
+    window — enough for the LLM to recognise and link them. See
+    `_EXISTING_BUDGET_BY_RANK`.
+    """
     if not filenames:
         return ""
     parts = ["\nExisting page content (MERGE; do not overwrite-erase):\n"]
-    budget = _MAX_EXISTING_CHARS
-    for fname in filenames:
+    for rank, fname in enumerate(filenames):
         path = _wiki() / fname
         if not path.exists():
             continue
+        budget = (_EXISTING_BUDGET_BY_RANK[rank]
+                  if rank < len(_EXISTING_BUDGET_BY_RANK)
+                  else _EXISTING_BUDGET_BY_RANK[-1])
         body = path.read_text()
         if len(body) > budget:
             body = body[:budget] + "\n…[truncated]"
         parts.append(f"\n--- {fname} ---\n{body}\n")
-        budget -= len(body)
-        if budget <= 0:
-            break
     return "".join(parts) + "\n"
 
 
@@ -259,17 +284,16 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
             except Exception:
                 pass  # qa-gen is best-effort; never fail ingest on it
 
-    affected = _select_affected_pages(system, source_name, index_text, full_text)
-    existing_block = _build_existing_block(affected)
-
     return {
         "system": system,
         "source_name": source_name,
         "index_text": index_text,
         "meta_block": meta_block,
         "example_extra": example_extra,
-        "affected": affected,
-        "existing_block": existing_block,
+        # Affected pages are now selected per piece via BM25 (see ingest_piece);
+        # `affected` accumulates the union across pieces for the result/log.
+        "src_to_pages": _source_to_pages(),
+        "affected": [],
         "chunks": chunks,
         "created": [],
         "updated": [],
@@ -281,11 +305,19 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
 def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> None:
     """Run the LLM wiki-synthesis for one 40 KB piece. Mutates `ctx` in place."""
     piece_source = ctx["source_name"] if total == 1 else f"{ctx['source_name']} [Teil {index + 1}/{total}]"
+    # BM25-select the existing pages THIS piece most likely updates, then inject
+    # their content (rank-weighted budget) for an accurate merge. Per-piece so a
+    # later piece of a long document can surface pages the first piece didn't.
+    ranked = _select_affected_pages(piece_text, ctx["src_to_pages"], exclude_source=ctx["source_name"])
+    for fname in ranked:
+        if fname not in ctx["affected"]:
+            ctx["affected"].append(fname)
+    existing_block = _build_existing_block(ranked)
     prompt = INGEST_PROMPT.format(
         source_name=piece_source,
         meta_block=ctx["meta_block"],
         index_text=ctx["index_text"],
-        existing_block=ctx["existing_block"],
+        existing_block=existing_block,
         text=piece_text,
         summary_slug=_title_to_filename(piece_source).replace(".md", ""),
         example_extra=ctx["example_extra"],

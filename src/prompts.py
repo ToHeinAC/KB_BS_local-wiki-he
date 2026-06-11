@@ -93,7 +93,7 @@ Instructions:
 1. Create a detailled source-summary representation page for this document (filename: summary-{summary_slug}.md). Never invent information. 
    Preserve relevant passages from chunk sources in detail. Copy relevant numbers, sizes, and references exactly as they appear in the original, never round or paraphrase. Format every citation as e.g. [{source_name}.md] using the source from the original doc.
 2. Create or update concept/entity pages for key topics found in the source.
-3. When updating an existing page (provided above as "Existing page content"), MERGE — preserve prior facts, integrate new information, refine wording. Never strip nuance from a prior version.
+3. When updating an existing page (provided above as "Existing page content"), produce a MERGED version: start FROM the existing text, then ADD new facts and REVISE only what this source actually changes. Preserve every prior fact, number, and citation unless the source directly corrects it. Do NOT rewrite the page from scratch and do NOT drop nuance — output the full merged page, not just the new parts.
 4. Populate `related` frontmatter ONLY with filenames of pages whose topic is directly
    and explicitly discussed in THIS source text in connection with the current page.
    A link requires clear evidence in the source — loose thematic or domain overlap is
@@ -153,18 +153,6 @@ Wiki index (filename — description) AFTER the deletion:
 {index_text}
 
 If the current overview now describes scope, topics, or sources that no longer exist in the database, rewrite and output the FULL revised overview (plain markdown, no frontmatter, at most 250 words). If the current overview still represents the remaining database well, reply with exactly NO_CHANGE and nothing else."""
-
-SELECT_AFFECTED_PROMPT = """A new source is being ingested. Identify which existing wiki pages it most likely updates.
-
-Source name: {source_name}
-
-Wiki index (filename — description):
-{index_text}
-
-Source excerpt:
-{excerpt}
-
-Reply with up to 5 affected filenames, one per line. Filename only (e.g. siemens-ag.md). Reply NONE if no existing page is affected."""
 
 RESOLVE_CONTRADICTION_PROMPT = """Resolve a contradiction in the wiki.
 

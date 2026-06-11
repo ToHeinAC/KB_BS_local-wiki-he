@@ -324,18 +324,26 @@ def test_find_orphans_returns_pages_with_no_inedges(wiki_dir):
 # --- ingest with existing content + retry ---
 
 def test_ingest_loads_existing_content_for_affected_pages(wiki_dir, monkeypatch):
-    (wiki_dir / "alpha.md").write_text("EXISTING_ALPHA_BODY")
-    (wiki_dir / "index.md").write_text("# Wiki Index\n- [Alpha](alpha.md) — existing\n")
+    """BM25 selection: a page derived from a prior source whose chunks match the
+    new text is surfaced, and its body is injected for merge."""
+    import chunker
+    import lex_index
+    # Existing page derived from a prior source, present in the BM25 index.
+    (wiki_dir / "alpha.md").write_text(
+        '---\ntitle: Alpha\ntype: concept\nsources: ["prior.md"]\n---\nEXISTING_ALPHA_BODY'
+    )
+    chunker.write_chunks("prior.md", [{
+        "chunk_id": "c-prior-1",
+        "text": "Alpha radiation protection dose limits and shielding fundamentals.",
+        "anchor": "", "heading_path": [], "char_start": 0, "char_end": 60, "lang": "en",
+    }])
+    lex_index.build()
     mock = MagicMock()
-    # First generate → SELECT_AFFECTED returns "alpha.md"
-    # Second generate → INGEST returns parseable response
-    mock.generate.side_effect = [
-        {"response": "alpha.md\n"},
-        {"response": _INGEST_RESPONSE},
-    ]
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
     monkeypatch.setattr(ollama_client, "_client", lambda: mock)
-    wiki_engine.ingest("source text about alpha", "src.txt")
-    ingest_prompt = mock.generate.call_args_list[1].kwargs["prompt"]
+    wiki_engine.ingest("source text about alpha radiation protection dose", "src.txt")
+    # Only one generate call now (synthesis) — selection is BM25, not an LLM call.
+    ingest_prompt = mock.generate.call_args.kwargs["prompt"]
     assert "EXISTING_ALPHA_BODY" in ingest_prompt
     assert "Existing page content" in ingest_prompt
 
@@ -343,15 +351,14 @@ def test_ingest_loads_existing_content_for_affected_pages(wiki_dir, monkeypatch)
 def test_ingest_retries_when_no_pages_parsed(wiki_dir, monkeypatch):
     mock = MagicMock()
     mock.generate.side_effect = [
-        {"response": "NONE\n"},                # SELECT_AFFECTED
         {"response": "garbage no delimiters"},  # first INGEST attempt
         {"response": _INGEST_RESPONSE},         # retry attempt
     ]
     monkeypatch.setattr(ollama_client, "_client", lambda: mock)
     result = wiki_engine.ingest("text", "src.txt")
     assert "concept-alpha.md" in result["created"]
-    # 3 calls: select + ingest + retry
-    assert mock.generate.call_count == 3
+    # 2 calls: ingest + retry (selection is BM25, not an LLM call).
+    assert mock.generate.call_count == 2
 
 
 # --- resolve_contradiction ---
@@ -381,24 +388,36 @@ def test_ingest_begin_piece_end_creates_pages(wiki_dir, monkeypatch):
     assert (wiki_dir / "summary-mysrc.md").exists()
 
 
-def test_ingest_begin_runs_select_affected_once_across_many_pieces(wiki_dir, monkeypatch):
-    """The select-affected LLM call must NOT run per piece."""
-    (wiki_dir / "alpha.md").write_text("EXISTING_ALPHA_BODY")
-    (wiki_dir / "index.md").write_text("# Wiki Index\n- [Alpha](alpha.md) — existing\n")
+def test_build_existing_block_rank_weighted_budget(wiki_dir):
+    """Top-ranked page gets the largest merge window; tail pages get truncated."""
+    (wiki_dir / "top.md").write_text("T" * 6000)
+    (wiki_dir / "tail.md").write_text("L" * 6000)
+    block = wiki_engine._build_existing_block(["top.md", "tail.md"])
+    # rank 0 budget 4000, rank 1 budget 2000 (see _EXISTING_BUDGET_BY_RANK).
+    assert block.count("T") == 4000
+    assert block.count("L") == 2000
+    assert "…[truncated]" in block
+
+
+def test_source_to_pages_maps_frontmatter_sources(wiki_dir):
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nsources: ["s1.md", "s2.md"]\n---\nbody')
+    (wiki_dir / "b.md").write_text('---\ntitle: B\nsources: ["s1.md"]\n---\nbody')
+    mapping = wiki_engine._source_to_pages()
+    assert set(mapping["s1.md"]) == {"a.md", "b.md"}
+    assert mapping["s2.md"] == ["a.md"]
+
+
+def test_ingest_affected_selection_adds_no_llm_calls_per_piece(wiki_dir, monkeypatch):
+    """Affected-page selection is BM25 (no LLM), so generate runs once per piece only."""
     mock = MagicMock()
-    mock.generate.side_effect = [
-        {"response": "alpha.md\n"},        # SELECT_AFFECTED (once)
-        {"response": _INGEST_RESPONSE},    # piece 1
-        {"response": _INGEST_RESPONSE},    # piece 2
-        {"response": _INGEST_RESPONSE},    # piece 3
-    ]
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
     monkeypatch.setattr(ollama_client, "_client", lambda: mock)
     ctx = wiki_engine.ingest_begin("full text", "src.txt")
     for i in range(3):
         wiki_engine.ingest_piece(ctx, "piece text", i, 3)
     wiki_engine.ingest_end(ctx)
-    # 1 select + 3 synthesis = 4 LLM calls total (no per-piece extra select).
-    assert mock.generate.call_count == 4
+    # 3 synthesis calls, nothing extra for selection.
+    assert mock.generate.call_count == 3
 
 
 def test_ingest_back_compat_wrapper_still_works(wiki_dir, monkeypatch):
