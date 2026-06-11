@@ -48,6 +48,22 @@ def test_generate_passes_correct_args(monkeypatch):
     )
 
 
+def test_generate_uses_model_id_override(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.generate.return_value = {"response": "ok"}
+    ollama_client.generate("s", "p", model_id="big-model:70b")
+    _, kwargs = mock.generate.call_args
+    assert kwargs.get("model") == "big-model:70b"
+
+
+def test_generate_defaults_to_base_model_when_no_model_id(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.generate.return_value = {"response": "ok"}
+    ollama_client.generate("s", "p")
+    _, kwargs = mock.generate.call_args
+    assert kwargs.get("model") == ollama_client._MODEL
+
+
 def test_generate_raises_runtime_error_on_failure(monkeypatch):
     mock = _make_mock(monkeypatch)
     mock.generate.side_effect = Exception("boom")

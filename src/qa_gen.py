@@ -68,7 +68,7 @@ def _strip_json_fences(s: str) -> str:
 
 def _run_batch(batch: list[dict], temperature: float = 0.2) -> list[tuple[str, str]]:
     try:
-        system = schema_loader.get_system_prompt()
+        system = schema_loader.get_system_prompt(mode="query")
     except Exception:
         system = ""
     prompt = GENERATE_QUESTIONS_PROMPT.format(chunks_block=_chunks_block(batch))

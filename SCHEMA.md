@@ -36,6 +36,13 @@ confidence: high | medium | low
 5. When information conflicts between sources, note the contradiction explicitly.
 6. Confidence reflects how well-supported the claims are across sources.
 
+## Operational Constraints
+
+- **Length:** ≤400 words for concept/entity pages; ≤800 for source-summary. Be concise.
+- **When NOT to create a page:** only create one if the topic is the source's primary subject OR appears substantively in 2+ sources; otherwise fold it into an existing page.
+- **Confidence:** high = stated in 2+ sources; medium = stated in 1 source; low = inferred or partial.
+- **Related links:** link only to a page explicitly named or directly discussed in the source — never by mere topical association.
+
 ## Filename Convention
 
 - Lowercase, hyphen-separated, `.md` extension.

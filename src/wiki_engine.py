@@ -128,7 +128,7 @@ def _select_affected_pages(system: str, source_name: str, index_text: str, text:
         source_name=source_name, index_text=index_text, excerpt=excerpt
     )
     try:
-        raw = ollama_client.generate(system, prompt, temperature=0.1)
+        raw = ollama_client.generate(system, prompt, temperature=0.1, model_id=ollama_client._QUERY_MODEL)
     except RuntimeError:
         return []
     candidates = []
@@ -292,7 +292,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
         date=_date(),
     )
 
-    response = ollama_client.generate(ctx["system"], prompt, temperature=0.3)
+    response = ollama_client.generate(ctx["system"], prompt, temperature=0.3, model_id=ollama_client._INGEST_MODEL)
     pages = _parse_llm_pages(response)
 
     if not pages:
@@ -301,7 +301,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
             "Reformat your output now using EXACTLY that delimiter. Same content, correct format.\n\n"
             f"Original task was:\n{prompt}"
         )
-        response = ollama_client.generate(ctx["system"], retry_prompt, temperature=0.2)
+        response = ollama_client.generate(ctx["system"], retry_prompt, temperature=0.2, model_id=ollama_client._INGEST_MODEL)
         pages = _parse_llm_pages(response)
 
     for page in pages:
@@ -502,11 +502,11 @@ def condense_followup(prev_q: str, prev_a: str, followup: str) -> str:
 
 def query_with_sources(question: str) -> dict:
     """Answer a question using wiki content. Returns {answer, sources, raw_sources}."""
-    system = schema_loader.get_system_prompt()
+    system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
 
     select_prompt = SELECT_PROMPT.format(index_text=index_text, question=question)
-    selected_raw = ollama_client.generate(system, select_prompt, temperature=0.1)
+    selected_raw = ollama_client.generate(system, select_prompt, temperature=0.1, model_id=ollama_client._QUERY_MODEL)
     selected = [
         ln.strip()
         for ln in selected_raw.splitlines()
@@ -538,7 +538,7 @@ def query_with_sources(question: str) -> dict:
 
 def lint() -> str:
     """Run wiki health check. Returns the lint report."""
-    system = schema_loader.get_system_prompt()
+    system = schema_loader.get_system_prompt(mode="query")
     all_pages = ""
     for md in sorted(_wiki().glob("*.md")):
         if md.name in _SYSTEM_PAGES:
@@ -548,7 +548,7 @@ def lint() -> str:
     if not all_pages:
         return "Wiki is empty — nothing to lint."
 
-    report = ollama_client.generate(system, LINT_PROMPT.format(all_pages=all_pages), temperature=0.3)
+    report = ollama_client.generate(system, LINT_PROMPT.format(all_pages=all_pages), temperature=0.3, model_id=ollama_client._FAST_MODEL)
 
     orphans = find_orphans()
     if orphans:
@@ -626,7 +626,7 @@ def read_description() -> str:
 
 def build_description() -> str:
     """Synthesize the database overview from the current wiki index and persist it."""
-    system = schema_loader.get_system_prompt()
+    system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else ""
     prompt = DESCRIPTION_BUILD_PROMPT.format(
         db_name=db_context.get_active_db(), index_text=index_text
@@ -658,7 +658,7 @@ def update_description(ctx: dict) -> None:
         f"Source: {ctx['source_name']}\n"
         f"Pages created/updated: {', '.join(titles) if titles else '(none)'}"
     )
-    system = schema_loader.get_system_prompt()
+    system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else ""
     prompt = DESCRIPTION_UPDATE_PROMPT.format(
         db_name=db_context.get_active_db(),
@@ -685,7 +685,7 @@ def refresh_description_after_delete(source_name: str, removed_pages: list[str])
         f"Deleted source: {source_name}\n"
         f"Wiki pages removed: {', '.join(removed_pages)}"
     )
-    system = schema_loader.get_system_prompt()
+    system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else ""
     prompt = DESCRIPTION_DELETE_PROMPT.format(
         db_name=db_context.get_active_db(),

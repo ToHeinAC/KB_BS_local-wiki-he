@@ -45,7 +45,7 @@ _RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]]+\.(?:md|txt|html))\s*\]")
 
 def _build_llm():
     return ChatOllama(
-        model=ollama_client._MODEL,
+        model=ollama_client._QUERY_MODEL,
         base_url=ollama_client._HOST,
         temperature=0.3,
         timeout=LLM_TIMEOUT,

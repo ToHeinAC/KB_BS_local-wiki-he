@@ -9,6 +9,13 @@ load_dotenv()
 _MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
 _HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
+# Per-role model overrides. Each defaults to _MODEL, so behaviour is unchanged
+# unless the operator sets the env var. QUERY = precision/selection calls,
+# INGEST = page synthesis, FAST = lightweight maintenance (lint).
+_QUERY_MODEL = os.getenv("QUERY_MODEL") or _MODEL
+_INGEST_MODEL = os.getenv("INGEST_MODEL") or _MODEL
+_FAST_MODEL = os.getenv("FAST_MODEL") or _MODEL
+
 
 def _client():
     import ollama
@@ -23,10 +30,10 @@ def is_available() -> bool:
         return False
 
 
-def generate(system: str, prompt: str, temperature: float = 0.3) -> str:
+def generate(system: str, prompt: str, temperature: float = 0.3, model_id: str | None = None) -> str:
     try:
         resp = _client().generate(
-            model=_MODEL,
+            model=model_id or _MODEL,
             system=system,
             prompt=prompt,
             options={"temperature": temperature},
