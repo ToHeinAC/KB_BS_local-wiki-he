@@ -99,6 +99,42 @@ def test_thresholds_appear_in_system_prompt(monkeypatch):
     assert str(agent.MIN_SEARCHES) in sys_text and str(agent.MIN_WORDS) in sys_text
 
 
+# --- fallback synthesis (no submit, no prose) ------------------------------
+
+def test_stalled_agent_synthesizes_from_notes(monkeypatch):
+    # Agent calls a tool, then emits an empty completion (no prose, no submit).
+    _patch_llm(
+        monkeypatch,
+        [
+            _ai_with_tool("think_tool", {"reflection": "found X about Y"}),
+            AIMessage(content="", tool_calls=[]),  # stalls: graph ends, no answer
+        ],
+    )
+    monkeypatch.setattr(
+        agent.ollama_client, "generate",
+        lambda system, prompt, **kw: "SYNTHESIZED ANSWER",
+    )
+    steps = list(agent.run_research_agent("q?"))
+    final = [s for s in steps if s["type"] == "final_answer"]
+    assert final and "SYNTHESIZED ANSWER" in final[-1]["content"]
+    assert final[-1].get("note", "").startswith("Fallback synthesis")
+
+
+def test_no_notes_no_prose_yields_error_without_synth_call(monkeypatch):
+    # Empty first completion, no tool calls -> no notes -> no synthesis, plain error.
+    _patch_llm(monkeypatch, [AIMessage(content="", tool_calls=[])])
+    called = {"n": 0}
+
+    def _spy(system, prompt, **kw):
+        called["n"] += 1
+        return "X"
+
+    monkeypatch.setattr(agent.ollama_client, "generate", _spy)
+    steps = list(agent.run_research_agent("q?"))
+    assert called["n"] == 0
+    assert steps and steps[-1]["type"] == "error"
+
+
 # --- error handling --------------------------------------------------------
 
 def test_llm_init_failure_yields_error(monkeypatch):

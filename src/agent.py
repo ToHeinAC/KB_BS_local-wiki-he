@@ -25,7 +25,12 @@ import db_context
 import ollama_client
 import run_memory
 import tools as tool_module
-from prompts import RESEARCHER_INSTRUCTIONS, RESEARCH_BUDGET_NUDGE
+from prompts import (
+    RESEARCHER_INSTRUCTIONS,
+    RESEARCH_BUDGET_NUDGE,
+    RESEARCH_FALLBACK_PROMPT,
+    RESEARCH_FALLBACK_SYSTEM,
+)
 
 load_dotenv()
 
@@ -36,6 +41,7 @@ MAX_ITER = int(os.getenv("RESEARCH_MAX_ITERATIONS", "40"))
 NUDGE_AT = int(os.getenv("RESEARCH_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 MAX_SUBMIT_ATTEMPTS = int(os.getenv("RESEARCH_MAX_SUBMIT_ATTEMPTS", "3"))
 LLM_TIMEOUT = int(os.getenv("RESEARCH_LLM_TIMEOUT", "300"))
+FALLBACK_NOTES_CAP = int(os.getenv("RESEARCH_FALLBACK_NOTES_CAP", "12000"))
 
 
 def _build_llm():
@@ -126,6 +132,35 @@ def _tool_to_result(msg: ToolMessage):
     yield {"type": "tool_result", "name": msg.name, "result": content}
 
 
+def _gather_notes(all_messages: list) -> str:
+    """Concatenate search/read tool results so a fallback pass can synthesise
+    from what the agent gathered. Keeps the most recent notes within the cap."""
+    blocks: list[str] = []
+    for m in all_messages:
+        if isinstance(m, ToolMessage):
+            c = m.content if isinstance(m.content, str) else str(m.content)
+            if c.strip():
+                blocks.append(f"### {m.name}\n{c.strip()}")
+    notes = "\n\n".join(blocks)
+    return notes[-FALLBACK_NOTES_CAP:] if len(notes) > FALLBACK_NOTES_CAP else notes
+
+
+def _synthesize_fallback(question: str, all_messages: list) -> str:
+    """Best-effort report from gathered notes when the agent stalled without
+    calling submit_final_answer. Returns '' if there are no notes or on error."""
+    notes = _gather_notes(all_messages)
+    if not notes.strip():
+        return ""
+    prompt = RESEARCH_FALLBACK_PROMPT.format(question=question, notes=notes)
+    try:
+        return ollama_client.generate(
+            RESEARCH_FALLBACK_SYSTEM, prompt,
+            temperature=0.3, model_id=ollama_client._QUERY_MODEL,
+        ).strip()
+    except Exception:
+        return ""
+
+
 def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict, None, None]:
     run_memory.begin_run()
     try:
@@ -211,6 +246,19 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
                     "report_path": None,
                 }
                 return
+
+    # The agent gathered search results but never wrote prose or filed a report
+    # (common with small local models). Synthesise an answer from the notes
+    # instead of discarding everything.
+    synth = _synthesize_fallback(question, all_messages)
+    if synth:
+        yield {
+            "type": "final_answer",
+            "content": f"(assembled from gathered notes — the agent did not file a report)\n\n{synth}",
+            "report_path": None,
+            "note": "Fallback synthesis from gathered tool results.",
+        }
+        return
 
     if recursion_hit:
         yield {"type": "final_answer",

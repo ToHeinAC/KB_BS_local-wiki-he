@@ -359,6 +359,20 @@ RESEARCH_BUDGET_NUDGE = (
     "This is your only remaining action."
 )
 
+RESEARCH_FALLBACK_SYSTEM = (
+    "You are a research report writer. Ground every statement in the provided "
+    "notes; never invent sources or facts beyond them."
+)
+
+RESEARCH_FALLBACK_PROMPT = """The research agent gathered the notes below but stopped without assembling a report. Using ONLY these notes, write the best possible answer to the question.
+
+Question: {question}
+
+Research notes (tool results):
+{notes}
+
+Write a structured markdown answer with ## headings. Inline-cite every claim with the [Wiki: filename.md] or [Source: ...] tags exactly as they appear in the notes. If the notes are insufficient to answer fully, state what is known and list the remaining gaps explicitly."""
+
 
 # --- Document → Markdown conversion (md_convert.py) -------------------------
 # Ported from ToHeinAC/MD-maker (Apache-2.0). See md_convert.py header.
