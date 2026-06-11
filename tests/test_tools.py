@@ -218,6 +218,11 @@ def test_wiki_read_empty_input():
     assert "Error" in tools._wiki_read_impl([])
 
 
+def test_research_tools_include_raw_search_and_read():
+    names = {getattr(t, "name", None) for t in tools.TOOLS}
+    assert {"wiki_search", "raw_search", "raw_read"} <= names  # research can drill into raw docs
+
+
 # --- raw_read section resolution ------------------------------------------
 
 

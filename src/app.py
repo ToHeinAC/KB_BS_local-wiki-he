@@ -1059,6 +1059,10 @@ elif page == "Wiki Chat":
             answer = ""
             raw_sources: list[str] = []
             _live = st.container()
+            with _live:
+                st.markdown(f"**Question:** {prompt}")
+                if interpreted:
+                    st.caption(f"🔎 Researching as: {interpreted}")
             for step in chat_agent.run_chat_agent(q_to_ask):
                 steps.append(step)
                 stype = step["type"]

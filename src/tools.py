@@ -683,6 +683,8 @@ def evaluate_condition(facts: dict, condition: dict) -> str:
 TOOLS = [
     wiki_search,
     wiki_read,
+    raw_search,
+    raw_read,
     tavily_search,
     fetch_webpage_content,
     think_tool,
