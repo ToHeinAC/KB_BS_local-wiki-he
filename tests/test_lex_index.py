@@ -39,6 +39,33 @@ def fresh_index(tmp_path, monkeypatch):
     return summary
 
 
+def test_scope_separates_raw_and_wiki(tmp_path, monkeypatch):
+    """R-1: wiki page bodies are indexed under scope='wiki'; raw queries exclude them."""
+    import db_context
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
+    wiki = tmp_path / "d" / "wiki"
+    wiki.mkdir(parents=True)
+    (wiki / "alpha.md").write_text(
+        "---\ntitle: Alpha\ntype: concept\n---\nThe attention mechanism scales context windows."
+    )
+    chunker.write_chunks("src.md", [{
+        "chunk_id": "r1", "text": "plutonium isotope criticality safety data",
+        "anchor": "", "heading_path": [], "char_start": 0, "char_end": 41, "lang": "en",
+    }])
+    lex_index.build()
+
+    wiki_hits = lex_index.query("attention", scope="wiki")
+    assert wiki_hits and all(h["scope"] == "wiki" for h in wiki_hits)
+    assert any(h["source"] == "alpha.md" for h in wiki_hits)
+    assert "attention" in wiki_hits[0]["text"].lower()  # text available inline
+
+    raw_hits = lex_index.query("plutonium", scope="raw")
+    assert raw_hits and all(h["scope"] == "raw" for h in raw_hits)
+    # A raw-scoped query must not leak wiki chunks.
+    assert lex_index.query("attention", scope="raw") == []
+
+
 def test_variants_three_forms():
     v = lex_index.variants("Rückstände")
     assert "rückstände" in v

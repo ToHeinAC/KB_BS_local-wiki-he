@@ -61,6 +61,12 @@ _AFFECTED_QUERY_TOPK = 20  # BM25 chunk hits considered when mapping to wiki pag
 # largest merge window so its merge stays accurate; tail pages get just enough
 # for the LLM to recognise and link them. Index = rank (0 = top hit).
 _EXISTING_BUDGET_BY_RANK = (4000, 2000, 2000, 800, 800)
+# Query-path tuning (Q-1 hybrid selection + Q-3 section-level synthesis).
+_QUERY_CANDIDATE_TOPK = 15       # BM25 hits scanned to build the candidate page set
+_QUERY_MAX_CANDIDATES = 10       # candidate pages handed to the LLM re-ranker
+_QUERY_CHUNKS_PER_PAGE = 2       # wiki chunks injected per selected page
+_QUERY_SYNTH_MAX_CHARS = 8000    # hard cap on total synthesis context
+_QUERY_PAGE_FALLBACK_CHARS = 1500  # body slice when a page had no BM25 chunk hit
 _TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*(?:\.md)?\s*$")
 
 
@@ -150,7 +156,7 @@ def _select_affected_pages(query_text: str, src_to_pages: dict[str, list[str]],
     if not src_to_pages or not query_text.strip():
         return []
     try:
-        hits = lex_index.query(query_text, top_k=_AFFECTED_QUERY_TOPK)
+        hits = lex_index.query(query_text, top_k=_AFFECTED_QUERY_TOPK, scope="raw")
     except Exception:
         return []
     page_score: dict[str, float] = {}
@@ -532,33 +538,111 @@ def condense_followup(prev_q: str, prev_a: str, followup: str) -> str:
         return followup
 
 
+def _candidate_pages_for_query(question: str) -> list[str]:
+    """BM25 candidate wiki pages for a question (Q-1).
+
+    Unions wiki-scope hits (the hit `source` IS the page filename) with raw-scope
+    hits mapped to pages via `_source_to_pages()`, preserving score order. Empty
+    when the index has no match — the caller then falls back to index-blurb LLM
+    selection.
+    """
+    cands: list[str] = []
+    seen: set[str] = set()
+
+    def _add(fname: str) -> None:
+        f = (fname or "").strip()
+        if f and f not in seen and f not in _SYSTEM_PAGES and (_wiki() / f).exists():
+            seen.add(f)
+            cands.append(f)
+
+    try:
+        for h in lex_index.query(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki"):
+            _add(h.get("source", ""))
+    except Exception:
+        pass
+    src_map = _source_to_pages()
+    try:
+        for h in lex_index.query(question, top_k=_QUERY_CANDIDATE_TOPK, scope="raw"):
+            for f in src_map.get((h.get("source") or "").strip(), []):
+                _add(f)
+    except Exception:
+        pass
+    return cands[:_QUERY_MAX_CANDIDATES]
+
+
+def _index_text_for(filenames: list[str]) -> str:
+    """A minimal `index.md`-style block (title — description) for given pages."""
+    by_name = {p["filename"]: p for p in list_pages()}
+    lines = []
+    for f in filenames:
+        p = by_name.get(f)
+        if p:
+            lines.append(f"- [{p.get('title', f)}]({f}) — {p.get('description', '')}")
+    return "\n".join(lines)
+
+
+def _select_pages(question: str, system: str, index_text: str) -> list[str]:
+    """Pick the wiki pages to answer from (Q-1: BM25 pre-select → LLM re-rank).
+
+    When BM25 surfaces candidates, the LLM re-ranks only those (high precision);
+    otherwise it selects from the full index (recall fallback). Always returns
+    valid existing page filenames, capped at 5.
+    """
+    candidates = _candidate_pages_for_query(question)
+    rank_index = _index_text_for(candidates) if candidates else index_text
+    select_prompt = SELECT_PROMPT.format(index_text=rank_index, question=question)
+    selected_raw = ollama_client.generate(
+        system, select_prompt, temperature=0.1, model_id=ollama_client._QUERY_MODEL)
+    selected = [
+        ln.strip()
+        for ln in selected_raw.splitlines()
+        if ln.strip().endswith(".md") and ln.strip() not in _SYSTEM_PAGES
+    ]
+    if candidates:
+        cand_set = set(candidates)
+        selected = [s for s in selected if s in cand_set] or candidates[:5]
+    return [s for s in selected if (_wiki() / s).exists()][:5]
+
+
 def query_with_sources(question: str) -> dict:
     """Answer a question using wiki content. Returns {answer, sources, raw_sources}."""
     system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
 
-    select_prompt = SELECT_PROMPT.format(index_text=index_text, question=question)
-    selected_raw = ollama_client.generate(system, select_prompt, temperature=0.1, model_id=ollama_client._QUERY_MODEL)
-    selected = [
-        ln.strip()
-        for ln in selected_raw.splitlines()
-        if ln.strip().endswith(".md") and ln.strip() != "index.md"
-    ][:5]
+    selected = _select_pages(question, system, index_text)
+
+    # Q-3: inject the most relevant chunks per page (with anchors), not full pages.
+    hits_by_page: dict[str, list[dict]] = {}
+    try:
+        for h in lex_index.query(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki"):
+            hits_by_page.setdefault(h.get("source", ""), []).append(h)
+    except Exception:
+        pass
 
     pages_text = ""
     used_sources = []
     raw_sources_set: set[str] = set()
     for fname in selected:
         path = _wiki() / fname
-        if path.exists():
-            text = path.read_text()
-            pages_text += f"\n\n--- {fname} ---\n{text}"
-            used_sources.append(fname)
-            try:
-                page_fm = frontmatter.loads(text)
-                raw_sources_set.update(page_fm.get("sources", []))
-            except Exception:
-                pass
+        if not path.exists():
+            continue
+        used_sources.append(fname)
+        try:
+            raw_sources_set.update(frontmatter.loads(path.read_text()).get("sources", []))
+        except Exception:
+            pass
+        hits = hits_by_page.get(fname, [])[:_QUERY_CHUNKS_PER_PAGE]
+        if hits:
+            for h in hits:
+                anchor = h.get("anchor") or ""
+                header = f"--- {fname}{(' ' + anchor) if anchor else ''} ---"
+                pages_text += f"\n\n{header}\n{h.get('text', '')}"
+        else:  # page not surfaced by the wiki query (title-only / fallback select)
+            body = read_page_parsed(fname)["content"]
+            pages_text += f"\n\n--- {fname} ---\n{body[:_QUERY_PAGE_FALLBACK_CHARS]}"
+        if len(pages_text) >= _QUERY_SYNTH_MAX_CHARS:
+            pages_text = pages_text[:_QUERY_SYNTH_MAX_CHARS] + "\n…[truncated]"
+            break
 
     if not pages_text:
         pages_text = "(no relevant pages found)"
@@ -734,41 +818,34 @@ _TYPE_GROUPS = ("concept", "entity", "source-summary", "comparison")
 
 
 def search_wiki(query: str) -> list[dict]:
-    """Case-insensitive full-text search across page titles, filenames, and bodies.
+    """BM25 full-text search over wiki page bodies (R-1).
 
-    Returns list of {"filename", "title", "excerpt"} for matching pages.
-    Excerpt is ~160 chars centred on the first body match, or page start
-    when the match is in title/filename only. Empty query returns [].
+    Queries the wiki-scoped lexical index (page bodies + their title/filename),
+    deduplicates to one result per page (best-scoring chunk wins), and returns
+    `{"filename", "title", "excerpt"}`. Empty query returns []. Requires the index
+    to have been built (ingest_end / rebuild); returns [] if it is empty.
     """
-    q = query.strip().lower()
+    q = query.strip()
     if not q:
         return []
-    results = []
-    for md in sorted(_wiki().glob("*.md")):
-        if md.name in _SYSTEM_PAGES:
+    try:
+        hits = lex_index.query(q, top_k=30, scope="wiki")
+    except Exception:
+        hits = []
+    titles = {p["filename"]: str(p.get("title", p["filename"])) for p in list_pages()}
+    results: list[dict] = []
+    seen: set[str] = set()
+    for h in hits:
+        fname = h.get("source", "")
+        if not fname or fname in seen:
             continue
-        try:
-            post = frontmatter.load(str(md))
-            title = str(post.metadata.get("title", md.stem))
-            body = post.content
-        except Exception:
-            title = md.stem
-            body = md.read_text()
-        body_lower = body.lower()
-        idx = body_lower.find(q)
-        if idx == -1 and q not in title.lower() and q not in md.name.lower():
-            continue
-        if idx == -1:
-            excerpt = body[:160].replace("\n", " ").strip()
-        else:
-            start = max(0, idx - 60)
-            end = min(len(body), idx + 100)
-            excerpt = body[start:end].replace("\n", " ").strip()
-            if start > 0:
-                excerpt = "…" + excerpt
-            if end < len(body):
-                excerpt = excerpt + "…"
-        results.append({"filename": md.name, "title": title, "excerpt": excerpt})
+        seen.add(fname)
+        excerpt = (h.get("preview") or h.get("text", "")[:320]).replace("\n", " ").strip()
+        results.append({
+            "filename": fname,
+            "title": titles.get(fname, fname.replace(".md", "")),
+            "excerpt": excerpt,
+        })
     return results
 
 

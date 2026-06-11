@@ -23,6 +23,7 @@ import re
 import unicodedata
 from pathlib import Path
 
+import frontmatter
 from dotenv import load_dotenv
 
 import chunker
@@ -125,10 +126,53 @@ def tokenize(text: str) -> list[str]:
     return [m.group(0).lower() for m in _TOKEN_RE.finditer(text)]
 
 
+_WIKI_SYSTEM_PAGES = {"index.md", "log.md", "DESCRIPTION.md"}
+
+
+def _wiki_chunks() -> list[dict]:
+    """Pseudo-chunks over wiki page bodies, tagged scope='wiki' (R-1).
+
+    Lets BM25 search synthesized/merged wiki content — which may use different
+    vocabulary than the original sources — instead of an O(n·m) string scan. Each
+    chunk's `source` is the page filename and its `text` is stored inline (these
+    are not persisted to data/chunks/, so query() reads text from `chunk_meta`).
+    The page title + filename stem are prepended so a term that lives only in the
+    title still matches.
+    """
+    wiki = db_context.wiki_dir()
+    if not wiki.exists():
+        return []
+    out: list[dict] = []
+    md_files = sorted(wiki.glob("*.md")) + sorted(wiki.glob("insights/*.md"))
+    for md in md_files:
+        if md.name in _WIKI_SYSTEM_PAGES:
+            continue
+        try:
+            post = frontmatter.load(str(md))
+            title = str(post.metadata.get("title", md.stem))
+            body = post.content
+        except Exception:
+            title, body = md.stem, md.read_text()
+        indexable = f"{title} {md.stem}\n\n{body}".strip()
+        if not indexable:
+            continue
+        for ch in chunker.split(indexable):
+            c = dict(ch)
+            c["chunk_id"] = f"wiki:{md.name}:{ch['chunk_id']}"
+            c["source"] = md.name
+            c["scope"] = "wiki"
+            out.append(c)
+    return out
+
+
 def build(chunks: list[dict] | None = None) -> dict:
-    """Build (or rebuild) the index over all chunks. Returns a small summary."""
+    """Build (or rebuild) the index over all chunks. Returns a small summary.
+
+    When no chunks are passed, indexes raw source chunks (scope='raw') plus wiki
+    page pseudo-chunks (scope='wiki') so both layers are searchable from one store.
+    """
     if chunks is None:
-        chunks = chunker.all_chunks()
+        chunks = chunker.all_chunks() + _wiki_chunks()
     postings: dict[str, dict[str, int]] = {}
     chunk_meta: dict[str, dict] = {}
     chunk_dl: dict[str, int] = {}
@@ -149,14 +193,20 @@ def build(chunks: list[dict] | None = None) -> dict:
         surface_tokens = body_tokens + qa_tokens
         dl = len(body_tokens)
         chunk_dl[cid] = dl
-        chunk_meta[cid] = {
+        scope = ch.get("scope", "raw")
+        meta = {
             "source": ch.get("source", ""),
+            "scope": scope,
             "anchor": ch.get("anchor", ""),
             "heading_path": ch.get("heading_path", []),
             "char_start": ch.get("char_start", 0),
             "char_end": ch.get("char_end", 0),
             "lang": ch.get("lang", ""),
         }
+        if scope != "raw":
+            # Wiki pseudo-chunks aren't in data/chunks/; keep their text inline.
+            meta["text"] = ch.get("text", "")
+        chunk_meta[cid] = meta
         seen_in_doc: set[str] = set()
         for tok in surface_tokens:
             for v in variants(tok):
@@ -190,11 +240,15 @@ def _load() -> tuple[dict, dict]:
     return postings, stats
 
 
-def query(q: str, top_k: int = 10) -> list[dict]:
+def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
     """BM25 over chunks. Returns up to top_k hits.
 
-    Each hit: {chunk_id, score, source, anchor, heading_path, char_start, char_end,
-               text_preview, lang, matched_terms}.
+    `scope` filters by chunk scope: "raw" (source chunks), "wiki" (wiki page
+    bodies), or None (both). A chunk indexed before R-1 (no scope in meta) counts
+    as "raw" so existing raw queries are unaffected.
+
+    Each hit: {chunk_id, score, source, scope, anchor, heading_path, char_start,
+               char_end, text, preview, lang, matched_terms}.
     """
     postings, stats = _load()
     n = stats.get("n", 0)
@@ -227,14 +281,22 @@ def query(q: str, top_k: int = 10) -> list[dict]:
             scores[cid] = scores.get(cid, 0.0) + score
             matched.setdefault(cid, set()).add(term)
 
+    if scope is not None:
+        scores = {cid: s for cid, s in scores.items()
+                  if chunk_meta.get(cid, {}).get("scope", "raw") == scope}
+
     ranked = sorted(scores.items(), key=lambda kv: -kv[1])[:top_k]
     if not ranked:
         return []
 
-    # Load chunk texts lazily from JSONL (cache per source)
+    # Load chunk texts lazily from JSONL (cache per source). Wiki pseudo-chunks
+    # carry their text inline in meta (not persisted to data/chunks/).
     text_cache: dict[str, dict[str, str]] = {}
 
-    def _text_for(cid: str, source: str) -> str:
+    def _text_for(cid: str, meta: dict) -> str:
+        if meta.get("text") is not None:
+            return meta["text"]
+        source = meta.get("source", "")
         if source not in text_cache:
             text_cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
         return text_cache[source].get(cid, "")
@@ -242,7 +304,7 @@ def query(q: str, top_k: int = 10) -> list[dict]:
     out: list[dict] = []
     for cid, score in ranked:
         meta = chunk_meta.get(cid, {})
-        text = _text_for(cid, meta.get("source", ""))
+        text = _text_for(cid, meta)
         preview = text.replace("\n", " ").strip()
         if len(preview) > 320:
             preview = preview[:320] + "…"
@@ -250,6 +312,7 @@ def query(q: str, top_k: int = 10) -> list[dict]:
             "chunk_id": cid,
             "score": round(score, 3),
             "source": meta.get("source", ""),
+            "scope": meta.get("scope", "raw"),
             "anchor": meta.get("anchor", ""),
             "heading_path": meta.get("heading_path", []),
             "char_start": meta.get("char_start", 0),

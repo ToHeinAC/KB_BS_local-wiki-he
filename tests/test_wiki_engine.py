@@ -264,17 +264,21 @@ def test_stats_correct_page_count(wiki_dir):
 
 
 def test_search_wiki_matches_title(wiki_dir):
+    import lex_index
     (wiki_dir / "transformer.md").write_text(
         "---\ntitle: Transformer Architecture\ntype: concept\n---\nbody"
     )
+    lex_index.build()  # wiki bodies + title/filename are indexed (R-1)
     hits = wiki_engine.search_wiki("transform")
     assert any(h["filename"] == "transformer.md" for h in hits)
 
 
 def test_search_wiki_matches_body(wiki_dir):
+    import lex_index
     (wiki_dir / "x.md").write_text(
         "---\ntitle: X\n---\nThe attention mechanism scales context windows."
     )
+    lex_index.build()
     hits = wiki_engine.search_wiki("attention")
     assert len(hits) == 1
     assert "attention" in hits[0]["excerpt"].lower()
@@ -284,6 +288,72 @@ def test_search_wiki_empty_query_returns_empty(wiki_dir):
     (wiki_dir / "p.md").write_text("any content")
     assert wiki_engine.search_wiki("") == []
     assert wiki_engine.search_wiki("   ") == []
+
+
+# --- Q-1: hybrid page selection ---
+
+def test_candidate_pages_finds_body_match_absent_from_blurb(wiki_dir):
+    """A term that lives in the page BODY (not its index blurb) still surfaces."""
+    import lex_index
+    (wiki_dir / "dose.md").write_text(
+        '---\ntitle: Overview\ntype: concept\nsources: ["s.md"]\n---\n'
+        "The annual effective limit is 20 millisievert for occupationally exposed workers."
+    )
+    lex_index.build()
+    cands = wiki_engine._candidate_pages_for_query("millisievert limit workers")
+    assert "dose.md" in cands
+
+
+def test_candidate_pages_maps_raw_hit_to_page(wiki_dir):
+    """A raw-chunk match maps back to its derived wiki page via `sources:`."""
+    import chunker
+    import lex_index
+    (wiki_dir / "page.md").write_text(
+        '---\ntitle: P\ntype: concept\nsources: ["src.md"]\n---\ngeneric overview body'
+    )
+    chunker.write_chunks("src.md", [{
+        "chunk_id": "r1", "text": "plutonium isotope criticality safety threshold",
+        "anchor": "", "heading_path": [], "char_start": 0, "char_end": 46, "lang": "en",
+    }])
+    lex_index.build()
+    cands = wiki_engine._candidate_pages_for_query("plutonium criticality")
+    assert "page.md" in cands
+
+
+# --- Q-3: section-level synthesis ---
+
+def test_query_synthesis_injects_chunks_not_full_page(wiki_dir, monkeypatch):
+    import lex_index
+    body = (
+        "## Dose limits\nThe annual effective dose limit is 20 millisievert per year.\n\n"
+        "## Banana farming\nUnrelated ZZZFILLER orchard gardening notes about bananas. " * 1
+        + "## Weather\nZZZFILLER cloudy skies and rainfall patterns over the region described. "
+        + "## Cooking\nZZZFILLER recipes for soup and bread baking at home in detail here. "
+    )
+    (wiki_dir / "dose.md").write_text(
+        f'---\ntitle: Dose\ntype: concept\nsources: ["s.md"]\n---\n{body}'
+    )
+    lex_index.build()
+
+    captured = {}
+
+    def _route(system, prompt, **kw):
+        if prompt.startswith("Wiki index:"):
+            return {"response": "dose.md\n"}
+        if prompt.startswith("Using only the wiki pages below"):
+            captured["answer_prompt"] = prompt
+            return {"response": "ok"}
+        return {"response": ""}
+
+    mock = MagicMock()
+    mock.generate.side_effect = lambda system, prompt, **kw: _route(system, prompt, **kw)
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+
+    out = wiki_engine.query_with_sources("dose limit millisievert per year")
+    assert out["sources"] == ["dose.md"]
+    ap = captured["answer_prompt"]
+    assert "20 millisievert" in ap          # the matching section is present
+    assert "ZZZFILLER" not in ap            # unrelated sections are NOT injected (chunk-level, not full page)
 
 
 def test_get_wiki_tree_groups_by_type(wiki_dir):

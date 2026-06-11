@@ -175,7 +175,7 @@ def _wiki_read_impl(filenames) -> str:
 
 def _raw_search_one(query: str, max_results: int) -> str:
     parts = [f"## Raw query: {query}"]
-    hits = lex_index.query(query, top_k=max_results)
+    hits = lex_index.query(query, top_k=max_results, scope="raw")
     if not hits:
         parts.append("(no results — try a different keyword or a question phrasing)")
         return "\n".join(parts)
