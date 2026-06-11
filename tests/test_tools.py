@@ -108,6 +108,27 @@ def test_submit_accepts_wiki_citations_as_sources(tmp_path, monkeypatch):
     assert "wiki:siemens-ag.md" in written
 
 
+def test_submit_accepts_file_source_citations(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
+    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "MIN_URLS", 2)
+    out = tools._submit_final_impl(
+        "Legal", "alpha beta gamma [Source: StrlSchG.md § 78] [Source: StrlSchV.md § 33]"
+    )
+    assert out.startswith("ACCEPTED") and "2 source cites" in out
+    written = (tmp_path / "comparisons" / "report-legal.md").read_text()
+    assert "src:StrlSchG.md § 78" in written
+
+
+def test_submit_does_not_double_count_url_source_citations(tmp_path, monkeypatch):
+    monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
+    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "MIN_URLS", 2)
+    # A single [Source: <URL>.html] must count once (as a URL), not twice.
+    out = tools._submit_final_impl("Once", "alpha beta gamma [Source: https://x.com/a.html]")
+    assert out.startswith("REJECTED") and "1 unique source" in out
+
+
 # --- wiki_search / wiki_read ---------------------------------------------
 
 

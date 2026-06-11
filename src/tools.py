@@ -397,7 +397,10 @@ def _submit_final_impl(title: str, answer: str) -> str:
     words = len(re.findall(r"\w+", answer or ""))
     urls = set(_URL_RE.findall(answer or ""))
     wiki_cites = set(_WIKI_CITE_RE.findall(answer or ""))
-    sources = urls | {f"wiki:{w}" for w in wiki_cites}
+    # File-style [Source: file.md] cites also count; drop URL-bearing ones so a
+    # [Source: https://…html] isn't tallied twice (already caught by _URL_RE).
+    raw_cites = {r for r in _RAW_CITE_RE.findall(answer or "") if "://" not in r}
+    sources = urls | {f"wiki:{w}" for w in wiki_cites} | {f"src:{r}" for r in raw_cites}
     if words < MIN_WORDS:
         return (
             f"REJECTED: report has {words} words, minimum is {MIN_WORDS}. "
@@ -406,14 +409,15 @@ def _submit_final_impl(title: str, answer: str) -> str:
     if len(sources) < MIN_URLS:
         return (
             f"REJECTED: report cites {len(sources)} unique sources "
-            f"(URLs + [Wiki: ...] citations), minimum is {MIN_URLS}. "
+            f"(URLs + [Wiki: ...] + [Source: ...] citations), minimum is {MIN_URLS}. "
             "Run more searches and cite additional sources."
         )
     dest_dir = db_context.wiki_dir() / "comparisons"
     dest_dir.mkdir(parents=True, exist_ok=True)
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     filename = f"report-{_slug(title)}.md"
-    all_sources = sorted(urls) + sorted(f"wiki:{w}" for w in wiki_cites)
+    all_sources = (sorted(urls) + sorted(f"wiki:{w}" for w in wiki_cites)
+                   + sorted(f"src:{r}" for r in raw_cites))
     body = (
         f'---\ntitle: "{title}"\ntype: report\ncreated: "{date}"\n'
         f"sources: {all_sources}\n---\n\n{answer}"
@@ -421,7 +425,7 @@ def _submit_final_impl(title: str, answer: str) -> str:
     (dest_dir / filename).write_text(body)
     return (
         f"ACCEPTED: comparisons/{filename} ({words} words, "
-        f"{len(urls)} urls, {len(wiki_cites)} wiki cites)"
+        f"{len(urls)} urls, {len(wiki_cites)} wiki cites, {len(raw_cites)} source cites)"
     )
 
 

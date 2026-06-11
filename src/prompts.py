@@ -11,7 +11,7 @@ RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the 
 - fetch_webpage_content(urls): fetch full page markdown in parallel. Use sparingly, only for URLs the search snippets show as highly relevant.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
-- submit_final_answer(title, answer): submit the final report. REJECTED if answer < {min_words} words or fewer than {min_urls} unique sources ([Wiki: ...] citations count alongside URLs).
+- submit_final_answer(title, answer): submit the final report. REJECTED if answer < {min_words} words or fewer than {min_urls} unique sources (web URLs, [Wiki: filename.md], and [Source: filename] citations all count).
 
 Required workflow:
 1. PLAN: think_tool once at the start. Break the original question into 3-6 sub-questions. Decide an initial wiki query plan.
@@ -72,7 +72,8 @@ FETCH_WEBPAGE_DESCRIPTION = (
 )
 
 SUBMIT_FINAL_DESCRIPTION = (
-    "Submit the final research report. Validates >= min_words and >= min_urls unique URLs. "
+    "Submit the final research report. Validates >= min_words and >= min_urls unique sources "
+    "(web URLs, [Wiki: filename.md], and [Source: filename] citations all count). "
     "On accept, the report is written to data/wiki/comparisons/ and the session ends."
 )
 

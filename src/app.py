@@ -462,6 +462,8 @@ def _render_research_sources_panel() -> None:
 
 def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str, auto_save: bool) -> None:
     st.session_state["research_sources"] = []
+    st.session_state["last_research_answer"] = ""
+    st.session_state["last_research_error"] = ""
     st.session_state["last_research_q"] = display_q
     _interpreted = question_to_run if question_to_run.strip() != display_q.strip() else None
     st.session_state["last_research_interpreted"] = _interpreted
@@ -505,6 +507,10 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                     st.session_state["last_research_answer"] = step.get("content", "")
                     if not step.get("content", "").strip():
                         st.warning("Agent completed but produced no answer text.")
+                        st.session_state["last_research_error"] = (
+                            "The agent finished but produced no answer text. "
+                            "Try rephrasing the question, or click 🆕 New research."
+                        )
                 st.session_state.setdefault("research_history", []).append({
                     "q": display_q,
                     "a": st.session_state.get("last_research_answer", ""),
@@ -514,6 +520,7 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                 })
             elif stype == "error":
                 st.error(step["content"])
+                st.session_state["last_research_error"] = step["content"]
 
 
 def _page_header(title: str, subtitle: str = "") -> None:
@@ -1096,7 +1103,7 @@ elif page == "Research":
         if st.button("🆕 New research", key="new_research"):
             for _k in ("research_history", "last_research_q", "last_research_answer",
                        "last_research_interpreted", "last_report", "research_sources",
-                       "research_followup_input"):
+                       "last_research_error", "research_followup_input"):
                 st.session_state.pop(_k, None)
             st.rerun()
 
@@ -1144,6 +1151,10 @@ elif page == "Research":
                 mime="text/markdown",
                 key="dl_report",
             )
+        elif st.session_state.get("last_research_error"):
+            st.markdown("---")
+            st.error(st.session_state["last_research_error"])
+            st.caption("The live trace above is cleared on refresh — the line above is why the run produced no answer.")
 
         if st.session_state.get("last_research_q"):
             st.markdown("---")
