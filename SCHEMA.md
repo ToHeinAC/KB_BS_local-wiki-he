@@ -42,6 +42,7 @@ confidence: high | medium | low
 - **When NOT to create a page:** only create one if the topic is the source's primary subject OR appears substantively in 2+ sources; otherwise fold it into an existing page.
 - **Confidence:** high = stated in 2+ sources; medium = stated in 1 source; low = inferred or partial.
 - **Related links:** link only to a page explicitly named or directly discussed in the source — never by mere topical association.
+- **Staleness:** optionally set `expires_after_days` in frontmatter by how fast the topic changes — ~365 for regulations/standards, ~90 for market or price data; omit for timeless facts.
 
 ## Filename Convention
 

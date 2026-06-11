@@ -214,13 +214,13 @@ Wiki pages:
 
 Question: {question}"""
 
-LINT_PROMPT = """Review all wiki pages below for quality issues.
+LINT_PROMPT = """Review all wiki pages below for quality issues. Today's date is {today}.
 
 Report:
 1. CONTRADICTIONS: pages with conflicting facts
 2. ORPHANS: pages not linked from index or other pages
 3. GAPS: important concepts mentioned but lacking their own page
-4. STALE: claims that seem outdated or uncertain
+4. STALE: claims likely outdated — weigh each page's `updated` date (and any `expires_after_days`) against today, and flag regulatory or numeric thresholds whose source version may have since changed
 5. SUGGESTIONS: 2-3 investigation ideas for future ingestion
 
 Wiki pages:

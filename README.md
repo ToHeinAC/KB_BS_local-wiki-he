@@ -52,6 +52,7 @@ Edit `.env` (copied from `.env.example`):
 | `PDF_DPI` | `150` | Rasterization DPI for scanned PDF pages sent to OCR |
 | `DATA_ROOT` | `data` | Root for all databases; each DB is an isolated subtree `$DATA_ROOT/<db>/{raw,chunks,index,wiki}`; `users.json` lives at `$DATA_ROOT/users.json` |
 | `INGEST_QA` | `1` | Run hypothetical-question generator during ingest (`0` to disable) |
+| `STALE_AFTER_DAYS` | `365` | Default freshness window; pages older than this (unless they set `expires_after_days`) are flagged ⚠️ stale in the wiki tree and lint |
 | `QA_BATCH_SIZE` | `12` | Chunks per QA-generator LLM batch |
 | `QA_MAX_PAIRS_PER_SOURCE` | `5` | Max hypothetical-question pairs persisted per source (caps `qa_gen` cost) |
 | `TAVILY_API_KEY` | — | Required for the Research page (web search) |

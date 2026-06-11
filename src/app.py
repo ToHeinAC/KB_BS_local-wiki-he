@@ -409,15 +409,16 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
         tree = wiki_engine.get_wiki_tree()
         group_labels = {
             "concept": "Concepts", "entity": "Entities",
-            "source-summary": "Source Summaries", "comparison": "Comparisons", "other": "Other",
+            "source-summary": "Source Summaries", "comparison": "Comparisons",
+            "insight": "Insights", "other": "Other",
         }
-        for grp in ["concept", "entity", "source-summary", "comparison", "other"]:
+        for grp in ["concept", "entity", "source-summary", "comparison", "insight", "other"]:
             group = tree.get(grp)
             if not group:
                 continue
             with st.expander(f"{group_labels[grp]} ({len(group)})", expanded=(grp == "concept")):
                 for p in group:
-                    title = p.get("title", p["filename"])
+                    title = ("⚠️ " if p.get("stale") else "") + p.get("title", p["filename"])
                     if st.button(title, key=f"{key_prefix}_nav_{p['filename']}", use_container_width=True):
                         st.session_state[f"{key_prefix}_selected_page"] = p["filename"]
                         selected = p["filename"]

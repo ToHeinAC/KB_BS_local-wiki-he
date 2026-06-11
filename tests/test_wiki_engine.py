@@ -1,5 +1,6 @@
 """Tests for wiki_engine.py — core wiki operations."""
 
+from datetime import date
 from unittest.mock import MagicMock
 
 import pytest
@@ -354,6 +355,89 @@ def test_query_synthesis_injects_chunks_not_full_page(wiki_dir, monkeypatch):
     ap = captured["answer_prompt"]
     assert "20 millisievert" in ap          # the matching section is present
     assert "ZZZFILLER" not in ap            # unrelated sections are NOT injected (chunk-level, not full page)
+
+
+# --- E-1: staleness ---
+
+def test_is_page_stale_default_ttl():
+    today = date(2026, 6, 11)
+    old = {"updated": "2024-01-01"}          # >365 days before today
+    fresh = {"updated": "2026-06-01"}
+    assert wiki_engine.is_page_stale(old, today) is True
+    assert wiki_engine.is_page_stale(fresh, today) is False
+
+
+def test_is_page_stale_respects_expires_after_days_override():
+    today = date(2026, 6, 11)
+    # 100 days old: stale under a 30-day TTL, fresh under the 365-day default.
+    page = {"updated": "2026-03-03", "expires_after_days": 30}
+    assert wiki_engine.is_page_stale(page, today) is True
+    assert wiki_engine.is_page_stale({"updated": "2026-03-03"}, today) is False
+
+
+def test_is_page_stale_handles_missing_or_disabled():
+    today = date(2026, 6, 11)
+    assert wiki_engine.is_page_stale({}, today) is False                       # no updated
+    assert wiki_engine.is_page_stale({"updated": "nonsense"}, today) is False  # unparseable
+    assert wiki_engine.is_page_stale(                                          # TTL<=0 = never
+        {"updated": "2000-01-01", "expires_after_days": 0}, today) is False
+
+
+def test_stale_pages_lists_overdue_page(wiki_dir):
+    (wiki_dir / "old.md").write_text(
+        '---\ntitle: Old\ntype: concept\nupdated: "2020-01-01"\n---\nbody'
+    )
+    (wiki_dir / "new.md").write_text(
+        f'---\ntitle: New\ntype: concept\nupdated: "{wiki_engine._date()}"\n---\nbody'
+    )
+    stale = wiki_engine.stale_pages()
+    assert "old.md" in stale
+    assert "new.md" not in stale
+
+
+def test_lint_prepends_stale_pages(wiki_dir, monkeypatch):
+    (wiki_dir / "old.md").write_text(
+        '---\ntitle: Old\ntype: concept\nupdated: "2020-01-01"\n---\nbody'
+    )
+    mock = MagicMock()
+    mock.generate.return_value = {"response": "LLM lint body"}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    report = wiki_engine.lint()
+    assert "Possibly stale" in report
+    assert "old.md" in report
+
+
+# --- E-2: insights in wiki health ---
+
+def test_list_pages_includes_insights_when_requested(wiki_dir):
+    wiki_engine.file_answer("What is the dose limit?", "20 mSv per year.", ["dose.md"])
+    without = {p["filename"] for p in wiki_engine.list_pages()}
+    with_ins = {p["filename"] for p in wiki_engine.list_pages(include_insights=True)}
+    assert not any(f.startswith("insights/") for f in without)   # default unchanged
+    insight = next(f for f in with_ins if f.startswith("insights/"))
+    page = next(p for p in wiki_engine.list_pages(include_insights=True)
+                if p["filename"] == insight)
+    assert page["type"] == "insight"
+
+
+def test_rebuild_index_has_insights_section(wiki_dir):
+    (wiki_dir / "concept-a.md").write_text("---\ntitle: A\ntype: concept\n---\nbody")
+    wiki_engine.file_answer("Q?", "A.", [])
+    wiki_engine._rebuild_index()
+    index = (wiki_dir / "index.md").read_text()
+    assert "## Insights" in index
+    assert "insights/insight-q.md" in index
+
+
+def test_get_wiki_tree_groups_insights_and_flags_stale(wiki_dir):
+    (wiki_dir / "old.md").write_text(
+        '---\ntitle: Old\ntype: concept\nupdated: "2020-01-01"\n---\nbody'
+    )
+    wiki_engine.file_answer("Q?", "A.", [])
+    tree = wiki_engine.get_wiki_tree()
+    assert "insight" in tree and tree["insight"]
+    old = next(p for p in tree["concept"] if p["filename"] == "old.md")
+    assert old["stale"] is True
 
 
 def test_get_wiki_tree_groups_by_type(wiki_dir):

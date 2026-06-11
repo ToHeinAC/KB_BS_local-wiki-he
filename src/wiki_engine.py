@@ -3,7 +3,7 @@
 import os
 import re
 import shutil
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import frontmatter
@@ -67,6 +67,9 @@ _QUERY_MAX_CANDIDATES = 10       # candidate pages handed to the LLM re-ranker
 _QUERY_CHUNKS_PER_PAGE = 2       # wiki chunks injected per selected page
 _QUERY_SYNTH_MAX_CHARS = 8000    # hard cap on total synthesis context
 _QUERY_PAGE_FALLBACK_CHARS = 1500  # body slice when a page had no BM25 chunk hit
+# Temporal staleness (E-1): a page is stale when `updated` + TTL < today. TTL is the
+# page's own `expires_after_days` frontmatter if set, else this default.
+_DEFAULT_EXPIRE_DAYS = int(os.getenv("STALE_AFTER_DAYS", "365"))
 _TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*(?:\.md)?\s*$")
 
 
@@ -89,6 +92,38 @@ def _date() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
+def _parse_date(value) -> date | None:
+    try:
+        return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        return None
+
+
+def is_page_stale(meta: dict, today: date | None = None) -> bool:
+    """True when a page is past its freshness window (E-1).
+
+    Window = the page's `expires_after_days` frontmatter (int), else
+    `_DEFAULT_EXPIRE_DAYS`. A non-positive TTL or an unparseable `updated` date
+    means 'never stale'.
+    """
+    updated = _parse_date(meta.get("updated"))
+    if updated is None:
+        return False
+    try:
+        ttl = int(meta.get("expires_after_days"))
+    except (TypeError, ValueError):
+        ttl = _DEFAULT_EXPIRE_DAYS
+    if ttl <= 0:
+        return False
+    today = today or datetime.now(timezone.utc).date()
+    return (today - updated).days > ttl
+
+
+def stale_pages() -> list[str]:
+    """Filenames of all pages (incl. insights) currently flagged stale."""
+    return [p["filename"] for p in list_pages(include_insights=True) if is_page_stale(p)]
+
+
 def _append_log(action: str, detail: str) -> None:
     entry = f"\n## {_now()} — {action}\n{detail}\n"
     with _log_path().open("a") as f:
@@ -96,12 +131,18 @@ def _append_log(action: str, detail: str) -> None:
 
 
 def _rebuild_index() -> None:
-    pages = list_pages()
-    lines = [f"# Wiki Index\nUpdated: {_date()} | Pages: {len(pages)}\n\n## Pages\n"]
-    for p in pages:
-        title = p.get("title", p["filename"])
-        desc = p.get("description", "")
-        lines.append(f"- [{title}]({p['filename']}) — {desc}\n")
+    pages = list_pages(include_insights=True)
+    main = [p for p in pages if p.get("type") != "insight"]
+    insights = [p for p in pages if p.get("type") == "insight"]
+
+    def _line(p: dict) -> str:
+        return f"- [{p.get('title', p['filename'])}]({p['filename']}) — {p.get('description', '')}\n"
+
+    lines = [f"# Wiki Index\nUpdated: {_date()} | Pages: {len(main)}\n\n## Pages\n"]
+    lines += [_line(p) for p in main]
+    if insights:
+        lines.append("\n## Insights\n")
+        lines += [_line(p) for p in insights]
     _index_path().write_text("".join(lines))
 
 
@@ -656,41 +697,63 @@ def lint() -> str:
     """Run wiki health check. Returns the lint report."""
     system = schema_loader.get_system_prompt(mode="query")
     all_pages = ""
-    for md in sorted(_wiki().glob("*.md")):
+    files = sorted(_wiki().glob("*.md")) + sorted((_wiki() / _INSIGHTS_DIR).glob("*.md"))
+    for md in files:
         if md.name in _SYSTEM_PAGES:
             continue
-        all_pages += f"\n\n--- {md.name} ---\n{md.read_text()}"
+        label = f"{_INSIGHTS_DIR}/{md.name}" if md.parent.name == _INSIGHTS_DIR else md.name
+        all_pages += f"\n\n--- {label} ---\n{md.read_text()}"
 
     if not all_pages:
         return "Wiki is empty — nothing to lint."
 
-    report = ollama_client.generate(system, LINT_PROMPT.format(all_pages=all_pages), temperature=0.3, model_id=ollama_client._FAST_MODEL)
+    report = ollama_client.generate(
+        system, LINT_PROMPT.format(all_pages=all_pages, today=_date()),
+        temperature=0.3, model_id=ollama_client._FAST_MODEL)
 
+    prog_blocks = []
     orphans = find_orphans()
     if orphans:
-        prog = "## Programmatic checks\n\n**Orphans (no in-links from `related` frontmatter):**\n" + "\n".join(
-            f"- {o}" for o in orphans
-        ) + "\n\n---\n\n"
-        report = prog + report
+        prog_blocks.append("**Orphans (no in-links from `related` frontmatter):**\n"
+                           + "\n".join(f"- {o}" for o in orphans))
+    stale = stale_pages()
+    if stale:
+        prog_blocks.append(f"**Possibly stale (past freshness window as of {_date()}):**\n"
+                           + "\n".join(f"- {s}" for s in stale))
+    if prog_blocks:
+        report = "## Programmatic checks\n\n" + "\n\n".join(prog_blocks) + "\n\n---\n\n" + report
 
     _append_log("Lint", report[:500])
     return report
 
 
-def list_pages() -> list[dict]:
-    """Return metadata for all non-system wiki pages."""
+def list_pages(include_insights: bool = False) -> list[dict]:
+    """Return metadata for all non-system wiki pages.
+
+    With `include_insights=True`, also lists `insights/*.md` (E-2) — their
+    `filename` carries the `insights/` prefix (so `read_page` resolves them) and
+    their `type` is forced to `insight`.
+    """
+    files = sorted(_wiki().glob("*.md"))
+    if include_insights:
+        files += sorted((_wiki() / _INSIGHTS_DIR).glob("*.md"))
     results = []
-    for md in sorted(_wiki().glob("*.md")):
+    for md in files:
         if md.name in _SYSTEM_PAGES:
             continue
+        is_insight = md.parent.name == _INSIGHTS_DIR
+        fname = f"{_INSIGHTS_DIR}/{md.name}" if is_insight else md.name
         try:
             post = frontmatter.load(str(md))
             meta = dict(post.metadata)
-            meta["filename"] = md.name
+            meta["filename"] = fname
+            if is_insight:
+                meta["type"] = "insight"
             meta.setdefault("description", post.content[:120].replace("\n", " "))
             results.append(meta)
         except Exception:
-            results.append({"filename": md.name, "title": md.stem, "description": ""})
+            results.append({"filename": fname, "title": md.stem, "description": "",
+                            **({"type": "insight"} if is_insight else {})})
     return results
 
 
@@ -814,7 +877,7 @@ def refresh_description_after_delete(source_name: str, removed_pages: list[str])
         _description_path().write_text(_cap_description(response))
 
 
-_TYPE_GROUPS = ("concept", "entity", "source-summary", "comparison")
+_TYPE_GROUPS = ("concept", "entity", "source-summary", "comparison", "insight")
 
 
 def search_wiki(query: str) -> list[dict]:
@@ -852,13 +915,16 @@ def search_wiki(query: str) -> list[dict]:
 def get_wiki_tree() -> dict[str, list[dict]]:
     """Group `list_pages()` output by frontmatter `type`.
 
-    Returns dict keyed by type (concept/entity/source-summary/comparison/other),
-    only including non-empty groups. Order within a group matches list_pages().
+    Returns dict keyed by type (concept/entity/source-summary/comparison/insight/
+    other), only including non-empty groups. Order within a group matches
+    list_pages(). Each page dict is annotated with `stale` (E-1).
     """
+    today = datetime.now(timezone.utc).date()
     tree: dict[str, list[dict]] = {}
-    for page in list_pages():
+    for page in list_pages(include_insights=True):
         t = str(page.get("type", "")).strip().lower()
         key = t if t in _TYPE_GROUPS else "other"
+        page["stale"] = is_page_stale(page, today)
         tree.setdefault(key, []).append(page)
     return tree
 
