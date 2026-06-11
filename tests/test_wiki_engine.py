@@ -475,6 +475,44 @@ def test_find_orphans_returns_pages_with_no_inedges(wiki_dir):
     assert "c.md" in orphans
 
 
+# --- linked_pages (link-aware retrieval expansion) ---
+
+def test_linked_pages_returns_one_hop_neighbours(wiki_dir):
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["b.md", "c.md"]\n---\nBody A')
+    (wiki_dir / "b.md").write_text("---\ntitle: B\nrelated: []\n---\nBody B")
+    (wiki_dir / "c.md").write_text("---\ntitle: C\nrelated: []\n---\nBody C")
+    out = wiki_engine.linked_pages(["a.md"])
+    names = {p["filename"] for p in out}
+    assert names == {"b.md", "c.md"}
+    assert all(p["via"] == "a.md" for p in out)
+    assert next(p for p in out if p["filename"] == "b.md")["title"] == "B"
+
+
+def test_linked_pages_excludes_seeds_and_missing_targets(wiki_dir):
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["b.md", "gone.md", "a.md"]\n---\nA')
+    (wiki_dir / "b.md").write_text("---\ntitle: B\nrelated: []\n---\nB")
+    out = wiki_engine.linked_pages(["a.md"])
+    assert {p["filename"] for p in out} == {"b.md"}  # seed + nonexistent dropped
+
+
+def test_linked_pages_ranks_by_link_count_and_caps(wiki_dir):
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["shared.md", "x.md"]\n---\nA')
+    (wiki_dir / "b.md").write_text('---\ntitle: B\nrelated: ["shared.md"]\n---\nB')
+    for n in ("shared.md", "x.md"):
+        (wiki_dir / n).write_text(f"---\ntitle: {n}\nrelated: []\n---\n{n}")
+    out = wiki_engine.linked_pages(["a.md", "b.md"], limit=1)
+    assert [p["filename"] for p in out] == ["shared.md"]  # 2 links > 1 link, capped at 1
+
+
+def test_linked_pages_includes_insight_neighbours(wiki_dir):
+    (wiki_dir / "insights").mkdir(exist_ok=True)
+    (wiki_dir / "insights" / "note.md").write_text("---\ntitle: Note\n---\nInsight body")
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["insights/note.md"]\n---\nA')
+    out = wiki_engine.linked_pages(["a.md"])
+    assert {p["filename"] for p in out} == {"insights/note.md"}
+    assert out[0]["title"] == "Note"
+
+
 # --- ingest with existing content + retry ---
 
 def test_ingest_loads_existing_content_for_affected_pages(wiki_dir, monkeypatch):

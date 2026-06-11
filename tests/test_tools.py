@@ -140,6 +140,53 @@ def test_wiki_search_parallel_batch(monkeypatch):
     assert "a.md" in out and "b.md" in out and "c.md" in out
 
 
+def test_wiki_search_appends_linked_pages(monkeypatch):
+    monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", True)
+    monkeypatch.setattr(
+        tools.wiki_engine, "search_wiki",
+        lambda q: [{"filename": "a.md", "title": "A", "excerpt": "hit"}],
+    )
+    captured = {}
+
+    def fake_linked(seeds, limit):
+        captured["seeds"] = seeds
+        return [{"filename": "b.md", "title": "B", "excerpt": "nbr", "via": "a.md"}]
+
+    monkeypatch.setattr(tools.wiki_engine, "linked_pages", fake_linked)
+    out = tools._wiki_search_impl(query="x")
+    assert captured["seeds"] == ["a.md"]
+    assert "Wiki linked 1" in out and "b.md" in out and "related via a.md" in out
+
+
+def test_wiki_search_link_expansion_skips_already_shown(monkeypatch):
+    monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", True)
+    monkeypatch.setattr(
+        tools.wiki_engine, "search_wiki",
+        lambda q: [{"filename": "a.md", "title": "A", "excerpt": "hit"}],
+    )
+    # linked_pages returns a page already present as a direct hit -> filtered out
+    monkeypatch.setattr(
+        tools.wiki_engine, "linked_pages",
+        lambda seeds, limit: [{"filename": "a.md", "title": "A", "excerpt": "", "via": "a.md"}],
+    )
+    out = tools._wiki_search_impl(query="x")
+    assert "Wiki linked" not in out
+
+
+def test_wiki_search_link_expansion_disabled(monkeypatch):
+    monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", False)
+    monkeypatch.setattr(
+        tools.wiki_engine, "search_wiki",
+        lambda q: [{"filename": "a.md", "title": "A", "excerpt": "hit"}],
+    )
+    monkeypatch.setattr(
+        tools.wiki_engine, "linked_pages",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not be called")),
+    )
+    out = tools._wiki_search_impl(query="x")
+    assert "Wiki linked" not in out
+
+
 def test_wiki_read_returns_body(monkeypatch):
     monkeypatch.setattr(tools.wiki_engine, "read_page", lambda f: f"BODY OF {f}")
     out = tools._wiki_read_impl(["siemens-ag.md"])
@@ -207,6 +254,27 @@ def test_raw_read_section_memory_keys_distinct(wiki_dir):
     assert "[memory] Already read this section" in again
     # menu lists only sections not yet read this run (§61, §62 already read)
     assert "§ 63" in again and "§ 62" not in again
+
+
+def test_raw_read_duplicate_offset_names_next_unread_window(wiki_dir):
+    cap = tools.RAW_READ_CAP
+    (tools.db_context.raw_dir() / "big.md").write_text("x" * (cap * 3), encoding="utf-8")
+    run_memory.begin_run()
+    first = tools.raw_read.invoke({"filenames": ["big.md"], "offset": 0})
+    assert "[memory] Already read" not in first
+    dup = tools.raw_read.invoke({"filenames": ["big.md"], "offset": 0})
+    assert "[memory] Already read" in dup
+    assert f"offset={cap}" in dup  # concrete next window, not generic advice
+
+
+def test_raw_read_duplicate_offset_after_full_read_has_no_offset_hint(wiki_dir):
+    cap = tools.RAW_READ_CAP
+    (tools.db_context.raw_dir() / "small.md").write_text("y" * (cap // 2), encoding="utf-8")
+    run_memory.begin_run()
+    tools.raw_read.invoke({"filenames": ["small.md"], "offset": 0})  # whole file in one window
+    dup = tools.raw_read.invoke({"filenames": ["small.md"], "offset": 0})
+    assert "[memory] Already read" in dup
+    assert "Whole file already read" in dup and "offset=" not in dup
 
 
 # --- think_tool -----------------------------------------------------------

@@ -1008,6 +1008,44 @@ def build_link_graph() -> dict[str, set[str]]:
     return graph
 
 
+def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
+    """1-hop link expansion: neighbours of `filenames` via frontmatter `related:`.
+
+    Used by link-aware retrieval — after a wiki search, pull the related pages of
+    the top hits into context so a query reaches material it didn't lexically
+    match. Returns up to `limit` page dicts `{filename, title, excerpt, via}` that
+    are NOT already in `filenames`. Neighbours linked by more seeds rank first
+    (insertion order breaks ties); `via` is the first seed that links each one.
+    Only existing wiki pages are returned (insights included, `insights/`-prefixed).
+    """
+    seeds = [f for f in filenames if f]
+    if not seeds or limit <= 0:
+        return []
+    seed_set = set(seeds)
+    titles = {p["filename"]: str(p.get("title", p["filename"]))
+              for p in list_pages(include_insights=True)}
+    order: list[str] = []
+    counts: dict[str, int] = {}
+    via: dict[str, str] = {}
+    for seed in seeds:
+        for r in read_page_parsed(seed).get("related", []) or []:
+            r = str(r).strip()
+            if not r or r in seed_set or r not in titles:
+                continue
+            if r not in counts:
+                counts[r] = 0
+                via[r] = seed
+                order.append(r)
+            counts[r] += 1
+    order.sort(key=lambda r: -counts[r])  # stable: equal counts keep insertion order
+    out: list[dict] = []
+    for r in order[:limit]:
+        body = read_page_parsed(r).get("content", "")
+        excerpt = " ".join(body.split())[:240]
+        out.append({"filename": r, "title": titles[r], "excerpt": excerpt, "via": via[r]})
+    return out
+
+
 def build_typed_graph() -> dict:
     """Return a typed node/edge list for the wiki graph viz.
 

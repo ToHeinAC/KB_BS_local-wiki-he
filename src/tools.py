@@ -43,6 +43,9 @@ CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "300"))
 CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 CONTENT_TRUNCATE = 2000
 RAW_READ_CAP = 8000  # chars per raw_read call (per file, per offset window)
+WIKI_LINK_EXPANSION = os.getenv("WIKI_LINK_EXPANSION", "1") != "0"
+WIKI_LINK_SEEDS = int(os.getenv("WIKI_LINK_SEEDS", "3"))  # top hits whose links we follow
+WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended per query
 
 _URL_RE = re.compile(r"https?://[^\s\)\]]+")
 _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([\w\-./]+\.md)\s*\]")
@@ -130,14 +133,31 @@ def _format_wiki_hit(idx: int, hit: dict) -> str:
     )
 
 
+def _format_wiki_link(idx: int, hit: dict) -> str:
+    return (
+        f"[Wiki linked {idx} — related via {hit.get('via', '')}]\n"
+        f"file: {hit.get('filename', '')}\n"
+        f"title: {hit.get('title', '')}\n"
+        f"excerpt: {hit.get('excerpt', '')}\n---"
+    )
+
+
 def _wiki_search_one(query: str, max_results: int) -> str:
     hits = wiki_engine.search_wiki(query) or []
     parts = [f"## Wiki query: {query}"]
     if not hits:
         parts.append("(no results)")
         return "\n".join(parts)
-    for i, h in enumerate(hits[:max_results], 1):
+    top = hits[:max_results]
+    for i, h in enumerate(top, 1):
         parts.append(_format_wiki_hit(i, h))
+    if WIKI_LINK_EXPANSION:
+        seeds = [h["filename"] for h in top[:WIKI_LINK_SEEDS]]
+        shown = {h["filename"] for h in top}
+        linked = [l for l in wiki_engine.linked_pages(seeds, limit=WIKI_LINK_MAX)
+                  if l["filename"] not in shown]
+        for i, l in enumerate(linked, 1):
+            parts.append(_format_wiki_link(i, l))
     return "\n".join(parts)
 
 
@@ -283,6 +303,38 @@ def _read_canons(mem, base: str) -> set[str]:
     """Normalized section anchors of `base` already read this run."""
     prefix = f"raw:{base}|sec="
     return {k[len(prefix):].rsplit(":", 1)[0] for k in mem.reads if k.startswith(prefix)}
+
+
+def _read_offsets(mem, base: str) -> set[int]:
+    """Section-less byte offsets of `base` already read this run."""
+    prefix = f"raw:{base}:"  # excludes section keys (those have '|sec=' before ':')
+    out: set[int] = set()
+    for k in mem.reads:
+        if k.startswith(prefix):
+            try:
+                out.add(int(k[len(prefix):]))
+            except ValueError:
+                pass
+    return out
+
+
+def _next_unread_offset(mem, base: str) -> int | None:
+    """Smallest RAW_READ_CAP-aligned offset of `base` not yet read this run.
+
+    None if the whole file is read (or it can't be sized). Lets the duplicate-read
+    stub name the exact next call instead of generic 'paginate' advice, so a weak
+    model breaks the offset-0 loop in one step."""
+    data = wiki_engine.read_raw_source(base)
+    if data is None:
+        return None
+    total = len(data.decode("utf-8", errors="replace"))
+    read = _read_offsets(mem, base)
+    g = 0
+    while g < total:
+        if g not in read:
+            return g
+        g += RAW_READ_CAP
+    return None
 
 
 def _raw_read_one(filename: str, offset: int = 0) -> str:
@@ -504,10 +556,15 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
                 "Read one of those, pick a different file, or call think_tool."
             )
         else:
+            nxt = _next_unread_offset(mem, base)
+            hint = (
+                f"Next unread window: call raw_read(['{base}'], offset={nxt})."
+                if nxt is not None
+                else "Whole file already read — pick a different file or call think_tool."
+            )
             out.append(
                 f"## Raw file: {base} (offset {int(offset or 0)})\n"
-                f"[memory] Already read at step {prior} — do not re-fetch. "
-                "Paginate with a new offset, pick a different file, or use think_tool."
+                f"[memory] Already read at step {prior} — do not re-fetch. {hint}"
             )
     if fresh:
         out.append(_raw_read_impl(fresh, offset=offset))

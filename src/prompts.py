@@ -48,7 +48,9 @@ THINK_TOOL_DESCRIPTION = (
 WIKI_SEARCH_DESCRIPTION = (
     "Full-text search over the local wiki (data/wiki/). Pass `query` (single string) OR "
     "`queries` (list of 2-4 sub-queries) to search in parallel. Returns filename, title, "
-    "and excerpt for each hit. Cite hits in the final report as [Wiki: filename.md]. "
+    "and excerpt for each hit. May also append `[Wiki linked N]` entries: pages "
+    "related (via frontmatter) to the top hits — wiki_read them if relevant. "
+    "Cite hits in the final report as [Wiki: filename.md]. "
     "This MUST be the first non-think tool call in every research run."
 )
 
