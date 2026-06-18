@@ -15,6 +15,7 @@ import auth
 import db_context
 import dedup
 import file_processor
+import gpu_widget
 import md_convert
 import ollama_client
 import template_loader
@@ -564,17 +565,6 @@ def _safe_reset() -> None:
     st.rerun()
 
 
-def _ollama_badge() -> None:
-    ok = ollama_client.is_available()
-    color = "#2d6a2d" if ok else "#a00"
-    label = "Ollama online" if ok else "Ollama offline"
-    st.sidebar.markdown(
-        f'<span style="background:{color};color:#fff;padding:2px 8px;border-radius:2px;font-size:0.75rem;font-weight:600">{label}</span>',
-        unsafe_allow_html=True,
-    )
-    st.sidebar.caption(f"Model: {ollama_client._MODEL}")
-
-
 # --- bootstrap: migrate legacy data layout + seed default user ---
 db_context.migrate_legacy_layout()
 auth.ensure_seeded()
@@ -621,15 +611,8 @@ db_context.set_active_db(st.session_state["active_db"])
 _can_maintain = auth.is_maintainer(_user, st.session_state["active_db"])
 wiki_engine.init_wiki()
 
-_logo_col, _badge_col = st.sidebar.columns([2, 1])
-_logo_col.markdown("## 📖 LocalWiki")
-with _badge_col:
-    _ollama_badge()
-
-_next_theme = "🌙 Dark" if st.session_state["theme"] == "Forest" else "☀️ Light"
-if st.sidebar.button(_next_theme, key="theme_toggle"):
-    st.session_state["theme"] = "Slate" if st.session_state["theme"] == "Forest" else "Forest"
-    st.rerun()
+st.sidebar.markdown("## 📖 LocalWiki")
+gpu_widget.render_gpu_sidebar(accent=_t["primary"])
 
 st.sidebar.caption("DATABASE")
 _db_choice = st.sidebar.selectbox(

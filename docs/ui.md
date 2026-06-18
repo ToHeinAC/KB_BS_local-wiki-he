@@ -33,7 +33,7 @@ The editorial language is delivered through a single theme-aware CSS block injec
 | `border` | `#d4dbd6` | `#2e3347` |
 
 - **Typography:** **Inter** body (Google Fonts) + **Libre Baskerville** serif headings (the editorial pairing). Buttons are sentence-case with a subtle 6 px radius and hover transition (replacing the earlier all-caps treatment).
-- **Toggle:** a sidebar button (`🌙 Dark` / `☀️ Light`, key `theme_toggle`) flips `st.session_state["theme"]` between `Forest` and `Slate` and reruns. Default is `Forest`.
+- **Toggle:** the runtime theme switch is currently disabled — the app stays on the default `Forest` palette. The `Slate` (dark) palette and the full `_THEMES` switching machinery (CSS keyed on `st.session_state["theme"]`) remain in `src/app.py` so a `theme_toggle` sidebar button can be re-added later without rework.
 - **`config.toml`:** `.streamlit/config.toml` sets the static base palette (`textColor=#1a1f1c`, `secondaryBackgroundColor=#eaf0ec`); the injected CSS overrides per-surface for dark mode because config theme values are not runtime-switchable. The wildcard rule sets only `color` (never `font-family`, which would break Material icon ligatures); an explicit rule re-asserts the Material Symbols font on icon spans. Component surfaces that pull from `secondaryBackgroundColor` (file-uploader dropzone, expanders, form-submit buttons) get explicit theme overrides so neither theme shows low-contrast text.
 - **Expanders** use the page `bg` so the lighter `widget_bg` list buttons inside (e.g. the Wiki Explorer nav panel) stand out as distinct boxes.
 
@@ -66,14 +66,14 @@ Admins (`is_admin`) manage users/databases in the Maintenance admin panels: main
 
 ## Top-bar / chrome
 
-Logo + nav + live wiki stats (`N pages | N sources | last updated`) + Ollama connectivity indicator. PRD §3.9.1.
+Logo + nav + live wiki stats (`N pages | N sources | last updated`) + live GPU widget. PRD §3.9.1.
 
-The sidebar Ollama indicator (`_ollama_badge()`) shows a green/red badge ("Ollama online / offline") followed by a `st.sidebar.caption` with the active model name (e.g. `Model: gemma4:e4b` from `ollama_client._MODEL`).
+**Live GPU widget (`src/gpu_widget.py`).** Replaces the former text-only Ollama badge with a real-time monitor: per-GPU temperature / fan / load (from `nvidia-smi`) plus the active model (`llm: …` from `ollama_client._MODEL`) and, during a research run, an elapsed timer. Because Streamlit 1.57 serves via **Starlette/uvicorn** (not Tornado), `render_gpu_sidebar()` injects a same-origin `/_api/gpu` route into the live Starlette app (discovered through `gc.get_objects()`, inserted at index 0 of `app.router.routes` so it precedes the SPA catch-all). A small `components.html` iframe polls that relative URL every second — no extra port, no CORS, works over SSH/Cloudflare tunnels. The widget is hidden gracefully when no GPU / `nvidia-smi` is present. Colors track the Streamlit theme: GPU rows use the muted grey of the `llm:` line, and the normal temp/load state uses the `primaryColor` (`#234637`, passed via `render_gpu_sidebar(accent=_t["primary"])`) — the same dark green as the radio buttons; warning thresholds stay orange (≥70 °C / ≥50 %) and red (≥80 °C / ≥80 %).
 
-**Sidebar layout (top → bottom):** logo + Ollama badge in a row; the theme toggle; a `DATABASE` caption + DB selectbox (label collapsed); divider; a `NAVIGATION` caption + the page radio; live `N pages · M sources` stats; divider; `Signed in as …` + matching boxed **Reset** / **Logout** buttons side-by-side (`st.columns(2)`, styled via their `.st-key-reset_btn` / `.st-key-logout_btn` classes to override the transparent nav-button style).
+**Sidebar layout (top → bottom):** `## 📖 LocalWiki` logo + the GPU widget; a `DATABASE` caption + DB selectbox (label collapsed); divider; a `NAVIGATION` caption + the page radio; live `N pages · M sources` stats; divider; `Signed in as …` + matching boxed **Reset** / **Logout** buttons side-by-side (`st.columns(2)`, styled via their `.st-key-reset_btn` / `.st-key-logout_btn` classes to override the transparent nav-button style).
 
 The **login gate** is centered in a constrained middle column (`st.columns([1, 1.4, 1])`) with a `## 📖 LocalWiki` heading, a "Sign in to continue" caption, and a full-width primary submit button.
 
 ## Error states (UI surface)
 
-Connectivity and config errors must be visible, not silent (PRD §4.2): Ollama down → offline indicator + `ollama serve` hint; missing model → `ollama pull gemma4:e4b`; converting a non-Markdown upload while Ollama is unreachable → error with `ollama pull deepseek-ocr:3b` hint (ingest blocked until conversion succeeds); missing `TAVILY_API_KEY` → Research page disabled with setup steps; partial PDF extraction → `Partial extraction: N pages read`.
+Connectivity and config errors must be visible, not silent (PRD §4.2): Ollama down → error surfaced at point of use (chat/research/conversion) with an `ollama serve` hint; missing model → `ollama pull gemma4:e4b`; converting a non-Markdown upload while Ollama is unreachable → error with `ollama pull deepseek-ocr:3b` hint (ingest blocked until conversion succeeds); missing `TAVILY_API_KEY` → Research page disabled with setup steps; partial PDF extraction → `Partial extraction: N pages read`.
