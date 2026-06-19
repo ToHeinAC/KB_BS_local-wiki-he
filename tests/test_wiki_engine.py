@@ -522,7 +522,8 @@ def test_ingest_loads_existing_content_for_affected_pages(wiki_dir, monkeypatch)
     import lex_index
     # Existing page derived from a prior source, present in the BM25 index.
     (wiki_dir / "alpha.md").write_text(
-        '---\ntitle: Alpha\ntype: concept\nsources: ["prior.md"]\n---\nEXISTING_ALPHA_BODY'
+        '---\ntitle: Alpha\ntype: concept\nsources: ["prior.md"]\n---\n'
+        '## Key facts\n- alpha radiation dose limit\n\nEXISTING_ALPHA_BODY'
     )
     chunker.write_chunks("prior.md", [{
         "chunk_id": "c-prior-1",
@@ -536,8 +537,12 @@ def test_ingest_loads_existing_content_for_affected_pages(wiki_dir, monkeypatch)
     wiki_engine.ingest("source text about alpha radiation protection dose", "src.txt")
     # Only one generate call now (synthesis) — selection is BM25, not an LLM call.
     ingest_prompt = mock.generate.call_args.kwargs["prompt"]
-    assert "EXISTING_ALPHA_BODY" in ingest_prompt
-    assert "Existing page content" in ingest_prompt
+    # The affected page is surfaced as a cheap REUSE candidate (key facts only),
+    # not as a full-body injection — code-side merge is the real safety net.
+    assert "alpha.md" in ingest_prompt
+    assert "REUSE the exact filename" in ingest_prompt
+    assert "alpha radiation dose limit" in ingest_prompt
+    assert "EXISTING_ALPHA_BODY" not in ingest_prompt
 
 
 def test_ingest_retries_when_no_pages_parsed(wiki_dir, monkeypatch):
@@ -575,9 +580,11 @@ def test_ingest_begin_piece_end_creates_pages(wiki_dir, monkeypatch):
     ctx = wiki_engine.ingest_begin("source body", "src.txt")
     wiki_engine.ingest_piece(ctx, "source body", 0, 1)
     result = wiki_engine.ingest_end(ctx)
-    assert "summary-mysrc.md" in result["created"]
+    # Summary filename is derived from the SOURCE (src.txt), not the LLM's emitted
+    # name, so every part of a document collapses to one summary page.
+    assert "summary-src.md" in result["created"]
     assert "concept-alpha.md" in result["created"]
-    assert (wiki_dir / "summary-mysrc.md").exists()
+    assert (wiki_dir / "summary-src.md").exists()
 
 
 def test_build_existing_block_rank_weighted_budget(wiki_dir):

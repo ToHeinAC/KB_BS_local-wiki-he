@@ -93,12 +93,15 @@ def test_second_source_merges_into_existing_page_no_duplicate(wiki_dir, monkeypa
     wiki_engine.ingest("Occupational dose limit 20 mSv per year clarification", "strlschv.md")
 
     assert "ingest_prompt" in seen
-    # BM25 surfaced the existing concept page and its body was injected to merge.
-    assert "Existing page content" in seen["ingest_prompt"]
+    # BM25 surfaced the existing concept page as a cheap REUSE candidate (key-facts
+    # index); the actual merge is done deterministically in code.
+    assert "Existing pages you may extend" in seen["ingest_prompt"]
     assert "dose-limit.md" in seen["ingest_prompt"]
 
-    # The concept page set is unchanged (merged in place, not duplicated), and
-    # the second source is now recorded in the page's provenance.
-    assert {p["filename"] for p in wiki_engine.list_pages()} == pages_after_first
+    # The shared CONCEPT page is merged in place (not duplicated). A fresh
+    # source-summary for the new document is expected and correct.
+    concept_pages = [p["filename"] for p in wiki_engine.list_pages()
+                     if p.get("type") == "concept"]
+    assert concept_pages == ["dose-limit.md"]
     post = frontmatter.load(str(wiki_dir / "dose-limit.md"))
     assert "strlschv.md" in post.metadata["sources"]

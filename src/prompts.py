@@ -95,10 +95,11 @@ Source text (may be truncated):
 {text}
 
 Instructions:
-1. Create a detailled source-summary representation page for this document (filename: summary-{summary_slug}.md). Never invent information. 
-   Preserve relevant passages from chunk sources in detail. Copy relevant numbers, sizes, and references exactly as they appear in the original, never round or paraphrase. Format every citation as e.g. [{source_name}.md] using the source from the original doc.
-2. Create or update concept/entity pages for key topics found in the source.
-3. When updating an existing page (provided above as "Existing page content"), produce a MERGED version: start FROM the existing text, then ADD new facts and REVISE only what this source actually changes. Preserve every prior fact, number, and citation unless the source directly corrects it. Do NOT rewrite the page from scratch and do NOT drop nuance — output the full merged page, not just the new parts.
+1. Create a detailled source-summary representation page for this document (filename: summary-{summary_slug}.md). Never invent information.
+   This is the SAME summary file for EVERY part of this document — extend it, do NOT create one summary per part.
+   Preserve relevant passages from chunk sources in detail. Copy relevant numbers, sizes, and references exactly as they appear in the original, never round or paraphrase. Format every citation as [{source_name}.md] — never append a part/"[Teil n/m]" marker and never double the ".md".
+2. Create or update concept/entity pages for key topics found in the source. If a topic matches one of the "Existing pages you may extend" listed above, REUSE that page's EXACT filename so it is updated, not duplicated.
+3. Begin every page body with a `## Key facts` block: 3-5 one-line bullets naming the page's main terms and facts. Then write the prose sections.
 4. Populate `related` frontmatter ONLY with filenames of pages whose topic is directly
    and explicitly discussed in THIS source text in connection with the current page.
    A link requires clear evidence in the source — loose thematic or domain overlap is
@@ -118,6 +119,10 @@ updated: "{date}"
 confidence: high | medium | low{example_extra}
 ---
 
+## Key facts
+- main term or fact
+- main term or fact
+
 Page content here.
 
 === END ===
@@ -125,6 +130,17 @@ Page content here.
 List pages you would UPDATE (already in index): UPDATE: filename.md
 List contradictions found: CONTRADICTION: <brief description>
 """
+
+CONSOLIDATE_POLISH_PROMPT = """The following wiki page was assembled by mechanically merging several
+near-duplicate pages, so it may repeat itself or read disjointedly.
+
+Rewrite it into clean, non-repetitive encyclopaedic prose. STRICT RULES:
+- Preserve EVERY fact, number, date, and `[source.md]` citation. Never invent or drop information.
+- Keep the leading `## Key facts` bullet block and all `##` section headings.
+- Only improve wording and remove literal duplication. Output the full page body only (no frontmatter).
+
+Page:
+{page}"""
 
 DESCRIPTION_BUILD_PROMPT = """Write a concise high-level overview of the knowledge base "{db_name}".
 

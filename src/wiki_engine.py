@@ -19,6 +19,7 @@ import schema_loader
 from prompts import (
     ANSWER_PROMPT,
     CONDENSE_PROMPT,
+    CONSOLIDATE_POLISH_PROMPT,
     DESCRIPTION_BUILD_PROMPT,
     DESCRIPTION_DELETE_PROMPT,
     DESCRIPTION_UPDATE_PROMPT,
@@ -151,6 +152,345 @@ def _title_to_filename(title: str) -> str:
     return f"{slug}.md"
 
 
+# --- Deterministic dedup-routing + merge (model-independent) -----------------
+# These helpers let a small local model name pages freely while CODE decides
+# whether a freshly-synthesised page is the same topic as an existing one and,
+# if so, merges them. All matching is deterministic so model quality is moot.
+
+_STOPWORDS_SLUG = {"of", "the", "and", "a", "an", "to", "in", "for", "on",
+                   "with", "md", "der", "die", "das", "und", "von", "im"}
+_PAGE_PREFIX_RE = re.compile(r"^(concept|entity|summary|report|insight)-")
+_FILE_TEIL_RE = re.compile(r"-teil-\d+-\d+(?=\.md$|$)")
+_KEY_FACTS_HEADING = "## Key facts"
+_TERM_OVERLAP_THRESHOLD = 0.7
+_MAX_KEY_TERMS = 12
+# number+unit pairs used for the deterministic contradiction check. Units are a
+# pragmatic mix of the project's domains (radiation, generic %, sizes, time).
+_NUM_UNIT_RE = re.compile(
+    r"(\d+(?:[.,]\d+)?)\s*(%|mSv|µSv|uSv|Sv|mGy|Gy|Bq|kg|km|mm|cm|gb|tb|mb|"
+    r"days?|jahre?|years?|hours?|tokens?|mio|mrd)\b",
+    re.IGNORECASE,
+)
+
+
+def _depluralize(tok: str) -> str:
+    """Fold simple English plurals the lex stemmer's 4-char floor misses.
+
+    `lex_index._stem` leaves <=4-char tokens untouched, so `llms` would not fold
+    to `llm` — the flagship duplicate case. This closes that gap.
+    """
+    if len(tok) >= 5 and tok.endswith("es"):
+        return tok[:-2]
+    if len(tok) >= 4 and tok.endswith("s") and not tok.endswith("ss"):
+        return tok[:-1]
+    return tok
+
+
+def _term_key(tok: str) -> str:
+    """Canonical comparison key for one surface token.
+
+    Depluralize only when the lex stemmer left the token unchanged — otherwise
+    the stemmer already handled the suffix and a second strip would over-trim
+    (e.g. `densing`→`dens` must NOT become `den`).
+    """
+    folded = lex_index._nfkd_fold(tok.lower())
+    stemmed = lex_index._stem(folded)
+    return _depluralize(stemmed) if stemmed == folded else stemmed
+
+
+def _canonical_slug_tokens(name: str) -> frozenset[str]:
+    """Topic token-set for a filename or title (prefix/stopwords/plurals folded)."""
+    base = name.lower()
+    if base.endswith(".md"):
+        base = base[:-3]
+    base = _PAGE_PREFIX_RE.sub("", base)
+    keys = {_term_key(t) for t in re.split(r"[^a-z0-9]+", base)
+            if t and t not in _STOPWORDS_SLUG}
+    return frozenset(k for k in keys if k)
+
+
+def _parse_index_block(body: str) -> list[str]:
+    """Bullet lines under a leading '## Key facts' heading (the page's index)."""
+    out, capturing = [], False
+    for line in body.splitlines():
+        s = line.strip()
+        if s.lower().startswith("## key facts"):
+            capturing = True
+            continue
+        if capturing:
+            if s.startswith("## "):
+                break
+            if s.startswith("- "):
+                out.append(s[2:].strip())
+    return out
+
+
+def _extract_key_terms(content: str) -> list[str]:
+    """Canonical key terms from the title + the `## Key facts` bullets (capped)."""
+    try:
+        post = frontmatter.loads(content)
+        title, body = str(post.metadata.get("title", "")), post.content
+    except Exception:
+        title, body = "", content
+    text = title + "\n" + "\n".join(_parse_index_block(body))
+    terms, seen = [], set()
+    for tok in re.split(r"[^A-Za-z0-9]+", text):
+        if len(tok) < 2 or tok.lower() in _STOPWORDS_SLUG:
+            continue
+        k = _term_key(tok)
+        if k and k not in seen:
+            seen.add(k)
+            terms.append(k)
+        if len(terms) >= _MAX_KEY_TERMS:
+            break
+    return terms
+
+
+def _ensure_key_terms(content: str) -> str:
+    """Stamp the derived `key_terms` list into frontmatter (idempotent)."""
+    try:
+        post = frontmatter.loads(content)
+    except Exception:
+        return content
+    post.metadata["key_terms"] = _extract_key_terms(content)
+    return frontmatter.dumps(post) + "\n"
+
+
+def _readable_facts(content: str) -> list[str]:
+    """Human-readable index bullets: page title + its `##`/`###` section headings."""
+    try:
+        post = frontmatter.loads(content)
+        title, body = str(post.metadata.get("title", "")), post.content
+    except Exception:
+        title, body = "", content
+    facts = [title] if title else []
+    for line in body.splitlines():
+        if re.match(r"^#{2,3}\s", line.strip()):
+            h = line.strip().lstrip("#").strip()
+            if h and h.lower() != "key facts" and h not in facts:
+                facts.append(h)
+        if len(facts) >= 5:
+            break
+    return facts[:5]
+
+
+def _ensure_index_block(content: str) -> str:
+    """Prepend a `## Key facts` index when the model didn't write one.
+
+    Synthesised bullets use the title + section headings (readable), not the
+    internal stem `key_terms`. Pages that already have a `## Key facts` block
+    (e.g. fresh model output) are left untouched.
+    """
+    try:
+        post = frontmatter.loads(content)
+    except Exception:
+        return content
+    if _parse_index_block(post.content):
+        return content
+    facts = _readable_facts(content)
+    if not facts:
+        return content
+    block = _KEY_FACTS_HEADING + "\n" + "\n".join(f"- {f}" for f in facts)
+    post.content = block + "\n\n" + post.content.lstrip()
+    return frontmatter.dumps(post) + "\n"
+
+
+def _page_type(content: str, filename: str = "") -> str:
+    try:
+        t = str(frontmatter.loads(content).metadata.get("type", "") or "").strip().lower()
+    except Exception:
+        t = ""
+    if t:
+        return t
+    return "source-summary" if filename.startswith("summary-") else "concept"
+
+
+def _page_title(content: str, filename: str = "") -> str:
+    try:
+        return str(frontmatter.loads(content).metadata.get("title", "") or "") or filename
+    except Exception:
+        return filename
+
+
+def _overlap_coef(a: frozenset, b: frozenset) -> float:
+    if not a or not b:
+        return 0.0
+    return len(a & b) / min(len(a), len(b))
+
+
+def _route_page(ptype: str, tokens: frozenset, terms: frozenset,
+                registry: dict, self_filename: str) -> str | None:
+    """Existing filename this page should merge into, or None to create new.
+
+    Same `type` only. Exact topic-token match wins; otherwise a subset relation
+    (one topic is a specialization of the other) gated by >= 0.7 key-term overlap.
+    """
+    if not tokens:
+        return None
+    exact = subset = None
+    for fname, info in registry.items():
+        if fname == self_filename or info["type"] != ptype:
+            continue
+        ctoks = info["tokens"]
+        if not ctoks:
+            continue
+        if tokens == ctoks:
+            exact = exact or fname
+        elif (tokens <= ctoks or ctoks <= tokens) and \
+                _overlap_coef(terms, info["terms"]) >= _TERM_OVERLAP_THRESHOLD:
+            subset = subset or fname
+    return exact or subset
+
+
+def _split_sections(body: str) -> list[list]:
+    """[[heading, [lines]]]; pre-heading lead text uses heading ''."""
+    sections: list[list] = [["", []]]
+    for line in body.splitlines():
+        if re.match(r"^#{1,6}\s", line):
+            sections.append([line.strip(), []])
+        else:
+            sections[-1][1].append(line)
+    return sections
+
+
+def _norm_line(line: str) -> str:
+    return re.sub(r"\s+", " ", line.strip().lower())
+
+
+def _merge_bodies(existing: str, new: str) -> str:
+    """Union of sections; appends only non-duplicate lines (no fact dropped)."""
+    e_secs = _split_sections(existing)
+    heading_idx = {h.lower(): i for i, (h, _) in enumerate(e_secs) if h}
+    seen = {_norm_line(l) for _, ls in e_secs for l in ls if l.strip()}
+    for h, lines in _split_sections(new):
+        add = [l for l in lines if not l.strip() or _norm_line(l) not in seen]
+        add = [l for l in add if l.strip() or (add and h)]  # drop leading blanks
+        key = h.lower()
+        if h and key in heading_idx:
+            e_secs[heading_idx[key]][1].extend(l for l in add if l.strip())
+        elif h:
+            e_secs.append([h, [l for l in lines if l.strip()]])
+            heading_idx[key] = len(e_secs) - 1
+        else:
+            e_secs[0][1].extend(l for l in add if l.strip())
+        seen.update(_norm_line(l) for l in lines if l.strip())
+    out: list[str] = []
+    for h, lines in e_secs:
+        if h:
+            out.append(h)
+        out.extend(lines)
+    return "\n".join(out).strip() + "\n"
+
+
+def _union_list(a, b) -> list:
+    merged = [str(x).strip() for x in (a or []) if str(x).strip()]
+    for v in (b or []):
+        v = str(v).strip()
+        if v and v not in merged:
+            merged.append(v)
+    return merged
+
+
+def _is_newer(nmeta: dict, emeta: dict) -> bool:
+    nd = _parse_date(nmeta.get("effective as of") or nmeta.get("updated") or nmeta.get("created"))
+    ed = _parse_date(emeta.get("effective as of") or emeta.get("updated") or emeta.get("created"))
+    return bool(nd and ed and nd > ed)
+
+
+def _extract_facts(text: str) -> dict[str, set[str]]:
+    """Map `term|unit` -> set of values, for the contradiction check."""
+    facts: dict[str, set[str]] = {}
+    for m in _NUM_UNIT_RE.finditer(text):
+        num, unit = m.group(1).replace(",", "."), m.group(2).lower()
+        words = re.findall(r"[A-Za-zÄÖÜäöüß][\w-]+", text[max(0, m.start() - 40):m.start()])
+        term = _term_key(words[-1]) if words else ""
+        facts.setdefault(f"{term}|{unit}", set()).add(f"{num} {unit}")
+    return facts
+
+
+def _contradiction_check(existing: str, new: str, emeta: dict, nmeta: dict) -> list[str]:
+    """Flag same-term/same-unit numeric conflicts. Resolves only on a date signal."""
+    ef, nf = _extract_facts(existing), _extract_facts(new)
+    newer = _is_newer(nmeta, emeta)
+    out = []
+    for key, nvals in nf.items():
+        evals = ef.get(key)
+        if not evals or not (nvals - evals):
+            continue
+        term = key.split("|")[0]
+        old, newv = ", ".join(sorted(evals)), ", ".join(sorted(nvals))
+        if newer:
+            out.append(f"{term}: now {newv} per the newer source; previously {old}")
+        else:
+            out.append(f"{term}: sources disagree — {old} vs {newv} (unresolved)")
+    return out
+
+
+def _merge_pages(existing: str, new: str, source: str) -> str:
+    """Deterministic, no-LLM merge of `new` into `existing`. Never drops a fact."""
+    try:
+        ep, np_ = frontmatter.loads(existing), frontmatter.loads(new)
+    except Exception:
+        return existing
+    meta = dict(ep.metadata)
+    for key in ("sources", "related", "key_terms"):
+        meta[key] = _union_list(ep.metadata.get(key), np_.metadata.get(key))
+    nc = _parse_date(np_.metadata.get("created"))
+    ec = _parse_date(ep.metadata.get("created"))
+    if nc and (not ec or nc < ec):
+        meta["created"] = np_.metadata.get("created")
+    meta["updated"] = _date()
+    body = _merge_bodies(ep.content, np_.content)
+    contradictions = _contradiction_check(ep.content, np_.content, ep.metadata, np_.metadata)
+    if contradictions:
+        body = body.rstrip() + "\n\n## Contradictions\n" + \
+            "\n".join(f"- {c}" for c in contradictions) + "\n"
+        meta["confidence"] = "low"
+    out = frontmatter.dumps(frontmatter.Post(body, **meta)) + "\n"
+    out = _ensure_key_terms(out)
+    return _ensure_index_block(out)
+
+
+def _build_registry() -> dict:
+    """{filename: {type, tokens, terms}} for every existing page (routing input)."""
+    reg: dict[str, dict] = {}
+    for p in list_pages():
+        fn = p["filename"]
+        terms = p.get("key_terms")
+        if not terms:
+            terms = _extract_key_terms(read_page(fn))
+        reg[fn] = {
+            "type": str(p.get("type") or "concept").strip().lower(),
+            "tokens": _canonical_slug_tokens(str(p.get("title") or fn)),
+            "terms": frozenset(terms or []),
+        }
+    return reg
+
+
+def _registry_add(registry: dict, target: str, content: str) -> None:
+    registry[target] = {
+        "type": _page_type(content, target),
+        "tokens": _canonical_slug_tokens(_page_title(content, target)),
+        "terms": frozenset(_extract_key_terms(content)),
+    }
+
+
+def _resolve_target(content: str, llm_filename: str, ctx: dict) -> str:
+    """Deterministic on-disk filename for an LLM-emitted page.
+
+    Source-summaries always collapse to one stable `summary-<doc>.md` (kills the
+    per-Teil explosion). Concept/entity pages route into an existing near-duplicate
+    when one exists, else keep the model's filename.
+    """
+    ptype = _page_type(content, llm_filename)
+    if ptype == "source-summary":
+        return f"summary-{ctx['summary_slug']}.md"
+    tokens = _canonical_slug_tokens(_page_title(content, llm_filename))
+    terms = frozenset(_extract_key_terms(content))
+    routed = _route_page(ptype, tokens, terms, ctx["registry"], llm_filename)
+    return routed or llm_filename
+
+
 def _parse_llm_pages(response: str) -> list[dict]:
     """Extract filename→content pairs from LLM output.
 
@@ -233,6 +573,30 @@ def _build_existing_block(filenames: list[str]) -> str:
         if len(body) > budget:
             body = body[:budget] + "\n…[truncated]"
         parts.append(f"\n--- {fname} ---\n{body}\n")
+    return "".join(parts) + "\n"
+
+
+def _build_candidate_index_block(filenames: list[str]) -> str:
+    """Cheap candidate index: filename — title: key facts (NOT full bodies).
+
+    Nudges the model to REUSE an existing filename; code-side routing/merge is
+    the real safety net, so this stays tiny — only each page's `## Key facts`.
+    """
+    if not filenames:
+        return ""
+    parts = ["\nExisting pages you may extend "
+             "(REUSE the exact filename if your topic matches one):\n"]
+    for fname in filenames:
+        path = _wiki() / fname
+        if not path.exists():
+            continue
+        try:
+            post = frontmatter.load(str(path))
+            facts = "; ".join(_parse_index_block(post.content)[:5])
+            title = post.metadata.get("title", fname)
+        except Exception:
+            facts, title = "", fname
+        parts.append(f"- {fname} — {title}: {facts}\n")
     return "".join(parts) + "\n"
 
 
@@ -346,6 +710,10 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
         "updated": [],
         "contradictions": [],
         "existing_filenames": {p["filename"] for p in list_pages()},
+        # One stable source-summary slug for the WHOLE document (no per-Teil
+        # explosion); plus the routing registry of every existing page.
+        "summary_slug": _title_to_filename(Path(_TEIL_SUFFIX_RE.sub("", source_name)).stem).replace(".md", ""),
+        "registry": _build_registry(),
     }
 
 
@@ -359,14 +727,17 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
     for fname in ranked:
         if fname not in ctx["affected"]:
             ctx["affected"].append(fname)
-    existing_block = _build_existing_block(ranked)
+    # Inject only the cheap candidate INDEX (key facts), not full bodies — the
+    # actual merge is done deterministically in code below, so the small model
+    # only needs a nudge to reuse an existing filename.
+    existing_block = _build_candidate_index_block(ranked)
     prompt = INGEST_PROMPT.format(
         source_name=piece_source,
         meta_block=ctx["meta_block"],
         index_text=ctx["index_text"],
         existing_block=existing_block,
         text=piece_text,
-        summary_slug=_title_to_filename(piece_source).replace(".md", ""),
+        summary_slug=ctx["summary_slug"],
         example_extra=ctx["example_extra"],
         date=_date(),
     )
@@ -384,20 +755,27 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
         pages = _parse_llm_pages(response)
 
     for page in pages:
-        dest = _wiki() / page["filename"]
         content = _ensure_frontmatter(page["content"], page["filename"])
         # Merge current source into frontmatter `sources:` so the graph viz can
         # draw `derived-from` edges (source → page) without trusting the LLM
         # to have written it correctly.
         content = _ensure_source_in_frontmatter(content, ctx["source_name"])
         content = _scrub_related(content, ctx["existing_filenames"])
+        content = _ensure_key_terms(content)
+        content = _ensure_index_block(content)
+        target = _resolve_target(content, page["filename"], ctx)
+        dest = _wiki() / target
         if dest.exists():
-            if page["filename"] not in ctx["updated"] and page["filename"] not in ctx["created"]:
-                ctx["updated"].append(page["filename"])
-        else:
-            if page["filename"] not in ctx["created"]:
-                ctx["created"].append(page["filename"])
+            # Deterministic, no-LLM merge: never drops a prior fact, dedupes lines,
+            # flags numeric contradictions (date-resolved when possible).
+            content = _merge_pages(dest.read_text(), content, ctx["source_name"])
+            if target not in ctx["updated"] and target not in ctx["created"]:
+                ctx["updated"].append(target)
+        elif target not in ctx["created"]:
+            ctx["created"].append(target)
         dest.write_text(content)
+        ctx["existing_filenames"].add(target)
+        _registry_add(ctx["registry"], target, content)
 
     for line in response.splitlines():
         if line.startswith("UPDATE:"):
@@ -446,6 +824,214 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
 def rebuild_lex_index() -> dict:
     """Rebuild the BM25 index from all persisted chunks. Returns a summary."""
     return lex_index.build()
+
+
+# --- One-off consolidation (clean up legacy chunk-derived duplicates) --------
+
+def _clean_teil_text(text: str) -> str:
+    """Strip `[Teil n/m]` markers and collapse any repeated `.md.md…` runs."""
+    text = re.sub(r"\s*\[Teil\s+\d+/\d+\]", "", text)
+    return re.sub(r"(\.md){2,}", ".md", text)
+
+
+def _strip_teil_sources(content: str) -> str:
+    """De-Teil and dedupe the frontmatter `sources:` list."""
+    try:
+        post = frontmatter.loads(content)
+    except Exception:
+        return content
+    cleaned: list[str] = []
+    for s in (post.metadata.get("sources") or []):
+        s2 = _TEIL_SUFFIX_RE.sub("", str(s)).strip()
+        if s2 and s2 not in cleaned:
+            cleaned.append(s2)
+    post.metadata["sources"] = cleaned
+    return frontmatter.dumps(post) + "\n"
+
+
+def _summary_base(filename: str) -> str:
+    base = filename[:-3] if filename.endswith(".md") else filename
+    base = _FILE_TEIL_RE.sub("", base)
+    if base.startswith("summary-"):
+        base = base[len("summary-"):]
+    # drop stray `source-summary-`/`concept-`/`entity-` infixes left by old ingests
+    base = re.sub(r"^(source-summary-|concept-|entity-)+", "", base)
+    if base.endswith("-md"):
+        base = base[:-3]
+    return re.sub(r"[^a-z0-9]+", "-", base.lower()).strip("-")  # normalize separators
+
+
+def _needs_cleanup(filename: str) -> bool:
+    p = _wiki() / filename
+    if not p.exists():
+        return False
+    if _FILE_TEIL_RE.search(filename):
+        return True
+    txt = p.read_text()
+    return "[Teil " in txt or ".md.md" in txt
+
+
+def _group_concept_pages(pages: list[dict]) -> list[list[str]]:
+    """Connected components of concept/entity pages under the same-topic relation."""
+    items = []
+    for p in pages:
+        if str(p.get("type") or "").lower() not in ("concept", "entity"):
+            continue
+        fn = p["filename"]
+        terms = p.get("key_terms") or _extract_key_terms(read_page(fn))
+        items.append((fn, str(p.get("type")).lower(),
+                      _canonical_slug_tokens(str(p.get("title") or fn)),
+                      frozenset(terms or [])))
+    parent = {it[0]: it[0] for it in items}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    for i in range(len(items)):
+        for j in range(i + 1, len(items)):
+            a, b = items[i], items[j]
+            if a[1] != b[1] or not a[2] or not b[2]:
+                continue
+            if a[2] == b[2] or ((a[2] <= b[2] or b[2] <= a[2])
+                                and _overlap_coef(a[3], b[3]) >= _TERM_OVERLAP_THRESHOLD):
+                parent[find(a[0])] = find(b[0])
+    groups: dict[str, list[str]] = {}
+    for fn in parent:
+        groups.setdefault(find(fn), []).append(fn)
+    return list(groups.values())
+
+
+def _canonical_concept(members: list[str], title_by: dict[str, str]) -> str:
+    """Most-general member: fewest topic tokens, then shortest filename."""
+    return min(members, key=lambda m: (len(_canonical_slug_tokens(title_by.get(m, m))),
+                                       len(m), m))
+
+
+def _plan_groups(pages: list[dict]) -> list[dict]:
+    """Build {canonical, members, base} merge plans for summaries + concepts."""
+    plans: list[dict] = []
+    summaries: dict[str, list[str]] = {}
+    for p in pages:
+        if str(p.get("type") or "").lower() == "source-summary" or p["filename"].startswith("summary-"):
+            summaries.setdefault(_summary_base(p["filename"]), []).append(p["filename"])
+    for base, members in summaries.items():
+        canonical = f"summary-{base}.md"
+        base_member = max(members, key=lambda m: (_wiki() / m).stat().st_size
+                          if (_wiki() / m).exists() else 0)
+        if len(members) == 1 and members[0] == canonical and not _needs_cleanup(canonical):
+            continue
+        plans.append({"canonical": canonical, "members": members, "base": base_member})
+    title_by = {p["filename"]: str(p.get("title") or p["filename"]) for p in pages}
+    for members in _group_concept_pages(pages):
+        canonical = _canonical_concept(members, title_by)
+        if len(members) == 1 and not _needs_cleanup(canonical):
+            continue
+        plans.append({"canonical": canonical, "members": members, "base": canonical})
+    # Catch-all: any remaining page (incl. those with a missing/other `type`)
+    # that still carries Teil markers gets a singleton cleanup pass.
+    grouped = {m for pl in plans for m in pl["members"]}
+    for p in pages:
+        fn = p["filename"]
+        if fn not in grouped and _needs_cleanup(fn):
+            plans.append({"canonical": fn, "members": [fn], "base": fn})
+    return plans
+
+
+def _merge_group(contents: list[str]) -> str:
+    base = contents[0]
+    for c in contents[1:]:
+        base = _merge_pages(base, c, "")
+    return base
+
+
+def _remap_related(rename: dict[str, str]) -> None:
+    """Repoint every page's `related:` away from merged-out files; drop self/dupes."""
+    for p in _wiki().glob("*.md"):
+        if p.name in _SYSTEM_PAGES:
+            continue
+        try:
+            post = frontmatter.load(str(p))
+        except Exception:
+            continue
+        related = post.metadata.get("related") or []
+        new: list[str] = []
+        for r in related:
+            r2 = rename.get(str(r).strip(), str(r).strip())
+            if r2 and r2 != p.name and r2 not in new:
+                new.append(r2)
+        if new != related:
+            post.metadata["related"] = new
+            p.write_text(frontmatter.dumps(post) + "\n")
+
+
+def _polish_page(content: str) -> str:
+    """Optional LLM prose-smoothing of a merged page (facts must be preserved)."""
+    try:
+        post = frontmatter.loads(content)
+    except Exception:
+        return content
+    try:
+        resp = ollama_client.generate(schema_loader.get_system_prompt(),
+                                       CONSOLIDATE_POLISH_PROMPT.format(page=post.content),
+                                       temperature=0.2, model_id=ollama_client._INGEST_MODEL)
+    except Exception:
+        return content
+    if resp and resp.strip():
+        post.content = resp.strip()
+    return frontmatter.dumps(post) + "\n"
+
+
+def consolidate(db: str | None = None, dry_run: bool = True, llm_polish: bool = False) -> dict:
+    """Collapse legacy chunk-derived duplicate pages into one page per topic.
+
+    Groups source-summaries by document base (Teil-stripped) and concept/entity
+    pages by the same-topic relation, merges each group deterministically
+    (`_merge_pages` — no fact dropped), de-Teils filenames/sources/citations,
+    repoints `related:`, deletes the merged-out files and rebuilds the indexes.
+    `dry_run=True` only reports the plan. Optionally switches active DB first.
+    """
+    prev = db_context.get_active_db()
+    if db and db != prev:
+        db_context.set_active_db(db)
+    try:
+        return _consolidate_active(dry_run, llm_polish)
+    finally:
+        if db and db != prev:
+            db_context.set_active_db(prev)
+
+
+def _consolidate_active(dry_run: bool, llm_polish: bool) -> dict:
+    pages = list_pages()
+    plans = _plan_groups(pages)
+    rename = {m: pl["canonical"] for pl in plans for m in pl["members"] if m != pl["canonical"]}
+    grouped = {m for pl in plans for m in pl["members"]}
+    after = len([p for p in pages if p["filename"] not in grouped]) + \
+        len({pl["canonical"] for pl in plans})
+    summary = {"before": len(pages), "after": after,
+               "groups": [(pl["canonical"], pl["members"]) for pl in plans],
+               "rename": rename}
+    if dry_run:
+        return summary
+    for pl in plans:
+        order = [pl["base"]] + sorted(m for m in pl["members"] if m != pl["base"])
+        content = _merge_group([read_page(m) for m in order])
+        content = _strip_teil_sources(_clean_teil_text(content))
+        if llm_polish:
+            content = _polish_page(content)
+        content = _ensure_index_block(_ensure_key_terms(content))
+        (_wiki() / pl["canonical"]).write_text(content)  # write canonical BEFORE deleting
+    _remap_related(rename)
+    for old, canon in rename.items():
+        if old != canon:
+            (_wiki() / old).unlink(missing_ok=True)
+    lex_index.build()
+    _rebuild_index()
+    _append_log("Consolidate",
+                f"Merged {len(rename)} pages into {len(plans)} canonical pages.")
+    return summary
 
 
 def delete_source(source_name: str) -> dict:
