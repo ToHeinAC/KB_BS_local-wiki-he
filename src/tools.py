@@ -47,6 +47,24 @@ WIKI_LINK_EXPANSION = os.getenv("WIKI_LINK_EXPANSION", "1") != "0"
 WIKI_LINK_SEEDS = int(os.getenv("WIKI_LINK_SEEDS", "3"))  # top hits whose links we follow
 WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended per query
 
+def _with_active_db(fn):
+    """Wrap `fn` so a ThreadPoolExecutor worker re-applies the caller's DB.
+
+    Worker threads don't inherit the main thread's ContextVar context, so the
+    active database (`db_context._active`) would silently reset to the default
+    inside the pool. We capture it here (in the calling thread) and re-set it at
+    the start of each worker call. `copy_context().run` can't be used for this:
+    one Context object can't be entered by multiple workers concurrently.
+    """
+    db = db_context.get_active_db()
+
+    def _wrapped(*args, **kwargs):
+        db_context.set_active_db(db)
+        return fn(*args, **kwargs)
+
+    return _wrapped
+
+
 _URL_RE = re.compile(r"https?://[^\s\)\]]+")
 _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([\w\-./]+\.md)\s*\]")
 # Accept an optional trailing " §..." or " #..." section marker so the same file
@@ -169,7 +187,7 @@ def _wiki_search_impl(query=None, queries=None, max_results: int = 8) -> str:
     if len(qs) == 1:
         return _wiki_search_one(qs[0], max_results)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(lambda q: _wiki_search_one(q, max_results), qs))
+        outs = list(ex.map(_with_active_db(lambda q: _wiki_search_one(q, max_results)), qs))
     return "\n\n".join(outs)
 
 
@@ -189,7 +207,7 @@ def _wiki_read_impl(filenames) -> str:
     if len(filenames) == 1:
         return _wiki_read_one(filenames[0])
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(_wiki_read_one, filenames))
+        outs = list(ex.map(_with_active_db(_wiki_read_one), filenames))
     return "\n\n".join(outs)
 
 
@@ -220,7 +238,7 @@ def _raw_search_impl(query=None, queries=None, max_results: int = 6) -> str:
     if len(qs) == 1:
         return _raw_search_one(qs[0], max_results)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(lambda q: _raw_search_one(q, max_results), qs))
+        outs = list(ex.map(_with_active_db(lambda q: _raw_search_one(q, max_results)), qs))
     return "\n\n".join(outs)
 
 
@@ -371,7 +389,7 @@ def _raw_read_impl(filenames, offset: int = 0) -> str:
     if len(filenames) == 1:
         return _raw_read_one(filenames[0], offset=offset)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(lambda f: _raw_read_one(f, offset=offset), filenames))
+        outs = list(ex.map(_with_active_db(lambda f: _raw_read_one(f, offset=offset)), filenames))
     return "\n\n".join(outs)
 
 
