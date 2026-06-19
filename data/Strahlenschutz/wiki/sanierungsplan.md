@@ -1,17 +1,25 @@
 ---
 confidence: high
 created: '2026-05-17'
+key_terms:
+- sanierungspla
 related:
-- summary-strlschg-md-teil-9-13.md
+- summary-strlschg.md
 - radioaktive-altlasten.md
 - strahlenschutzgesetz-strlschg.md
 sources:
-- StrlSchG.md [Teil 9/13]
 - StrlSchG.md
 title: Sanierungsplan
 type: concept
 updated: '2026-05-17'
 ---
+
+## Key facts
+- Sanierungsplan
+- Purpose and Requirement
+- Required Contents
+- Authority Oversight
+- Financial and Legal Aspects
 
 # Sanierungsplan (Remediation Plan)
 

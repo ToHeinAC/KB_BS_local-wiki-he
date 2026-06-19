@@ -19,3 +19,6 @@ Affected: []
 Created: ['summary-pwc-semiconductor-and-beyond-2026-full-report-md-teil-1-5.md', 'summary-pwc-semiconductor-and-beyond-2026-full-report-md-teil-2-5.md', 'summary-pwc-semiconductor-and-beyond-2026-full-report-md-teil-3-5.md', 'semiconductor-supply-chain.md', 'semiconductor-design.md', 'application-specific-integrated-circuits.md', 'general-purpose-chips.md', 'electronic-design-automation.md', 'intellectual-property.md', 'wide-bandgap-semiconductors.md', 'high-bandwidth-memory.md', 'summary-pwc-semiconductor-and-beyond-2026-full-report-md-teil-4-5.md', 'advanced-packaging.md', 'chiplet-architecture.md', 'wafer-testing.md', 'advanced-ai.md', 'quantum-computing.md', 'autonomous-vehicles.md', 'humanoid-robotics.md', 'summary-pwc-semiconductor-and-beyond-2026-full-report-md-teil-5-5.md', 'hybrid-quantum-computing.md', 'brain-computer-interface.md']
 Updated: ['index.md', 'smart-home-technology.md', 'wearable-devices.md', 'edge-ai.md', 'connectivity-ics.md', 'power-management-integrated-circuits.md', 'log.md']
 Contradictions: ['No contradictions were noted between the source material and the existing wiki content, as no existing content was provided for comparison.', 'No contradictions were found between the new source and existing wiki content.']
+
+## 2026-06-19 11:21 — Consolidate
+Merged 6 pages into 17 canonical pages.

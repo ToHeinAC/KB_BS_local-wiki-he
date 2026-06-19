@@ -1,16 +1,32 @@
 ---
 confidence: high
 created: '2026-05-17'
+key_terms:
+- kontaminier
+- abf
+- lle
+- regulatory
+- framework
+- right
+- obligation
+- oversight
 related:
 - strahlenschutzgesetz-strlschg.md
-- summary-strlschg-md-teil-7-13.md
+- summary-strlschg.md
+- concept-radiation-protection.md
 sources:
-- StrlSchG.md [Teil 7/13]
 - StrlSchG.md
+- jc_8_bericht_deutschland_atomenergie_bf.md
 title: Kontaminierte Abfälle
 type: concept
-updated: '2026-05-17'
+updated: '2026-06-19'
 ---
+
+## Key facts
+- Kontaminierte Abfälle
+- Regulatory Framework
+- Rights and Obligations
+- Regulatory Oversight
 
 The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under the *Strahlenschutzgesetz* (StrlSchG).
 
@@ -23,3 +39,9 @@ The law establishes specific rules for:
 ## Rights and Obligations
 *   **Information Access (§ 95a):** The law grants the competent authority's employees and agents the right to request information, inspect properties, and conduct technical investigations from generators, owners, operators, and waste handlers. This right extends to properties and premises, even outside usual business hours, if necessary to prevent urgent danger.
 *   **Data Security:** Information obtained during these inspections is subject to specific rules regarding its use and retention, exempting it from certain fiscal laws.
+# Kontaminierte Abfälle
+The management of waste contaminated by or potentially contaminated by ionizing radiation is strictly regulated under the *Strahlenschutzgesetz* (StrlSchG) [kontaminierte-abfaelle.md].
+## Regulatory Oversight
+The handling of such materials requires adherence to both national German law and international best practices.
+*   **Safety Requirements:** The principles of radiation protection mandate rigorous control over the entire lifecycle of contaminated waste, from identification to final disposal [concept-radiation-protection.md].
+*   **International Standards:** The safe treatment of radioactive waste, einschließlich der Behandlung abgebrannter Brennelemente, wird durch das Gemeinsame Übereinkommen über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle geregelt [jc_8_bericht_deutschland_atomenergie_bf.md].

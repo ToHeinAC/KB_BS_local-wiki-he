@@ -1,17 +1,37 @@
 ---
 confidence: high
 created: '2026-05-17'
+key_terms:
+- radioaktiv
+- altlas
+- definitio
+- scop
+- responsibility
+- manag
+- remediatio
+- umwelt
+- berwach
 related:
-- summary-strlschg-md-teil-9-13.md
+- summary-strlschg.md
 - strahlenschutzgesetz-strlschg.md
 - sanierungsplan.md
+- concept-radiation-protection.md
 sources:
-- StrlSchG.md [Teil 9/13]
 - StrlSchG.md
+- Radon-Handbuch_BfS.md
+- StrlSchV.md
+- summary-radon-handbuch-bfs-md-teil-2-5.md
 title: Radioaktive Altlasten
 type: concept
-updated: '2026-05-17'
+updated: '2026-06-19'
 ---
+
+## Key facts
+- Radioaktive Altlasten
+- Definition and Scope
+- Responsibility
+- Management and Remediation
+- Umweltüberwachung
 
 # Radioaktive Altlasten
 
@@ -36,3 +56,23 @@ The management of these sites involves several mandatory steps:
 *   **Planning:** The competent authority may require the responsible party to submit a comprehensive **Remediation Plan (Sanierungsplan)**. This plan must detail investigation results, planned remediation measures, and follow-up actions [summary-strlschg-md-teil-9-13.md].
 *   **Authority Powers:** The competent authority has the power to mandate investigations, remediation measures, and monitoring to ensure the reference value is undercut [summary-strlschg-md-teil-9-13.md].
 *   **Financial Liability:** The costs of mandated measures are generally borne by the responsible parties [summary-strlschg-md-teil-9-13.md].
+# Radioaktive Altlasten (Radioactive Contaminated Sites)
+Radioaktive Altlasten (*radioaktive Altlasten*) sind kontaminierte Standorte, deren Umgang und deren Überwachung durch das Strahlenschutzgesetz (StrlSchG) geregelt ist [StrlSchG.md]. Die Prävention von Radon-Einbrüchen aus dem Baugrund ist ein zentrales Thema im Umgang mit solchen Altlasten [Radon-Handbuch_BfS.md].
+Radioactive contaminated sites (*radioaktive Altlasten*) are defined under the *Strahlenschutzgesetz* (StrlSchG) [summary-strlschg-md-teil-12-13.md].
+## Umweltüberwachung
+Die Überwachung der Umweltradioaktivität ist ein staatlich geregelter Prozess, der zwischen Bundes- und Landesbehörden aufgeteilt ist [StrlSchG.md].
+**Bundesebene (§ 161):** Zuständig für die großflächige Bestimmung der Radioaktivität in Medien wie Luft, Niederschlag, Bundeswasserstraßen sowie im Grund- und Meerwasser [StrlSchG.md].
+**Landesebene (§ 162):** Zuständig für die Bestimmung der Radioaktivität in Indikator-Matrizen wie Nahrungsmitteln, Trinkwasser, Böden und Pflanzen [StrlSchG.md].
+## Radon-Prävention im Bauwesen
+Bei der Planung von Bauwerken in potenziell kontaminierten oder radonbelasteten Gebieten muss die Radon-Infiltration aktiv verhindert werden [Radon-Handbuch_BfS.md].
+### Bauliche Maßnahmen
+Der Schutz erfordert eine geschlossene „Gebäudeumhüllung“ gegen das Erdreich [Radon-Handbuch_BfS.md]. Die Abdichtung muss gegen konvektiven Transport (durch Unterdruck) und Diffusionsprozesse geschützt sein [Radon-Handbuch_BfS.md].
+*   **Abdichtung:** Es sind Mehrfachstrategien zu empfehlen, die Dichtungsbahnen, Anstriche und das Dichten von Fugen, Rissen und Durchführungen umfassen [Radon-Handbuch_BfS.md].
+*   **Leitungen:** Leitungsdurchführungen durch Wände sind bevorzugt gegenüber Durchführungen durch den Boden [Radon-Handbuch_BfS.md].
+*   **Trennung:** Bei der Planung sollte die physische Trennung von Kellerräumen von Wohnbereichen durch dichte Türen erfolgen [Radon-Handbuch_BfS.md].
+### Lüftungstechnische Maßnahmen
+Die Kontrolle der Druckverhältnisse ist essenziell. Unterdruckgefälle vom Erdreich zum Gebäudeinneren treiben die Radoninfiltration an [Radon-Handbuch_BfS.md]. Daher ist die Eliminierung von Unterdruckquellen (z. B. durch Abluftanlagen ohne Nachströmung) oder die Erzeugung von Überdruck ein zentrales Ziel [Radon-Handbuch_BfS.md].
+## Regulatory Framework
+The management of these sites is governed by the *Strahlenschutzverordnung* (StrlSchV) [StrlSchV.md]. Procedures are detailed for determining exposure, setting test values, and establishing principles for remediation plans (*Sanierungspläne*) [StrlSchV.md].
+## Radon Context
+The assessment of contamination risks, including those from Radon, is relevant when dealing with contaminated sites. The assessment of contamination risks requires determining the source, the entry pathway, and the dissemination pathway of the Radon [summary-radon-handbuch-bfs-md-teil-2-5.md].

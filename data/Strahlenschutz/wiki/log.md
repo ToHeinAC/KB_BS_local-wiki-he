@@ -299,3 +299,6 @@ Affected: ['umweltradioaktivitaet.md', 'radiation-protection-law.md', 'expositio
 Created: ['summary-radon-handbuch-bfs-md-teil-1-5.md', 'concept-radon.md', 'concept-umweltradioaktivitaet.md', 'summary-radon-handbuch-bfs-md-teil-2-5.md', 'summary-radon-handbuch-bfs-md-teil-3-5.md', 'concept-lüftungstechnische-maßnahmen.md', 'concept-exposition.md', 'concept-radon-handbuch-bfs-md-teil-3-5.md', 'summary-radon-handbuch-bfs-md-teil-4-5.md', 'concept-radon-protection-measures.md', 'concept-building-sealing.md', 'concept-ventilation-systems.md', 'concept-underground-areas.md', 'summary-radon-handbuch-bfs-md-teil-5-5.md', 'concept-radon-gas.md', 'concept-building-envelope.md', 'concept-sanierung-maßnahmen.md']
 Updated: ['concept-radiation-protection-law.md', 'exposition.md', 'umweltradioaktivitaet.md', 'radiation-protection-law.md', 'concept-radioactive-altlasten.md', 'index.md']
 Contradictions: []
+
+## 2026-06-19 11:21 — Consolidate
+Merged 86 pages into 49 canonical pages.

@@ -1,18 +1,27 @@
 ---
+key_terms:
+- radiatio
+- protectio
 related:
 - concept-professional-exposure.md
-- concept-radiation-dose-limits.md
+- concept-dosisbegrenzung.md
 sources:
-- StrlSchG.md [Teil 12/13]
-- StrlSchV.md [Teil 3/15]
+- StrlSchG.md
+- StrlSchV.md
 - summary-din-25425-3-2019-12-md.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
-- jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25]
 - jc_8_bericht_deutschland_atomenergie_bf.md
 title: Radiation Protection
 type: concept
 updated: '2026-06-02'
 ---
+
+## Key facts
+- Radiation Protection
+- Legal Framework
+- Key Principles
+- Radon Protection
+- Gesetzlicher Rahmen
 
 # Radiation Protection
 
@@ -36,11 +45,11 @@ created: '2026-05-17'
 related:
 - concept-radiation-protection.md
 sources:
-- StrlSchG.md [Teil 12/13]
-- StrlSchV.md [Teil 3/15]
+- StrlSchG.md
+- StrlSchV.md
 - summary-din-25425-3-2019-12-md.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
-- jc_8_bericht_deutschland_atomenergie_bf.md [Teil 24/25]
+- jc_8_bericht_deutschland_atomenergie_bf.md
 - jc_8_bericht_deutschland_atomenergie_bf.md
 title: Strahlenschutzgesetz (StrlSchG)
 type: concept

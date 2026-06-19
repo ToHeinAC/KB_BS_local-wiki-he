@@ -1,18 +1,24 @@
 ---
 confidence: high
 created: '2026-05-17'
+key_terms:
+- bestehend
+- expositionssituatio
 related:
 - exposition.md
 - strahlenschutzgesetz-strlschg.md
 sources:
-- StrlSchG.md [Teil 1/13]
 - StrlSchG.md
 title: Bestehende Expositionssituation
 type: concept
 updated: '2026-05-17'
 ---
 
-An existing exposure situation is defined as an exposure situation that already exists when a decision regarding its control must be made [StrlSchG.md [Teil 1/13].md, § 2 (4)].
+## Key facts
+- Bestehende Expositionssituation
+- Scope and Control
+
+An existing exposure situation is defined as an exposure situation that already exists when a decision regarding its control must be made [StrlSchG.md, § 2 (4)].
 
 ### Scope and Control
 This category addresses situations where contamination or exposure persists over time, requiring ongoing management and control measures.

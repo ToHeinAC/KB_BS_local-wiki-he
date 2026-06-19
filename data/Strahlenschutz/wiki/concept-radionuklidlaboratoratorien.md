@@ -1,15 +1,36 @@
 ---
+created: '2026-05-21'
+key_terms:
+- radionuclid
+- laboratori
+- purpos
+- scop
+- risk
+- assessment
+- room
+- classificatio
+- factor
+- handl
+- method
 related:
 - concept-radiation-protection.md
 - concept-professional-exposure.md
-- concept-radiation-dose-limits.md
+- concept-dosisbegrenzung.md
 sources:
 - summary-din-25425-3-2019-12-md.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
+- summary-din-25425-4-2019-12-md-teil-1-2.md
 title: Radionuclide Laboratories
 type: concept
-updated: '2026-05-27'
+updated: '2026-06-19'
 ---
+
+## Key facts
+- Radionuclide Laboratories
+- Purpose and Scope
+- Risk Assessment and Room Classification
+- Assessment Factor (K)
+- Handling Method
 
 # Radionuclide Laboratories
 
@@ -90,3 +111,45 @@ In addition to structural and fire safety, the standard mandates specific rules 
 *   **Monitoring:** Personnel must be subject to regular monitoring. This includes:
     *   **Dosimetry:** Implementation of personal dosimetry systems to track cumulative radiation doses received by individuals [summary-din-25425-4-2019-12-md-teil-2-2.md].
     *   **Contamination Checks:** Regular monitoring of personnel and equipment for radioactive contamination is required [summary-din-25425-4-2019-12-md-teil-2-2.md].
+## Personal Protection (DIN 25425-4)
+The standard DIN 25425-4 provides detailed rules for personal protection in radionuclide laboratories, supplementing the structural requirements of DIN 25425-1 and fire protection of DIN 25425-3.
+### Operational Safety and Monitoring
+*   **Legal Basis:** The foundation for handling radioactive substances is the *Strahlenschutzgesetz* (StrlSchG) and the *Strahlenschutzverordnung* (StrlSchV) [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   **Exposure Monitoring:** For external exposure, the body dose is generally measured using official personal dosimeters [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   **Personnel Classification:** Personnel are classified into Category A or Category B based on expected exposure. Category A personnel require annual medical monitoring [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   **Pregnancy:** Handling open radioactive substances is prohibited for pregnant or breastfeeding women, as internal incorporation cannot be ruled out [summary-din-25425-4-2019-12-md-teil-1-2.md].
+### Contamination Control
+*   During activities with open radioactive substances, the possibility of checking clothing, body, and work materials for contamination must exist [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   If contamination is suspected on accessible traffic areas, an immediate contamination check must be performed [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   The documentation of personal contamination incidents is required for 30 years (for significant contamination without limit exceedance) [summary-din-25425-4-2019-12-md-teil-1-2.md].
+### Documentation Requirements
+The documentation of radiation protection must adhere to the StrlSchG and StrlSchV. The required records include:
+*   Personal dosimetry measurements (75 years after birth, but min. 30 years after employment end) [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   Incorporated activity (75 years after birth, but min. 30 years after employment end) [summary-din-25425-4-2019-12-md-teil-1-2.md].
+*   Radioactive waste/residues (30 years) [summary-din-25425-4-2019-12-md-teil-1-2.md].
+## Decontamination of Surfaces (DIN 25425-5)
+The management of surface contamination is governed by DIN 25425-5, which provides detailed rules for decontamination procedures.
+### Scope and Principles
+This standard sets general rules for decontamination measures for both adherent and non-adherent surface contaminations, aiming to allow the reuse of rooms, work surfaces, and objects [summary-din-25425-5-2024-12.md]. The principles of contamination behavior are detailed, distinguishing between mechanical adhesion, adsorption, ion exchange, and diffusion [summary-din-25425-5-2024-12.md].
+### Decontamination Procedures
+The procedures are categorized based on whether material removal is necessary:
+**1. Procedures without Material Removal:**
+These are suitable for contamination that is mechanically adhered, embedded in dirt layers, or physically/chemically adsorbed [summary-din-25425-5-2024-12.md].
+*   **Dry Mechanical:** Vacuuming with exhaust filtration (minimum H13 efficiency per DIN EN 1822-1:2019-10) is used for dust/particles. Adhesive films can be used for weak contamination [summary-din-25425-5-2024-12.md].
+*   **Wet Mechanical:** Water with additives like tensides is used. Mechanical support can involve soft plastic brushes or floor polishing machines with vacuuming [summary-din-25425-5-2024-12.md]. Ultrasound can improve cleaning, especially on rough surfaces, using a shaking bath or encapsulated sonotrode [summary-din-25425-5-2024-12.md].
+*   **Wet Chemical:** Use aqueous solutions of surfactant mixtures, alcohols, complexing agents, or organic acids. These must be supplemented with mechanical support [summary-din-25425-5-2024-12.md].
+**2. Procedures with Material Removal:**
+These are required if contamination is deeply embedded in pores, cracks, or gaps, embedded in corrosion layers, or diffused in surfaces [summary-din-25425-5-2024-12.md].
+*   **Mechanical:** Includes cutting, milling, planing, or grinding. These must be equipped with a vacuum system. The removal depth is limited to 1 mm [summary-din-25425-5-2024-12.md].
+*   **Chemical:** Use solutions of alkalis, acids, redox chemicals, or complexing agents. The surface must be carefully rinsed, neutralized, and possibly passivated after treatment [summary-din-25425-5-2024-12.md].
+*   **Electrochemical:** Applicable only to metal objects. Electro-polishing uses dilute acids or mixtures thereof (usually phosphoric and sulfuric acid) to achieve a polished surface. Electro-decontaminating uses dilute acids or salt solutions, which is generally preferred due to less material removal [summary-din-25425-5-2024-12.md].
+### Selection and Measurement
+The selection of procedures must consider personnel exposure, risks from hazardous substances (GefStoffV), waste disposal, decontamination effect, minimal surface damage, and time required [summary-din-25425-5-2024-12.md].
+Measurement of surface contamination can be done by direct and indirect methods. Indirect methods (like wipe tests) are associated with uncertainties and can only allow for a conservative estimate. For compliance outside radiation protection areas, adherent contamination can be disregarded [summary-din-25425-5-2024-12.md].
+## Literature References
+The standard references several other DIN documents, including:
+*   DIN 25425-1 (Rules for the Design);
+*   DIN 25425-3 (Rules for Preventive Fire Protection);
+*   DIN 25425-4 (Rules for Personal Protection);
+*   DIN 25430 (Safety Marking in Radiation Protection);
+*   DIN ISO 7503-1, DIN ISO 7503-2, DIN ISO 7503-3 (Measurement and Evaluation of Surface Contamination).

@@ -1,16 +1,23 @@
 ---
 confidence: high
 created: '2026-05-17'
+key_terms:
+- notfallvorsorg
 related:
 - strahlenschutzgesetz-strlschg.md
-- summary-strlschg-md-teil-7-13.md
+- summary-strlschg.md
 sources:
-- StrlSchG.md [Teil 7/13]
 - StrlSchG.md
 title: Notfallvorsorge
 type: concept
 updated: '2026-05-17'
 ---
+
+## Key facts
+- Notfallvorsorge
+- Planning Structure
+- Core Principles and Procedures
+- Public Communication
 
 Emergency preparedness concerning ionizing radiation is governed by a hierarchical and multi-layered system detailed within the *Strahlenschutzgesetz* (StrlSchG). The goal is to ensure coordinated, timely, and appropriate responses to potential radiological emergencies.
 
