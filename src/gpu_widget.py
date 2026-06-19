@@ -76,6 +76,7 @@ def _get_gpu_stats() -> list[dict]:
 
 def _build_payload() -> str:
     """Build JSON payload for the GPU stats endpoint."""
+    import ollama_client
     gpus = _get_gpu_stats()
     elapsed = None
     is_running = False
@@ -88,6 +89,7 @@ def _build_payload() -> str:
         "gpus": gpus,
         "elapsed": elapsed,
         "is_running": is_running,
+        "model": ollama_client.loaded_model(),
     })
 
 
@@ -154,7 +156,7 @@ def _ensure_gpu_route() -> bool:
 # HTML/JS template (fetches relative /_api/gpu)
 # ---------------------------------------------------------------------------
 
-def _gpu_html(model: str, accent: str = "#234637") -> str:
+def _gpu_html(accent: str = "#234637") -> str:
     return f"""\
 <div id="gpu-stats" style="font-family:monospace; font-size:13px; color:#aaa; white-space:nowrap;">
   Lade GPU...
@@ -181,7 +183,7 @@ function fetchGPU() {{
           + "|Fan:" + fan + "%"
           + "|<span style='color:" + uCol + "'>Load:" + load + "%</span>";
       }}).join("<br>");
-      html += "<br><span style='color:#aaa'>llm: {model}</span>";
+      html += "<br><span style='color:#aaa'>llm: " + (data.model || "") + "</span>";
       if (data.elapsed !== null && data.elapsed !== undefined) {{
         let eCol = data.is_running ? "#21c354" : "#aaa";
         let dots = data.is_running ? "..." : "";
@@ -205,7 +207,6 @@ def render_gpu_sidebar(accent: str = "#234637") -> None:
     """Render live GPU widget in sidebar via Starlette route injection."""
     if not _ensure_gpu_route():
         return
-    import ollama_client as _oc
     st.sidebar.markdown("**GPU**")
     with st.sidebar:
-        components.html(_gpu_html(_oc._MODEL, accent), height=85, scrolling=False)
+        components.html(_gpu_html(accent), height=85, scrolling=False)

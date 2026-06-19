@@ -55,6 +55,19 @@ def chat(messages: list[dict], temperature: float = 0.7) -> str:
         raise RuntimeError(f"Ollama chat failed: {exc}") from exc
 
 
+def loaded_model() -> str:
+    """Model currently loaded in Ollama VRAM; falls back to configured _MODEL when idle."""
+    try:
+        resp = _client().ps()
+        models = getattr(resp, "models", None) or (resp.get("models") if isinstance(resp, dict) else None) or []
+        if models:
+            m = models[0]
+            return getattr(m, "model", None) or (m.get("model") if isinstance(m, dict) else None) or _MODEL
+    except Exception:
+        pass
+    return _MODEL
+
+
 def ocr(model_id: str, prompt: str, image_b64: str, temperature: float = 0.0) -> str:
     """Run a vision OCR model on one base64 image. model_id must be vision-capable."""
     try:
