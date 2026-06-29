@@ -207,6 +207,6 @@ def render_gpu_sidebar(accent: str = "#234637") -> None:
     """Render live GPU widget in sidebar via Starlette route injection."""
     if not _ensure_gpu_route():
         return
-    st.sidebar.markdown("**GPU**")
+    st.sidebar.caption("GPU")
     with st.sidebar:
         components.html(_gpu_html(accent), height=85, scrolling=False)

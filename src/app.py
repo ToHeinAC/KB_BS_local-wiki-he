@@ -614,6 +614,8 @@ wiki_engine.init_wiki()
 st.sidebar.markdown("## 📖 LocalWiki")
 gpu_widget.render_gpu_sidebar(accent=_t["primary"])
 
+st.sidebar.markdown("---")
+
 st.sidebar.caption("DATABASE")
 _db_choice = st.sidebar.selectbox(
     "Database",
