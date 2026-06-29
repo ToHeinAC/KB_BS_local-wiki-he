@@ -28,7 +28,12 @@ import db_context
 import ollama_client
 import run_memory
 import tools as tool_module
-from prompts import CHAT_AGENT_SYSTEM, CHAT_BUDGET_NUDGE
+from prompts import (
+    CHAT_AGENT_SYSTEM,
+    CHAT_BUDGET_NUDGE,
+    CHAT_FALLBACK_PROMPT,
+    CHAT_FALLBACK_SYSTEM,
+)
 
 load_dotenv()
 
@@ -38,6 +43,7 @@ MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 MAX_ITER = int(os.getenv("CHAT_MAX_ITERATIONS", "25"))
 NUDGE_AT = int(os.getenv("CHAT_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 LLM_TIMEOUT = int(os.getenv("CHAT_LLM_TIMEOUT", "180"))
+FALLBACK_NOTES_CAP = int(os.getenv("CHAT_FALLBACK_NOTES_CAP", "12000"))
 
 _RAW_TEXT_EXTS = {".md", ".txt", ".html"}
 _RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]]+\.(?:md|txt|html))\s*\]")
@@ -133,6 +139,46 @@ def _tool_to_result(msg: ToolMessage):
     yield {"type": "tool_result", "name": msg.name, "result": content}
 
 
+def _with_iter_hint(content: str, recursion_hit: bool) -> str:
+    """Append an end-of-answer hint when the run stopped on the iteration limit."""
+    if not recursion_hit:
+        return content
+    return (
+        f"{content}\n\n---\n"
+        f"*Hint: the agent reached its iteration limit ({MAX_ITER}) before submitting "
+        "a complete answer, so this response may be partial.*"
+    )
+
+
+def _gather_notes(all_messages) -> str:
+    """Concatenate search/read tool results so a fallback pass can synthesise
+    from what the agent gathered. Keeps the most recent notes within the cap."""
+    blocks: list[str] = []
+    for m in all_messages:
+        if isinstance(m, ToolMessage):
+            c = m.content if isinstance(m.content, str) else str(m.content)
+            if c.strip():
+                blocks.append(f"### {m.name}\n{c.strip()}")
+    notes = "\n\n".join(blocks)
+    return notes[-FALLBACK_NOTES_CAP:] if len(notes) > FALLBACK_NOTES_CAP else notes
+
+
+def _synthesize_fallback(question: str, all_messages) -> str:
+    """Best-effort answer from gathered notes when the agent stalled without
+    calling submit_chat_answer. Returns '' if there are no notes or on error."""
+    notes = _gather_notes(all_messages)
+    if not notes.strip():
+        return ""
+    prompt = CHAT_FALLBACK_PROMPT.format(question=question, notes=notes)
+    try:
+        return ollama_client.generate(
+            CHAT_FALLBACK_SYSTEM, prompt,
+            temperature=0.3, model_id=ollama_client._QUERY_MODEL,
+        ).strip()
+    except Exception:
+        return ""
+
+
 def _extract_submitted_answer(messages) -> tuple[str, list[str]] | None:
     """Find the most recent submit_chat_answer call whose tool result was ACCEPTED.
 
@@ -207,7 +253,8 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
     if submitted is not None:
         answer, sources = submitted
         cited = sorted(set(_RAW_CITE_RE.findall(answer)) | set(sources))
-        yield {"type": "final_answer", "content": answer, "sources": cited}
+        yield {"type": "final_answer",
+               "content": _with_iter_hint(answer, recursion_hit), "sources": cited}
         return
 
     # Clean exit: the final assistant message carries non-empty answer text.
@@ -215,7 +262,8 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
         text = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
         if text.strip():
             cited = sorted(set(_RAW_CITE_RE.findall(text)))
-            yield {"type": "final_answer", "content": text, "sources": cited}
+            yield {"type": "final_answer",
+                   "content": _with_iter_hint(text, recursion_hit), "sources": cited}
             return
 
     _prefix = "(partial — recursion limit hit)" if recursion_hit else "(best-effort — quality gate not met)"
@@ -229,7 +277,9 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
                     if draft:
                         cited = sorted(set(_RAW_CITE_RE.findall(draft))
                                        | set((tc.get("args") or {}).get("sources") or []))
-                        yield {"type": "final_answer", "content": f"{_prefix}\n\n{draft}", "sources": cited}
+                        yield {"type": "final_answer",
+                               "content": _with_iter_hint(f"{_prefix}\n\n{draft}", recursion_hit),
+                               "sources": cited}
                         return
 
     # Best-effort: the last non-empty assistant message (usually a reflection).
@@ -238,8 +288,27 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
             text = m.content if isinstance(m.content, str) else str(m.content or "")
             if text.strip():
                 cited = sorted(set(_RAW_CITE_RE.findall(text)))
-                yield {"type": "final_answer", "content": f"{_prefix}\n\n{text}", "sources": cited}
+                yield {"type": "final_answer",
+                       "content": _with_iter_hint(f"{_prefix}\n\n{text}", recursion_hit),
+                       "sources": cited}
                 return
+
+    # The agent gathered search results but never submitted or wrote prose
+    # (common with small local models). Synthesise an answer from the notes
+    # instead of discarding everything.
+    synth = _synthesize_fallback(question, all_messages)
+    if synth:
+        cited = sorted(set(_RAW_CITE_RE.findall(synth)))
+        yield {
+            "type": "final_answer",
+            "content": _with_iter_hint(
+                f"(assembled from gathered notes — the agent did not submit an answer)\n\n{synth}",
+                recursion_hit,
+            ),
+            "sources": cited,
+            "note": "Fallback synthesis from gathered tool results.",
+        }
+        return
 
     if recursion_hit:
         yield {"type": "final_answer",

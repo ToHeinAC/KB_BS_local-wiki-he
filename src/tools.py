@@ -42,7 +42,11 @@ MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
 CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "300"))
 CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 CONTENT_TRUNCATE = 2000
-RAW_READ_CAP = 8000  # chars per raw_read call (per file, per offset window)
+RAW_READ_CAP = 16000  # chars per raw_read call (per file, per offset window)
+# After this many distinct byte-offset windows of one file have been read in a
+# run, the read result appends a "submit now" nudge — stops weak models from
+# paginating a whole document instead of answering.
+RAW_READ_NUDGE_AFTER = int(os.getenv("CHAT_RAW_READ_NUDGE_AFTER", "2"))
 WIKI_LINK_EXPANSION = os.getenv("WIKI_LINK_EXPANSION", "1") != "0"
 WIKI_LINK_SEEDS = int(os.getenv("WIKI_LINK_SEEDS", "3"))  # top hits whose links we follow
 WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended per query
@@ -590,10 +594,23 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
             )
     if fresh:
         out.append(_raw_read_impl(fresh, offset=offset))
+        nudge_bases: list[str] = []
         for f in fresh:
             base, section = _split_filename(f)
             canon = _norm_anchor(section) if section else ""
             mem.mark_read(_read_key(base, canon, offset))
+            # Section-less (byte-offset) reads are the pagination death-spiral
+            # path: once enough windows of one file are read, tell the model to
+            # stop paginating and answer.
+            if not canon and len(_read_offsets(mem, base)) >= RAW_READ_NUDGE_AFTER:
+                nudge_bases.append(base)
+        if nudge_bases:
+            files = ", ".join(sorted(set(nudge_bases)))
+            out.append(
+                f"[memory] You have now read {RAW_READ_NUDGE_AFTER}+ windows of {files}. "
+                "Stop paginating — if you have enough to answer, call submit_chat_answer "
+                "now; otherwise raw_search a different file or call think_tool."
+            )
     return "\n\n".join(out)
 
 

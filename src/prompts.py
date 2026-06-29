@@ -265,7 +265,7 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions strictly
 
 {raw_block}Tools available:
 - raw_search(query OR queries): full-text search over data/raw/. Pass 1-3 sub-queries in parallel. Cite hits as [Source: filename].
-- raw_read(filenames, offset=0): read up to 8000 chars from one or more original files. For long files, paginate: the result footer tells you the next offset.
+- raw_read(filenames, offset=0): read up to 16000 chars from one or more original files. For long files, paginate: the result footer tells you the next offset.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
 - submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words or fewer than {min_sources} unique [Source: ...] citations.
@@ -381,6 +381,20 @@ RESEARCH_FALLBACK_SYSTEM = (
     "You are a research report writer. Ground every statement in the provided "
     "notes; never invent sources or facts beyond them."
 )
+
+CHAT_FALLBACK_SYSTEM = (
+    "You answer questions strictly from the provided source notes. Ground every "
+    "statement in the notes; never invent sources or facts beyond them."
+)
+
+CHAT_FALLBACK_PROMPT = """The chat agent gathered the notes below from data/raw/ but stopped without submitting an answer. Using ONLY these notes, write the best possible answer to the question.
+
+Question: {question}
+
+Source notes (tool results):
+{notes}
+
+Write a concise markdown answer. Inline-cite every claim with the [Source: filename] tags exactly as they appear in the notes. If the notes are insufficient to answer fully, state what is known and list the remaining gaps explicitly."""
 
 RESEARCH_FALLBACK_PROMPT = """The research agent gathered the notes below but stopped without assembling a report. Using ONLY these notes, write the best possible answer to the question.
 

@@ -303,6 +303,17 @@ def test_raw_read_duplicate_offset_after_full_read_has_no_offset_hint(wiki_dir):
     assert "Whole file already read" in dup and "offset=" not in dup
 
 
+def test_raw_read_nudges_submit_after_paginating(wiki_dir):
+    cap = tools.RAW_READ_CAP
+    (tools.db_context.raw_dir() / "big.md").write_text("z" * (cap * 4), encoding="utf-8")
+    run_memory.begin_run()
+    first = tools.raw_read.invoke({"filenames": ["big.md"], "offset": 0})
+    assert "Stop paginating" not in first  # one window read, no nudge yet
+    second = tools.raw_read.invoke({"filenames": ["big.md"], "offset": cap})
+    assert "Stop paginating" in second  # RAW_READ_NUDGE_AFTER=2 windows reached
+    assert "submit_chat_answer" in second
+
+
 # --- think_tool -----------------------------------------------------------
 
 def test_think_tool_passthrough():
