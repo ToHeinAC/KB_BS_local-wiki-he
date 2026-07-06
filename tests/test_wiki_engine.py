@@ -425,7 +425,8 @@ def test_rebuild_index_has_insights_section(wiki_dir):
     wiki_engine.file_answer("Q?", "A.", [])
     wiki_engine._rebuild_index()
     index = (wiki_dir / "index.md").read_text()
-    assert "## Insights" in index
+    assert 'okf_version: "0.1"' in index  # OKF bundle-root declaration
+    assert "# Insights" in index
     assert "insights/insight-q.md" in index
 
 

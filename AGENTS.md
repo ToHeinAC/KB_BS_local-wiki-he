@@ -92,6 +92,7 @@ The project uses the following technology choices:
 - **Ingest is three-stage** (`ingest_begin` / `ingest_piece` / `ingest_end`; legacy single-call `ingest()` wraps them). Page identity and merge are **deterministic in code** (`_route_page` / `_merge_pages`), not prompt-driven — don't push that logic into prompts.
 - **Deletion goes through `wiki_engine.delete_source(name)`** — it cascades across every store (raw file, manifest, chunks, qa.jsonl, wiki pages) and rebuilds the index. Never delete from one store alone.
 - **Agent loop guard:** `src/run_memory.py` short-circuits duplicate reads/searches so weak local models can't loop. Section-aware reads and the 16 KB byte-offset window (`RAW_READ_CAP`) live in `src/tools.py`; if you change read/search behaviour, keep the visited-set keying intact.
+- **OKF conformance is code-stamped, not prompt-driven.** The `wiki/` folder is an Open Knowledge Format (OKF v0.1) bundle; `src/okf.py` deterministically stamps OKF frontmatter + `## Citations` on every page write and formats `index.md`/`log.md`. Never ask the LLM to emit `okf_version`/`tags`/`resource`/`timestamp`/citations — keep it in code (small-model-safe). See [docs/okf.md](docs/okf.md).
 
 ### 5.4 Licencing
 All implementation must be under the Apache Licence 2.0 or more permissive (e.g. MIT).

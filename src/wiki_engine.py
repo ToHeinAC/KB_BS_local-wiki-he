@@ -13,6 +13,7 @@ import chunker
 import db_context
 import dedup
 import lex_index
+import okf
 import ollama_client
 import qa_gen
 import schema_loader
@@ -78,15 +79,13 @@ def init_wiki() -> None:
     _wiki().mkdir(parents=True, exist_ok=True)
     _raw().mkdir(parents=True, exist_ok=True)
     if not _index_path().exists():
-        _index_path().write_text("# Wiki Index\nUpdated: — | Pages: 0\n\n## Pages\n")
+        _index_path().write_text(
+            f'---\ntitle: Index\nokf_version: "{okf.OKF_VERSION}"\n---\n\n# Pages\n'
+        )
     if not _log_path().exists():
-        _log_path().write_text("# Wiki Log\n")
+        _log_path().write_text("---\ntitle: Activity Log\n---\n\n# Log\n")
     if not _description_path().exists():
         _description_path().write_text("")
-
-
-def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M")
 
 
 def _date() -> str:
@@ -126,9 +125,11 @@ def stale_pages() -> list[str]:
 
 
 def _append_log(action: str, detail: str) -> None:
-    entry = f"\n## {_now()} — {action}\n{detail}\n"
-    with _log_path().open("a") as f:
-        f.write(entry)
+    """OKF-format log write: newest-first under a `## YYYY-MM-DD` date section."""
+    path = _log_path()
+    text = path.read_text() if path.exists() else ""
+    time = datetime.now(timezone.utc).strftime("%H:%M")
+    path.write_text(okf.add_log_entry(text, action, detail, day=_date(), time=time))
 
 
 def _rebuild_index() -> None:
@@ -137,12 +138,15 @@ def _rebuild_index() -> None:
     insights = [p for p in pages if p.get("type") == "insight"]
 
     def _line(p: dict) -> str:
-        return f"- [{p.get('title', p['filename'])}]({p['filename']}) — {p.get('description', '')}\n"
+        return f"* [{p.get('title', p['filename'])}]({p['filename']}) - {p.get('description', '')}\n"
 
-    lines = [f"# Wiki Index\nUpdated: {_date()} | Pages: {len(main)}\n\n## Pages\n"]
+    head = ("---\ntitle: Index\n"
+            f'okf_version: "{okf.OKF_VERSION}"\n'
+            f'updated: "{_date()}"\n---\n\n# Pages\n')
+    lines = [head]
     lines += [_line(p) for p in main]
     if insights:
-        lines.append("\n## Insights\n")
+        lines.append("\n# Insights\n")
         lines += [_line(p) for p in insights]
     _index_path().write_text("".join(lines))
 
@@ -448,7 +452,8 @@ def _merge_pages(existing: str, new: str, source: str) -> str:
         meta["confidence"] = "low"
     out = frontmatter.dumps(frontmatter.Post(body, **meta)) + "\n"
     out = _ensure_key_terms(out)
-    return _ensure_index_block(out)
+    out = _ensure_index_block(out)
+    return _okf_apply(out)  # keep merged pages OKF-conformant for every caller
 
 
 def _build_registry() -> dict:
@@ -637,6 +642,11 @@ def _ensure_source_in_frontmatter(content: str, source_name: str) -> str:
     return frontmatter.dumps(post) + "\n"
 
 
+def _okf_apply(content: str) -> str:
+    """Stamp OKF fields + `## Citations` on a page (deterministic, no LLM)."""
+    return okf.apply_to_page(content, db=db_context.get_active_db())
+
+
 def _ensure_frontmatter(content: str, fname: str) -> str:
     """Patch minimal YAML frontmatter when the LLM omitted it."""
     if content.lstrip().startswith("---"):
@@ -773,6 +783,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
                 ctx["updated"].append(target)
         elif target not in ctx["created"]:
             ctx["created"].append(target)
+        content = _okf_apply(content)  # OKF frontmatter + citations (deterministic)
         dest.write_text(content)
         ctx["existing_filenames"].add(target)
         _registry_add(ctx["registry"], target, content)

@@ -50,21 +50,31 @@ confidence: high | medium | low
 - Derived from the page title: "Quantum Entanglement" → `quantum-entanglement.md`
 - Source summaries: `summary-<source-basename>.md`
 
-## index.md Structure
+## OKF fields — do NOT author these
+
+The wiki is an Open Knowledge Format (OKF v0.1) bundle. Code auto-stamps
+`okf_version`, `description`, `tags`, `resource`, `timestamp` and the
+`## Citations` section deterministically — do not write them yourself. Just
+author `title`/`type`/`sources`/`related` and the body as above. See
+[docs/okf.md](docs/okf.md).
+
+## index.md Structure (OKF; code-generated)
 
 ```markdown
-# Wiki Index
-Updated: YYYY-MM-DD | Pages: N
+---
+title: Index
+okf_version: "0.1"
+---
 
-## Pages
-- [Title](filename.md) — one-line description
+# Pages
+* [Title](filename.md) - one-line description
 ```
 
-## log.md Structure
+## log.md Structure (OKF; code-generated)
 
-Append entries chronologically:
+Date-grouped, newest first:
 
 ```markdown
-## YYYY-MM-DD HH:MM — <action>
-<brief narrative of what happened>
+## YYYY-MM-DD
+- HH:MM — <action>: <brief detail>
 ```
