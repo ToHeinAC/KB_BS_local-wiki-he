@@ -32,7 +32,7 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `src/run_memory.py` | **Done** |
 | `src/db_context.py` (multi-DB path resolution) | **Done** |
 | `src/auth.py` (users + bcrypt) | **Done** |
-| Test suite | **Done** (130 tests; old 100-cap superseded — see [`docs/tests.md`](docs/tests.md)) |
+| Test suite | **Done** (≈233 tests; 100-cap superseded — see §5 and [`docs/tests.md`](docs/tests.md)) |
 | `.streamlit/config.toml` | **Done** |
 | `tunnel.sh` (Cloudflare quick tunnel) | **Done** |
 
@@ -54,6 +54,7 @@ All planned modules implemented plus a retrieval layer: chunk store + BM25 lexic
 | Testing strategy | [`docs/tests.md`](docs/tests.md) | §4.5 |
 | Open issues | [`docs/openissues.md`](docs/openissues.md) | — |
 | Dated change log | [`docs/changelog.md`](docs/changelog.md) | — |
+| Critical analysis & roadmap (historical review, not current guidance) | `docs/LocalWiki Implementation — Critical Analysis & Improvement Roadmap.md` | — |
 
 ---
 
@@ -82,7 +83,7 @@ All Python modules live under `src/`. Entry point: `uv run streamlit run src/app
 | `src/template_loader.py` | Reads `templates/insert.md` → ordered list of user-fillable metadata fields | Done |
 | `src/db_context.py` | Active-database context. `ContextVar`-backed `set_active_db`/`get_active_db`; per-call path getters `wiki_dir()`/`raw_dir()`/`chunks_dir()`/`index_dir()` (all `$DATA_ROOT/<db>/…`) consumed by every data module instead of import-time constants. `list_dbs()`/`create_db()`; `migrate_legacy_layout()` moves pre-multi-DB `data/{raw,chunks,index,wiki}` into `data/Strahlenschutz/`. | Done |
 | `src/auth.py` | Local user store at `data/users.json` (gitignored). bcrypt password hashes; per-user DB allowlist (`dbs`) + `is_admin` + per-DB maintainer list (`maintains`). `verify`, `add_user`, `delete_user`, `set_user_dbs`, `change_password`, `user_dbs`, `is_admin`. **Maintainer layer:** `user_maintains`, `is_maintainer(user, db)` (= `db in maintains`; admin does **not** imply maintainer), `set_user_maintains`, `grant_maintainer` (adds DB to both `dbs` + `maintains`). `ensure_seeded()` creates default admin `T. Hein`/`k-wiki` (maintains `Strahlenschutz`); `backfill_maintainers()` is an idempotent migration that grants pre-existing admins `maintains = dbs` (non-admins stay read-only). | Done |
-| `SCHEMA.md` | Wiki schema injected into every LLM system prompt | Done |
+| `SCHEMA.md` | Wiki schema; the mode-appropriate variant (`SCHEMA.md` full for ingest/page-writing, `SCHEMA_QUERY.md` trimmed for read/answer/lint) is injected into the LLM system prompt via `schema_loader.get_system_prompt` | Done |
 
 ---
 
@@ -106,7 +107,7 @@ The mockup simplifies a few planned details — tracked here so future iteration
 - **No async** unless UI stack requires it at boundaries (PRD §4.4).
 - **All modules in `src/`**, one file per module, no sub-packages (PRD §4.4). Prompts in `src/prompts.py`.
 - **`uv` only** for env + deps (PRD §5.3).
-- **Test cap: 100 automated tests**, ≈90% core / ≈10% new features (PRD §4.5).
+- **Test suite: ≈233 tests, no hard cap** — the source-of-truth count. PRD §4.5's original 100-cap was superseded 2026-05 (new modules with verifiable behaviour are exempt); keep the suite lean and high-signal, no low-value proliferation.
 - **NYT editorial UI style** (PRD §2.4).
 - **Apache-2.0 / MIT-compatible licensing** (CLAUDE.md §5.4).
 - **Streamlit port: 8520** (8511 reserved for another app on this host).

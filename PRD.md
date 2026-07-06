@@ -744,6 +744,8 @@ On first run, the application must:[1]
 
 The project must include automated tests, but the total number of automatic tests must be capped at **100 tests maximum**. This cap is intended to keep the suite intentionally lean, fast, and focused.[1]
 
+> **Superseded — see [IMPLEMENTATION.md](IMPLEMENTATION.md) §5 for the current policy.** The hard 100-test cap was relaxed in 2026-05: whole new modules with verifiable behaviour are exempt, so the suite now stands at ≈233 tests. The cap's *intent* — a lean, high-signal suite with no low-value proliferation — still governs. Other "100 tests" mentions in this spec are historical.
+
 **Test allocation rules:**
 - Approximately **90%** of tests shall cover the most important parts of the system.
 - The remaining approximately **10%** shall cover newly implemented features.
