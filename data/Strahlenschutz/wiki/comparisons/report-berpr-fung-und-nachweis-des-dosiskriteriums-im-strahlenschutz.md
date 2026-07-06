@@ -1,8 +1,19 @@
 ---
-title: "Überprüfung und Nachweis des Dosiskriteriums im Strahlenschutz"
+created: '2026-05-22'
+description: Die Überprüfung und der Nachweis der Einhaltung von Dosiskriterien ist
+  ein zentraler, mehrstufiger Prozess im deutschen Strahlenschutzrecht
+resource: https://flexikon.doccheck.com/de/Dosimetrie
+sources:
+- https://flexikon.doccheck.com/de/Dosimetrie
+- https://www.bfs.de/DE/themen/ion/service/dosimetrie/dosimetrie_node.html
+- https://www.bfs.de/SharedDocs/Glossareintraege/DE/E/effektive-dosis.html
+- https://www.fs-ev.org/fileadmin/user_upload/93_Oeff.-Arbeit/StrahlenschutzKompakt/SK06n_Dosis%20im%20Strahlenschutz-2b.pdf
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-22T00:00:00Z'
+title: Überprüfung und Nachweis des Dosiskriteriums im Strahlenschutz
 type: report
-created: "2026-05-22"
-sources: ['https://flexikon.doccheck.com/de/Dosimetrie', 'https://www.bfs.de/DE/themen/ion/service/dosimetrie/dosimetrie_node.html', 'https://www.bfs.de/SharedDocs/Glossareintraege/DE/E/effektive-dosis.html', 'https://www.fs-ev.org/fileadmin/user_upload/93_Oeff.-Arbeit/StrahlenschutzKompakt/SK06n_Dosis%20im%20Strahlenschutz-2b.pdf']
 ---
 
 # Überprüfung und Nachweis des Dosiskriteriums im Strahlenschutz
@@ -45,3 +56,10 @@ Der Nachweis ist nicht nur eine Messung, sondern ein formalisiertes Verfahren, d
 3.  **Spezialfälle:** Bei **Notfällen** (Notfall-Expositionssituation) sind spezielle Protokolle für die Dosimetrie und medizinische Nachsorge der Einsatzkräfte vorgeschrieben [StrlSchV.md [Teil 1/15].md].
 
 Zusammenfassend lässt sich sagen, dass der Nachweis des Dosiskriteriums ein kontinuierlicher Kreislauf ist: **Planung $\rightarrow$ Messung (Dosimetrie) $\rightarrow$ Berechnung (Effektive Dosis) $\rightarrow$ Vergleich mit Grenzwerten $\rightarrow$ Dokumentation**. Die Einhaltung dieser Kette ist Voraussetzung für die Genehmigung und den Betrieb jeglicher strahlenexponierter Tätigkeit.
+
+## Citations
+
+1. https://flexikon.doccheck.com/de/Dosimetrie
+2. https://www.bfs.de/DE/themen/ion/service/dosimetrie/dosimetrie_node.html
+3. https://www.bfs.de/SharedDocs/Glossareintraege/DE/E/effektive-dosis.html
+4. https://www.fs-ev.org/fileadmin/user_upload/93_Oeff.-Arbeit/StrahlenschutzKompakt/SK06n_Dosis%20im%20Strahlenschutz-2b.pdf

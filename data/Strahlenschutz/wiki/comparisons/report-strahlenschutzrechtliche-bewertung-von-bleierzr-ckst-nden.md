@@ -1,8 +1,24 @@
 ---
-title: "Strahlenschutzrechtliche Bewertung von Bleierzrückständen"
+created: '2026-05-20'
+description: Die Frage, ob ein Bleierz mit einer spezifischen Aktivität von $1.5 \text{
+  Bq/g}$ als „überwachungsbedürftiger Rückstand“ gilt und wie es aus der Überwachung…
+resource: https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf
+sources:
+- https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf
+- https://um.baden-wuerttemberg.de/de/umwelt-natur/kernenergie/strahlenschutz/ueberwachung-der-radioaktivitaet/natuerliche-radioaktivitaet/norm-naturally-occuring-radioactive-material/norm-rueckstaende
+- https://www.buzer.de/gesetz/13179/b30033.htm
+- https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+- https://www.strahlenschutz.sachsen.de/freigabe-radioaktiver-stoffe-10064.html
+- https://www.strahlenschutz.sachsen.de/radioaktive-abfalle-und-ruckstande-10440.html
+- https://www.sv-strahlenschutz.de/fachinformationen/r%C3%BCckst%C3%A4nde/
+- wiki:concept-kontaminierte-abfaelle.md
+- wiki:concept-radiation-protection-law.md
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-20T00:00:00Z'
+title: Strahlenschutzrechtliche Bewertung von Bleierzrückständen
 type: report
-created: "2026-05-20"
-sources: ['https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf', 'https://um.baden-wuerttemberg.de/de/umwelt-natur/kernenergie/strahlenschutz/ueberwachung-der-radioaktivitaet/natuerliche-radioaktivitaet/norm-naturally-occuring-radioactive-material/norm-rueckstaende', 'https://www.buzer.de/gesetz/13179/b30033.htm', 'https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf', 'https://www.strahlenschutz.sachsen.de/freigabe-radioaktiver-stoffe-10064.html', 'https://www.strahlenschutz.sachsen.de/radioaktive-abfalle-und-ruckstande-10440.html', 'https://www.sv-strahlenschutz.de/fachinformationen/r%C3%BCckst%C3%A4nde/', 'wiki:concept-kontaminierte-abfaelle.md', 'wiki:concept-radiation-protection-law.md']
 ---
 
 # Analyse der Überwachungsbedürftigkeit und Freigabe eines Bleierzes mit $1.5 \text{ Bq/g}$ nach deutschem Strahlenschutzrecht
@@ -59,3 +75,15 @@ Ob das Bleierz als überwachungsbedürftig gilt, hängt davon ab, **welchen Zwec
 *   [Source: https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf]
 *   [Source: https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf]
 *   [Source: https://www.buzer.de/gesetz/13179/b30033.htm]
+
+## Citations
+
+1. https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf
+2. https://um.baden-wuerttemberg.de/de/umwelt-natur/kernenergie/strahlenschutz/ueberwachung-der-radioaktivitaet/natuerliche-radioaktivitaet/norm-naturally-occuring-radioactive-material/norm-rueckstaende
+3. https://www.buzer.de/gesetz/13179/b30033.htm
+4. https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+5. https://www.strahlenschutz.sachsen.de/freigabe-radioaktiver-stoffe-10064.html
+6. https://www.strahlenschutz.sachsen.de/radioaktive-abfalle-und-ruckstande-10440.html
+7. https://www.sv-strahlenschutz.de/fachinformationen/r%C3%BCckst%C3%A4nde/
+8. wiki:concept-kontaminierte-abfaelle.md
+9. wiki:concept-radiation-protection-law.md

@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Medizinphysik-Experte
 key_terms:
 - medizinphysik
 - exper
@@ -9,6 +10,10 @@ related:
 sources:
 - StrlSchG.md
 - StrlSchV.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-27T00:00:00Z'
 title: Medizinphysik-Experte
 type: concept
 updated: '2026-05-27'
@@ -38,3 +43,8 @@ The duties of the expert are comprehensive and include:
 
 ## Relationship to Authorized Physicians
 The StrlSchV also details the role of the *ermächtigte Ärzte* (authorized physicians) (§ 175 StrlSchV), who are specifically authorized to perform medical monitoring and are responsible for maintaining the health record (§ 175 StrlSchV). While distinct roles, both groups are central to the medical oversight of professional radiation exposure.
+
+## Citations
+
+1. StrlSchG.md
+2. StrlSchV.md

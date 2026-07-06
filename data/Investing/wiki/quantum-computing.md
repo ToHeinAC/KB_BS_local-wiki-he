@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Quantum Computing
 key_terms:
 - quantum
 - comput
@@ -15,6 +16,10 @@ key_terms:
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Quantum Computing
 type: concept
 updated: '2026-06-19'
@@ -63,3 +68,7 @@ To facilitate this hybrid model, semiconductor development must focus on interco
 *   **Interconnects:** There is a growing demand for semiconductors capable of enhancing data communication speed between quantum computers and supercomputers [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Hardware Links:** Chip makers should supply high-bandwidth links that tie quantum modules to classical HPC clusters [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Control Logic:** Low-latency control ASICs are required for managing the classical side of the computation [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

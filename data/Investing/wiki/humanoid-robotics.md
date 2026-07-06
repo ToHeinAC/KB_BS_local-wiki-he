@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Humanoid Robotics
 key_terms:
 - humanoid
 - robotic
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Humanoid Robotics
 type: concept
 updated: '2026-06-02'
@@ -37,3 +42,7 @@ The future of robotics is described as inseparable from semiconductor advancemen
 Key challenges for the industry include:
 *   **Energy Efficiency:** For battery-powered robots, achieving high energy and thermal efficiency is critical, especially for last-mile delivery bots where frequent charging is impractical [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Workforce:** There is a growing demand for SoC designers with expertise in real-time processing, embedded AI, and multi-sensor fusion [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

@@ -1,8 +1,19 @@
 ---
-title: "Überprüfung des Dosiskriteriums im Strahlenschutzrecht"
+created: '2026-05-22'
+description: Die Überprüfung des Dosiskriteriums (Dosisbegrenzung) ist ein hochregulierter,
+  mehrstufiger Prozess, der sowohl die Einhaltung gesetzlich festgelegter…
+resource: raw/wiki:concept-dosisbegrenzung.md
+sources:
+- wiki:concept-dosisbegrenzung.md
+- wiki:concept-radiation-protection-law.md
+- wiki:concept-radiation-protection.md
+- wiki:summary-strlschv-md-teil-4-15.md
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-22T00:00:00Z'
+title: Überprüfung des Dosiskriteriums im Strahlenschutzrecht
 type: report
-created: "2026-05-22"
-sources: ['wiki:concept-dosisbegrenzung.md', 'wiki:concept-radiation-protection-law.md', 'wiki:concept-radiation-protection.md', 'wiki:summary-strlschv-md-teil-4-15.md']
 ---
 
 ## Überprüfung des Dosiskriteriums im Strahlenschutzrecht
@@ -47,3 +58,10 @@ Die gesamte Überwachung stützt sich auf das *Strahlenschutzgesetz* (StrlSchG) 
 Die technische Umsetzung und die detaillierten Anforderungen an die Sicherheit sind in der *Strahlenschutzverordnung* (StrlSchV) verankert [Wiki: concept-radiation-protection.md]. Darüber hinaus müssen spezialisierte Einrichtungen, wie Radionuklidlaboratorien, strenge technische Standards einhalten, die in Normen wie DIN 25425-1 festgelegt sind [summary-din-25425-1-2021-05-md-teil-1-2.md].
 
 Zusammenfassend ist die Überprüfung des Dosiskriteriums ein kontinuierlicher Zyklus: **Risikobewertung** (Vergleich mit den Grenzwerten) $\rightarrow$ **Messung** (mittels Dosimetrie nach *StrlSchV*) $\rightarrow$ **Dokumentation** (Erstellung des Nachweises) $\rightarrow$ **Vergleich** (Prüfung, ob die gemessenen Werte die gesetzlichen Obergrenzen überschreiten). Die Einhaltung dieser Kriterien ist zwingend erforderlich, um gesundheitliche Schäden durch ionisierende Strahlung zu verhindern und das oberste Schutzprinzip des Strahlenschutzrechts zu gewährleisten.
+
+## Citations
+
+1. wiki:concept-dosisbegrenzung.md
+2. wiki:concept-radiation-protection-law.md
+3. wiki:concept-radiation-protection.md
+4. wiki:summary-strlschv-md-teil-4-15.md

@@ -1,4 +1,5 @@
 ---
+description: Atomrechtliche Entsorgungsverordnung - AtEV
 key_terms:
 - atomrechtlich
 - entsorgungsverordn
@@ -8,6 +9,10 @@ related:
 - strahlenschutzverordnung-strlschv.md
 sources:
 - AtEV.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-03T00:00:00Z'
 title: Atomrechtliche Entsorgungsverordnung - AtEV
 type: concept
 updated: '2026-06-03'
@@ -64,3 +69,7 @@ Defines data requirements for irradiated fuel elements and vitrified reprocessin
 **Vitrified Radioactive Waste:** fixing agent quality, glass matrix composition, mixing ratio (waste:frit:additives), waste oxide content, glass frit chemical composition, homogeneity of activity distribution, volume and mass of the Kokille, and glass product state (density, transformation temperature) [AtEV.md].
 
 **Compacted Radioactive Waste:** ingot position in container, ingot material, pressing pressure, pressling dimensions (weight, diameter, height), whether casings and structural parts were compacted together with technology waste, cartridge material, empty cartridge weight, and number of presslings [AtEV.md].
+
+## Citations
+
+1. AtEV.md

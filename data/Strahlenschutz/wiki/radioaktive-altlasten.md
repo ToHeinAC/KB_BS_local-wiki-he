@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Radioaktive Altlasten
 key_terms:
 - radioaktiv
 - altlas
@@ -21,6 +22,10 @@ sources:
 - Radon-Handbuch_BfS.md
 - StrlSchV.md
 - summary-radon-handbuch-bfs-md-teil-2-5.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Radioaktive Altlasten
 type: concept
 updated: '2026-06-19'
@@ -76,3 +81,10 @@ Die Kontrolle der Druckverhältnisse ist essenziell. Unterdruckgefälle vom Erdr
 The management of these sites is governed by the *Strahlenschutzverordnung* (StrlSchV) [StrlSchV.md]. Procedures are detailed for determining exposure, setting test values, and establishing principles for remediation plans (*Sanierungspläne*) [StrlSchV.md].
 ## Radon Context
 The assessment of contamination risks, including those from Radon, is relevant when dealing with contaminated sites. The assessment of contamination risks requires determining the source, the entry pathway, and the dissemination pathway of the Radon [summary-radon-handbuch-bfs-md-teil-2-5.md].
+
+## Citations
+
+1. StrlSchG.md
+2. Radon-Handbuch_BfS.md
+3. StrlSchV.md
+4. summary-radon-handbuch-bfs-md-teil-2-5.md

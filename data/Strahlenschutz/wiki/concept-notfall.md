@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Notfall
 key_terms:
 - notfall
 - arte
@@ -14,6 +15,10 @@ related:
 - exposition.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Notfall
 type: concept
 updated: '2026-06-19'
@@ -41,3 +46,7 @@ The management of such situations is covered extensively in Part 3 of the StrlSc
 *   **Principles:** The law outlines general emergency protection principles (§ 92) and establishes reference and dose values for protecting the population (§ 93, § 94).
 *   **Planning:** It mandates the creation of general and special emergency plans at federal and state levels (§ 98, § 100).
 *   **Response Coordination:** The framework includes provisions for radiological situation centers and coordination between federal and state authorities during emergencies (§ 106, § 110).
+
+## Citations
+
+1. StrlSchG.md

@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-18'
+description: Staatliche Aufsicht
 key_terms:
 - staatlich
 - aufsicht
@@ -8,6 +9,10 @@ related:
 - concept-atomgesetz-atg.md
 sources:
 - AtG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-27T00:00:00Z'
 title: Staatliche Aufsicht
 type: concept
 updated: '2026-05-27'
@@ -37,3 +42,7 @@ Supervisory authorities are empowered to:
 The system mandates the reporting of deviations:
 *   Facility owners must report any deviations from the permit application or permit to the supervisory authority [AtG.md].
 *   The supervisory authority must report safety-critical deviations, such as accidents, to the competent authorities [AtG.md].
+
+## Citations
+
+1. AtG.md

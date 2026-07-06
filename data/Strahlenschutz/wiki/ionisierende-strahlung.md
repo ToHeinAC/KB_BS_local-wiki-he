@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Ionisierende Strahlung
 key_terms:
 - ionisierend
 - strahl
@@ -22,6 +23,10 @@ related:
 - radioaktive-stoffe.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Ionisierende Strahlung
 type: concept
 updated: '2026-06-19'
@@ -57,3 +62,7 @@ The management of ionizing radiation is governed by strict legal procedures, inc
 *   **Planned Activities:** Requiring assessment of planned exposure situations [StrlSchG.md, § 2 (2)].
 *   **Emergency Response:** Establishing protocols for emergency exposure situations [StrlSchG.md, § 2 (3)].
 *   **Dose Limitation:** Setting specific dose limits for professional and population exposure [StrlSchG.md, § 77, § 80].
+
+## Citations
+
+1. StrlSchG.md

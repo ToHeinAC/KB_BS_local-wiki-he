@@ -1,8 +1,20 @@
 ---
-title: "Strahlenschutzrechtliche Bewertung von radioaktiven Rückständen (U-238)"
+created: '2026-05-22'
+description: Die Frage, ob ein Bleierz mit einer spezifischen Aktivität von $1.5 \text{
+  Bq/g}$ an U-238 als überwachungsbedürftiger Rückstand gilt und wie eine mögliche…
+resource: https://um.baden-wuerttemberg.de/fileadmin/redaktion/m-um/intern/Dateien/Dokumente/3_Umwelt/Kernenergie/Freigaben_StrlSCHVO/2020-Freigabeleitfaden-bf.pdf
+sources:
+- https://um.baden-wuerttemberg.de/fileadmin/redaktion/m-um/intern/Dateien/Dokumente/3_Umwelt/Kernenergie/Freigaben_StrlSCHVO/2020-Freigabeleitfaden-bf.pdf
+- https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+- https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf
+- https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf;
+- https://www.strahlenschutz.sachsen.de/freigabe-radioaktiver-stoffe-10064.html
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-22T00:00:00Z'
+title: Strahlenschutzrechtliche Bewertung von radioaktiven Rückständen (U-238)
 type: report
-created: "2026-05-22"
-sources: ['https://um.baden-wuerttemberg.de/fileadmin/redaktion/m-um/intern/Dateien/Dokumente/3_Umwelt/Kernenergie/Freigaben_StrlSCHVO/2020-Freigabeleitfaden-bf.pdf', 'https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf', 'https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf', 'https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf;', 'https://www.strahlenschutz.sachsen.de/freigabe-radioaktiver-stoffe-10064.html']
 ---
 
 ## Analyse der Überwachungsbedürftigkeit von Bleierz mit U-238
@@ -51,3 +63,11 @@ Die Entlassung aus der Überwachung ist nur möglich, wenn ein formeller Antrag 
 [Source: https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf]
 [Source: https://um.baden-wuerttemberg.de/fileadmin/redaktion/m-um/intern/Dateien/Dokumente/3_Umwelt/Kernenergie/Freigaben_StrlSCHVO/2020-Freigabeleitfaden-bf.pdf]
 [Source: https://www.strahlenschutz.sachsen.de/freigabe-radioaktiver-stoffe-10064.html]
+
+## Citations
+
+1. https://um.baden-wuerttemberg.de/fileadmin/redaktion/m-um/intern/Dateien/Dokumente/3_Umwelt/Kernenergie/Freigaben_StrlSCHVO/2020-Freigabeleitfaden-bf.pdf
+2. https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+3. https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf
+4. https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf;
+5. https://www.strahlenschutz.sachsen.de/freigabe-radioaktiver-stoffe-10064.html

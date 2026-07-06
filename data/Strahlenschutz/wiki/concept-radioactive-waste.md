@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-27'
+description: Radioactive Waste
 key_terms:
 - radioactiv
 - wast
@@ -14,6 +15,10 @@ key_terms:
 related: []
 sources:
 - jc_8_bericht_deutschland_atomenergie_bf.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Radioactive Waste
 type: concept
 updated: '2026-06-19'
@@ -44,3 +49,7 @@ Effective waste management requires:
 *   **Disposal:** The final disposal must occur in secure, deep geological repositories, meeting international safety standards [jc_8_bericht_deutschland_atomenergie_bf.md].
 ## Scope
 The management scope covers all radioactive waste, ensuring that regulatory compliance is maintained throughout the entire waste lifecycle [jc_8_bericht_deutschland_atomenergie_bf.md].
+
+## Citations
+
+1. jc_8_bericht_deutschland_atomenergie_bf.md

@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Exposition (Radiation)
 key_terms:
 - expositio
 - radiatio
@@ -17,6 +18,10 @@ related:
 sources:
 - StrlSchG.md
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Exposition (Radiation)
 type: concept
 updated: '2026-06-19'
@@ -62,3 +67,8 @@ Ein spezifisches Thema ist die Radonexposition in Innenräumen. Die Radonkonzent
 *   **Radon-Kontrolle:** Die Radonexposition wird durch die bauliche Ausgangslage, die Art der Lüftung und die Abdichtung der Gebäudehülle bestimmt [Radon-Handbuch_BfS.md].
 ## Lüftung und Druckverhältnisse
 Die Lüftungstechnik ist entscheidend für die Radonkontrolle, da Unterdruckgefälle vom Erdreich in das Gebäudeinnere die Radoninfiltration antreiben können [Radon-Handbuch_BfS.md]. Die Kontrolle der Druckverhältnisse ist daher ein integraler Bestandteil des Strahlenschutzes [Radon-Handbuch_BfS.md].
+
+## Citations
+
+1. StrlSchG.md
+2. Radon-Handbuch_BfS.md

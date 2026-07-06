@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Semiconductor Supply Chain
 key_terms:
 - semiconductor
 - supp
@@ -8,6 +9,10 @@ key_terms:
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Semiconductor Supply Chain
 type: concept
 updated: '2026-06-02'
@@ -35,3 +40,7 @@ Geopolitical tensions and the need for supply chain stability have spurred massi
 *   **Investment Scale:** Global semiconductor fab spending from 2024 to 2030 is projected to exceed $1.5 trillion [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Regional Strategies:** The United States and China are leading in spending, with China focusing on self-sufficiency using mature nodes, while the US channels capital into advanced facilities [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Guiding Principle:** Through 2030, the guiding principle for investment is shifting toward **resilience** rather than pure cost reduction [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

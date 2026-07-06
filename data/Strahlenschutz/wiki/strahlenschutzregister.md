@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Strahlenschutzregister
 key_terms:
 - strahlenschutzregist
 related:
@@ -9,6 +10,10 @@ related:
 - berufliche-exposition.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-17T00:00:00Z'
 title: Strahlenschutzregister
 type: concept
 updated: '2026-05-17'
@@ -44,3 +49,7 @@ The following data are entered into the register:
 *   **Submission:** Data are submitted by measurement stations, competent authorities, or the responsible parties [StrlSchG.md].
 *   **Access:** Information can be provided to competent authorities, measurement stations, or responsible parties/employers upon request, subject to data protection laws [StrlSchG.md].
 *   **Research:** Transmission of personal data for research purposes requires consent from the affected persons, unless public interest significantly outweighs the privacy interest [StrlSchG.md].
+
+## Citations
+
+1. StrlSchG.md

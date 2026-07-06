@@ -1,8 +1,21 @@
 ---
-title: "Expert Analysis: Classification of Radioactive Material (Pu-239) under German Law"
+created: '2026-05-19'
+description: Based on the provided data and the regulatory framework outlined in the
+  German Radiation Protection Law (*Strahlenschutzgesetz* - StrlSchG) and related…
+resource: raw/wiki:concept-radiation-protection-law.md
+sources:
+- wiki:concept-radiation-protection-law.md
+- wiki:concept-radioactive-residues.md
+- wiki:radioaktive-stoffe.md
+- wiki:summary-atev-md-teil-2-2.md
+- wiki:summary-strlschv-md-teil-14-15.md
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-19T00:00:00Z'
+title: 'Expert Analysis: Classification of Radioactive Material (Pu-239) under German
+  Law'
 type: report
-created: "2026-05-19"
-sources: ['wiki:concept-radiation-protection-law.md', 'wiki:concept-radioactive-residues.md', 'wiki:radioaktive-stoffe.md', 'wiki:summary-atev-md-teil-2-2.md', 'wiki:summary-strlschv-md-teil-14-15.md']
 ---
 
 ## Expert Analysis: Classification of Radioactive Material (Pu-239) under German Law
@@ -64,3 +77,11 @@ In summary, while the material is undeniably a **radioactive substance** requiri
 **Remaining Gap:** The inability to provide a definitive classification without knowing the material's origin and regulatory status. This is an inherent gap in the available documentation, as the law itself dictates the required input data.
 
 **Parked (out of scope):** The specific dose limits detailed in the StrlSchV appendices are not relevant to the material classification question.
+
+## Citations
+
+1. wiki:concept-radiation-protection-law.md
+2. wiki:concept-radioactive-residues.md
+3. wiki:radioaktive-stoffe.md
+4. wiki:summary-atev-md-teil-2-2.md
+5. wiki:summary-strlschv-md-teil-14-15.md

@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Radon
 key_terms:
 - rado
 - chemistry
@@ -16,6 +17,10 @@ related:
 - radiation-protection-law.md
 sources:
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Radon
 type: concept
 updated: '2026-06-19'
@@ -93,3 +98,7 @@ Several techniques can be employed to manage soil gas:
 ## Implementation Guidelines
 *   **New Builds vs. Existing Buildings:** For existing buildings, it is advisable to proceed stepwise, distinguishing between "simple" and "comprehensive" remediation.
 *   **Monitoring:** After construction, radon measurements are necessary to confirm the success of the measures.
+
+## Citations
+
+1. Radon-Handbuch_BfS.md

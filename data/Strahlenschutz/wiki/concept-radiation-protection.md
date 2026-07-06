@@ -1,4 +1,5 @@
 ---
+description: Radiation Protection
 key_terms:
 - radiatio
 - protectio
@@ -11,6 +12,10 @@ sources:
 - summary-din-25425-3-2019-12-md.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
 - jc_8_bericht_deutschland_atomenergie_bf.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Radiation Protection
 type: concept
 updated: '2026-06-02'
@@ -73,3 +78,11 @@ Das Gesetz regelt nicht nur den Betrieb, sondern auch die Entsorgung. Es bildet 
 
 ## Radon-spezifische Aspekte
 Das Gesetz regelt auch den Umgang mit Radon. Die Ermittlung der Radonkonzentration in Aufenthaltsräumen ist ein wichtiger Bestandteil der Risikobewertung [summary-radon-handbuch-bfs-md-teil-2-5.md]. Bei der Bewertung der Messergebnisse muss die Quelle, der Eintrittsweg und der Ausbreitungsweg des Radons quantifiziert dargestellt werden, um ein optimales Sanierungsprojekt zu erstellen [summary-radon-handbuch-bfs-md-teil-2-5.md].
+
+## Citations
+
+1. StrlSchG.md
+2. StrlSchV.md
+3. summary-din-25425-3-2019-12-md.md
+4. summary-din-25425-4-2019-12-md-teil-2-2.md
+5. jc_8_bericht_deutschland_atomenergie_bf.md

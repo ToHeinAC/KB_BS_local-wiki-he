@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Advanced Packaging
 key_terms:
 - advanc
 - packag
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Advanced Packaging
 type: concept
 updated: '2026-06-02'
@@ -42,3 +47,7 @@ The global advanced packaging market is projected to grow, with the 2.5D/3D segm
 
 ## Strategic Importance
 Advanced packaging is becoming a critical component of the semiconductor supply chain, alongside front-end scaling, especially in regions like Taiwan, Korea, and the US, which are investing heavily in 2.5D/3D capacity [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Lüftungstechnische Maßnahmen
 key_terms:
 - ftungstechnisch
 - ma
@@ -10,6 +11,10 @@ related:
 - radioaktive-altlasten.md
 sources:
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Lüftungstechnische Maßnahmen
 type: concept
 updated: '2026-06-02'
@@ -53,3 +58,7 @@ Die möglichen Lüftungsstrategien lassen sich auf fünf Prinzipien zuordnen [Ra
 ## Aktive vs. Passive Systeme
 *   **Passive Systeme:** Diese nutzen natürliche Effekte wie den thermischen Auftrieb.
 *   **Aktive Systeme:** Diese benötigen eine Stromversorgung und müssen immer als zweite Stufe betrachtet werden, falls passive Systeme keinen Erfolg zeigen [Radon-Handbuch_BfS.md].
+
+## Citations
+
+1. Radon-Handbuch_BfS.md

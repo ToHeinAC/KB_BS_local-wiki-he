@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-27'
+description: Spent Fuel
 key_terms:
 - spent
 - fuel
@@ -15,6 +16,10 @@ key_terms:
 related: []
 sources:
 - jc_8_bericht_deutschland_atomenergie_bf.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Spent Fuel
 type: concept
 updated: '2026-06-19'
@@ -45,3 +50,7 @@ The management process involves several critical stages:
 3.  **Disposal:** The ultimate goal is the safe disposal of spent fuel in deep geological repositories, adhering to international safety standards [jc_8_bericht_deutschland_atomenergie_bf.md].
 ## Regulatory Oversight
 The Joint Convention Deutschland provides the regulatory backbone, ensuring that all safety measures—from handling to final disposal—are rigorously controlled [jc_8_bericht_deutschland_atomenergie_bf.md].
+
+## Citations
+
+1. jc_8_bericht_deutschland_atomenergie_bf.md

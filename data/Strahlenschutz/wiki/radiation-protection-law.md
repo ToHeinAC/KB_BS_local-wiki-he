@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Strahlenschutzgesetz (StrlSchG)
 key_terms:
 - strahlenschutzgesetz
 - strlschg
@@ -32,6 +33,10 @@ sources:
 - summary-strlschg-md-teil-3-13.md
 - summary-strlschg-md-teil-2-13.md
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Strahlenschutzgesetz (StrlSchG)
 type: concept
 updated: '2026-06-19'
@@ -82,3 +87,20 @@ Die Gesetzgebung erweitert den Schutz auf die Umwelt und Baustoffe:
 *   **Baumaterialien:** Es listet radiologisch relevante mineralische Primärrohstoffe (z. B. saure magmatische Gesteine, bestimmte Sedimentgesteine und Travertin) auf, die bei der Konstruktion von Wohnräumen berücksichtigt werden müssen [StrlSchG.md].
 ### Umgang mit Altlasten
 Im Kontext von radioaktiven Altlasten ist die Verhinderung des Eintritts von Radon aus dem Baugrund ein wichtiges Thema [Radon-Handbuch_BfS.md].
+
+## Citations
+
+1. StrlSchG.md
+2. summary-strlschg-md-teil-13-13.md
+3. summary-strlschg-md-teil-12-13.md
+4. summary-strlschg-md-teil-11-13.md
+5. summary-strlschg-md-teil-10-13.md
+6. summary-strlschg-md-teil-9-13.md
+7. summary-strlschg-md-teil-8-13.md
+8. summary-strlschg-md-teil-7-13.md
+9. summary-strlschg-md-teil-6-13.md
+10. summary-strlschg-md-teil-5-13.md
+11. summary-strlschg-md-teil-4-13.md
+12. summary-strlschg-md-teil-3-13.md
+13. summary-strlschg-md-teil-2-13.md
+14. Radon-Handbuch_BfS.md

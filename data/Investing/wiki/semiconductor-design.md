@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Semiconductor Design
 key_terms:
 - semiconductor
 - desig
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Semiconductor Design
 type: concept
 updated: '2026-06-02'
@@ -38,3 +43,7 @@ Major global territories are adopting specialized strategies to secure technolog
 
 ## Design Cost Drivers
 Design complexity drives up development costs. IP license & royalty can consume 25–35% of a leading project’s budget. To mitigate this, companies are encouraged to build reusable in-house IP, utilize chiplets, and adopt open-source standards like RISC-V [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

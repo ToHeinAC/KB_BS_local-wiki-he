@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: High-Bandwidth Memory (HBM)
 key_terms:
 - high
 - bandwidth
@@ -9,6 +10,10 @@ key_terms:
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: High-Bandwidth Memory (HBM)
 type: concept
 updated: '2026-06-02'
@@ -34,3 +39,7 @@ The HBM market is projected for substantial growth, with a CAGR of +27.8% from 2
     1.  Demand potentially outrunning optimistic forecasts.
     2.  The long lead time (18-to-24 months) for new TSV lines, limiting quick fixes [pwc-semiconductor-and-beyond-2026-full-report.md].
     3.  Supply chain bottlenecks in supporting infrastructure, such as silicon interposers, advanced bumping capacity, or the specialized base-logic die [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

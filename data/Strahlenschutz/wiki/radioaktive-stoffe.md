@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Radioaktive Stoffe
 key_terms:
 - radioaktiv
 - stoff
@@ -10,6 +11,10 @@ related:
 - radioaktive-stoffe-definition.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-17T00:00:00Z'
 title: Radioaktive Stoffe
 type: concept
 updated: '2026-05-17'
@@ -32,3 +37,7 @@ The management of radioactive substances is critical across various aspects of r
 *   **Activities:** Handling, storage, and transport of these substances constitute regulated "activities" under the StrlSchG [StrlSchG.md, § 4 (1)].
 *   **Waste:** The law addresses the handling of radioactive waste and residues [StrlSchG.md, § 5 (1)].
 *   **Altlasten:** The concept is directly linked to the management of radioactive contaminated sites (Altlasten) [StrlSchG.md, § 136].
+
+## Citations
+
+1. StrlSchG.md

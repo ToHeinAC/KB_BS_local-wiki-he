@@ -1,21 +1,34 @@
-# Wiki Index
-Updated: 2026-06-19 | Pages: 17
+---
+title: Index
+okf_version: "0.1"
+updated: "2026-07-06"
+---
 
-## Pages
-- [Artificial General Intelligence](advanced-ai.md) — ## Key facts - Artificial General Intelligence - Development Timeline and Milestones - Semiconductor Requirements for AG
-- [Advanced Packaging](advanced-packaging.md) — ## Key facts - Advanced Packaging - Importance and Drivers - Key Methodologies - Industry Leadership - Market Growth  # 
-- [Application-Specific Integrated Circuits (ASICs)](application-specific-integrated-circuits.md) — ## Key facts - Application-Specific Integrated Circuits (ASICs) - Characteristics and Advantages - Challenges - Comparis
-- [Autonomous Vehicles](autonomous-vehicles.md) — ## Key facts - Autonomous Vehicles - Levels of Automation - Technological Requirements - Impact on Semiconductors  # Aut
-- [Brain-Computer Interface](brain-computer-interface.md) — ## Key facts - Brain-Computer Interface - Operational Principles - Types of BCI - Semiconductor Technology Drivers - Mar
-- [Chiplet Architecture](chiplet-architecture.md) — ## Key facts - Chiplet Architecture - Benefits and Functionality - Industry Adoption - Ecosystem Implications  # Chiplet
-- [Electronic Design Automation (EDA)](electronic-design-automation.md) — ## Key facts - Electronic Design Automation (EDA) - Function and Importance - Market Structure and Competition - Industr
-- [General-Purpose Chips](general-purpose-chips.md) — ## Key facts - General-Purpose Chips - Characteristics - Comparison with ASICs  # General-Purpose Chips  General-purpose
-- [High-Bandwidth Memory (HBM)](high-bandwidth-memory.md) — ## Key facts - High-Bandwidth Memory (HBM) - Function and Necessity - Market Outlook and Supply Risks  # High-Bandwidth 
-- [Humanoid Robotics](humanoid-robotics.md) — ## Key facts - Humanoid Robotics - Market Drivers - Semiconductor Dependence - Future Challenges  # Humanoid Robotics  H
-- [Intellectual Property (IP)](intellectual-property.md) — ## Key facts - Intellectual Property (IP) - Types of IP - Impact on Design and Cost  # Intellectual Property (IP)  Semic
-- [Quantum Computing](quantum-computing.md) — ## Key facts - Quantum Computing - Core Concepts - Computational Architectures - Technological Paths and Semiconductor A
-- [Semiconductor Design](semiconductor-design.md) — ## Key facts - Semiconductor Design - Design Evolution and Trends - Global Design Strategies - Design Cost Drivers  # Se
-- [Semiconductor Supply Chain](semiconductor-supply-chain.md) — ## Key facts - Semiconductor Supply Chain - Key Components - Global Resilience and Investment  # Semiconductor Supply Ch
-- [PwC Semiconductor and Beyond 2026 Full Report (Part 5/5)](summary-pwc-semiconductor-and-beyond-2026-full-report.md) — pwc-semiconductor-and-beyond-2026-full-report von Ende 2025
-- [Wafer Testing](wafer-testing.md) — ## Key facts - Wafer Testing - Role in Yield Enhancement - Evolution of Testing Methods - Testing Stages  # Wafer Testin
-- [Wide-Bandgap Semiconductors](wide-bandgap-semiconductors.md) — ## Key facts - Wide-Bandgap Semiconductors - Advantages Over Silicon - Material Specific Applications - Supply Constrain
+# Pages
+* [Artificial General Intelligence](advanced-ai.md) - Artificial General Intelligence
+* [Advanced Packaging](advanced-packaging.md) - Advanced Packaging
+* [Application-Specific Integrated Circuits (ASICs)](application-specific-integrated-circuits.md) - Application-Specific Integrated Circuits (ASICs)
+* [Artificial Intelligence](artificial-intelligence.md) - AI is driving massive capital expenditure, particularly in data centers and supercomputing infrastructure
+* [Autonomous Vehicles](autonomous-vehicles.md) - Autonomous Vehicles
+* [Brain-Computer Interface](brain-computer-interface.md) - Brain-Computer Interface
+* [Chiplet Architecture](chiplet-architecture.md) - Chiplet Architecture
+* [Climate Sensitivity](climate-sensitivity.md) - Climate sensitivity is a structural driver of increased reinsurance demand and pricing power
+* [Copper](copper-commodity.md) - Copper is recognized as the irreplaceable conductor of electricity, making it essential for modern infrastructure
+* [Cyber Insurance](cyber-insurance.md) - The cyber insurance market is projected to grow significantly, reaching $29bn by 2027
+* [Data Center Infrastructure](data-center-infrastructure.md) - The data center market is experiencing a boom, driven primarily by the massive computational needs of AI and supercomputing
+* [Electronic Design Automation (EDA)](electronic-design-automation.md) - Electronic Design Automation (EDA)
+* [Energy Transition](energy-transition.md) - The Energy Transition involves shifting global power generation from fossil fuels to renewable sources like wind and solar
+* [Freeport-McMoRan](freeport-mcmoran.md) - Freeport-McMoRan (FCX) is the world's largest publicly traded copper producer and a pure-play bet on electrification
+* [General-Purpose Chips](general-purpose-chips.md) - General-Purpose Chips
+* [High-Bandwidth Memory (HBM)](high-bandwidth-memory.md) - High-Bandwidth Memory (HBM)
+* [Humanoid Robotics](humanoid-robotics.md) - Humanoid Robotics
+* [Intellectual Property (IP)](intellectual-property.md) - Intellectual Property (IP)
+* [Munich Re](munich-re.md) - Munich Re is one of the world's most financially robust reinsurers, known for its strong long-term compounding potential
+* [Quantum Computing](quantum-computing.md) - Quantum Computing
+* [Semiconductor Design](semiconductor-design.md) - Semiconductor Design
+* [Semiconductor Supply Chain](semiconductor-supply-chain.md) - Semiconductor Supply Chain
+* [Benefits and Risks of Investing in Freeport MM](summary-benefits-and-risks-of-investing-in-freeport-mm.md) - benefits and risks of investing in Freeport MM as of 24.06.2026
+* [Benefits and Risks of Investing in Munich Re](summary-benefits-and-risks-of-investing-in-munich-re.md) - benefits and risks of investing in Munich Re as of 24.06.2026
+* [PwC Semiconductor and Beyond 2026 Full Report (Part 5/5)](summary-pwc-semiconductor-and-beyond-2026-full-report.md) - pwc-semiconductor-and-beyond-2026-full-report von Ende 2025
+* [Wafer Testing](wafer-testing.md) - Wafer Testing
+* [Wide-Bandgap Semiconductors](wide-bandgap-semiconductors.md) - Wide-Bandgap Semiconductors

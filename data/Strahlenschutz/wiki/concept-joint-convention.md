@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-27'
+description: Joint Convention
 key_terms:
 - joint
 - conventio
@@ -16,6 +17,10 @@ key_terms:
 related: []
 sources:
 - jc_8_bericht_deutschland_atomenergie_bf.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Joint Convention
 type: concept
 updated: '2026-06-19'
@@ -51,3 +56,7 @@ The convention mandates safety measures across several stages:
 *   **Radioactive Waste:** The management of waste requires thorough classification and treatment to minimize risks before disposal [jc_8_bericht_deutschland_atomenergie_bf.md].
 ## Regulatory Importance
 The Joint Convention acts as a benchmark for national regulatory bodies, ensuring that all activities involving radioactive materials meet high levels of safety assurance [jc_8_bericht_deutschland_atomenergie_bf.md].
+
+## Citations
+
+1. jc_8_bericht_deutschland_atomenergie_bf.md

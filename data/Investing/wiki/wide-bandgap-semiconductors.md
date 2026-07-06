@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Wide-Bandgap Semiconductors
 key_terms:
 - wide
 - bandgap
@@ -8,6 +9,10 @@ key_terms:
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Wide-Bandgap Semiconductors
 type: concept
 updated: '2026-06-02'
@@ -35,3 +40,7 @@ WBG materials are favored because they can operate at:
 
 ## Supply Constraints
 Despite the growing demand, supply limitations persist due to the costly and time-intensive nature of processes like crystal boule growth, wafer polishing, and advanced epitaxy [pwc-semiconductor-and-beyond-2026-full-report.md]. Short-term shortages are possible, particularly for 200-mm SiC substrates and high-voltage GaN wafers. Continued investment in larger wafers and improved yields is necessary to narrow the cost gap with silicon [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

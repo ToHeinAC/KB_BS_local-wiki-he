@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Umweltradioaktivität
 key_terms:
 - umweltradioaktivit
 - monitor
@@ -18,6 +19,10 @@ related:
 sources:
 - StrlSchG.md
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Umweltradioaktivität
 type: concept
 updated: '2026-06-19'
@@ -57,3 +62,8 @@ Radon monitoring is a key component of environmental radioactivity assessment:
 *   **Soil Gas:** Radon emanates from the earth, and its concentration in the soil air is measured, with typical concentrations ranging from several thousand $\text{Bq/m}^3$ up to over $1 \text{ MBq/m}^3$ in certain areas [Radon-Handbuch_BfS.md].
 *   **Water:** Radon is highly soluble in water and transported by groundwater. While the contribution from water use is generally considered minor, specific geological conditions (e.g., granite areas) can lead to contributions up to $10 \text{ Bq/m}^3$ to the indoor Radon concentration [Radon-Handbuch_BfS.md].
 *   **Air:** The concentration of Radon in the open air is important as it is a minor but non-negligible contribution to the population's radiation exposure [Radon-Handbuch_BfS.md].
+
+## Citations
+
+1. StrlSchG.md
+2. Radon-Handbuch_BfS.md

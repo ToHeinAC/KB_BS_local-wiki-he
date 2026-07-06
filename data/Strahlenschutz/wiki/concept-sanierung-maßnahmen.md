@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Sanierung Maßnahmen
 key_terms:
 - sanier
 - ma
@@ -8,6 +9,10 @@ key_terms:
 related: []
 sources:
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Sanierung Maßnahmen
 type: concept
 updated: '2026-06-02'
@@ -36,3 +41,7 @@ Before implementing measures, a detailed inspection must be conducted to identif
 1.  **Structural Assessment:** Checking all boundaries, basement walls, and floors for cracks and weak spots.
 2.  **Utility Assessment:** Ensuring all pipes and lines are sealed against radon gas.
 3.  **Pressure Analysis:** Analyzing the overall pressure situation within the building, as this dictates the necessary ventilation strategy [Radon-Handbuch_BfS.md].
+
+## Citations
+
+1. Radon-Handbuch_BfS.md

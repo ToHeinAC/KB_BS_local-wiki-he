@@ -1,8 +1,22 @@
 ---
-title: "Strahlenschutzrechtliche Bewertung von U-238 in Bleierz-Rückständen"
+created: '2026-05-22'
+description: Die Frage, ob ein Bleierz mit einer Konzentration von $1.5 \text{ Bq/g}$
+  an $\text{U-238}$ als überwachungsbedürftiger Rückstand gilt und wie eine Entlassung…
+resource: https://igsvtu.lanuk.nrw.de/vtu/doc.app?DATEI=9/do...
+sources:
+- https://igsvtu.lanuk.nrw.de/vtu/doc.app?DATEI=9/do...
+- https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+- https://www.grs.de/sites/default/files/publications/grs-506_mit_corrigendum.pdf
+- wiki:concept-radiation-protection-law.md
+- wiki:concept-radioactive-residues.md
+- wiki:summary-strlschg-md-teil-12-13.md
+- wiki:summary-strlschv-md-teil-13-15.md
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-22T00:00:00Z'
+title: Strahlenschutzrechtliche Bewertung von U-238 in Bleierz-Rückständen
 type: report
-created: "2026-05-22"
-sources: ['https://igsvtu.lanuk.nrw.de/vtu/doc.app?DATEI=9/do...', 'https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf', 'https://www.grs.de/sites/default/files/publications/grs-506_mit_corrigendum.pdf', 'wiki:concept-radiation-protection-law.md', 'wiki:concept-radioactive-residues.md', 'wiki:summary-strlschg-md-teil-12-13.md', 'wiki:summary-strlschv-md-teil-13-15.md']
 ---
 
 ## Analyse der Überwachungsbedürftigkeit von Bleierz mit U-238 gemäß Strahlenschutzrecht
@@ -53,3 +67,13 @@ Die Grundlage für die Freigabe ist immer die **Rechtfertigung der Tätigkeit** 
 *   [Source: https://igsvtu.lanuk.nrw.de/vtu/doc.app?DATEI=9/do...]* (Dosiswert-Basis)
 
 *Hinweis: Die Quelle [Source: https://igsvtu.lanuk.nrw.de/vtu/doc.app?DATEI=9/do...] wurde zur Veranschaulichung des Dosiskonzepts herangezogen, da keine spezifische Quelle für die $1 \text{ mSv/Jahr}$ Angabe vorlag, aber das Konzept der Überwachungsbedürftigkeit klar darstellt.*
+
+## Citations
+
+1. https://igsvtu.lanuk.nrw.de/vtu/doc.app?DATEI=9/do...
+2. https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+3. https://www.grs.de/sites/default/files/publications/grs-506_mit_corrigendum.pdf
+4. wiki:concept-radiation-protection-law.md
+5. wiki:concept-radioactive-residues.md
+6. wiki:summary-strlschg-md-teil-12-13.md
+7. wiki:summary-strlschv-md-teil-13-15.md

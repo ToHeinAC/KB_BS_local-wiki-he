@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Application-Specific Integrated Circuits (ASICs)
 key_terms:
 - applicatio
 - specific
@@ -10,6 +11,10 @@ key_terms:
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Application-Specific Integrated Circuits (ASICs)
 type: concept
 updated: '2026-06-02'
@@ -35,3 +40,7 @@ The primary challenge associated with ASICs is cost competitiveness. Due to thei
 
 ## Comparison to General-Purpose Chips
 ASICs represent a trade-off: they sacrifice the versatility of general-purpose chips for specialized efficiency. While general-purpose chips support a broad range of workloads and software updates, this versatility often results in lower specialized efficiency [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

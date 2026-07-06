@@ -1,8 +1,25 @@
 ---
-title: "Strahlenschutzrechtliche Bewertung von radioaktiven Rückständen"
+created: '2026-05-22'
+description: Die Frage, ob ein Bleierz mit einer spezifischen Aktivität von $1.5 \text{
+  Bq/g}$ an $\text{U-238}$ nach deutschem Strahlenschutzrecht als…
+resource: https://um.baden-wuerttemberg.de/de/umwelt-natur/kernenergie/strahlenschutz/ueberwachung-der-radioaktivitaet/natuerliche-radioaktivitaet/norm-naturally-occuring-radioactive-material/norm-rueckstaende
+sources:
+- https://um.baden-wuerttemberg.de/de/umwelt-natur/kernenergie/strahlenschutz/ueberwachung-der-radioaktivitaet/natuerliche-radioaktivitaet/norm-naturally-occuring-radioactive-material/norm-rueckstaende
+- https://www.buzer.de/gesetz/13179/b30033.htm
+- https://www.dvgw.de/medien/dvgw/regional/hessen/pdf/Radon-Rueckstaende/Informationsblatt_zum_Umgang_mit_Rueckstaenden_aus_der_Grundwasseraufbereitung_HMUKLV_DVGW_Hessen_.pdf
+- https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+- https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf
+- https://www.strahlenschutz.sachsen.de/ruckstande-naturliche-radionuklide-10459.html
+- wiki:concept-radiation-protection-law.md
+- wiki:summary-strlschv-md-teil-1-15.md
+- wiki:summary-strlschv-md-teil-4-15.md
+- wiki:summary-strlschv-md-teil-5-15.md
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-22T00:00:00Z'
+title: Strahlenschutzrechtliche Bewertung von radioaktiven Rückständen
 type: report
-created: "2026-05-22"
-sources: ['https://um.baden-wuerttemberg.de/de/umwelt-natur/kernenergie/strahlenschutz/ueberwachung-der-radioaktivitaet/natuerliche-radioaktivitaet/norm-naturally-occuring-radioactive-material/norm-rueckstaende', 'https://www.buzer.de/gesetz/13179/b30033.htm', 'https://www.dvgw.de/medien/dvgw/regional/hessen/pdf/Radon-Rueckstaende/Informationsblatt_zum_Umgang_mit_Rueckstaenden_aus_der_Grundwasseraufbereitung_HMUKLV_DVGW_Hessen_.pdf', 'https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf', 'https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf', 'https://www.strahlenschutz.sachsen.de/ruckstande-naturliche-radionuklide-10459.html', 'wiki:concept-radiation-protection-law.md', 'wiki:summary-strlschv-md-teil-1-15.md', 'wiki:summary-strlschv-md-teil-4-15.md', 'wiki:summary-strlschv-md-teil-5-15.md']
 ---
 
 # Bewertung der Überwachungsbedürftigkeit und Entlassung eines Bleierz mit U-238
@@ -66,3 +83,16 @@ Die Entlassung ist nur möglich, wenn:
 [Source: https://www.buzer.de/gesetz/13179/b30033.htm]
 [Source: https://um.baden-wuerttemberg.de/de/umwelt-natur/kernenergie/strahlenschutz/ueberwachung-der-radioaktivitaet/natuerliche-radioaktivitaet/norm-naturally-occuring-radioactive-material/norm-rueckstaende]
 [Source: https://www.dvgw.de/medien/dvgw/regional/hessen/pdf/Radon-Rueckstaende/Informationsblatt_zum_Umgang_mit_Rueckstaenden_aus_der_Grundwasseraufbereitung_HMUKLV_DVGW_Hessen_.pdf]
+
+## Citations
+
+1. https://um.baden-wuerttemberg.de/de/umwelt-natur/kernenergie/strahlenschutz/ueberwachung-der-radioaktivitaet/natuerliche-radioaktivitaet/norm-naturally-occuring-radioactive-material/norm-rueckstaende
+2. https://www.buzer.de/gesetz/13179/b30033.htm
+3. https://www.dvgw.de/medien/dvgw/regional/hessen/pdf/Radon-Rueckstaende/Informationsblatt_zum_Umgang_mit_Rueckstaenden_aus_der_Grundwasseraufbereitung_HMUKLV_DVGW_Hessen_.pdf
+4. https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+5. https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf
+6. https://www.strahlenschutz.sachsen.de/ruckstande-naturliche-radionuklide-10459.html
+7. wiki:concept-radiation-protection-law.md
+8. wiki:summary-strlschv-md-teil-1-15.md
+9. wiki:summary-strlschv-md-teil-4-15.md
+10. wiki:summary-strlschv-md-teil-5-15.md

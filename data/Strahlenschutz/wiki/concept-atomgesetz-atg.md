@@ -1,4 +1,5 @@
 ---
+description: Atomgesetz - AtG
 key_terms:
 - atomgesetz
 - atg
@@ -7,6 +8,10 @@ sources:
 - AtG.md
 - AtDeckV.md
 - jc_8_bericht_deutschland_atomenergie_bf.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-27T00:00:00Z'
 title: Atomgesetz - AtG
 type: concept
 updated: '2026-05-27'
@@ -49,3 +54,9 @@ The AtG establishes mechanisms to ensure financial accountability for potential 
 
 ## Relationship to Other Laws
 The AtG works in conjunction with the *Strahlenschutzgesetz* (StrlSchG), which provides the overarching technical and procedural rules for radiation protection [concept-radiation-protection-law.md].
+
+## Citations
+
+1. AtG.md
+2. AtDeckV.md
+3. jc_8_bericht_deutschland_atomenergie_bf.md

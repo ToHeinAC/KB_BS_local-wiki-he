@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Strahlenschutzrechtliche Genehmigungen
 key_terms:
 - strahlenschutzrechtlich
 - genehmig
@@ -10,6 +11,10 @@ related:
 - ionisierende-strahlung.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-17T00:00:00Z'
 title: Strahlenschutzrechtliche Genehmigungen
 type: concept
 updated: '2026-05-17'
@@ -33,3 +38,7 @@ The process for obtaining and maintaining these permits is highly structured:
 *   **Competent Authorities:** Jurisdiction is divided among specialized federal bodies, such as the Federal Radiation Protection Agency ($\S 185$) and the Federal Office for the Safety of Nuclear Waste ($\S 186$) [StrlSchG.md].
 *   **Documentation:** The process requires detailed notifications, justifications, and adherence to specific technical standards, including the use of qualified electronic signatures where applicable [StrlSchG.md].
 *   **Transitional Measures:** The Act includes specific transitional provisions ($\S 196$ to $\S 201$) to manage the continuity of existing permits issued before December 31, 2018 [StrlSchG.md].
+
+## Citations
+
+1. StrlSchG.md

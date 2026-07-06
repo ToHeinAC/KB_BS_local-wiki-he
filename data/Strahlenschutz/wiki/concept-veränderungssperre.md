@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-27'
+description: Veränderungssperre
 key_terms:
 - ver
 - nderungssperr
@@ -9,6 +10,10 @@ related:
 sources:
 - AtG.md
 - jc_8_bericht_deutschland_atomenergie_bf.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-27T00:00:00Z'
 title: Veränderungssperre
 type: concept
 updated: '2026-05-27'
@@ -26,3 +31,8 @@ The restriction is utilized to prevent changes that could compromise the safety 
 
 ## Context in Waste Management (jc_8_bericht_deutschland_atomenergie_bf)
 Im Kontext der Abfallbehandlung wird die Veränderungssperre als ein Element der langfristigen Sicherstellung von Standorten betrachtet, um die Integrität der Lagerstätten zu gewährleisten [jc_8_bericht_deutschland_atomenergie_bf.md].
+
+## Citations
+
+1. AtG.md
+2. jc_8_bericht_deutschland_atomenergie_bf.md

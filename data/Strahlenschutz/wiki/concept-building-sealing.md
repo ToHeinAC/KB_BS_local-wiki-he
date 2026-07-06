@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Building Sealing
 key_terms:
 - build
 - seal
 related: []
 sources:
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Building Sealing
 type: concept
 updated: '2026-06-02'
@@ -38,3 +43,7 @@ The selection of sealing materials must be compatible with the structural elemen
 Sealing measures are highly synergistic with other protective concepts:
 *   **Moisture Protection:** The sealing required for moisture control aligns perfectly with radon protection, as both require the sealing of leaks [Radon-Handbuch_BfS.md].
 *   **Thermal Protection:** While necessary for energy efficiency, sealing must be carefully managed to ensure that the building envelope does not inadvertently create a pathway for radon accumulation if the ground gas pressure gradient is not addressed [Radon-Handbuch_BfS.md].
+
+## Citations
+
+1. Radon-Handbuch_BfS.md

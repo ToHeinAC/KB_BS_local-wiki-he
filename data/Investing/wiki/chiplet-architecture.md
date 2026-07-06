@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Chiplet Architecture
 key_terms:
 - chipl
 - architectur
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Chiplet Architecture
 type: concept
 updated: '2026-06-02'
@@ -36,3 +41,7 @@ The trend toward chiplets is accelerating due to the flattening efficiency gains
 
 ## Ecosystem Implications
 The growing adoption of chiplets necessitates the development of open interconnect standards and advanced packaging skills across the entire value chain [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

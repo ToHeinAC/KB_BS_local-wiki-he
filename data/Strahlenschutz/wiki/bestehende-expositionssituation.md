@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Bestehende Expositionssituation
 key_terms:
 - bestehend
 - expositionssituatio
@@ -9,6 +10,10 @@ related:
 - strahlenschutzgesetz-strlschg.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-17T00:00:00Z'
 title: Bestehende Expositionssituation
 type: concept
 updated: '2026-05-17'
@@ -27,3 +32,7 @@ Key areas covered include:
 *   **Contaminated Areas:** Regulations apply to areas contaminated in an emergency situation (§ 151) or in a situation existing after an emergency (§ 152).
 *   **Contamination Control:** The law provides mechanisms for assessing and managing contamination, including the determination of reference values (§ 155) and implementing necessary measures (§ 156).
 *   **Radioactive Contaminated Sites (Altlasten):** Specific provisions address the legal status and management of radioactive contaminated sites (§ 136).
+
+## Citations
+
+1. StrlSchG.md

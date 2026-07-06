@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Sanierungsplan
 key_terms:
 - sanierungspla
 related:
@@ -9,6 +10,10 @@ related:
 - strahlenschutzgesetz-strlschg.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-17T00:00:00Z'
 title: Sanierungsplan
 type: concept
 updated: '2026-05-17'
@@ -45,3 +50,7 @@ The competent authority has the power to:
 ## Financial and Legal Aspects
 *   **Cost Bearing:** The costs of measures ordered under the plan are generally borne by the responsible parties [summary-strlschg-md-teil-9-13.md].
 *   **Value Compensation:** If public funds are used for remediation, the owner may be subject to a value compensation payment (Wertausgleich) for the resulting increase in property value, unless specific exemptions apply [summary-strlschg-md-teil-9-13.md].
+
+## Citations
+
+1. StrlSchG.md

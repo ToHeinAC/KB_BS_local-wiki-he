@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Building Envelope
 key_terms:
 - build
 - envelop
 related: []
 sources:
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Building Envelope
 type: concept
 updated: '2026-06-02'
@@ -29,3 +34,7 @@ A thorough inspection of the building envelope must cover:
 *   **Boundaries:** Mapping all structures and rooms that border the ground.
 *   **Basement/Foundation:** Detailed inspection of basement walls against the ground, checking for cracks, holes, and the condition of joints to the floor and ceiling [Radon-Handbuch_BfS.md].
 *   **Utility Penetrations:** Assessing the sealing of all pipes and lines passing through the envelope.
+
+## Citations
+
+1. Radon-Handbuch_BfS.md

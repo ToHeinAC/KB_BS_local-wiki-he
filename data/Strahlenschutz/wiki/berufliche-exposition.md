@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Berufliche Exposition
 key_terms:
 - beruflich
 - expositio
@@ -10,6 +11,10 @@ related:
 - strahlenschutzregister.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-17T00:00:00Z'
 title: Berufliche Exposition
 type: concept
 updated: '2026-05-17'
@@ -34,3 +39,7 @@ Professional exposure refers to the radiation dose received by an individual due
 
 ## Central Registry
 All data regarding professional exposures are collected and stored in the Radiation Protection Register (Strahlenschutzregister) [StrlSchG.md].
+
+## Citations
+
+1. StrlSchG.md

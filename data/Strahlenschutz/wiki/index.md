@@ -1,53 +1,56 @@
-# Wiki Index
-Updated: 2026-06-19 | Pages: 49
+---
+title: Index
+okf_version: "0.1"
+updated: "2026-07-06"
+---
 
-## Pages
-- [Berufliche Exposition](berufliche-exposition.md) — ## Key facts - Berufliche Exposition - Dose Determination and Calculation - Documentation and Measurement - Central Regi
-- [Bestehende Expositionssituation](bestehende-expositionssituation.md) — ## Key facts - Bestehende Expositionssituation - Scope and Control  An existing exposure situation is defined as an expo
-- [Atomrechtliche Entsorgungsverordnung - AtEV](concept-atev.md) — ## Key facts - Atomrechtliche Entsorgungsverordnung - AtEV - Scope and Applicability - Waste Recording and Documentation
-- [Atomgesetz - AtG](concept-atomgesetz-atg.md) — ## Key facts - Atomgesetz - AtG - Scope and Purpose - Key Regulatory Procedures - Site Management and Waste - Operationa
-- [Building Envelope](concept-building-envelope.md) — ## Key facts - Building Envelope - Function in Radon Protection - Inspection Points  The building envelope refers to the
-- [Building Sealing](concept-building-sealing.md) — ## Key facts - Building Sealing - Importance in Radon Protection - Sealing Techniques - Synergy with Other Protection Me
-- [Radiation Dose Limits](concept-dosisbegrenzung.md) — Radiation Dose Limits are legally established maximum permissible levels of radiation energy ab [concept-radiation-prote
-- [Emergency Planning](concept-emergency-planning.md) — ## Key facts - Emergency Planning - Scope and Requirements  # Emergency Planning  Emergency planning, within the context
-- [Endlager Konrad](concept-endlager-konrad.md) — ## Key facts - Endlager Konrad - Standort und Kapazität - Aufbau und Betrieb - Prozess  # Endlager Konrad  Das Endlager 
-- [Health Record (Radiation)](concept-health-record-radiation.md) — ## Key facts - Health Record (Radiation) - Maintenance and Retention - Content and Purpose  # Health Record (Radiation) 
-- [Joint Convention](concept-joint-convention.md) — ## Key facts - Joint Convention - Zweck und Umfang - Regulatorische Bedeutung - Core Objectives - Scope of Safety Treatm
-- [Lüftungstechnische Maßnahmen](concept-lüftungstechnische-maßnahmen.md) — ## Key facts - Lüftungstechnische Maßnahmen - Druckgefälle und Radoninfiltration - Lüftungsstrategien zur Radonkontrolle
-- [Medizinphysik-Experte](concept-medizinphysik-experte.md) — ## Key facts - Medizinphysik-Experte - Qualifications and Appointment - Duties and Responsibilities - Relationship to Au
-- [Notfall](concept-notfall.md) — ## Key facts - Notfall - Arten von Notfällen - Management and Response  An emergency exposure situation is defined as an
-- [Professional Exposure](concept-professional-exposure.md) — ## Key facts - Professional Exposure - Definition - Regulatory Context - Relation to Waste Management  # Professional Ex
-- [Radiation Protection](concept-radiation-protection.md) — ## Key facts - Radiation Protection - Legal Framework - Key Principles - Radon Protection - Gesetzlicher Rahmen  # Radia
-- [Radioactive Residues](concept-radioactive-residues.md) — ## Key facts - Radioactive Residues - Management and Safety  # Radioactive Residues  Radioactive residues are materials 
-- [Radioactive Substances](concept-radioactive-stoffe.md) — ## Key facts - Radioactive Substances - Scope and Regulation - International Context - Scope of Regulation - Waste Impli
-- [Radioactive Waste](concept-radioactive-waste.md) — ## Key facts - Radioactive Waste - Management und Behandlung - Abgrenzung und Kontext - Core Principles - Scope  # Radio
-- [Radionuclide Laboratories](concept-radionuklidlaboratoratorien.md) — ## Key facts - Radionuclide Laboratories - Purpose and Scope - Risk Assessment and Room Classification - Assessment Fact
-- [Radon](concept-radon.md) — ## Key facts - Radon - Chemistry and Physics - Occurrence and Accumulation - Health Risks and Protection - Sources and P
-- [Röntgeneinrichtung](concept-röntgeneinrichtung.md) — ## Key facts - Röntgeneinrichtung - Technical Requirements for Use - Quality Assurance and Checks  Eine Röntgeneinrichtu
-- [Sanierung Maßnahmen](concept-sanierung-maßnahmen.md) — ## Key facts - Sanierung Maßnahmen - Remediation Techniques and Effectiveness - Inspection Protocol for Remediation Plan
-- [Spent Fuel](concept-spent-fuel.md) — ## Key facts - Spent Fuel - Umgang und Sicherheit - Regulatorischer Rahmen - Lifecycle Stages - Regulatory Oversight  # 
-- [Staatliche Aufsicht](concept-staatliche-aufsicht.md) — ## Key facts - Staatliche Aufsicht - Scope of Supervision - Supervisory Powers - Reporting and Information Flow  State s
-- [Sub-ground Areas](concept-underground-areas.md) — ## Key facts - Sub-ground Areas - Radon Risk Profile - Mitigation Strategies for Sub-ground Areas - 1. Sealing and Conta
-- [Ventilation Systems](concept-ventilation-systems.md) — ## Key facts - Ventilation Systems - Principles of Operation - System Components and Techniques - 1. Mechanical Ventilat
-- [Veränderungssperre](concept-veränderungssperre.md) — ## Key facts - Veränderungssperre - Purpose and Application - Context in Waste Management (jc_8_bericht_deutschland_atom
-- [Vorkommnis](concept-vorkommnis.md) — ## Key facts - Vorkommnis - Definition - Regulatory Context - Distinction from Accidents  # Vorkommnis (Incident)  In th
-- [Exposition (Radiation)](exposition.md) — ## Key facts - Exposition (Radiation) - Types of Exposure - Assessment and Reference Values - Radon-Specific Exposure - 
-- [Geplante Expositionssituation](geplante-expositionssituation.md) — ## Key facts - Geplante Expositionssituation - Regulatory Focus  A planned exposure situation is defined as an exposure 
-- [Ionisierende Strahlung](ionisierende-strahlung.md) — ## Key facts - Ionisierende Strahlung - Context in Radiation Protection Law - Applications and Control - Legal Implicati
-- [Kontaminierte Abfälle](kontaminierte-abfaelle.md) — ## Key facts - Kontaminierte Abfälle - Regulatory Framework - Rights and Obligations - Regulatory Oversight  The managem
-- [Notfallvorsorge](notfallvorsorge.md) — ## Key facts - Notfallvorsorge - Planning Structure - Core Principles and Procedures - Public Communication  Emergency p
-- [Strahlenschutzgesetz (StrlSchG)](radiation-protection-law.md) — ## Key facts - Strahlenschutzgesetz (StrlSchG) - Scope and Purpose - Key Regulatory Areas - Emergency Planning and Respo
-- [Radioaktive Altlasten](radioaktive-altlasten.md) — ## Key facts - Radioaktive Altlasten - Definition and Scope - Responsibility - Management and Remediation - Umweltüberwa
-- [Radioaktive Stoffe](radioaktive-stoffe.md) — ## Key facts - Radioaktive Stoffe - Composition and Scope - Legal Application  Radioactive substances are defined within
-- [Sanierungsplan](sanierungsplan.md) — ## Key facts - Sanierungsplan - Purpose and Requirement - Required Contents - Authority Oversight - Financial and Legal 
-- [strahlenschutzgesetz-strlschg.md](strahlenschutzgesetz-strlschg.md) — ## Key facts - Scope and Purpose - Key Regulatory Areas  The Strahlenschutzgesetz (StrlSchG), or Law for the Protection 
-- [Strahlenschutzrechtliche Genehmigungen](strahlenschutzrechtliche-genehmigungen.md) — ## Key facts - Strahlenschutzrechtliche Genehmigungen - Types of Permits and Authorization - Administrative Process  Rad
-- [Strahlenschutzregister](strahlenschutzregister.md) — ## Key facts - Strahlenschutzregister - Purpose and Scope - Data Recorded - Management and Access  The Radiation Protect
-- [Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV](summary-atdeckv.md) — ## Key facts - Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV - General Provisions (Erster Abschnitt) - Types of C
-- [Atomrechtliche Entsorgungsverordnung - AtEV](summary-atev.md) — ## Key facts - Atomrechtliche Entsorgungsverordnung - AtEV - Waste Characterization Parameters - Detailed Waste Stream D
-- [Atomgesetz - AtG (Teil 3/5)](summary-atg.md) — The *Atomgesetz* (AtG), or Law for the Peaceful Use of Nuclear Energy and Protection Against Its Dangers, is a comprehen
-- [Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle](summary-jc-8-bericht-deutschland-atomenergie-bf.md) — This source summarizes the findings of the "Bericht 8. Joint Convention Deutschland," which addresses the safety protoco
-- [Radon-Handbuch_BfS](summary-radon-handbuch-bfs.md) — Radon-Handbuch_BfS von 2019
-- [Strahlenschutzgesetz - StrlSchG (Teil 7/13)](summary-strlschg.md) — The source document provides excerpts from the *Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (
-- [Strahlenschutzverordnung - StrlSchV (Teil 9/15)](summary-strlschv.md) — This document provides excerpts from the *Verordnung zum Schutz vor der schädlichen Wirkung ionisierender Strahlung* (St
-- [Umweltradioaktivität](umweltradioaktivitaet.md) — ## Key facts - Umweltradioaktivität - Monitoring Scope - Federal Monitoring (§ 161) - State Monitoring (§ 162) - Data Ma
+# Pages
+* [Berufliche Exposition](berufliche-exposition.md) - Berufliche Exposition
+* [Bestehende Expositionssituation](bestehende-expositionssituation.md) - Bestehende Expositionssituation
+* [Atomrechtliche Entsorgungsverordnung - AtEV](concept-atev.md) - Atomrechtliche Entsorgungsverordnung - AtEV
+* [Atomgesetz - AtG](concept-atomgesetz-atg.md) - Atomgesetz - AtG
+* [Building Envelope](concept-building-envelope.md) - Building Envelope
+* [Building Sealing](concept-building-sealing.md) - Building Sealing
+* [Radiation Dose Limits](concept-dosisbegrenzung.md) - Radiation Dose Limits
+* [Emergency Planning](concept-emergency-planning.md) - Emergency Planning
+* [Endlager Konrad](concept-endlager-konrad.md) - Endlager Konrad
+* [Health Record (Radiation)](concept-health-record-radiation.md) - Health Record (Radiation)
+* [Joint Convention](concept-joint-convention.md) - Joint Convention
+* [Lüftungstechnische Maßnahmen](concept-lüftungstechnische-maßnahmen.md) - Lüftungstechnische Maßnahmen
+* [Medizinphysik-Experte](concept-medizinphysik-experte.md) - Medizinphysik-Experte
+* [Notfall](concept-notfall.md) - Notfall
+* [Professional Exposure](concept-professional-exposure.md) - Professional Exposure
+* [Radiation Protection](concept-radiation-protection.md) - Radiation Protection
+* [Radioactive Residues](concept-radioactive-residues.md) - Radioactive Residues
+* [Radioactive Substances](concept-radioactive-stoffe.md) - Radioactive Substances
+* [Radioactive Waste](concept-radioactive-waste.md) - Radioactive Waste
+* [Radionuclide Laboratories](concept-radionuklidlaboratoratorien.md) - Radionuclide Laboratories
+* [Radon](concept-radon.md) - Radon
+* [Röntgeneinrichtung](concept-röntgeneinrichtung.md) - Röntgeneinrichtung
+* [Sanierung Maßnahmen](concept-sanierung-maßnahmen.md) - Sanierung Maßnahmen
+* [Spent Fuel](concept-spent-fuel.md) - Spent Fuel
+* [Staatliche Aufsicht](concept-staatliche-aufsicht.md) - Staatliche Aufsicht
+* [Sub-ground Areas](concept-underground-areas.md) - Sub-ground Areas
+* [Ventilation Systems](concept-ventilation-systems.md) - Ventilation Systems
+* [Veränderungssperre](concept-veränderungssperre.md) - Veränderungssperre
+* [Vorkommnis](concept-vorkommnis.md) - Vorkommnis
+* [Exposition (Radiation)](exposition.md) - Exposition (Radiation)
+* [Geplante Expositionssituation](geplante-expositionssituation.md) - Geplante Expositionssituation
+* [Ionisierende Strahlung](ionisierende-strahlung.md) - Ionisierende Strahlung
+* [Kontaminierte Abfälle](kontaminierte-abfaelle.md) - Kontaminierte Abfälle
+* [Notfallvorsorge](notfallvorsorge.md) - Notfallvorsorge
+* [Strahlenschutzgesetz (StrlSchG)](radiation-protection-law.md) - Strahlenschutzgesetz (StrlSchG)
+* [Radioaktive Altlasten](radioaktive-altlasten.md) - Radioaktive Altlasten
+* [Radioaktive Stoffe](radioaktive-stoffe.md) - Radioaktive Stoffe
+* [Sanierungsplan](sanierungsplan.md) - Sanierungsplan
+* [strahlenschutzgesetz-strlschg.md](strahlenschutzgesetz-strlschg.md) - Scope and Purpose
+* [Strahlenschutzrechtliche Genehmigungen](strahlenschutzrechtliche-genehmigungen.md) - Strahlenschutzrechtliche Genehmigungen
+* [Strahlenschutzregister](strahlenschutzregister.md) - Strahlenschutzregister
+* [Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV](summary-atdeckv.md) - Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV
+* [Atomrechtliche Entsorgungsverordnung - AtEV](summary-atev.md) - Atomrechtliche Entsorgungsverordnung - AtEV
+* [Atomgesetz - AtG (Teil 3/5)](summary-atg.md) - Atomgesetz - AtG (Teil 3/5)
+* [Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der Behandlung radioaktiver Abfälle](summary-jc-8-bericht-deutschland-atomenergie-bf.md) - Bericht 8. Joint Convention Deutschland: Gemeinsamen Übereinkommens über die Sicherheit der Behandlung abgebrannter Brennelemente und über die Sicherheit der…
+* [Radon-Handbuch_BfS](summary-radon-handbuch-bfs.md) - Radon-Handbuch_BfS von 2019
+* [Strahlenschutzgesetz - StrlSchG (Teil 7/13)](summary-strlschg.md) - Strahlenschutzgesetz - StrlSchG (Teil 7/13)
+* [Strahlenschutzverordnung - StrlSchV (Teil 9/15)](summary-strlschv.md) - Strahlenschutzverordnung - StrlSchV (Teil 9/15)
+* [Umweltradioaktivität](umweltradioaktivitaet.md) - Umweltradioaktivität

@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Sub-ground Areas
 key_terms:
 - sub
 - ground
@@ -8,6 +9,10 @@ key_terms:
 related: []
 sources:
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Sub-ground Areas
 type: concept
 updated: '2026-06-02'
@@ -44,3 +49,7 @@ Mitigation requires a combination of sealing and active ventilation:
 ## Operational Considerations
 *   **Cooling Risk:** Increased ventilation in basements, especially in winter, must be managed to prevent excessive cooling or frost damage [Radon-Handbuch_BfS.md].
 *   **Monitoring:** Continuous monitoring and regular inspection of the ventilation system are necessary to ensure sustained protection.
+
+## Citations
+
+1. Radon-Handbuch_BfS.md

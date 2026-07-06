@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Röntgeneinrichtung
 key_terms:
 - ntgeneinricht
 related:
@@ -9,6 +10,10 @@ related:
 sources:
 - StrlSchG.md
 - StrlSchV.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-27T00:00:00Z'
 title: Röntgeneinrichtung
 type: concept
 updated: '2026-05-27'
@@ -32,3 +37,8 @@ The *Strahlenschutzverantwortliche* must ensure several mandatory quality checks
 *   **Acceptance Test (§ 115):** Before commissioning, an acceptance test must be conducted by the manufacturer or supplier to ensure the required quality for the application [StrlSchV.md].
 *   **Constancy Check (§ 116):** The facility must be regularly checked after commissioning to ensure that the required quality is still achieved (constancy check) [StrlSchV.md].
 *   **Record Keeping:** Records of the acceptance tests and constancy checks must be maintained [StrlSchV.md].
+
+## Citations
+
+1. StrlSchG.md
+2. StrlSchV.md

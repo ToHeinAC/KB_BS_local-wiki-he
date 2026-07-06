@@ -1,8 +1,23 @@
 ---
-title: "Regulatorische Anforderungen für NORM-Bleierz (U-238) nach deutschem Strahlenschutzrecht"
+created: '2026-05-22'
+description: Die rechtliche Bewertung von Materialien, die als Natural Radioactive
+  Material (NORM) eingestuft werden, insbesondere Bleierz mit einer spezifischen…
+resource: https://www.bfs.de/DE/themen/ion/umwelt/rueckstaende/einfuehrung/einfuehrung_node.html
+sources:
+- https://www.bfs.de/DE/themen/ion/umwelt/rueckstaende/einfuehrung/einfuehrung_node.html
+- https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+- wiki:concept-health-record-radiation.md
+- wiki:concept-kontaminierte-abfaelle.md
+- wiki:concept-professional-exposure.md
+- wiki:concept-public-exposure.md
+- wiki:concept-radiation-protection-law.md
+- wiki:radiation-protection-law.md
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-22T00:00:00Z'
+title: Regulatorische Anforderungen für NORM-Bleierz (U-238) nach deutschem Strahlenschutzrecht
 type: report
-created: "2026-05-22"
-sources: ['https://www.bfs.de/DE/themen/ion/umwelt/rueckstaende/einfuehrung/einfuehrung_node.html', 'https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf', 'wiki:concept-health-record-radiation.md', 'wiki:concept-kontaminierte-abfaelle.md', 'wiki:concept-professional-exposure.md', 'wiki:concept-public-exposure.md', 'wiki:concept-radiation-protection-law.md', 'wiki:radiation-protection-law.md']
 ---
 
 ## Regulatorischer Rahmen für NORM-Materialien aus Bleierz mit $\text{U-238}$
@@ -60,3 +75,14 @@ Zusammenfassend lässt sich sagen, dass die **Landesbehörde** auf Basis des **S
 *   [Wiki: concept-kontaminierte-abfaelle.md]
 *   [Source: https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf]
 *   [Source: https://www.bfs.de/DE/themen/ion/umwelt/rueckstaende/einfuehrung/einfuehrung_node.html]
+
+## Citations
+
+1. https://www.bfs.de/DE/themen/ion/umwelt/rueckstaende/einfuehrung/einfuehrung_node.html
+2. https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+3. wiki:concept-health-record-radiation.md
+4. wiki:concept-kontaminierte-abfaelle.md
+5. wiki:concept-professional-exposure.md
+6. wiki:concept-public-exposure.md
+7. wiki:concept-radiation-protection-law.md
+8. wiki:radiation-protection-law.md

@@ -1,8 +1,20 @@
 ---
-title: "Strahlenschutzrechtliche Bewertung von U-238-Rückständen"
+created: '2026-05-22'
+description: Die Frage, ob ein Bleierz mit einer spezifischen Aktivität von $1.5 \text{
+  Bq/g}$ an U-238 als überwachungsbedürftiger Rückstand nach deutschem…
+resource: https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf
+sources:
+- https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf
+- https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+- https://www.gesetze-im-internet.de/strlschg/BJNR196610017.html
+- https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf
+- wiki:concept-radiation-protection-law.md
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-22T00:00:00Z'
+title: Strahlenschutzrechtliche Bewertung von U-238-Rückständen
 type: report
-created: "2026-05-22"
-sources: ['https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf', 'https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf', 'https://www.gesetze-im-internet.de/strlschg/BJNR196610017.html', 'https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf', 'wiki:concept-radiation-protection-law.md']
 ---
 
 ## Bewertung der Überwachungsbedürftigkeit und Entlassung von radioaktiven Rückständen
@@ -47,3 +59,11 @@ Der Umgang mit solchen Materialien ist umfassend durch das Strahlenschutzgesetz 
 *   [Source: https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf]
 *   [Source: https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf]
 *   [Source: https://www.gesetze-im-internet.de/strlschg/BJNR196610017.html]
+
+## Citations
+
+1. https://landwirtschaft.hessen.de/sites/landwirtschaft.hessen.de/files/2023-03/rueckstaende_und_sonstige_materialien_-_lange_textversion.pdf
+2. https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2024_AKU_Broschuere-Richtwerte.pdf
+3. https://www.gesetze-im-internet.de/strlschg/BJNR196610017.html
+4. https://www.hlnug.de/fileadmin/dokumente/wasser/Veranstaltungen/2016/Fachworkshop_Untergrund/6_Vortr_Kuczewski_NORM_tiefer_Untergrund.pdf
+5. wiki:concept-radiation-protection-law.md

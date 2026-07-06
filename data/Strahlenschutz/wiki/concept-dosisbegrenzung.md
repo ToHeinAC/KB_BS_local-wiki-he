@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Radiation Dose Limits
 key_terms:
 - radiatio
 - dose
@@ -23,6 +24,10 @@ sources:
 - summary-din-25425-4-2019-12-md-teil-2-2.md
 - jc_8_bericht_deutschland_atomenergie_bf.md
 - concept-radiation-protection.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Radiation Dose Limits
 type: concept
 updated: '2026-06-19'
@@ -64,3 +69,12 @@ These limits are codified within the *Strahlenschutzgesetz* (StrlSchG) [summary-
 Die Einhaltung dieser Grenzwerte ist ein fundamentales Ziel bei der Behandlung radioaktiver Abfälle. Die detaillierten Inventare von Zwischen- und Endlagern, wie sie im Bericht 8. Joint Convention Deutschland dargestellt sind, sind darauf ausgelegt, die Exposition der Umwelt und des Personals unterhalb dieser gesetzlichen Grenzwerte zu halten [jc_8_bericht_deutschland_atomenergie_bf.md].
 ## Relation to Professional Exposure
 Die Einhaltung der Dosisgrenzwerte ist eng mit dem Schutz des Personals verbunden, da die berufliche Exposition (Professional Exposure) direkt durch die Einhaltung dieser Limits gesteuert wird [jc_8_bericht_deutschland_atomenergie_bf.md].
+
+## Citations
+
+1. StrlSchG.md
+2. StrlSchV.md
+3. summary-din-25425-3-2019-12-md.md
+4. summary-din-25425-4-2019-12-md-teil-2-2.md
+5. jc_8_bericht_deutschland_atomenergie_bf.md
+6. concept-radiation-protection.md

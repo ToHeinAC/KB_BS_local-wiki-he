@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Wafer Testing
 key_terms:
 - wafer
 - test
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Wafer Testing
 type: concept
 updated: '2026-06-02'
@@ -39,3 +44,7 @@ The testing process is highly modular, encompassing several stages:
 3.  **Packaging Test:** Testing after the assembly process [pwc-semiconductor-and-beyond-2026-full-report.md].
 4.  **Module Test:** Testing at the module level [pwc-semiconductor-and-beyond-2026-full-report.md].
 5.  **Burn-in / Component Test:** Final reliability checks [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

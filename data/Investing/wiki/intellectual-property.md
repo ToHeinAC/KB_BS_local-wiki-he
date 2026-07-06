@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Intellectual Property (IP)
 key_terms:
 - intellectual
 - property
@@ -8,6 +9,10 @@ key_terms:
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Intellectual Property (IP)
 type: concept
 updated: '2026-06-02'
@@ -31,3 +36,7 @@ The market is segmented by function, with Interface IP and Processor IP attracti
 IP blocks function like modular pieces for silicon, allowing fabless firms to focus on system-level differentiation while significantly reducing design cycles and non-recurring engineering costs [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Financial Burden:** The use of advanced IP can lead to substantial financial overhead, as IP license & royalty can consume 25–35% of a leading project’s budget [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Cost Mitigation:** Strategies to manage these costs include building reusable in-house IP, utilizing chiplets and multi-node partitioning, and adopting open-source alternatives like RISC-V [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

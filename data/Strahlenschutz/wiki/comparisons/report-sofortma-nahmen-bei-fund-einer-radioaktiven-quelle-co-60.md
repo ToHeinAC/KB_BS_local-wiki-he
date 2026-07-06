@@ -1,8 +1,25 @@
 ---
-title: "Sofortmaßnahmen bei Fund einer radioaktiven Quelle (Co-60)"
+created: '2026-05-19'
+description: Die Entdeckung einer radioaktiven Quelle, insbesondere von ${}^{60}\text{Co}$
+  mit einer Aktivität von $1 \times 10^8 \text{ Bq}$, stellt einen **Vorkommnis**…
+resource: http://www.revosax.sachsen.de/vorschrift/10467-VwV-Nukleare-Vorkommnisse
+sources:
+- http://www.revosax.sachsen.de/vorschrift/10467-VwV-Nukleare-Vorkommnisse
+- https://dserver.bundestag.de/btd/14/023/1402358.pdf
+- https://ssk.de/fileadmin/documents/de/2023/Info_07_Kurzfassung_Strahlennotfallhandbuch_gesamt.pdf
+- https://www.cdc.gov/radiation-emergencies/hcp/isotopes/cobalt-60.html
+- https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2007-142-AKN%20Sem%205%20Augsburg%20'Vorkehrungen%20und%20Massnahmen%20bei%20radiologischen%20Ereignissen'.pdf
+- https://www.reddit.com/r/Radiation/comments/1rj30xs/cobalt_60_tube_question/?tl=de
+- wiki:concept-kontaminierte-abfaelle.md
+- wiki:concept-radiation-protection-law.md
+- wiki:concept-strahlenschutzverordnung-strlschv.md
+- wiki:concept-vorkommnis.md
+tags:
+- strahlenschutz
+- report
+timestamp: '2026-05-19T00:00:00Z'
+title: Sofortmaßnahmen bei Fund einer radioaktiven Quelle (Co-60)
 type: report
-created: "2026-05-19"
-sources: ['http://www.revosax.sachsen.de/vorschrift/10467-VwV-Nukleare-Vorkommnisse', 'https://dserver.bundestag.de/btd/14/023/1402358.pdf', 'https://ssk.de/fileadmin/documents/de/2023/Info_07_Kurzfassung_Strahlennotfallhandbuch_gesamt.pdf', 'https://www.cdc.gov/radiation-emergencies/hcp/isotopes/cobalt-60.html', "https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2007-142-AKN%20Sem%205%20Augsburg%20'Vorkehrungen%20und%20Massnahmen%20bei%20radiologischen%20Ereignissen'.pdf", 'https://www.reddit.com/r/Radiation/comments/1rj30xs/cobalt_60_tube_question/?tl=de', 'wiki:concept-kontaminierte-abfaelle.md', 'wiki:concept-radiation-protection-law.md', 'wiki:concept-strahlenschutzverordnung-strlschv.md', 'wiki:concept-vorkommnis.md']
 ---
 
 ## Sofortmaßnahmen bei Fund einer radioaktiven Quelle (${}^{60}\text{Co}$)
@@ -61,3 +78,16 @@ Sobald die akute Gefahr gebannt ist, beginnt die Phase der Dokumentation und des
 **Wichtiger Hinweis:** Diese Zusammenfassung dient rein informativen Zwecken. Im echten Einsatz muss **immer** das lokale, aktuelle und spezifische Notfallprotokoll der zuständigen staatlichen Behörden befolgt werden.
 
 [Wiki: concept-vorkommnis.md] [Wiki: concept-kontaminierte-abfaelle.md] [Wiki: concept-radiation-protection-law.md] [Wiki: concept-strahlenschutzverordnung-strlschv.md] [Source: https://dserver.bundestag.de/btd/14/023/1402358.pdf] [Source: http://www.revosax.sachsen.de/vorschrift/10467-VwV-Nukleare-Vorkommnisse] [Source: https://www.cdc.gov/radiation-emergencies/hcp/isotopes/cobalt-60.html] [Source: https://www.reddit.com/r/Radiation/comments/1rj30xs/cobalt_60_tube_question/?tl=de]
+
+## Citations
+
+1. http://www.revosax.sachsen.de/vorschrift/10467-VwV-Nukleare-Vorkommnisse
+2. https://dserver.bundestag.de/btd/14/023/1402358.pdf
+3. https://ssk.de/fileadmin/documents/de/2023/Info_07_Kurzfassung_Strahlennotfallhandbuch_gesamt.pdf
+4. https://www.cdc.gov/radiation-emergencies/hcp/isotopes/cobalt-60.html
+5. https://www.fs-ev.org/fileadmin/user_upload/90_Archiv/FS-Pub-Archiv-final/FS-2007-142-AKN%20Sem%205%20Augsburg%20'Vorkehrungen%20und%20Massnahmen%20bei%20radiologischen%20Ereignissen'.pdf
+6. https://www.reddit.com/r/Radiation/comments/1rj30xs/cobalt_60_tube_question/?tl=de
+7. wiki:concept-kontaminierte-abfaelle.md
+8. wiki:concept-radiation-protection-law.md
+9. wiki:concept-strahlenschutzverordnung-strlschv.md
+10. wiki:concept-vorkommnis.md

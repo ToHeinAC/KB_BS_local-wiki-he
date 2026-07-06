@@ -1,5 +1,6 @@
 ---
 created: '2026-05-21'
+description: Radionuclide Laboratories
 key_terms:
 - radionuclid
 - laboratori
@@ -20,6 +21,10 @@ sources:
 - summary-din-25425-3-2019-12-md.md
 - summary-din-25425-4-2019-12-md-teil-2-2.md
 - summary-din-25425-4-2019-12-md-teil-1-2.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-19T00:00:00Z'
 title: Radionuclide Laboratories
 type: concept
 updated: '2026-06-19'
@@ -153,3 +158,9 @@ The standard references several other DIN documents, including:
 *   DIN 25425-4 (Rules for Personal Protection);
 *   DIN 25430 (Safety Marking in Radiation Protection);
 *   DIN ISO 7503-1, DIN ISO 7503-2, DIN ISO 7503-3 (Measurement and Evaluation of Surface Contamination).
+
+## Citations
+
+1. summary-din-25425-3-2019-12-md.md
+2. summary-din-25425-4-2019-12-md-teil-2-2.md
+3. summary-din-25425-4-2019-12-md-teil-1-2.md

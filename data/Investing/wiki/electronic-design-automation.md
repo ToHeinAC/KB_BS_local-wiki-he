@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Electronic Design Automation (EDA)
 key_terms:
 - electronic
 - desig
@@ -9,6 +10,10 @@ key_terms:
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Electronic Design Automation (EDA)
 type: concept
 updated: '2026-06-02'
@@ -34,3 +39,7 @@ The EDA market leadership is highly concentrated, with established vendors such 
 
 ## Industry Trends
 Customers are increasingly focusing on forging tighter partnerships, adopting cloud-based tool flows, and developing in-house automation scripts to maximize value from the existing ecosystem [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

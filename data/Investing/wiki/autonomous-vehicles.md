@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Autonomous Vehicles
 key_terms:
 - autonomou
 - vehicl
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Autonomous Vehicles
 type: concept
 updated: '2026-06-02'
@@ -38,3 +43,7 @@ The shift to autonomy significantly increases the semiconductor requirement per 
 *   **Market Size:** Conventional vehicles typically contain 200 to 300 semiconductors, whereas autonomous vehicles at Level 3 and above could require more than 1,000 [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Chip Requirements:** Demand is growing for high-performance computing chips (like Domain Control Units or DCUs), sensors, and communication chips for V2X [pwc-semiconductor-and-beyond-2026-full-report.md].
 *   **Design Shift:** For higher levels of autonomy, specialized chips tailored to each company are likely, potentially leading to more OEMs designing and producing their own chips, moving away from standard industry-standard components [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

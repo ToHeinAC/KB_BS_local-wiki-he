@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Notfallvorsorge
 key_terms:
 - notfallvorsorg
 related:
@@ -8,6 +9,10 @@ related:
 - summary-strlschg.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-17T00:00:00Z'
 title: Notfallvorsorge
 type: concept
 updated: '2026-05-17'
@@ -39,3 +44,7 @@ The law mandates the development of several interconnected plans:
 A key component is public awareness, requiring competent authorities to:
 *   Inform the public about the basic concepts of radioactivity and the potential consequences of emergencies (§ 105).
 *   Ensure that information and behavior recommendations are constantly accessible and updated.
+
+## Citations
+
+1. StrlSchG.md

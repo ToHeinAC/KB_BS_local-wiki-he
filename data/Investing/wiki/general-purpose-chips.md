@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: General-Purpose Chips
 key_terms:
 - general
 - purpos
@@ -8,6 +9,10 @@ key_terms:
 related: []
 sources:
 - pwc-semiconductor-and-beyond-2026-full-report.md
+tags:
+- investing
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: General-Purpose Chips
 type: concept
 updated: '2026-06-02'
@@ -28,3 +33,7 @@ General-purpose chips are semiconductor devices designed to handle a broad range
 
 ## Comparison with ASICs
 General-purpose chips contrast with Application-Specific Integrated Circuits (ASICs). While ASICs are purpose-built for superior performance and power efficiency in niche applications, general-purpose chips provide the necessary adaptability for evolving or undefined computing tasks [pwc-semiconductor-and-beyond-2026-full-report.md].
+
+## Citations
+
+1. pwc-semiconductor-and-beyond-2026-full-report.md

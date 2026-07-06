@@ -1,12 +1,17 @@
 ---
 confidence: high
 created: '2026-06-02'
+description: Ventilation Systems
 key_terms:
 - ventilatio
 - system
 related: []
 sources:
 - Radon-Handbuch_BfS.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-06-02T00:00:00Z'
 title: Ventilation Systems
 type: concept
 updated: '2026-06-02'
@@ -47,3 +52,7 @@ Ventilation fans must meet stringent technical criteria:
 ### 4. Operational Considerations
 *   **Condensation:** When installing ventilation systems, measures must be taken to prevent condensation (Kondensat), such as providing insulation or installing condensate drainage lines [Radon-Handbuch_BfS.md].
 *   **Maintenance:** Regular inspection of air volumes and radon levels is required, treating the radon aspect with the same diligence as the mechanical function of the system [Radon-Handbuch_BfS.md].
+
+## Citations
+
+1. Radon-Handbuch_BfS.md

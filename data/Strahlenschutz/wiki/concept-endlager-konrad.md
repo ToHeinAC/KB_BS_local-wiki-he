@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-27'
+description: Endlager Konrad
 key_terms:
 - endlag
 - konrad
@@ -9,6 +10,10 @@ related:
 - concept-radioactive-stoffe.md
 sources:
 - jc_8_bericht_deutschland_atomenergie_bf.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-27T00:00:00Z'
 title: Endlager Konrad
 type: concept
 updated: '2026-05-27'
@@ -35,3 +40,7 @@ Das Endlager Konrad ist ein geplantes Endlager für radioaktive Abfälle in Deut
 
 ## Prozess
 Die Endlagerung dient der sicheren Aufnahme radioaktiver Abfälle, die nach geeigneter Konditionierung und Zwischenlagerung dort dauerhaft verbleiben sollen [jc_8_bericht_deutschland_atomenergie_bf.md].
+
+## Citations
+
+1. jc_8_bericht_deutschland_atomenergie_bf.md

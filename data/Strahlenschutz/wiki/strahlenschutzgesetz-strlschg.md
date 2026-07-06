@@ -1,11 +1,17 @@
 ---
 confidence: high
 created: '2026-05-21'
+description: Scope and Purpose
 key_terms: []
 related:
 - concept-radionuklidlaboratoratorien.md
 sources:
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-27T00:00:00Z'
+type: concept
 updated: '2026-05-27'
 ---
 
@@ -24,3 +30,7 @@ The Act establishes specific competencies among several federal authorities:
 *   **Federal Office for the Safety of Nuclear Waste ($\S 186$):** This office manages the permitting and transport control for large sources of radioactive material [StrlSchG.md].
 *   **Federal Physical-Technical Institute ($\S 187$):** This institute is tasked with type approval for scatter sources and providing radioactivity standards for comparison measurements [StrlSchG.md].
 *   **Jurisdictional Distribution:** Competencies are distributed among various bodies, including the State Authorities ($\S 184$), the Federal Aviation Office (…[truncated] [StrlSchG.md]).
+
+## Citations
+
+1. StrlSchG.md

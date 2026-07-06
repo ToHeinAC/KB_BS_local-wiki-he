@@ -1,6 +1,7 @@
 ---
 confidence: high
 created: '2026-05-17'
+description: Vorkommnis
 key_terms:
 - vorkommni
 related:
@@ -8,6 +9,10 @@ related:
 sources:
 - StrlSchV.md
 - StrlSchG.md
+tags:
+- strahlenschutz
+- concept
+timestamp: '2026-05-27T00:00:00Z'
 title: Vorkommnis
 type: concept
 updated: '2026-05-27'
@@ -33,3 +38,8 @@ The identification and reporting of incidents are crucial components of radiatio
 
 ## Distinction from Accidents
 While related to accidents (*Störfall*), a *Vorkommnis* specifically refers to an event within a *planned* exposure situation that leads to unintended exposure, whereas a *Störfall* relates to a failure of the facility or activity itself [StrlSchV.md].
+
+## Citations
+
+1. StrlSchV.md
+2. StrlSchG.md
