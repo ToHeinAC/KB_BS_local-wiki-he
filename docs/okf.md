@@ -12,6 +12,12 @@ cross-links as relationships, and an optional `## Citations` section.
 never break conformance. This mirrors the existing model-independent
 `_route_page`/`_merge_pages`/frontmatter-patching in `wiki_engine`.
 
+**Every** page-writing path routes through `okf.apply_to_page`, not just the
+main ingest loop: `ingest_piece` + `_merge_pages` (ingest/consolidate),
+`file_answer` (Chat "Save to wiki" insights), `resolve_contradiction`, and the
+research-report writer (`tools.py` → `comparisons/`). So any page created after
+2026-07 is conformant and enriched regardless of which feature made it.
+
 ## Mapping (OKF ↔ this project)
 
 | OKF concept | This project |

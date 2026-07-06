@@ -430,6 +430,18 @@ def test_rebuild_index_has_insights_section(wiki_dir):
     assert "insights/insight-q.md" in index
 
 
+def test_file_answer_is_okf_enriched(wiki_dir):
+    import frontmatter
+    import okf
+    rel = wiki_engine.file_answer("What is copper used for?",
+                                  "Copper conducts electricity in wiring.", [])
+    post = frontmatter.loads((wiki_dir / rel).read_text())
+    assert post.metadata["tags"]              # OKF field code-stamped
+    assert post.metadata["description"]
+    assert "## Citations" in post.content     # regenerated from sources
+    assert okf.okf_validate(wiki_dir) == []   # whole bundle stays conformant
+
+
 def test_get_wiki_tree_groups_insights_and_flags_stale(wiki_dir):
     (wiki_dir / "old.md").write_text(
         '---\ntitle: Old\ntype: concept\nupdated: "2020-01-01"\n---\nbody'

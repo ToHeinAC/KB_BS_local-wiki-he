@@ -19,6 +19,7 @@ from langchain_core.tools import tool
 import chunker
 import db_context
 import lex_index
+import okf
 import run_memory
 import wiki_engine
 from prompts import (
@@ -444,7 +445,7 @@ def _submit_final_impl(title: str, answer: str) -> str:
         f'---\ntitle: "{title}"\ntype: report\ncreated: "{date}"\n'
         f"sources: {all_sources}\n---\n\n{answer}"
     )
-    (dest_dir / filename).write_text(body)
+    (dest_dir / filename).write_text(okf.apply_to_page(body, db=db_context.get_active_db()))
     return (
         f"ACCEPTED: comparisons/{filename} ({words} words, "
         f"{len(urls)} urls, {len(wiki_cites)} wiki cites, {len(raw_cites)} source cites)"

@@ -1562,7 +1562,7 @@ def file_answer(question: str, answer: str, related: list[str] | None = None) ->
         f"## Question\n{question.strip()}\n\n"
         f"## Answer\n{body}\n"
     )
-    dest.write_text(page)
+    dest.write_text(_okf_apply(page))
     _append_log("Insight filed", f"{rel}\nQ: {question[:120]}")
     _rebuild_index()
     return rel
@@ -1765,7 +1765,7 @@ def resolve_contradiction(description: str, page_filenames: list[str], user_guid
         dest = _wiki() / page["filename"]
         if not dest.exists():
             continue
-        dest.write_text(_ensure_frontmatter(page["content"], page["filename"]))
+        dest.write_text(_okf_apply(_ensure_frontmatter(page["content"], page["filename"])))
         updated.append(page["filename"])
 
     _append_log(
