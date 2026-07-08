@@ -161,6 +161,17 @@ def test_ingest_injects_user_metadata_into_prompt(wiki_dir, monkeypatch):
         assert v in sent_prompt
 
 
+def test_ingest_pins_source_language_in_system_prompt(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    wiki_engine.ingest("Der Bericht beschreibt die kerntechnische Anlage und ihre Grenzwerte.",
+                       "de-doc.txt")
+    sent_system = mock.generate.call_args.kwargs["system"]
+    assert "SPRACHE (verbindlich)" in sent_system  # German source → German directive
+    assert "## Key facts" in sent_system           # structural heading kept exempt
+
+
 def test_ingest_works_without_user_metadata(wiki_dir, monkeypatch):
     mock = MagicMock()
     mock.generate.return_value = {"response": _INGEST_RESPONSE}

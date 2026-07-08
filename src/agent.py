@@ -22,6 +22,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 import db_context
+import lang
 import ollama_client
 import run_memory
 import tools as tool_module
@@ -53,12 +54,14 @@ def _build_llm():
     ).bind_tools(tool_module.TOOLS)
 
 
-def _build_graph(llm):
+def _build_graph(llm, directive: str = ""):
+    nudge = RESEARCH_BUDGET_NUDGE + (f"\n\n{directive}" if directive else "")
+
     def agent_node(state: MessagesState) -> dict:
         msgs = list(state["messages"])
         ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
         if ai_count >= NUDGE_AT:
-            msgs = msgs + [HumanMessage(content=RESEARCH_BUDGET_NUDGE)]
+            msgs = msgs + [HumanMessage(content=nudge)]
         return {"messages": [llm.invoke(msgs)]}
 
     def should_continue(state: MessagesState) -> str:
@@ -96,7 +99,7 @@ def _load_wiki_index() -> str:
         return ""
 
 
-def _system_prompt(wiki_context: str) -> str:
+def _system_prompt(wiki_context: str, directive: str = "") -> str:
     parts: list[str] = []
     index_text = _load_wiki_index()
     if index_text.strip():
@@ -109,6 +112,7 @@ def _system_prompt(wiki_context: str) -> str:
     wiki_block = ("\n\n".join(parts) + "\n\n") if parts else ""
     return RESEARCHER_INSTRUCTIONS.format(
         wiki_block=wiki_block,
+        language_directive=directive,
         min_searches=MIN_SEARCHES,
         min_words=MIN_WORDS,
         min_urls=MIN_URLS,
@@ -145,13 +149,15 @@ def _gather_notes(all_messages: list) -> str:
     return notes[-FALLBACK_NOTES_CAP:] if len(notes) > FALLBACK_NOTES_CAP else notes
 
 
-def _synthesize_fallback(question: str, all_messages: list) -> str:
+def _synthesize_fallback(question: str, all_messages: list, directive: str = "") -> str:
     """Best-effort report from gathered notes when the agent stalled without
     calling submit_final_answer. Returns '' if there are no notes or on error."""
     notes = _gather_notes(all_messages)
     if not notes.strip():
         return ""
     prompt = RESEARCH_FALLBACK_PROMPT.format(question=question, notes=notes)
+    if directive:
+        prompt += f"\n\n{directive}"
     try:
         return ollama_client.generate(
             RESEARCH_FALLBACK_SYSTEM, prompt,
@@ -163,16 +169,17 @@ def _synthesize_fallback(question: str, all_messages: list) -> str:
 
 def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict, None, None]:
     run_memory.begin_run()
+    directive = lang.response_directive(question)
     try:
         llm = _build_llm()
-        graph = _build_graph(llm)
+        graph = _build_graph(llm, directive)
     except Exception as exc:
         yield {"type": "error", "content": f"Agent init failed: {exc}"}
         return
 
     init = {
         "messages": [
-            SystemMessage(content=_system_prompt(wiki_context)),
+            SystemMessage(content=_system_prompt(wiki_context, directive)),
             HumanMessage(content=question),
         ]
     }
@@ -250,7 +257,7 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
     # The agent gathered search results but never wrote prose or filed a report
     # (common with small local models). Synthesise an answer from the notes
     # instead of discarding everything.
-    synth = _synthesize_fallback(question, all_messages)
+    synth = _synthesize_fallback(question, all_messages, directive)
     if synth:
         yield {
             "type": "final_answer",

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import chunker
 import db_context
 import dedup
+import lang
 import lex_index
 import okf
 import ollama_client
@@ -675,7 +676,10 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
     `ctx` dict the per-piece synthesis and the final wrap-up consume.
     `lex_index.build()` is deferred to `ingest_end`.
     """
-    system = schema_loader.get_system_prompt()
+    # Pin the page-writer to the source's language via the system prompt (always
+    # preserved by Ollama, unlike the prompt tail where the 40 KB piece is
+    # truncated). Detection is deterministic; wording lives in prompts.py.
+    system = schema_loader.get_system_prompt() + "\n\n" + lang.ingest_directive(full_text)
     index_text = _index_path().read_text() if _index_path().exists() else ""
 
     clean_meta = {k: v for k, v in (user_meta or {}).items() if v and str(v).strip()}
@@ -1285,7 +1289,10 @@ def query_with_sources(question: str) -> dict:
     if not pages_text:
         pages_text = "(no relevant pages found)"
 
-    answer_prompt = ANSWER_PROMPT.format(pages_text=pages_text, question=question)
+    answer_prompt = ANSWER_PROMPT.format(
+        pages_text=pages_text, question=question,
+        language_directive=lang.response_directive(question),
+    )
     answer = ollama_client.generate(system, answer_prompt, temperature=0.7)
     return {"answer": answer, "sources": used_sources, "raw_sources": sorted(raw_sources_set)}
 

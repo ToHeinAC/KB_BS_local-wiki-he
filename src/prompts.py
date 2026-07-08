@@ -1,5 +1,47 @@
 """All LLM prompt templates for localwiki."""
 
+# --- Language directives (Layer 1: deterministic language pinning) ---------
+# Selected in code by src/lang.py after detecting the source/query language and
+# injected into the prompts below. Kept per-language as complete NATIVE strings
+# (the directive itself is in the target language — the strongest steering lever
+# for small local models like gemma4:e4b). Structural markers the pipeline keys
+# on (`## Key facts`), citations, and numbers are explicitly exempt from
+# translation. See docs/architecture.md.
+
+RESPONSE_LANGUAGE_DIRECTIVE = {
+    "de": (
+        "ANTWORTSPRACHE (verbindlich): Verfasse die gesamte Antwort auf Deutsch, "
+        "auch wenn die Quellen in einer anderen Sprache vorliegen — übersetze dafür "
+        "den Fließtext. Übernimm dabei UNVERÄNDERT und unübersetzt: Zitat-Marker in "
+        "eckigen Klammern (z. B. [Source: ...], [Wiki: datei.md], [Seitentitel]), "
+        "Abschnittsmarken (§X, #abschnitt), Zahlen, Einheiten und wörtlich zitierte "
+        "Gesetzesbegriffe."
+    ),
+    "en": (
+        "ANSWER LANGUAGE (strict): Write the entire answer in English, even if the "
+        "sources are in another language — translate the prose. Keep UNCHANGED and "
+        "untranslated: citation markers in square brackets (e.g. [Source: ...], "
+        "[Wiki: file.md], [page title]), section markers (§X, #section), numbers, "
+        "units, and verbatim-quoted legal terms."
+    ),
+}
+
+INGEST_LANGUAGE_DIRECTIVE = {
+    "de": (
+        "SPRACHE (verbindlich): Schreibe den Fließtext und die Zwischenüberschriften "
+        "jeder Wiki-Seite auf Deutsch — der Quelltext bestimmt die FAKTEN, nicht die "
+        "Sprache; fasse fremdsprachige Passagen auf Deutsch zusammen. UNVERÄNDERT "
+        "bleiben: die Überschrift `## Key facts` (genau so, englisch), Zahlen, Daten, "
+        "Einheiten und Zitate wie [quelle.md]."
+    ),
+    "en": (
+        "LANGUAGE (strict): Write the prose and section headings of every wiki page in "
+        "English — the source text sets the FACTS, not the language; summarise "
+        "non-English passages in English. KEEP UNCHANGED: the `## Key facts` heading "
+        "(exactly, in English), numbers, dates, units, and citations like [source.md]."
+    ),
+}
+
 # --- Deep researcher (Research page, agent.py) -----------------------------
 
 RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the local wiki, then decide autonomously which further tools to use. After every tool result, explicitly track gaps versus the original query and stay on the main research line.
@@ -14,6 +56,8 @@ RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the 
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
 - submit_final_answer(title, answer): submit the final report. REJECTED if answer < {min_words} words or fewer than {min_urls} unique sources (web URLs, [Wiki: filename.md], and [Source: filename] citations all count).
+
+{language_directive}
 
 Required workflow:
 1. PLAN: think_tool once at the start. Break the original question into 3-6 sub-questions. Decide an initial wiki query plan.
@@ -233,7 +277,9 @@ Cite wiki pages inline as [page title].
 Wiki pages:
 {pages_text}
 
-Question: {question}"""
+Question: {question}
+
+{language_directive}"""
 
 LINT_PROMPT = """Review all wiki pages below for quality issues. Today's date is {today}.
 
@@ -269,6 +315,8 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions strictly
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
 - submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words or fewer than {min_sources} unique [Source: ...] citations.
+
+{language_directive}
 
 Search strategy (critical):
 - Use SINGLE keywords or short 2-word phrases. NEVER whole sentences.

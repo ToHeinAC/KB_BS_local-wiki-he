@@ -25,6 +25,7 @@ from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 
 import db_context
+import lang
 import ollama_client
 import run_memory
 import tools as tool_module
@@ -58,12 +59,14 @@ def _build_llm():
     ).bind_tools(tool_module.CHAT_TOOLS)
 
 
-def _build_graph(llm):
+def _build_graph(llm, directive: str = ""):
+    nudge = CHAT_BUDGET_NUDGE + (f"\n\n{directive}" if directive else "")
+
     def agent_node(state: MessagesState) -> dict:
         msgs = list(state["messages"])
         ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
         if ai_count >= NUDGE_AT:
-            msgs = msgs + [HumanMessage(content=CHAT_BUDGET_NUDGE)]
+            msgs = msgs + [HumanMessage(content=nudge)]
         return {"messages": [llm.invoke(msgs)]}
 
     def should_continue(state: MessagesState) -> str:
@@ -112,7 +115,7 @@ def _build_raw_index() -> str:
     return "\n".join(lines)
 
 
-def _system_prompt() -> str:
+def _system_prompt(directive: str = "") -> str:
     index_text = _build_raw_index()
     raw_block = (
         f"Original files available in data/raw/:\n{index_text}\n\n"
@@ -120,6 +123,7 @@ def _system_prompt() -> str:
     )
     return CHAT_AGENT_SYSTEM.format(
         raw_block=raw_block,
+        language_directive=directive,
         min_searches=MIN_SEARCHES,
         min_words=MIN_WORDS,
         min_sources=MIN_SOURCES,
@@ -163,13 +167,15 @@ def _gather_notes(all_messages) -> str:
     return notes[-FALLBACK_NOTES_CAP:] if len(notes) > FALLBACK_NOTES_CAP else notes
 
 
-def _synthesize_fallback(question: str, all_messages) -> str:
+def _synthesize_fallback(question: str, all_messages, directive: str = "") -> str:
     """Best-effort answer from gathered notes when the agent stalled without
     calling submit_chat_answer. Returns '' if there are no notes or on error."""
     notes = _gather_notes(all_messages)
     if not notes.strip():
         return ""
     prompt = CHAT_FALLBACK_PROMPT.format(question=question, notes=notes)
+    if directive:
+        prompt += f"\n\n{directive}"
     try:
         return ollama_client.generate(
             CHAT_FALLBACK_SYSTEM, prompt,
@@ -207,16 +213,17 @@ def _extract_submitted_answer(messages) -> tuple[str, list[str]] | None:
 
 def run_chat_agent(question: str) -> Generator[dict, None, None]:
     run_memory.begin_run()
+    directive = lang.response_directive(question)
     try:
         llm = _build_llm()
-        graph = _build_graph(llm)
+        graph = _build_graph(llm, directive)
     except Exception as exc:
         yield {"type": "error", "content": f"Chat agent init failed: {exc}"}
         return
 
     init = {
         "messages": [
-            SystemMessage(content=_system_prompt()),
+            SystemMessage(content=_system_prompt(directive)),
             HumanMessage(content=question),
         ]
     }
@@ -296,7 +303,7 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
     # The agent gathered search results but never submitted or wrote prose
     # (common with small local models). Synthesise an answer from the notes
     # instead of discarding everything.
-    synth = _synthesize_fallback(question, all_messages)
+    synth = _synthesize_fallback(question, all_messages, directive)
     if synth:
         cited = sorted(set(_RAW_CITE_RE.findall(synth)))
         yield {
