@@ -170,7 +170,12 @@ def convert_to_markdown(
     """Convert a supported file to a Markdown string. Dispatch by extension."""
     suffix = Path(filename).suffix.lower()
     if suffix == ".pdf":
-        return _convert_pdf(file_bytes, on_progress)
+        try:
+            return _convert_pdf(file_bytes, on_progress)
+        finally:
+            # Free the OCR model so the ingest step (a text model) gets the full
+            # GPU instead of sharing/splitting VRAM with the resident vision model.
+            ollama_client.unload(OCR_MODEL)
     if suffix == ".docx":
         if on_progress:
             on_progress(0, 1, "Converting DOCX")
@@ -183,7 +188,10 @@ def convert_to_markdown(
 
         if on_progress:
             on_progress(0, 1, "OCR image")
-        md = convert_image(Image.open(io.BytesIO(file_bytes)))
+        try:
+            md = convert_image(Image.open(io.BytesIO(file_bytes)))
+        finally:
+            ollama_client.unload(OCR_MODEL)  # free VRAM for the ingest text model
         if on_progress:
             on_progress(1, 1, "Done")
         return md

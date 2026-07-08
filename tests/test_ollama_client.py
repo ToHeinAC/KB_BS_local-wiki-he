@@ -44,7 +44,7 @@ def test_generate_passes_correct_args(monkeypatch):
         model=ollama_client._MODEL,
         system="system",
         prompt="user prompt",
-        options={"temperature": 0.5},
+        options={"temperature": 0.5, "num_ctx": ollama_client._NUM_CTX},
     )
 
 

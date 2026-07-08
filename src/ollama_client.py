@@ -16,6 +16,13 @@ _QUERY_MODEL = os.getenv("QUERY_MODEL") or _MODEL
 _INGEST_MODEL = os.getenv("INGEST_MODEL") or _MODEL
 _FAST_MODEL = os.getenv("FAST_MODEL") or _MODEL
 
+# Cap the KV context for generate(). Models like gemma4:e4b (Gemma 3n) default
+# to a 131072-token window; that inflates the compute graph enough to trip the
+# ggml scheduler assert (GGML_SCHED_MAX_SPLIT_INPUTS) during ingest synthesis.
+# An ingest piece is <= MAX_INGEST_CHARS (~13K tokens) + system + output, so 32K
+# is ample while keeping the graph small enough to stay on one GPU.
+_NUM_CTX = int(os.getenv("INGEST_NUM_CTX", "32768"))
+
 
 def _client():
     import ollama
@@ -36,7 +43,7 @@ def generate(system: str, prompt: str, temperature: float = 0.3, model_id: str |
             model=model_id or _MODEL,
             system=system,
             prompt=prompt,
-            options={"temperature": temperature},
+            options={"temperature": temperature, "num_ctx": _NUM_CTX},
         )
         return resp["response"]
     except Exception as exc:
@@ -53,6 +60,15 @@ def chat(messages: list[dict], temperature: float = 0.7) -> str:
         return resp["message"]["content"]
     except Exception as exc:
         raise RuntimeError(f"Ollama chat failed: {exc}") from exc
+
+
+def unload(model_id: str) -> None:
+    """Evict a model from VRAM (keep_alive=0). Frees the GPU so a following
+    generate() model isn't forced to share/split. Best-effort; ignores errors."""
+    try:
+        _client().generate(model=model_id, prompt="", keep_alive=0)
+    except Exception:
+        pass
 
 
 def loaded_model() -> str:
