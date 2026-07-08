@@ -345,6 +345,20 @@ def _show_md_dialog(title: str, content: str) -> None:
     )
 
 
+@st.dialog("Confirm ingest")
+def _confirm_ingest_dialog(db_name: str, file_name: str) -> None:
+    st.warning(f"Ingest **{file_name}** into database **{db_name}**?")
+    st.caption("The document will be written to the currently selected database. "
+               "Make sure this is the right one.")
+    c1, c2 = st.columns(2)
+    if c1.button("Confirm", type="primary", key="confirm_ingest_btn"):
+        st.session_state["ingest_confirmed"] = True
+        st.rerun()
+    if c2.button("Cancel", key="cancel_ingest_btn"):
+        st.session_state.pop("pending_ingest_meta", None)
+        st.rerun()
+
+
 @st.dialog("Concept", width="large")
 def _show_node_details(node_id: str, graph: dict) -> None:
     nodes_by_id = {n["id"]: n for n in graph["nodes"]}
@@ -630,7 +644,8 @@ if _db_choice != st.session_state["active_db"]:
     # Clear per-DB session state to avoid cross-DB leakage.
     for _k in ("messages", "chat_followup", "research_history",
                "last_research_q", "last_research_answer", "last_report",
-               "research_sources", "explorer_selected_page", "last_contradictions"):
+               "research_sources", "explorer_selected_page", "last_contradictions",
+               "pending_ingest_meta", "ingest_confirmed"):
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -718,7 +733,13 @@ if page == "Upload":
                 values = {f: st.text_input(f.capitalize()) for f in fields}
                 submitted = st.form_submit_button("Ingest into wiki", type="primary")
             if submitted:
-                user_meta = {k: v.strip() for k, v in values.items() if v and v.strip()}
+                st.session_state["pending_ingest_meta"] = {
+                    k: v.strip() for k, v in values.items() if v and v.strip()
+                }
+                _confirm_ingest_dialog(st.session_state["active_db"], uploaded.name)
+
+            if st.session_state.pop("ingest_confirmed", False):
+                user_meta = st.session_state.pop("pending_ingest_meta", {})
                 if convertible:
                     md_name = Path(uploaded.name).stem + ".md"
                     with st.spinner("Saving file…"):
