@@ -801,16 +801,24 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
             ctx["contradictions"].append(line.split(":", 1)[1].strip())
 
 
-def ingest_end(ctx: dict) -> dict:
-    """Finalise: single lex_index rebuild, index page rebuild, log entry."""
-    if ctx["chunks"]:
-        lex_index.build()
+def ingest_end(ctx: dict, finalize: bool = True) -> dict:
+    """Finalise: index page rebuild + log entry, and (when ``finalize``) the
+    single corpus-wide `lex_index` rebuild + description refresh.
+
+    Batch ingest passes ``finalize=False`` for every file except the last, so the
+    two costly corpus-wide steps run once at the end instead of once per file.
+    The cheap per-file `_rebuild_index()` still runs so later files in the batch
+    route/merge against earlier ones' on-disk pages.
+    """
     _rebuild_index()
-    if os.getenv("INGEST_DESCRIPTION", "1") == "1":
-        try:
-            update_description(ctx)
-        except Exception:
-            pass  # best-effort; never fail ingest on the overview refresh
+    if finalize:
+        if ctx["chunks"]:
+            lex_index.build()
+        if os.getenv("INGEST_DESCRIPTION", "1") == "1":
+            try:
+                update_description(ctx)
+            except Exception:
+                pass  # best-effort; never fail ingest on the overview refresh
     _append_log(
         f"Ingest: {ctx['source_name']}",
         f"Affected: {ctx['affected']}\nCreated: {ctx['created']}\n"

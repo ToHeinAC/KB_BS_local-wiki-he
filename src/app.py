@@ -17,8 +17,8 @@ import dedup
 import file_processor
 import gpu_widget
 import md_convert
+import metadata_extract
 import ollama_client
-import template_loader
 import wiki_engine
 import agent as research_agent
 import chat_agent
@@ -346,16 +346,16 @@ def _show_md_dialog(title: str, content: str) -> None:
 
 
 @st.dialog("Confirm ingest")
-def _confirm_ingest_dialog(db_name: str, file_name: str) -> None:
-    st.warning(f"Ingest **{file_name}** into database **{db_name}**?")
-    st.caption("The document will be written to the currently selected database. "
+def _confirm_ingest_dialog(db_name: str, what: str) -> None:
+    st.warning(f"Ingest **{what}** into database **{db_name}**?")
+    st.caption("The document(s) will be written to the currently selected database. "
                "Make sure this is the right one.")
     c1, c2 = st.columns(2)
     if c1.button("Confirm", type="primary", key="confirm_ingest_btn"):
-        st.session_state["ingest_confirmed"] = True
+        st.session_state["batch_confirmed"] = True
         st.rerun()
     if c2.button("Cancel", key="cancel_ingest_btn"):
-        st.session_state.pop("pending_ingest_meta", None)
+        st.session_state.pop("pending_batch", None)
         st.rerun()
 
 
@@ -645,7 +645,8 @@ if _db_choice != st.session_state["active_db"]:
     for _k in ("messages", "chat_followup", "research_history",
                "last_research_q", "last_research_answer", "last_report",
                "research_sources", "explorer_selected_page", "last_contradictions",
-               "pending_ingest_meta", "ingest_confirmed"):
+               "pending_batch", "batch_confirmed", "batch_prepared", "batch_key",
+               "convert_editor"):
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -686,102 +687,152 @@ if page == "Upload":
         st.error("You are not a maintainer of this database. Ask an admin for maintainer rights.")
         st.stop()
     uploaded = st.file_uploader(
-        "Choose file",
+        "Choose files",
         type=["md", "pdf", "docx", "png", "jpg", "jpeg", "tiff", "tif", "bmp"],
+        accept_multiple_files=True,
         label_visibility="collapsed",
     )
     if uploaded:
-        raw = uploaded.read()
-        if dedup.is_duplicate(raw):
-            st.warning(f"**{uploaded.name}** has already been ingested (duplicate detected).")
-        else:
-            st.info(f"New file: **{uploaded.name}** ({len(raw):,} bytes)")
-            convertible = md_convert.is_convertible(uploaded.name)
-            converted_md = None
-            if convertible:
-                key = dedup.sha256(raw)
-                if st.session_state.get("convert_key") != key:
-                    if not ollama_client.is_available():
-                        st.error(
-                            "Ollama is not reachable. Start it and run "
-                            "`ollama pull deepseek-ocr:3b` to convert non-Markdown files."
-                        )
-                        st.stop()
-                    prog = st.progress(0.0, text="Converting to Markdown…")
+        # --- Phase 1: prepare each file (dedup, convert, extract, detect date) ---
+        # Cached under the exact set of uploaded SHAs so Streamlit reruns (editing
+        # the review table, opening the confirm dialog) never re-run OCR.
+        raws = {f.name: f.getvalue() for f in uploaded}
+        batch_key = "|".join(sorted(dedup.sha256(b) for b in raws.values()))
+        if st.session_state.get("batch_key") != batch_key:
+            st.session_state["batch_key"] = batch_key
+            st.session_state.pop("batch_prepared", None)
+            st.session_state.pop("convert_editor", None)
 
-                    def _cb(done: int, total: int, label: str) -> None:
-                        prog.progress(min(done / total, 1.0) if total else 1.0, text=label)
-
-                    try:
-                        md_text = md_convert.convert_to_markdown(raw, uploaded.name, _cb)
-                    except (RuntimeError, ValueError) as e:
-                        st.error(f"Conversion failed: {e}")
-                        st.stop()
-                    st.session_state["convert_key"] = key
-                    st.session_state["convert_md"] = md_text
-                st.markdown("**Converted Markdown** — review and edit before ingest.")
-                converted_md = st.text_area(
-                    "Converted Markdown",
-                    value=st.session_state.get("convert_md", ""),
-                    height=300,
-                    label_visibility="collapsed",
-                    key="convert_editor",
-                )
-            st.markdown("**Optional metadata** — fill in to make the ingest more reliable.")
-            fields = template_loader.load_insert_template()
-            with st.form("ingest_form"):
-                values = {f: st.text_input(f.capitalize()) for f in fields}
-                submitted = st.form_submit_button("Ingest into wiki", type="primary")
-            if submitted:
-                st.session_state["pending_ingest_meta"] = {
-                    k: v.strip() for k, v in values.items() if v and v.strip()
-                }
-                _confirm_ingest_dialog(st.session_state["active_db"], uploaded.name)
-
-            if st.session_state.pop("ingest_confirmed", False):
-                user_meta = st.session_state.pop("pending_ingest_meta", {})
+        prepared = st.session_state.get("batch_prepared")
+        if prepared is None:
+            dupes = [n for n, b in raws.items() if dedup.is_duplicate(b)]
+            todo = [n for n in raws if n not in dupes]
+            if dupes:
+                st.warning("Skipped (already ingested): " + ", ".join(f"**{n}**" for n in dupes))
+            if not todo:
+                st.info("Nothing new to ingest.")
+                st.stop()
+            if any(md_convert.is_convertible(n) for n in todo) and not ollama_client.is_available():
+                st.error("Ollama is not reachable. Start it to convert non-Markdown files.")
+                st.stop()
+            prog = st.progress(0.0, text="Preparing files…")
+            prepared = []
+            for i, name in enumerate(todo):
+                b = raws[name]
+                convertible = md_convert.is_convertible(name)
                 if convertible:
-                    md_name = Path(uploaded.name).stem + ".md"
-                    with st.spinner("Saving file…"):
-                        saved = dedup.register_file(raw, md_name, content=converted_md.encode())
-                    text = converted_md
+                    def _cb(done, total, label, _n=name, _i=i, _t=len(todo)):
+                        frac = (_i + (done / total if total else 1.0)) / _t
+                        prog.progress(min(frac, 1.0), text=f"{_n}: {label}")
+                    try:
+                        text = md_convert.convert_to_markdown(b, name, _cb)
+                    except (RuntimeError, ValueError) as e:
+                        st.warning(f"Skipped **{name}** — conversion failed: {e}")
+                        continue
+                    save_name = Path(name).stem + ".md"
+                    content_bytes = text.encode()
                 else:
-                    with st.spinner("Saving file…"):
-                        saved = dedup.register_file(raw, uploaded.name)
-                    with st.spinner("Extracting text…"):
-                        text = file_processor.extract_text(saved)
-                source_name = saved.name
-                chunks = file_processor.chunk_text(text)
-                n = len(chunks)
-                try:
-                    if n > 1:
-                        st.info(f"Dokument aufgeteilt in {n} Teile — jeder Teil wird separat verarbeitet.")
-                        progress = st.progress(0)
-                    with st.spinner("Indexing document (chunker, lexical index, sidecars)…"):
-                        ctx = wiki_engine.ingest_begin(text, source_name, user_meta or None)
-                    for i, chunk in enumerate(chunks):
-                        label = "Running LLM ingest (this may take a minute)…" if n == 1 else f"Teil {i + 1}/{n} wird verarbeitet…"
-                        with st.spinner(label):
-                            wiki_engine.ingest_piece(ctx, chunk, i, n)
-                        if n > 1:
-                            progress.progress((i + 1) / n)
-                    with st.spinner("Finalising index…"):
-                        result = wiki_engine.ingest_end(ctx)
-                    st.success("Ingest complete.")
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Created", len(result["created"]))
-                    col2.metric("Updated", len(result["updated"]))
-                    col3.metric("Contradictions", len(result["contradictions"]))
-                    if result["created"]:
-                        st.markdown("**New pages:** " + ", ".join(f"`{f}`" for f in result["created"]))
-                    if result.get("affected"):
-                        st.caption("Pre-loaded for merge: " + ", ".join(f"`{f}`" for f in result["affected"]))
-                    if result["contradictions"]:
-                        st.warning("Contradictions found:\n" + "\n".join(f"- {c}" for c in result["contradictions"]))
-                        st.session_state["last_contradictions"] = result["contradictions"]
-                        st.session_state["last_contradiction_pages"] = list({*result["created"], *result["updated"], *result.get("affected", [])})
-                except RuntimeError as e:
-                    st.error(str(e))
+                    prog.progress((i + 1) / len(todo), text=f"{name}: reading…")
+                    text = b.decode(errors="replace")
+                    save_name = name
+                    content_bytes = None  # write the original bytes as-is
+                prepared.append({
+                    "save_name": save_name,
+                    "raw": b,
+                    "text": text,
+                    "content_bytes": content_bytes,
+                    "convertible": convertible,
+                    "detected_date": metadata_extract.extract_effective_date(text) or "",
+                })
+            prog.empty()
+            if not prepared:
+                st.stop()
+            st.session_state["batch_prepared"] = prepared
+
+        # --- Phase 2: review (effective date is the only per-file editable field) ---
+        st.info(f"{len(prepared)} file(s) ready to ingest.")
+        single_md_edit = len(prepared) == 1 and prepared[0]["convertible"]
+        if single_md_edit:
+            st.markdown("**Converted Markdown** — review and edit before ingest.")
+            if "convert_editor" not in st.session_state:
+                st.session_state["convert_editor"] = prepared[0]["text"]
+            st.text_area("Converted Markdown", height=300,
+                         label_visibility="collapsed", key="convert_editor")
+
+        st.markdown("**Effective date** — auto-detected from each document; correct any before ingest.")
+        edited = st.data_editor(
+            [{"File": f["save_name"], "effective as of": f["detected_date"]} for f in prepared],
+            key="date_editor", hide_index=True, use_container_width=True,
+            disabled=["File"],
+            column_config={
+                "File": st.column_config.TextColumn("File"),
+                "effective as of": st.column_config.TextColumn("effective as of (YYYY-MM-DD)"),
+            },
+        )
+        with st.expander("Optional shared metadata (applied to all files)"):
+            shared_part = st.text_input("part of", key="batch_part_of")
+            shared_desc = st.text_input("description", key="batch_description")
+
+        if st.button(f"Ingest {len(prepared)} file(s) into wiki", type="primary"):
+            files = prepared
+            if single_md_edit:
+                files[0]["text"] = st.session_state.get("convert_editor", files[0]["text"])
+                files[0]["content_bytes"] = files[0]["text"].encode()
+            st.session_state["pending_batch"] = {
+                "files": files,
+                "dates": {r["File"]: str(r.get("effective as of") or "").strip() for r in edited},
+                "shared": {"part of": shared_part.strip(), "description": shared_desc.strip()},
+            }
+            _confirm_ingest_dialog(st.session_state["active_db"], f"{len(files)} file(s)")
+
+        # --- Phase 3: ordered batch ingest (oldest-first so newer supersedes) ---
+        if st.session_state.pop("batch_confirmed", False):
+            pending = st.session_state.pop("pending_batch", None)
+            if pending:
+                files, dates, shared = pending["files"], pending["dates"], pending["shared"]
+                files.sort(key=lambda f: dates.get(f["save_name"]) or "")
+                agg = {"created": [], "updated": [], "contradictions": [], "failed": []}
+                finalized = False
+                prog = st.progress(0.0, text="Ingesting…")
+                for i, f in enumerate(files):
+                    is_last = i == len(files) - 1
+                    with st.spinner(f"Ingesting {f['save_name']} ({i + 1}/{len(files)})…"):
+                        try:
+                            saved = dedup.register_file(f["raw"], f["save_name"], content=f["content_bytes"])
+                            chunks = file_processor.chunk_text(f["text"])
+                            per_meta = {k: v for k, v in {
+                                "effective as of": dates.get(f["save_name"], ""),
+                                "part of": shared["part of"],
+                                "description": shared["description"],
+                            }.items() if v}
+                            ctx = wiki_engine.ingest_begin(f["text"], saved.name, per_meta or None)
+                            for j, chunk in enumerate(chunks):
+                                wiki_engine.ingest_piece(ctx, chunk, j, len(chunks))
+                            res = wiki_engine.ingest_end(ctx, finalize=is_last)
+                            finalized = finalized or is_last
+                            agg["created"] += res["created"]
+                            agg["updated"] += res["updated"]
+                            agg["contradictions"] += res["contradictions"]
+                        except Exception as e:
+                            agg["failed"].append(f"{f['save_name']}: {e}")
+                    prog.progress((i + 1) / len(files))
+                if not finalized and (agg["created"] or agg["updated"]):
+                    wiki_engine.rebuild_lex_index()  # last file failed before finalize
+                st.session_state.pop("batch_prepared", None)
+                st.session_state.pop("batch_key", None)
+                st.success("Ingest complete.")
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Created", len(dict.fromkeys(agg["created"])))
+                c2.metric("Updated", len(dict.fromkeys(agg["updated"])))
+                c3.metric("Contradictions", len(agg["contradictions"]))
+                if agg["created"]:
+                    st.markdown("**New pages:** " + ", ".join(f"`{f}`" for f in dict.fromkeys(agg["created"])))
+                if agg["failed"]:
+                    st.error("Failed:\n" + "\n".join(f"- {x}" for x in agg["failed"]))
+                if agg["contradictions"]:
+                    st.warning("Contradictions found:\n" + "\n".join(f"- {c}" for c in agg["contradictions"]))
+                    st.session_state["last_contradictions"] = agg["contradictions"]
+                    st.session_state["last_contradiction_pages"] = list({*agg["created"], *agg["updated"]})
 
     if st.session_state.get("last_contradictions"):
         st.markdown("---")

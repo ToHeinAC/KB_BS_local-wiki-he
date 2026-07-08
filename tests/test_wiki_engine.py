@@ -185,6 +185,54 @@ def test_ingest_works_without_user_metadata(wiki_dir, monkeypatch):
     assert "User-supplied metadata" not in sent_prompt2
 
 
+# --- ingest_end finalize (batch deferral) ---
+
+def test_ingest_end_finalize_false_skips_lex_build(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    build_spy = MagicMock()
+    monkeypatch.setattr(wiki_engine.lex_index, "build", build_spy)
+    ctx = wiki_engine.ingest_begin("some text", "mysrc.txt")
+    wiki_engine.ingest_piece(ctx, "some text")
+    wiki_engine.ingest_end(ctx, finalize=False)
+    build_spy.assert_not_called()
+    # index.md is still refreshed so later batch files route against these pages
+    assert (wiki_dir / "index.md").read_text().strip()
+    assert (wiki_dir / "summary-mysrc.md").exists()
+
+
+def test_ingest_end_finalize_true_builds_once(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    build_spy = MagicMock()
+    monkeypatch.setattr(wiki_engine.lex_index, "build", build_spy)
+    ctx = wiki_engine.ingest_begin("some text", "mysrc.txt")
+    wiki_engine.ingest_piece(ctx, "some text")
+    wiki_engine.ingest_end(ctx, finalize=True)
+    build_spy.assert_called_once()
+
+
+# --- contradiction resolution guards on effective-as-of (the batch data-quality stake) ---
+
+def test_contradiction_resolves_with_newer_effective_date():
+    existing = "Der Grenzwert liegt bei 20 mSv pro Jahr."
+    new = "Der Grenzwert liegt bei 100 mSv pro Jahr."
+    out = wiki_engine._contradiction_check(
+        existing, new,
+        {"effective as of": "2018-01-01"}, {"effective as of": "2024-01-01"},
+    )
+    assert any("now" in c for c in out)
+
+
+def test_contradiction_unresolved_without_effective_date():
+    existing = "Der Grenzwert liegt bei 20 mSv pro Jahr."
+    new = "Der Grenzwert liegt bei 100 mSv pro Jahr."
+    out = wiki_engine._contradiction_check(existing, new, {}, {})
+    assert any("disagree" in c for c in out)
+
+
 # --- query ---
 
 def test_query_returns_string(wiki_dir, monkeypatch):

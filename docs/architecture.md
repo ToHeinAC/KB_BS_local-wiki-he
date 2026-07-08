@@ -97,12 +97,16 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 ### Ingest
 
 ```
-upload → dedup.is_duplicate()                  # keyed on original upload bytes
-       → [non-.md] md_convert.convert_to_markdown()  # PDF/DOCX/image → Markdown, edited in UI preview
+# Upload is a MULTI-FILE batch (accept_multiple_files). Phase 1 prepares each file
+# (dedup/convert/extract/date-detect, SHA-keyed cache); Phase 2 is one review table;
+# Phase 3 ingests the files ORDERED oldest-first, looping the per-source flow below.
+upload[N] → dedup.is_duplicate()               # keyed on original upload bytes; dupes skipped
+       → [non-.md] md_convert.convert_to_markdown()  # PDF/DOCX/image → Markdown (no per-file review in batch)
        → dedup.register_file(raw, name, content=md)  # stores converted .md in data/raw/
        → [.md] file_processor.extract_text()  # returns FULL text (no truncation)
+       → metadata_extract.extract_effective_date(text)  # regex, per file → prefilled review table (editable)
+       → [Upload UI] st.data_editor review table (editable effective-date) + optional shared part-of/description
        → file_processor.chunk_text(text)      # [text] if ≤MAX_INGEST_CHARS, else N chunks
-       → [Upload UI] optional metadata form driven by template_loader.load_insert_template()
        → wiki_engine.ingest_begin(full_text, source_name, user_meta)   # ONCE per source
            → schema_loader.get_system_prompt() + lang.ingest_directive(full_text)  # mode="full"; source-language directive appended to system prompt (truncation-safe)
            → chunker.split(full_text) → chunker.write_chunks()         # whole-document
@@ -120,10 +124,12 @@ upload → dedup.is_duplicate()                  # keyed on original upload byte
              → _resolve_target: source-summary→summary_slug; concept/entity→_route_page(registry) dedup
              → if target exists: _merge_pages (deterministic union + contradiction check); else write
              → update ctx[registry]; accumulate created/updated/contradictions
-       → wiki_engine.ingest_end(ctx)                                    # ONCE per source
-             → lex_index.build()                                        # single rebuild
-             → _rebuild_index() + _append_log()
+       → wiki_engine.ingest_end(ctx, finalize=is_last_file)             # ONCE per source
+             → _rebuild_index() + _append_log()                         # always (cheap; keeps batch coherent)
+             → [finalize only] lex_index.build() + update_description()  # corpus-wide; deferred to the last file
              → return {created, updated, contradictions, affected, chunks}
+# Batch: finalize=False for every file but the last, so the one costly lex_index.build()
+# runs once at the end. rebuild_lex_index() is the fallback if the last file fails first.
 ```
 
 LLM output format for ingest:
