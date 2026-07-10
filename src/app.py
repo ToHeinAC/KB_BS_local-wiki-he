@@ -150,6 +150,13 @@ st.markdown(
         color: #ffffff !important;
         border-color: {_t['primary']} !important;
     }}
+    /* The label lives in a nested <p>, which `.stApp *` would paint dark. */
+    .stButton > button[kind="primary"] *,
+    .stButton > button[kind="primary"]:hover *,
+    [data-testid="stFormSubmitButton"] button[kind="primary"] *,
+    [data-testid="stFormSubmitButton"] button[kind="primary"]:hover * {{
+        color: #ffffff !important;
+    }}
     /* Form submit buttons (not caught by .stButton) */
     [data-testid="stFormSubmitButton"] button {{
         border-radius: 6px !important;
