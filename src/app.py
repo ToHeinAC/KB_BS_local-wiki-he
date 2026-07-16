@@ -400,10 +400,12 @@ def _show_node_details(node_id: str, graph: dict) -> None:
 
 
 def _raw_source_button(filename: str, key: str) -> None:
-    base = _CHUNK_SUFFIX_RE.sub("", filename)
+    db, ref = db_context.split_ref(filename)  # cross-DB chat cites as "DB::file.md"
+    base = _CHUNK_SUFFIX_RE.sub("", ref)
     base = _CITE_SECTION_SUFFIX_RE.sub("", base).strip()
     if base.lower().endswith((".md", ".txt")):
-        data = wiki_engine.read_raw_source(base)
+        with db_context.using_db(db):
+            data = wiki_engine.read_raw_source(base)
         if data is None:
             st.markdown(f"- `{filename}` *(not found)*")
             return
@@ -462,7 +464,9 @@ def _render_chat_sources_panel() -> None:
         st.markdown("**Wiki pages**")
         for s in sources:
             if st.button(s, key=f"cpanel_wiki_{s}", use_container_width=True):
-                parsed = wiki_engine.read_page_parsed(s)
+                _db, _name = db_context.split_ref(s)
+                with db_context.using_db(_db):
+                    parsed = wiki_engine.read_page_parsed(_name)
                 _show_md_dialog(s, parsed["content"])
     if raw_sources:
         st.markdown("**Documents**")
@@ -643,7 +647,7 @@ if _db_choice != st.session_state["active_db"]:
                "last_research_q", "last_research_answer", "last_report",
                "research_sources", "explorer_selected_page", "last_contradictions",
                "pending_batch", "batch_confirmed", "batch_prepared", "batch_key",
-               "convert_editor"):
+               "convert_editor", "chat_scope"):
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -669,7 +673,7 @@ _rst_col, _logout_col = st.sidebar.columns(2)
 if _rst_col.button("Reset", key="reset_btn", help="Unload model from VRAM and reset session. Server stays running."):
     _safe_reset()
 if _logout_col.button("Logout", key="logout_btn"):
-    for _k in ("user", "active_db", "messages", "chat_followup",
+    for _k in ("user", "active_db", "messages", "chat_followup", "chat_scope",
                "research_history", "last_research_q", "last_research_answer",
                "last_report", "research_sources"):
         st.session_state.pop(_k, None)
@@ -1004,6 +1008,16 @@ elif page == "Wiki Chat":
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
 
+    # Bind the search scope before anything renders: the sources panel resolves
+    # DB-qualified refs through it. Written before the widget is instantiated, so
+    # an empty selection self-heals to the active DB on the next run.
+    if "chat_scope" not in st.session_state:
+        st.session_state["chat_scope"] = [st.session_state["active_db"]]
+    st.session_state["chat_scope"] = [
+        d for d in st.session_state["chat_scope"] if d in _allowed_dbs
+    ] or [st.session_state["active_db"]]
+    db_context.set_search_scope(st.session_state["chat_scope"])
+
     main_col, nav_col = st.columns([3, 1])
 
     with nav_col:
@@ -1020,6 +1034,18 @@ elif page == "Wiki Chat":
             "Mode", ["Fast", "Deep"], horizontal=True, key="chat_mode",
             help="Fast: one-shot retrieval over wiki pages. Deep: agentic loop over data/raw/ originals (~2x slower than Research, but more grounded).",
         )
+
+        st.multiselect(
+            "Search in", options=_allowed_dbs, key="chat_scope",
+            help="Databases this chat searches. Answers cite cross-database results "
+                 "as `Database::file.md`. Uploads and 'Save answer to wiki' still go "
+                 "to the active database in the sidebar.",
+        )
+        if len(st.session_state["chat_scope"]) > 1:
+            st.caption(
+                f"🔎 Searching {len(st.session_state['chat_scope'])} databases: "
+                + ", ".join(st.session_state["chat_scope"])
+            )
 
         st.markdown("---")
 
@@ -1067,10 +1093,16 @@ elif page == "Wiki Chat":
 
         last = st.session_state["messages"][-1] if st.session_state["messages"] else None
         if last and last["role"] == "assistant" and last.get("question") and not last["content"].startswith("Error:"):
-            if st.button("Save answer to wiki", key="save_answer"):
+            _active = st.session_state["active_db"]
+            if st.button("Save answer to wiki", key="save_answer",
+                         help=f"Files the answer into the active database ({_active})."):
+                # `related:` links are intra-DB, so a cross-DB answer only carries
+                # over the pages that actually live in the DB being written to.
+                _refs = [db_context.split_ref(s) for s in last.get("sources", [])]
+                _related = [_name for _db, _name in _refs if _db == _active]
                 try:
-                    rel = wiki_engine.file_answer(last["question"], last["content"], last.get("sources", []))
-                    st.success(f"Filed as `{rel}`")
+                    rel = wiki_engine.file_answer(last["question"], last["content"], _related)
+                    st.success(f"Filed as `{rel}` in **{_active}**")
                 except RuntimeError as e:
                     st.error(str(e))
 

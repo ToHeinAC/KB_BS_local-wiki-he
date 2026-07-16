@@ -51,27 +51,36 @@ RAW_READ_NUDGE_AFTER = int(os.getenv("CHAT_RAW_READ_NUDGE_AFTER", "2"))
 WIKI_LINK_EXPANSION = os.getenv("WIKI_LINK_EXPANSION", "1") != "0"
 WIKI_LINK_SEEDS = int(os.getenv("WIKI_LINK_SEEDS", "3"))  # top hits whose links we follow
 WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended per query
+# Floor on per-DB hits when a multi-DB search splits its budget — below this a
+# wide scope starves every DB into uselessness.
+MIN_HITS_PER_DB = 3
 
 def _with_active_db(fn):
-    """Wrap `fn` so a ThreadPoolExecutor worker re-applies the caller's DB.
+    """Wrap `fn` so a ThreadPoolExecutor worker re-applies the caller's DB context.
 
     Worker threads don't inherit the main thread's ContextVar context, so the
-    active database (`db_context._active`) would silently reset to the default
-    inside the pool. We capture it here (in the calling thread) and re-set it at
-    the start of each worker call. `copy_context().run` can't be used for this:
-    one Context object can't be entered by multiple workers concurrently.
+    active database (`db_context._active`) and the multi-DB search scope
+    (`db_context._scope`) would silently reset to their defaults inside the pool
+    — narrowing a cross-DB search back to one DB. We capture both here (in the
+    calling thread) and re-set them at the start of each worker call.
+    `copy_context().run` can't be used for this: one Context object can't be
+    entered by multiple workers concurrently.
     """
     db = db_context.get_active_db()
+    scope = db_context.search_scope()
 
     def _wrapped(*args, **kwargs):
         db_context.set_active_db(db)
+        db_context.set_search_scope(scope)
         return fn(*args, **kwargs)
 
     return _wrapped
 
 
 _URL_RE = re.compile(r"https?://[^\s\)\]]+")
-_WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([\w\-./]+\.md)\s*\]")
+# Permissive body so a DB-qualified page ("Investing::foo.md") still parses —
+# DB names may contain spaces, so this can't be a \w-class.
+_WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([^\]\n]+?\.md)\s*\]")
 # Accept an optional trailing " §..." or " #..." section marker so the same file
 # can be cited as multiple distinct sources, e.g. [Source: StrlSchG.md §62].
 _RAW_CITE_RE = re.compile(
@@ -150,7 +159,7 @@ def _fetch_webpage_impl(urls) -> str:
 def _format_wiki_hit(idx: int, hit: dict) -> str:
     return (
         f"[Wiki hit {idx}]\n"
-        f"file: {hit.get('filename', '')}\n"
+        f"file: {db_context.qualify(hit.get('filename', ''))}\n"
         f"title: {hit.get('title', '')}\n"
         f"excerpt: {hit.get('excerpt', '')}\n---"
     )
@@ -162,28 +171,50 @@ def _format_wiki_link(idx: int, hit: dict) -> str:
            else f"related via {via}")
     return (
         f"[Wiki linked {idx} — {why}]\n"
-        f"file: {hit.get('filename', '')}\n"
+        f"file: {db_context.qualify(hit.get('filename', ''))}\n"
         f"title: {hit.get('title', '')}\n"
         f"excerpt: {hit.get('excerpt', '')}\n---"
     )
 
 
-def _wiki_search_one(query: str, max_results: int) -> str:
+def _wiki_search_db(query: str, max_results: int) -> list[str]:
+    """Formatted wiki hits for the *active* DB; [] when nothing matched.
+
+    Link expansion stays inside the DB — `related:` edges never cross databases.
+    """
     hits = wiki_engine.search_wiki(query) or []
-    parts = [f"## Wiki query: {query}"]
     if not hits:
-        parts.append("(no results)")
-        return "\n".join(parts)
+        return []
     top = hits[:max_results]
-    for i, h in enumerate(top, 1):
-        parts.append(_format_wiki_hit(i, h))
+    parts = [_format_wiki_hit(i, h) for i, h in enumerate(top, 1)]
     if WIKI_LINK_EXPANSION:
         seeds = [h["filename"] for h in top[:WIKI_LINK_SEEDS]]
         shown = {h["filename"] for h in top}
         linked = [l for l in wiki_engine.linked_pages(seeds, limit=WIKI_LINK_MAX)
                   if l["filename"] not in shown]
-        for i, l in enumerate(linked, 1):
-            parts.append(_format_wiki_link(i, l))
+        parts.extend(_format_wiki_link(i, l) for i, l in enumerate(linked, 1))
+    return parts
+
+
+def _per_db_budget(max_results: int) -> int:
+    """Split a hit budget across the searched DBs so N DBs cost ~one DB's context."""
+    return max(max_results // len(db_context.search_scope()), MIN_HITS_PER_DB)
+
+
+def _wiki_search_one(query: str, max_results: int) -> str:
+    scope = db_context.search_scope()
+    per_db = _per_db_budget(max_results)
+    parts = [f"## Wiki query: {query}"]
+    found = False
+    for db in scope:
+        with db_context.using_db(db):
+            blocks = _wiki_search_db(query, per_db)
+        if len(scope) > 1:
+            parts.append(f"### Database: {db}" + ("" if blocks else "\n(no results)"))
+        parts.extend(blocks)
+        found = found or bool(blocks)
+    if not found and len(scope) == 1:
+        parts.append("(no results)")
     return "\n".join(parts)
 
 
@@ -200,7 +231,9 @@ def _wiki_search_impl(query=None, queries=None, max_results: int = 8) -> str:
 
 
 def _wiki_read_one(filename: str) -> str:
-    body = wiki_engine.read_page(filename)
+    db, name = db_context.split_ref(filename)
+    with db_context.using_db(db):
+        body = wiki_engine.read_page(name)
     if len(body) > CONTENT_TRUNCATE * 2:
         body = body[: CONTENT_TRUNCATE * 2] + "\n...[truncated]"
     return f"## Wiki page: {filename}\n{body}"
@@ -219,22 +252,37 @@ def _wiki_read_impl(filenames) -> str:
     return "\n\n".join(outs)
 
 
-def _raw_search_one(query: str, max_results: int) -> str:
-    parts = [f"## Raw query: {query}"]
+def _raw_search_db(query: str, max_results: int) -> list[str]:
+    """Formatted raw-chunk hits for the *active* DB; [] when nothing matched."""
     hits = lex_index.query(query, top_k=max_results, scope="raw")
-    if not hits:
-        parts.append("(no results — try a different keyword or a question phrasing)")
-        return "\n".join(parts)
+    parts = []
     for i, h in enumerate(hits, 1):
         anchor = h.get("anchor") or ""
         cite_suffix = f" {anchor}" if anchor else ""
         parts.append(
             f"[Raw hit {i}]\n"
-            f"file: {h['source']}{cite_suffix}\n"
+            f"file: {db_context.qualify(h['source'])}{cite_suffix}\n"
             f"chunk_id: {h['chunk_id']}\n"
             f"score: {h['score']}  matched: {', '.join(h['matched_terms'])}\n"
             f"excerpt: {h['preview']}\n---"
         )
+    return parts
+
+
+def _raw_search_one(query: str, max_results: int) -> str:
+    scope = db_context.search_scope()
+    per_db = _per_db_budget(max_results)
+    parts = [f"## Raw query: {query}"]
+    found = False
+    for db in scope:
+        with db_context.using_db(db):
+            blocks = _raw_search_db(query, per_db)
+        if len(scope) > 1:
+            parts.append(f"### Database: {db}" + ("" if blocks else "\n(no results)"))
+        parts.extend(blocks)
+        found = found or bool(blocks)
+    if not found and len(scope) == 1:
+        parts.append("(no results — try a different keyword or a question phrasing)")
     return "\n".join(parts)
 
 
@@ -267,6 +315,20 @@ def _split_filename(filename: str) -> tuple[str, str]:
     if m and wiki_engine.read_raw_source(m.group(1)) is not None:
         return m.group(1), m.group(2).strip()
     return f, ""
+
+
+def _split_ref(filename: str) -> tuple[str, str, str]:
+    """Split a raw-file ref into (db, base_file, section).
+
+    `filename` may carry a DB prefix, a section suffix, or both
+    ("Investing::StrlSchG.md §62"). `base_file` comes back unqualified — it names
+    a file *inside* `db` — so callers must bind `db` before touching chunk/raw
+    stores with it. Under a single-DB scope `db` is just the active DB.
+    """
+    db, rest = db_context.split_ref(filename)
+    with db_context.using_db(db):
+        base, section = _split_filename(rest)
+    return db, base, section
 
 
 def _norm_anchor(s: str) -> str:
@@ -303,7 +365,10 @@ def _resolve_section(base: str, section: str) -> dict | None:
     return None
 
 
-def _format_section(base: str, ch: dict) -> str:
+def _format_section(base: str, ch: dict, label: str | None = None) -> str:
+    """Render a section. `label` is the name echoed back to the model (DB-qualified
+    under a multi-DB scope) — `base` still addresses the chunk store."""
+    label = label or base
     anchor = ch.get("anchor", "")
     text = ch.get("text", "")
     if len(text) > RAW_READ_CAP:
@@ -313,8 +378,8 @@ def _format_section(base: str, ch: dict) -> str:
     if anchor in anchors:
         i = anchors.index(anchor)
         nxt = anchors[i + 1] if i + 1 < len(anchors) else None
-    footer = f"\n\n…[next section: read '{base} {nxt}']" if nxt else ""
-    return f"## Raw file: {base} {anchor}\n{text}{footer}"
+    footer = f"\n\n…[next section: read '{label} {nxt}']" if nxt else ""
+    return f"## Raw file: {label} {anchor}\n{text}{footer}"
 
 
 def _read_key(base: str, canon: str, offset: int) -> str:
@@ -344,9 +409,11 @@ def _read_offsets(mem, base: str) -> set[int]:
     return out
 
 
-def _next_unread_offset(mem, base: str) -> int | None:
+def _next_unread_offset(mem, base: str, key_base: str | None = None) -> int | None:
     """Smallest RAW_READ_CAP-aligned offset of `base` not yet read this run.
 
+    `base` addresses the raw store (caller binds its DB); `key_base` is the name
+    the visited-memory is keyed under (DB-qualified under a multi-DB scope).
     None if the whole file is read (or it can't be sized). Lets the duplicate-read
     stub name the exact next call instead of generic 'paginate' advice, so a weak
     model breaks the offset-0 loop in one step."""
@@ -354,7 +421,7 @@ def _next_unread_offset(mem, base: str) -> int | None:
     if data is None:
         return None
     total = len(data.decode("utf-8", errors="replace"))
-    read = _read_offsets(mem, base)
+    read = _read_offsets(mem, key_base or base)
     g = 0
     while g < total:
         if g not in read:
@@ -364,22 +431,24 @@ def _next_unread_offset(mem, base: str) -> int | None:
 
 
 def _raw_read_one(filename: str, offset: int = 0) -> str:
-    base, section = _split_filename(filename)
-    if section:
-        ch = _resolve_section(base, section)
-        if ch is not None:
-            return _format_section(base, ch)
-    data = wiki_engine.read_raw_source(base)
+    db, base, section = _split_ref(filename)
+    with db_context.using_db(db):
+        label = db_context.qualify(base, db)
+        if section:
+            ch = _resolve_section(base, section)
+            if ch is not None:
+                return _format_section(base, ch, label)
+        data = wiki_engine.read_raw_source(base)
     if data is None:
         return f"## Raw file: {filename}\n(not found)"
     body = data.decode("utf-8", errors="replace")
     total = len(body)
     start = max(0, int(offset or 0))
     if start >= total:
-        return f"## Raw file: {base} (offset {start}/{total})\n(offset past end)"
+        return f"## Raw file: {label} (offset {start}/{total})\n(offset past end)"
     end = min(total, start + RAW_READ_CAP)
     window = body[start:end]
-    header = f"## Raw file: {base} (bytes {start}-{end} of {total})"
+    header = f"## Raw file: {label} (bytes {start}-{end} of {total})"
     footer = ""
     if end < total:
         footer = f"\n\n…[truncated; pass offset={end} to continue]"
@@ -574,45 +643,52 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
     out: list[str] = []
     fresh: list[str] = []
     for f in filenames:
-        base, section = _split_filename(f)
+        db, base, section = _split_ref(f)
         canon = _norm_anchor(section) if section else ""
-        key = _read_key(base, canon, offset)
+        # Key on the qualified name: two DBs can hold same-named files, and the
+        # guard must not collapse them into one visited entry.
+        qbase = db_context.qualify(base, db)
+        key = _read_key(qbase, canon, offset)
         prior = mem.seen_read(key)
         if prior is None:
             fresh.append(f)
         elif canon:
-            unread = [a for a in _section_anchors(base)
-                      if _norm_anchor(a) not in _read_canons(mem, base)]
+            with db_context.using_db(db):
+                anchors = _section_anchors(base)
+            unread = [a for a in anchors
+                      if _norm_anchor(a) not in _read_canons(mem, qbase)]
             menu = ", ".join(unread[:6]) if unread else "none left — pick a different file"
             out.append(
-                f"## Raw file: {base} {section}\n"
+                f"## Raw file: {qbase} {section}\n"
                 f"[memory] Already read this section at step {prior}. "
-                f"Unread sections in {base}: {menu}. "
+                f"Unread sections in {qbase}: {menu}. "
                 "Read one of those, pick a different file, or call think_tool."
             )
         else:
-            nxt = _next_unread_offset(mem, base)
+            with db_context.using_db(db):
+                nxt = _next_unread_offset(mem, base, qbase)
             hint = (
-                f"Next unread window: call raw_read(['{base}'], offset={nxt})."
+                f"Next unread window: call raw_read(['{qbase}'], offset={nxt})."
                 if nxt is not None
                 else "Whole file already read — pick a different file or call think_tool."
             )
             out.append(
-                f"## Raw file: {base} (offset {int(offset or 0)})\n"
+                f"## Raw file: {qbase} (offset {int(offset or 0)})\n"
                 f"[memory] Already read at step {prior} — do not re-fetch. {hint}"
             )
     if fresh:
         out.append(_raw_read_impl(fresh, offset=offset))
         nudge_bases: list[str] = []
         for f in fresh:
-            base, section = _split_filename(f)
+            db, base, section = _split_ref(f)
             canon = _norm_anchor(section) if section else ""
-            mem.mark_read(_read_key(base, canon, offset))
+            qbase = db_context.qualify(base, db)
+            mem.mark_read(_read_key(qbase, canon, offset))
             # Section-less (byte-offset) reads are the pagination death-spiral
             # path: once enough windows of one file are read, tell the model to
             # stop paginating and answer.
-            if not canon and len(_read_offsets(mem, base)) >= RAW_READ_NUDGE_AFTER:
-                nudge_bases.append(base)
+            if not canon and len(_read_offsets(mem, qbase)) >= RAW_READ_NUDGE_AFTER:
+                nudge_bases.append(qbase)
         if nudge_bases:
             files = ", ".join(sorted(set(nudge_bases)))
             out.append(

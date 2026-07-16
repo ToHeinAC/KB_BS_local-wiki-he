@@ -69,6 +69,10 @@ _QUERY_CANDIDATE_TOPK = 15       # BM25 hits scanned to build the candidate page
 _QUERY_MAX_CANDIDATES = 10       # candidate pages handed to the LLM re-ranker
 _QUERY_CHUNKS_PER_PAGE = 2       # wiki chunks injected per selected page
 _QUERY_SYNTH_MAX_CHARS = 8000    # hard cap on total synthesis context
+# Multi-DB chat splits the synthesis cap across the searched DBs so N databases
+# cost the same context as one. The floor keeps each DB's slice usable when the
+# scope is wide (the total may exceed the cap above rather than starve a DB).
+_QUERY_MIN_DB_SYNTH_CHARS = 2500
 _QUERY_PAGE_FALLBACK_CHARS = 1500  # body slice when a page had no BM25 chunk hit
 _QUERY_LINK_SEEDS = 3            # top BM25 pages whose links are followed
 _QUERY_LINK_NEIGHBOURS = 3       # max link-expanded pages appended to the candidate set
@@ -1269,11 +1273,13 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
     return [s for s in selected if (_wiki() / s).exists()][:5]
 
 
-def query_with_sources(question: str) -> dict:
-    """Answer a question using wiki content. Returns {answer, sources, raw_sources}."""
-    system = schema_loader.get_system_prompt(mode="query")
-    index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
+def _gather_pages(question: str, system: str, budget: int) -> tuple[str, list[str], set[str]]:
+    """Collect synthesis context from the *active* DB (see `query_with_sources`).
 
+    Returns (pages_text, wiki_sources, raw_sources); the source names are
+    DB-qualified when the search scope spans several DBs.
+    """
+    index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
     selected = _select_pages(question, system, index_text)
 
     # Q-3: inject the most relevant chunks per page (with anchors), not full pages.
@@ -1285,33 +1291,60 @@ def query_with_sources(question: str) -> dict:
         pass
 
     pages_text = ""
-    used_sources = []
+    used_sources: list[str] = []
     raw_sources_set: set[str] = set()
     for fname in selected:
         path = _wiki() / fname
         if not path.exists():
             continue
-        used_sources.append(fname)
+        label = db_context.qualify(fname)
+        used_sources.append(label)
         try:
-            raw_sources_set.update(frontmatter.loads(path.read_text()).get("sources", []))
+            raw_sources_set.update(
+                db_context.qualify(s)
+                for s in frontmatter.loads(path.read_text()).get("sources", [])
+            )
         except Exception:
             pass
         hits = hits_by_page.get(fname, [])[:_QUERY_CHUNKS_PER_PAGE]
         if hits:
             for h in hits:
                 anchor = h.get("anchor") or ""
-                header = f"--- {fname}{(' ' + anchor) if anchor else ''} ---"
+                header = f"--- {label}{(' ' + anchor) if anchor else ''} ---"
                 pages_text += f"\n\n{header}\n{h.get('text', '')}"
         else:  # page not surfaced by the wiki query (title-only / fallback select)
             body = read_page_parsed(fname)["content"]
-            pages_text += f"\n\n--- {fname} ---\n{body[:_QUERY_PAGE_FALLBACK_CHARS]}"
-        if len(pages_text) >= _QUERY_SYNTH_MAX_CHARS:
-            pages_text = pages_text[:_QUERY_SYNTH_MAX_CHARS] + "\n…[truncated]"
+            pages_text += f"\n\n--- {label} ---\n{body[:_QUERY_PAGE_FALLBACK_CHARS]}"
+        if len(pages_text) >= budget:
+            pages_text = pages_text[:budget] + "\n…[truncated]"
             break
+    return pages_text, used_sources, raw_sources_set
 
-    if not pages_text:
-        pages_text = "(no relevant pages found)"
 
+def query_with_sources(question: str) -> dict:
+    """Answer a question using wiki content. Returns {answer, sources, raw_sources}.
+
+    Retrieval fans out over `db_context.search_scope()` — one page-selection pass
+    per DB — and the gathered context is synthesized in a single LLM call. With a
+    single-DB scope (the default) this is the original one-DB path verbatim.
+    """
+    system = schema_loader.get_system_prompt(mode="query")
+    scope = db_context.search_scope()
+    budget = max(_QUERY_SYNTH_MAX_CHARS // len(scope), _QUERY_MIN_DB_SYNTH_CHARS)
+
+    blocks: list[str] = []
+    used_sources: list[str] = []
+    raw_sources_set: set[str] = set()
+    for db in scope:
+        with db_context.using_db(db):
+            text, used, raws = _gather_pages(question, system, budget)
+        if not text.strip():
+            continue
+        blocks.append(f"\n\n===== Database: {db} ====={text}" if len(scope) > 1 else text)
+        used_sources.extend(used)
+        raw_sources_set.update(raws)
+
+    pages_text = "".join(blocks) or "(no relevant pages found)"
     answer_prompt = ANSWER_PROMPT.format(
         pages_text=pages_text, question=question,
         language_directive=lang.response_directive(question),

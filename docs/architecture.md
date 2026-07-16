@@ -163,6 +163,37 @@ wiki_engine.query_with_sources(question)
 
 `app.py` Chat page and Wiki Explorer both render sources in a collapsible "Sources" expander (original `data/raw/` documents + related wiki pages).
 
+### Multi-database chat (search scope)
+
+Wiki Chat can search several databases at once. Two separate concepts:
+
+| | Holds | Set by | Drives |
+|---|---|---|---|
+| **Active DB** (`_active`) | one name | sidebar selectbox | every path getter; all writes (upload, ingest, `file_answer`) |
+| **Search scope** (`_scope`) | list of names | Wiki Chat "Search in" multiselect | read-only retrieval fan-out |
+
+Scope defaults to `(active_db,)`, so every non-chat page and every single-DB caller is unaffected. Only `app.py`'s Wiki Chat block ever sets it.
+
+Fan-out binds **one DB at a time** — path state is never merged:
+
+```
+for db in db_context.search_scope():
+    with db_context.using_db(db):
+        ...   # every getter now resolves to `db`
+```
+
+Consumers: `wiki_engine.query_with_sources` (Fast — one `_gather_pages` pass per DB, then a *single* synthesis call), `tools._wiki_search_one` / `_raw_search_one` (Deep), and `chat_agent._build_raw_index`.
+
+**Cross-DB identity: `DB::file.md`.** Page names collide across databases (every DB has `index.md`), so results carry their origin. `db_context.qualify()` prefixes a name **only when the scope holds >1 DB** — single-DB citations, prompts, and run-memory keys stay byte-identical, so the common path carries no regression risk. `db_context.split_ref()` reverses it and falls back to the active DB when the prefix is absent or outside the scope, so a small model that drops or invents a prefix still reads a real file instead of erroring. Separator is `::` because `/` already means the `insights/` subpath and DB names may contain spaces (hence the permissive `_WIKI_CITE_RE`).
+
+Three things that break subtly if changed:
+
+- **Budgets are split, not multiplied.** `_QUERY_SYNTH_MAX_CHARS` (Fast) and each search tool's `max_results` (via `tools._per_db_budget`) are divided across the scope, with floors (`_QUERY_MIN_DB_SYNTH_CHARS`, `MIN_HITS_PER_DB`) so a wide scope doesn't starve every DB. N databases cost ~one database's context.
+- **Run-memory keys are DB-qualified** (`tools.raw_read`). Keying on the bare filename would make `shared.md` in DB B look like an already-read duplicate of `shared.md` in DB A, and the guard would suppress the second read.
+- **`_with_active_db` carries the scope, not just the active DB.** Worker threads don't inherit ContextVars, so a scope lost in the pool silently narrows a cross-DB search back to one DB.
+
+Link traversal stays **inside** each DB — `related:` edges never cross databases. Writes stay single-DB: "Save answer to wiki" files into the active DB and keeps only that DB's pages as `related:`.
+
 ### Link-aware retrieval (`wiki_engine.linked_pages`)
 
 How a query reaches connected material it never lexically matched. One deterministic primitive, `linked_pages(filenames, limit)`, returns 1-hop neighbours as `{filename, title, excerpt, via, kind}` and has two consumers: `_candidate_pages_for_query` (Fast chat — neighbours are appended to the BM25 candidate set, which the LLM re-ranker then filters) and `tools._wiki_search_one` (both agents — neighbours are appended to search output as `[Wiki linked N]` entries, gated by `WIKI_LINK_EXPANSION`).

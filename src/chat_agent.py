@@ -49,7 +49,9 @@ FALLBACK_NOTES_CAP = int(os.getenv("CHAT_FALLBACK_NOTES_CAP", "12000"))
 
 _RAW_TEXT_EXTS = {".md", ".txt", ".html"}
 _RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]]+\.(?:md|txt|html))\s*\]")
-_WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([\w\-./]+\.md)\s*\]")
+# Permissive body so a DB-qualified page ("Investing::foo.md") still parses —
+# DB names may contain spaces, so this can't be a \w-class.
+_WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([^\]\n]+?\.md)\s*\]")
 
 
 def _cites(text: str, extra: list[str] | None = None) -> dict:
@@ -99,7 +101,8 @@ def _build_graph(llm, directive: str = ""):
     return g.compile()
 
 
-def _build_raw_index() -> str:
+def _build_raw_index_one() -> str:
+    """One line per raw file in the *active* DB, names DB-qualified when needed."""
     raw = db_context.raw_dir()
     if not raw.exists():
         return ""
@@ -121,8 +124,26 @@ def _build_raw_index() -> str:
                         hint = s[:100]  # fallback to first prose line
         except Exception:
             pass
-        lines.append(f"- {p.name}" + (f" — {hint}" if hint else ""))
+        lines.append(f"- {db_context.qualify(p.name)}" + (f" — {hint}" if hint else ""))
     return "\n".join(lines)
+
+
+def _build_raw_index() -> str:
+    """Raw-file index across the whole search scope, grouped by DB.
+
+    Under a multi-DB scope every filename is DB-qualified, which is exactly the
+    form raw_read/raw_search expect back — so the model can copy names verbatim.
+    """
+    scope = db_context.search_scope()
+    if len(scope) == 1:
+        return _build_raw_index_one()
+    blocks = []
+    for db in scope:
+        with db_context.using_db(db):
+            text = _build_raw_index_one()
+        if text:
+            blocks.append(f"Database {db}:\n{text}")
+    return "\n\n".join(blocks)
 
 
 def _system_prompt(directive: str = "") -> str:
