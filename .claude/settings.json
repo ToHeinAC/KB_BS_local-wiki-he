@@ -3,12 +3,22 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|NotebookEdit",
+        "matcher": "Read|Grep|Glob|Write|Edit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in */data/KI/*) ;; */data/*) printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"AGENTS.md 5.5: databases under data/ are read-only to AI coding tools - data/KI is the only writable one (it is the disposable test DB). data/ is gitignored with no backup, so a wrong write is permanent data loss. Read/search this DB freely; ask the user before writing to it.\"}}' ;; esac; }",
-            "statusMessage": "Checking data/ write guard"
+            "command": "f=$(jq -r '[.tool_input.file_path, .tool_input.notebook_path, .tool_input.path] | map(select(. != null and . != \"\")) | first // empty'); case \"$f\" in data/KI|data/KI/*|*/data/KI|*/data/KI/*) ;; data/*|*/data/*) printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"AGENTS.md 5.5: databases under data/ are off-limits to AI coding tools - read AND write. data/KI is the only one you may touch (it is the disposable test DB); point exploration there instead. The rest hold the user real content and are not for tool context. If the task truly needs this DB, stop and ask the user to name it explicitly.\"}}' ;; esac",
+            "statusMessage": "Checking data/ access guard"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(jq -r '.tool_input.command // empty'); if printf '%s' \"$c\" | grep -oE 'data/[A-Za-z0-9_.-]+' | grep -qv '^data/KI$'; then printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"AGENTS.md 5.5: this command names a data/ database other than data/KI. Those are off-limits to AI coding tools for reads and writes alike. Approve only if you intended this DB to be touched.\"}}' ;fi",
+            "statusMessage": "Checking data/ access guard"
           }
         ]
       }

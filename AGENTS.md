@@ -100,17 +100,19 @@ The project uses the following technology choices:
 ### 5.4 Licencing
 All implementation must be under the Apache Licence 2.0 or more permissive (e.g. MIT).
 
-### 5.5 Databases in `data/` are read-only — except `KI`
+### 5.5 Databases in `data/` are off-limits — except `KI`
 
-**`data/KI` is the only database an AI coding tool may write to.** It is the test database, kept deliberately disposable for development work. Every other database under `data/` (`Strahlenschutz`, `Investing`, `AVE`, `AVE_RAG`, `Fusion`, `NORM`, `STA-QS`, `BGEconnect`, `Labor`, `CO2-Zertifikate_BECV`, `Abluftreinigung`, …) holds real user content and is **read-only to tools**: read it, search it, cite it, reason about it — never create, edit, move, or delete anything inside it.
+**`data/KI` is the only database an AI coding tool may touch at all — read or write.** It is the test database, kept deliberately disposable for development work. Every other database under `data/` (`Strahlenschutz`, `Investing`, `AVE`, `AVE_RAG`, `Fusion`, `NORM`, `STA-QS`, `BGEconnect`, `Labor`, `CO2-Zertifikate_BECV`, `Abluftreinigung`, …) holds real user content and is **not yours to open**: do not read, list, search, summarise, cite, or quote anything inside it, and do not create, edit, move, or delete anything inside it.
 
-This applies to any AI coding tool (Claude Code, Codex, Cursor, …) and to every mechanism: file edits, shell commands (`rm`, `mv`, `>`, `sed -i`), and scripts you write and run. If a task seems to require writing to a non-KI database, stop and ask; do not proceed on your own judgement.
+This applies to any AI coding tool (Claude Code, Codex, Cursor, …) and to every mechanism: the file tools, shell commands (`cat`, `less`, `grep`, `ls`, `rm`, `mv`, `>`, `sed -i`), and scripts you write and run. If a task seems to require reading or writing a non-KI database, stop and ask; do not proceed on your own judgement. "The user asked me a question I could answer by reading it" is not authorization — ask first.
 
-**Why this is a hard rule, not a preference:** `data/` is gitignored (except for stale tracked files under `Strahlenschutz`/`Investing` predating commit `7ab6176`). These databases exist **only on the local disk — there is no backup and no git history to restore from.** A wrong write is permanent data loss, not a revertable commit.
+**Why this is a hard rule, not a preference:**
+- **Writes:** `data/` is gitignored (except for stale tracked files under `Strahlenschutz`/`Investing` predating commit `7ab6176`). These databases exist **only on the local disk — there is no backup and no git history to restore from.** A wrong write is permanent data loss, not a revertable commit.
+- **Reads:** these are the user's real working corpora — legal texts, permits, internal material. They stay out of coding-tool context unless the user puts them there deliberately.
 
 Scope — what the rule does *not* restrict:
-- **Reading is always fine**, from every database. That is what they are there for.
-- **The application itself** (ingest, wiki writes, `delete_source`, index rebuilds via `uv run streamlit …`) writes to whatever DB the user selects at runtime. This rule constrains the *coding tool*, not the running app.
-- **User-directed, database-specific instructions win.** If the user explicitly names a non-KI database and asks for a write, that is authorization — confirm the target once, then proceed.
+- **`data/KI` is fully open** — read and write it freely. Point development, testing, and any "show me how a DB is structured" work at it.
+- **The application itself** (ingest, retrieval, wiki writes, `delete_source`, index rebuilds via `uv run streamlit …`) reads and writes whatever DB the user selects at runtime. This rule constrains the *coding tool*, not the running app. Never "fix" app code to stop it reaching `data/`.
+- **User-directed, database-specific instructions win.** If the user explicitly names a non-KI database and asks you to read or write it, that is authorization — confirm the target once, then proceed.
 
-Claude Code additionally enforces this mechanically via a `PreToolUse` hook in `.claude/settings.json`, which denies `Write`/`Edit` under `data/` outside `data/KI`. The hook is a backstop for one tool and does not cover shell writes — the rule above is what actually binds.
+Claude Code additionally enforces this mechanically via `PreToolUse` hooks in `.claude/settings.json`: file tools (`Read`/`Grep`/`Glob`/`Write`/`Edit`/`NotebookEdit`) are **denied** under `data/` outside `data/KI`, and `Bash` commands naming a non-KI `data/` path are escalated to **ask** (they cannot be auto-denied without also blocking legitimate app runs). The hooks are a backstop for one tool and are not airtight — an unscoped `grep` from the repo root can still surface `data/` content incidentally. The rule above is what actually binds.
