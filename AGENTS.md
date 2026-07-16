@@ -99,3 +99,18 @@ The project uses the following technology choices:
 
 ### 5.4 Licencing
 All implementation must be under the Apache Licence 2.0 or more permissive (e.g. MIT).
+
+### 5.5 Databases in `data/` are read-only — except `KI`
+
+**`data/KI` is the only database an AI coding tool may write to.** It is the test database, kept deliberately disposable for development work. Every other database under `data/` (`Strahlenschutz`, `Investing`, `AVE`, `AVE_RAG`, `Fusion`, `NORM`, `STA-QS`, `BGEconnect`, `Labor`, `CO2-Zertifikate_BECV`, `Abluftreinigung`, …) holds real user content and is **read-only to tools**: read it, search it, cite it, reason about it — never create, edit, move, or delete anything inside it.
+
+This applies to any AI coding tool (Claude Code, Codex, Cursor, …) and to every mechanism: file edits, shell commands (`rm`, `mv`, `>`, `sed -i`), and scripts you write and run. If a task seems to require writing to a non-KI database, stop and ask; do not proceed on your own judgement.
+
+**Why this is a hard rule, not a preference:** `data/` is gitignored (except for stale tracked files under `Strahlenschutz`/`Investing` predating commit `7ab6176`). These databases exist **only on the local disk — there is no backup and no git history to restore from.** A wrong write is permanent data loss, not a revertable commit.
+
+Scope — what the rule does *not* restrict:
+- **Reading is always fine**, from every database. That is what they are there for.
+- **The application itself** (ingest, wiki writes, `delete_source`, index rebuilds via `uv run streamlit …`) writes to whatever DB the user selects at runtime. This rule constrains the *coding tool*, not the running app.
+- **User-directed, database-specific instructions win.** If the user explicitly names a non-KI database and asks for a write, that is authorization — confirm the target once, then proceed.
+
+Claude Code additionally enforces this mechanically via a `PreToolUse` hook in `.claude/settings.json`, which denies `Write`/`Edit` under `data/` outside `data/KI`. The hook is a backstop for one tool and does not cover shell writes — the rule above is what actually binds.

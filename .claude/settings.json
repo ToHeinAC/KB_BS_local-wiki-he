@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // empty' | { read -r f; case \"$f\" in */data/KI/*) ;; */data/*) printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"AGENTS.md 5.5: databases under data/ are read-only to AI coding tools - data/KI is the only writable one (it is the disposable test DB). data/ is gitignored with no backup, so a wrong write is permanent data loss. Read/search this DB freely; ask the user before writing to it.\"}}' ;; esac; }",
+            "statusMessage": "Checking data/ write guard"
+          }
+        ]
+      }
+    ]
+  }
+}
