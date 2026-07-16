@@ -94,10 +94,11 @@ THINK_TOOL_DESCRIPTION = (
 WIKI_SEARCH_DESCRIPTION = (
     "Full-text search over the local wiki (data/wiki/). Pass `query` (single string) OR "
     "`queries` (list of 2-4 sub-queries) to search in parallel. Returns filename, title, "
-    "and excerpt for each hit. May also append `[Wiki linked N]` entries: pages "
-    "related (via frontmatter) to the top hits — wiki_read them if relevant. "
-    "Cite hits in the final report as [Wiki: filename.md]. "
-    "This MUST be the first non-think tool call in every research run."
+    "and excerpt for each hit. May also append `[Wiki linked N]` entries: pages connected "
+    "to the top hits — either linked via frontmatter (in either direction) or distilled "
+    "from the same original document. These are the wiki's own cross-references; "
+    "wiki_read them when the question spans more than one topic. "
+    "Cite hits as [Wiki: filename.md]."
 )
 
 WIKI_READ_DESCRIPTION = (
@@ -307,21 +308,28 @@ Chunks:
 
 # --- Deep chat agent (Chat page "Deep" mode, chat_agent.py) ---------------
 
-CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions strictly from the original source documents in data/raw/. You never invent facts and never use the web.
+CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions from the original source documents in data/raw/, using the local wiki to navigate them. You never invent facts and never use the web.
 
 {raw_block}Tools available:
 - raw_search(query OR queries): full-text search over data/raw/. Pass 1-3 sub-queries in parallel. Cite hits as [Source: filename].
 - raw_read(filenames, offset=0): read up to 16000 chars from one or more original files. For long files, paginate: the result footer tells you the next offset.
+- wiki_search(query OR queries): full-text search over the local wiki — short summarized pages ABOUT the originals. Use it to find WHICH originals matter and how topics connect. Each hit's `sources:` names the originals behind it. Cite as [Wiki: filename.md].
+- wiki_read(filenames): read a full wiki page. Its `[Wiki linked N]` cross-references point to connected pages — follow them when the question spans more than one topic.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
-- submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words or fewer than {min_sources} unique [Source: ...] citations.
+- submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words, or fewer than {min_sources} unique sources, or if no [Source: ...] document is cited.
+
+Wiki vs raw (critical):
+- The wiki is a MAP, the originals are the TERRITORY. Use the wiki to orient and to discover connections; take every fact, number, and exact wording from data/raw/.
+- Never answer from wiki pages alone. Every answer MUST cite at least one [Source: ...] original — a wiki-only answer is rejected.
+- When a wiki page looks relevant, raw_search or raw_read the originals listed in its `sources:` before citing anything from it.
 
 {language_directive}
 
 Search strategy (critical):
 - Use SINGLE keywords or short 2-word phrases. NEVER whole sentences.
 - Search is **prefix-based**: query tokens match the first 6 chars of words in the file. So for German compound or inflected nouns use the STEM (e.g. `Rückstand`, not `Rückstände`; `Freigabe`, not `Freigaben`). The English stem still works for English docs.
-- If a search returns "(no results)", do NOT just rephrase with synonyms. Either (a) try a single broader stem, or (b) `raw_read` the most likely file with `offset=` to scan deeper. Repeated negative searches waste iterations.
+- If a search returns "(no results)", do NOT just rephrase with synonyms. Either (a) try a single broader stem, (b) `wiki_search` the topic and read the `sources:` of the hits to learn which originals to open, or (c) `raw_read` the most likely file with `offset=` to scan deeper. Repeated negative searches waste iterations.
 
 Reading long documents (critical):
 - To read a specific part of a long file, call `raw_read` with a section taken VERBATIM from a raw_search hit (e.g. `StrlSchG.md § 62`, `guide.md ## Overview`). That returns just that section, and its footer names the next section to read. Prefer this over byte offsets — read §61, then §62, then §63 as distinct reads.
@@ -329,6 +337,7 @@ Reading long documents (critical):
 
 Citations:
 - Cite as `[Source: filename]` or, for distinct sections of the same long file, `[Source: filename §X]` / `[Source: filename #section]`. Section-suffixed citations count as DISTINCT sources for the {min_sources}-source gate, so a single long document can satisfy it via two sections — do NOT pad with unrelated files.
+- Cite a wiki page you actually used as `[Wiki: page.md]`. It counts toward the {min_sources}-source gate, but at least one `[Source: ...]` original is always required.
 
 Required workflow:
 1. PLAN: think_tool once at the start. Identify 1-3 sub-questions and an initial raw_search plan.
@@ -336,8 +345,8 @@ Required workflow:
 3. TRIAGE: after each tool result, call think_tool with exactly these three sections:
      Have: <facts already grounded, with [Source: ...] tags>
      Gaps vs original question: <bullet list, each gap referencing the original question verbatim>
-     Next: <which tool to call next and why; one of raw_read / raw_search / submit_chat_answer>
-4. AUTONOMOUS EXPANSION: based on the gaps, raw_read with offset OR raw_search with a different stem. Reflect every 2-3 tool calls.
+     Next: <which tool to call next and why; one of raw_read / raw_search / wiki_search / wiki_read / submit_chat_answer>
+4. AUTONOMOUS EXPANSION: based on the gaps, raw_read with offset OR raw_search with a different stem. When a gap is about which document covers a topic, or how two topics connect, use wiki_search / wiki_read to find the connection, then go back to the originals for the facts. Reflect every 2-3 tool calls.
 4.5 EVALUATE: if the question turns on whether values meet a threshold, limit, or compound rule that the sources state explicitly, you MUST call evaluate_condition exactly once before submit_chat_answer. Extract the literal `facts` from the source text (numbers, categories, labels — keep the units the law uses) and assemble the `condition` tree as the law states it (use `or` when the law says "oder", `and` when "und"). Quote the result block verbatim in the final answer.
 5. SUBMIT: when you have at least {min_searches} tool calls and at least {min_sources} unique sources (counting section suffixes), call submit_chat_answer with a concise markdown answer (>= {min_words} words). Inline-cite every factual claim.
 
@@ -352,7 +361,7 @@ RAW_SEARCH_DESCRIPTION = (
     "whitespace tokens and matched as a 6-character PREFIX against the file body (so 'Rückstände' "
     "matches 'Rückstand'). Use SINGLE keywords or short 2-word phrases — never full sentences. "
     "Returns up to 3 excerpts per file ranked by how many query tokens hit. Cite results as "
-    "[Source: filename] in the final answer. MUST be the first non-think tool call."
+    "[Source: filename] in the final answer."
 )
 
 RAW_READ_DESCRIPTION = (

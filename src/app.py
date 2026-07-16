@@ -482,11 +482,12 @@ def _render_research_sources_panel() -> None:
             st.markdown("---")
 
 
-def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str, auto_save: bool) -> None:
+def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str) -> None:
     st.session_state["research_sources"] = []
     st.session_state["last_research_answer"] = ""
     st.session_state["last_research_error"] = ""
     st.session_state["last_research_q"] = display_q
+    st.session_state.pop("research_saved", None)
     _interpreted = question_to_run if question_to_run.strip() != display_q.strip() else None
     st.session_state["last_research_interpreted"] = _interpreted
     st.markdown(f"**Research question:** {display_q}")
@@ -514,17 +515,6 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                         st.session_state["last_research_answer"] = wiki_engine.read_page_parsed(_rel)["content"]
                     except Exception:
                         st.session_state["last_research_answer"] = ""
-                    if auto_save:
-                        try:
-                            from pathlib import Path as _P
-                            import os as _os
-                            wiki_dir = db_context.wiki_dir()
-                            report_path = wiki_dir / "comparisons" / _P(step["report_path"].split("comparisons/")[-1])
-                            if report_path.exists():
-                                wiki_engine.ingest(report_path.read_text(), f"Research: {display_q[:60]}")
-                                st.success("Report also ingested into wiki.")
-                        except Exception as exc:
-                            st.warning(f"Auto-save to wiki failed: {exc}")
                 else:
                     st.session_state["last_research_answer"] = step.get("content", "")
                     if not step.get("content", "").strip():
@@ -1122,6 +1112,7 @@ elif page == "Wiki Chat":
             steps: list[dict] = []
             answer = ""
             raw_sources: list[str] = []
+            wiki_pages: list[str] = []
             _live = st.container()
             with _live:
                 st.markdown(f"**Question:** {prompt}")
@@ -1142,17 +1133,23 @@ elif page == "Wiki Chat":
                     elif stype == "final_answer":
                         answer = step["content"]
                         raw_sources = step.get("sources", []) or []
+                        wiki_pages = step.get("wiki_sources", []) or []
                     elif stype == "error" and not answer:
                         answer = f"Error: {step['content']}"
             st.session_state["messages"].append(
                 {"role": "assistant", "content": answer or "(no answer)", "question": prompt,
-                 "sources": [], "raw_sources": raw_sources, "steps": steps, "interpreted": interpreted}
+                 "sources": wiki_pages, "raw_sources": raw_sources, "steps": steps,
+                 "interpreted": interpreted}
             )
         st.rerun()
 
 
 elif page == "Research":
     _page_header("Research Agent")
+    st.caption(
+        "Research mode includes web search — the agent starts at the local wiki, "
+        "then searches the web and fetches pages to fill the gaps."
+    )
     tavily_key = os.getenv("TAVILY_API_KEY", "")
 
     if not tavily_key:
@@ -1171,13 +1168,11 @@ elif page == "Research":
         if st.button("🆕 New research", key="new_research"):
             for _k in ("research_history", "last_research_q", "last_research_answer",
                        "last_research_interpreted", "last_report", "research_sources",
-                       "last_research_error", "research_followup_input"):
+                       "last_research_error", "research_followup_input", "research_saved"):
                 st.session_state.pop(_k, None)
             st.rerun()
 
-        _q_col, _chk_col = st.columns([4, 2])
-        question = _q_col.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
-        auto_save = _chk_col.checkbox("Auto-save to wiki", value=True)
+        question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
 
         with st.expander("Extra wiki paste (optional — the agent browses the wiki on its own)"):
             wiki_context = st.text_area(
@@ -1187,7 +1182,7 @@ elif page == "Research":
             )
 
         if st.button("Start research", key="start_research_btn", use_container_width=True, disabled=not (tavily_key and question)):
-            _run_research_stream(question, question, wiki_context or "", auto_save)
+            _run_research_stream(question, question, wiki_context or "")
             st.rerun()
 
         _rhist = st.session_state.get("research_history", [])
@@ -1211,14 +1206,28 @@ elif page == "Research":
                 st.markdown(f"Report saved: `{_rel}`")
             _ans = st.session_state["last_research_answer"]
             st.markdown(_ans)
-            st.download_button(
+            _dl_col, _save_col = st.columns(2)
+            _dl_col.download_button(
                 "Download report",
                 data=_ans,
                 file_name=(st.session_state["last_report"].split("comparisons/")[-1]
                            if st.session_state.get("last_report") else "research-answer.md"),
                 mime="text/markdown",
                 key="dl_report",
+                use_container_width=True,
             )
+            if st.session_state.get("research_saved"):
+                _save_col.success("Saved to wiki.")
+            elif _save_col.button("Save to wiki", key="save_research_btn",
+                                  use_container_width=True,
+                                  help="Ingest this result into the wiki as new/updated pages."):
+                with st.spinner("Ingesting result into wiki…"):
+                    try:
+                        wiki_engine.ingest(_ans, f"Research: {st.session_state['last_research_q'][:60]}")
+                        st.session_state["research_saved"] = True
+                        st.rerun()
+                    except Exception as exc:
+                        st.error(f"Save to wiki failed: {exc}")
         elif st.session_state.get("last_research_error"):
             st.markdown("---")
             st.error(st.session_state["last_research_error"])
@@ -1233,7 +1242,7 @@ elif page == "Research":
                     standalone = wiki_engine.condense_followup(
                         st.session_state["last_research_q"],
                         st.session_state.get("last_research_answer", ""), fq)
-                _run_research_stream(standalone, fq, "", auto_save)
+                _run_research_stream(standalone, fq, "")
                 st.rerun()
 
 

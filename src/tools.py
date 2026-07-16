@@ -157,8 +157,11 @@ def _format_wiki_hit(idx: int, hit: dict) -> str:
 
 
 def _format_wiki_link(idx: int, hit: dict) -> str:
+    via = hit.get("via", "")
+    why = (f"shares a source with {via}" if hit.get("kind") == "shared-source"
+           else f"related via {via}")
     return (
-        f"[Wiki linked {idx} — related via {hit.get('via', '')}]\n"
+        f"[Wiki linked {idx} — {why}]\n"
         f"file: {hit.get('filename', '')}\n"
         f"title: {hit.get('title', '')}\n"
         f"excerpt: {hit.get('excerpt', '')}\n---"
@@ -402,16 +405,21 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     words = len(re.findall(r"\w+", answer or ""))
     cited = set(_RAW_CITE_RE.findall(answer or ""))
     extra = set(sources or [])
-    unique = cited | extra
+    # Wiki pages count toward the gate, but never alone: the wiki orients the
+    # agent, raw documents ground it.
+    wiki_cited = {f"wiki:{w}" for w in _WIKI_CITE_RE.findall(answer or "")}
+    raw_unique = cited | extra
+    unique = raw_unique | wiki_cited
     if words < CHAT_MIN_WORDS:
         return (
             f"REJECTED: answer has {words} words, minimum is {CHAT_MIN_WORDS}. "
             "Continue researching and expand the answer."
         )
-    if len(unique) < CHAT_MIN_SOURCES:
+    if len(unique) < CHAT_MIN_SOURCES or not raw_unique:
         return (
-            f"REJECTED: answer cites {len(unique)} unique sources, minimum is "
-            f"{CHAT_MIN_SOURCES}. Run more raw_search/raw_read and cite additional files."
+            f"REJECTED: answer cites {len(unique)} unique sources ({len(raw_unique)} from "
+            f"data/raw/), minimum is {CHAT_MIN_SOURCES} including at least one "
+            "[Source: ...] document. Run more raw_search/raw_read and cite additional files."
         )
     return f"ACCEPTED: {words} words, {len(unique)} sources cited."
 
@@ -728,9 +736,13 @@ TOOLS = [
     evaluate_condition,
 ]
 
+# Deep chat stays raw-grounded, but can navigate the wiki (and thus follow
+# `related:` links) to find which originals matter.
 CHAT_TOOLS = [
     raw_search,
     raw_read,
+    wiki_search,
+    wiki_read,
     think_tool,
     submit_chat_answer,
     evaluate_condition,

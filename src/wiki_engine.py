@@ -70,6 +70,11 @@ _QUERY_MAX_CANDIDATES = 10       # candidate pages handed to the LLM re-ranker
 _QUERY_CHUNKS_PER_PAGE = 2       # wiki chunks injected per selected page
 _QUERY_SYNTH_MAX_CHARS = 8000    # hard cap on total synthesis context
 _QUERY_PAGE_FALLBACK_CHARS = 1500  # body slice when a page had no BM25 chunk hit
+_QUERY_LINK_SEEDS = 3            # top BM25 pages whose links are followed
+_QUERY_LINK_NEIGHBOURS = 3       # max link-expanded pages appended to the candidate set
+# A raw source feeding more pages than this yields no topical signal (StrlSchG.md
+# alone backs 25 pages), so its shared-source edges are dropped as noise.
+_SHARED_SOURCE_MAX_CLIQUE = 8
 # Temporal staleness (E-1): a page is stale when `updated` + TTL < today. TTL is the
 # page's own `expires_after_days` frontmatter if set, else this default.
 _DEFAULT_EXPIRE_DAYS = int(os.getenv("STALE_AFTER_DAYS", "365"))
@@ -1189,12 +1194,15 @@ def condense_followup(prev_q: str, prev_a: str, followup: str) -> str:
 
 
 def _candidate_pages_for_query(question: str) -> list[str]:
-    """BM25 candidate wiki pages for a question (Q-1).
+    """BM25 candidate wiki pages for a question (Q-1), plus 1-hop link expansion.
 
     Unions wiki-scope hits (the hit `source` IS the page filename) with raw-scope
-    hits mapped to pages via `_source_to_pages()`, preserving score order. Empty
-    when the index has no match — the caller then falls back to index-blurb LLM
-    selection.
+    hits mapped to pages via `_source_to_pages()`, preserving score order, then
+    appends the link-graph neighbours of the top hits (`linked_pages`) so a query
+    reaches pages it never lexically matched. BM25 hits keep priority; the LLM
+    re-ranker in `_select_pages` and its 5-page cap bound what reaches synthesis.
+    Empty when the index has no match — the caller then falls back to index-blurb
+    LLM selection.
     """
     cands: list[str] = []
     seen: set[str] = set()
@@ -1217,7 +1225,14 @@ def _candidate_pages_for_query(question: str) -> list[str]:
                 _add(f)
     except Exception:
         pass
-    return cands[:_QUERY_MAX_CANDIDATES]
+    cands = cands[:_QUERY_MAX_CANDIDATES]
+    if not cands:
+        return cands
+    known = {p["filename"] for p in list_pages()}  # top-level pages the re-ranker can see
+    for n in linked_pages(cands[:_QUERY_LINK_SEEDS], limit=_QUERY_LINK_NEIGHBOURS):
+        if n["filename"] in known:
+            _add(n["filename"])
+    return cands
 
 
 def _index_text_for(filenames: list[str]) -> str:
@@ -1620,15 +1635,53 @@ def build_link_graph() -> dict[str, set[str]]:
     return graph
 
 
-def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
-    """1-hop link expansion: neighbours of `filenames` via frontmatter `related:`.
+def _backlink_map() -> dict[str, set[str]]:
+    """Reverse adjacency: page → pages listing it in their `related:` frontmatter."""
+    rev: dict[str, set[str]] = {}
+    for src, edges in build_link_graph().items():
+        for tgt in edges:
+            rev.setdefault(tgt, set()).add(src)
+    return rev
 
-    Used by link-aware retrieval — after a wiki search, pull the related pages of
-    the top hits into context so a query reaches material it didn't lexically
-    match. Returns up to `limit` page dicts `{filename, title, excerpt, via}` that
-    are NOT already in `filenames`. Neighbours linked by more seeds rank first
-    (insertion order breaks ties); `via` is the first seed that links each one.
-    Only existing wiki pages are returned (insights included, `insights/`-prefixed).
+
+def _shared_source_siblings() -> dict[str, set[str]]:
+    """page → pages sharing at least one `sources:` entry with it.
+
+    An implicit, deterministic edge type: two pages distilled from the same raw
+    document are topically adjacent even when neither cites the other. Sources
+    backing more than `_SHARED_SOURCE_MAX_CLIQUE` pages are skipped as noise.
+    """
+    by_source: dict[str, list[str]] = {}
+    for page in list_pages(include_insights=True):
+        for src in (page.get("sources") or []):
+            key = str(src).strip()
+            if key:
+                by_source.setdefault(key, []).append(page["filename"])
+    out: dict[str, set[str]] = {}
+    for pages in by_source.values():
+        if len(pages) > _SHARED_SOURCE_MAX_CLIQUE:
+            continue
+        for f in pages:
+            out.setdefault(f, set()).update(p for p in pages if p != f)
+    return out
+
+
+def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
+    """1-hop link expansion: neighbours of `filenames` in the wiki link graph.
+
+    Used by link-aware retrieval — after a wiki search, pull the neighbours of the
+    top hits into context so a query reaches material it didn't lexically match.
+    Traversal is UNDIRECTED: `related:` is LLM-written at ingest, so a page can
+    only cite pages that already existed and ~88% of real edges are one-way. Both
+    out-links (the seed's own `related:`) and in-links (pages citing the seed) are
+    followed, plus implicit shared-source edges (`_shared_source_siblings`).
+
+    Returns up to `limit` page dicts `{filename, title, excerpt, via, kind}` that
+    are NOT already in `filenames`. `kind` is `link` (explicit `related:`, either
+    direction) or `shared-source`; explicit links outrank shared-source siblings,
+    then neighbours reached from more seeds rank first (insertion order breaks
+    ties). `via` is the first seed that reached each one. Only existing wiki pages
+    are returned (insights included, `insights/`-prefixed).
     """
     seeds = [f for f in filenames if f]
     if not seeds or limit <= 0:
@@ -1636,25 +1689,42 @@ def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
     seed_set = set(seeds)
     titles = {p["filename"]: str(p.get("title", p["filename"]))
               for p in list_pages(include_insights=True)}
+    backlinks = _backlink_map()
+    siblings = _shared_source_siblings()
+
     order: list[str] = []
-    counts: dict[str, int] = {}
+    link_counts: dict[str, int] = {}
+    shared_counts: dict[str, int] = {}
     via: dict[str, str] = {}
+
+    def _note(cand: str, seed: str, counts: dict[str, int]) -> None:
+        r = str(cand).strip()
+        if not r or r in seed_set or r not in titles:
+            return
+        if r not in via:
+            via[r] = seed
+            order.append(r)
+        counts[r] = counts.get(r, 0) + 1
+
     for seed in seeds:
         for r in read_page_parsed(seed).get("related", []) or []:
-            r = str(r).strip()
-            if not r or r in seed_set or r not in titles:
-                continue
-            if r not in counts:
-                counts[r] = 0
-                via[r] = seed
-                order.append(r)
-            counts[r] += 1
-    order.sort(key=lambda r: -counts[r])  # stable: equal counts keep insertion order
+            _note(r, seed, link_counts)
+        for r in sorted(backlinks.get(seed, set())):
+            _note(r, seed, link_counts)
+        for r in sorted(siblings.get(seed, set())):
+            _note(r, seed, shared_counts)
+
+    # Tier 1: any explicit link. Tier 2: shared-source only. Stable sort, so
+    # equal-ranked neighbours keep insertion order.
+    order.sort(key=lambda r: (0 if link_counts.get(r) else 1,
+                              -link_counts.get(r, 0),
+                              -shared_counts.get(r, 0)))
     out: list[dict] = []
     for r in order[:limit]:
         body = read_page_parsed(r).get("content", "")
         excerpt = " ".join(body.split())[:240]
-        out.append({"filename": r, "title": titles[r], "excerpt": excerpt, "via": via[r]})
+        out.append({"filename": r, "title": titles[r], "excerpt": excerpt,
+                    "via": via[r], "kind": "link" if link_counts.get(r) else "shared-source"})
     return out
 
 

@@ -585,6 +585,90 @@ def test_linked_pages_includes_insight_neighbours(wiki_dir):
     assert out[0]["title"] == "Note"
 
 
+# --- linked_pages: undirected traversal + shared-source edges ---
+
+def test_linked_pages_follows_backlinks(wiki_dir):
+    """`related:` is written at ingest, so edges are ~88% one-way. Seeding the
+    TARGET of a one-way edge must still surface the page pointing at it."""
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["b.md"]\n---\nBody A')
+    (wiki_dir / "b.md").write_text("---\ntitle: B\nrelated: []\n---\nBody B")
+    out = wiki_engine.linked_pages(["b.md"])
+    assert {p["filename"] for p in out} == {"a.md"}
+    assert out[0]["via"] == "b.md"
+    assert out[0]["kind"] == "link"
+
+
+def test_linked_pages_dedups_mutual_links(wiki_dir):
+    """A mutual edge is one neighbour, not two."""
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["b.md"]\n---\nA')
+    (wiki_dir / "b.md").write_text('---\ntitle: B\nrelated: ["a.md"]\n---\nB')
+    out = wiki_engine.linked_pages(["a.md"])
+    assert [p["filename"] for p in out] == ["b.md"]
+
+
+def test_linked_pages_includes_shared_source_neighbours(wiki_dir):
+    """Pages derived from a common raw source are related even with empty `related:`."""
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: []\nsources: ["doc.md"]\n---\nA')
+    (wiki_dir / "b.md").write_text('---\ntitle: B\nrelated: []\nsources: ["doc.md"]\n---\nB')
+    (wiki_dir / "c.md").write_text('---\ntitle: C\nrelated: []\nsources: ["other.md"]\n---\nC')
+    out = wiki_engine.linked_pages(["a.md"])
+    assert {p["filename"] for p in out} == {"b.md"}
+    assert out[0]["kind"] == "shared-source"
+
+
+def test_linked_pages_ranks_explicit_links_above_shared_source(wiki_dir):
+    (wiki_dir / "a.md").write_text(
+        '---\ntitle: A\nrelated: ["linked.md"]\nsources: ["doc.md"]\n---\nA')
+    (wiki_dir / "linked.md").write_text('---\ntitle: Linked\nrelated: []\nsources: []\n---\nL')
+    (wiki_dir / "sib.md").write_text('---\ntitle: Sib\nrelated: []\nsources: ["doc.md"]\n---\nS')
+    out = wiki_engine.linked_pages(["a.md"], limit=1)
+    assert [p["filename"] for p in out] == ["linked.md"]
+
+
+def test_linked_pages_skips_oversized_shared_source_cliques(wiki_dir, monkeypatch):
+    """A source feeding many pages (e.g. StrlSchG.md -> 25) carries no topical
+    signal — those sibling edges are dropped rather than flooding the result."""
+    monkeypatch.setattr(wiki_engine, "_SHARED_SOURCE_MAX_CLIQUE", 3)
+    for n in ("a", "b", "c", "d"):
+        (wiki_dir / f"{n}.md").write_text(
+            f'---\ntitle: {n}\nrelated: []\nsources: ["big.md"]\n---\n{n}')
+    assert wiki_engine.linked_pages(["a.md"]) == []
+
+
+# --- Q-1: link-aware candidate expansion (Fast chat) ---
+
+def test_candidate_pages_expands_over_links(wiki_dir):
+    """A page with no lexical match is reachable via a link from a BM25 hit."""
+    import lex_index
+    (wiki_dir / "dose.md").write_text(
+        '---\ntitle: Dose\ntype: concept\nrelated: ["shield.md"]\nsources: []\n---\n'
+        "The annual effective limit is 20 millisievert for exposed workers."
+    )
+    (wiki_dir / "shield.md").write_text(
+        '---\ntitle: Shield\ntype: concept\nrelated: []\nsources: []\n---\n'
+        "Unrelated wording about lead aprons."
+    )
+    lex_index.build()
+    cands = wiki_engine._candidate_pages_for_query("millisievert limit workers")
+    assert cands[0] == "dose.md"          # BM25 hit keeps priority
+    assert "shield.md" in cands           # link-expanded neighbour is reachable
+
+
+def test_candidate_pages_expansion_follows_backlinks(wiki_dir):
+    import lex_index
+    (wiki_dir / "dose.md").write_text(
+        '---\ntitle: Dose\ntype: concept\nrelated: []\nsources: []\n---\n'
+        "The annual effective limit is 20 millisievert for exposed workers."
+    )
+    (wiki_dir / "shield.md").write_text(
+        '---\ntitle: Shield\ntype: concept\nrelated: ["dose.md"]\nsources: []\n---\n'
+        "Unrelated wording about lead aprons."
+    )
+    lex_index.build()
+    cands = wiki_engine._candidate_pages_for_query("millisievert limit workers")
+    assert "shield.md" in cands
+
+
 # --- ingest with existing content + retry ---
 
 def test_ingest_loads_existing_content_for_affected_pages(wiki_dir, monkeypatch):

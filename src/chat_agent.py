@@ -5,9 +5,10 @@ emitting the same step-dict shape as the research agent:
   {"type": "thought", "content": ...}
   {"type": "tool_call", "name": ..., "args": ...}
   {"type": "tool_result", "name": ..., "result": ...}
-  {"type": "final_answer", "content": ..., "sources": list[str]}
+  {"type": "final_answer", "content": ..., "sources": list[str], "wiki_sources": list[str]}
   {"type": "error", "content": ...}
 
+`sources` are cited data/raw/ originals; `wiki_sources` are cited wiki pages.
 Gates are halved vs the research agent for ~2x speed.
 """
 
@@ -48,6 +49,15 @@ FALLBACK_NOTES_CAP = int(os.getenv("CHAT_FALLBACK_NOTES_CAP", "12000"))
 
 _RAW_TEXT_EXTS = {".md", ".txt", ".html"}
 _RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]]+\.(?:md|txt|html))\s*\]")
+_WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([\w\-./]+\.md)\s*\]")
+
+
+def _cites(text: str, extra: list[str] | None = None) -> dict:
+    """Split the citations in `text` into raw originals and wiki pages."""
+    return {
+        "sources": sorted(set(_RAW_CITE_RE.findall(text)) | set(extra or [])),
+        "wiki_sources": sorted(set(_WIKI_CITE_RE.findall(text))),
+    }
 
 
 def _build_llm():
@@ -259,18 +269,16 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
     submitted = _extract_submitted_answer(all_messages)
     if submitted is not None:
         answer, sources = submitted
-        cited = sorted(set(_RAW_CITE_RE.findall(answer)) | set(sources))
         yield {"type": "final_answer",
-               "content": _with_iter_hint(answer, recursion_hit), "sources": cited}
+               "content": _with_iter_hint(answer, recursion_hit), **_cites(answer, sources)}
         return
 
     # Clean exit: the final assistant message carries non-empty answer text.
     if isinstance(final_msg, AIMessage) and not getattr(final_msg, "tool_calls", None):
         text = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
         if text.strip():
-            cited = sorted(set(_RAW_CITE_RE.findall(text)))
             yield {"type": "final_answer",
-                   "content": _with_iter_hint(text, recursion_hit), "sources": cited}
+                   "content": _with_iter_hint(text, recursion_hit), **_cites(text)}
             return
 
     _prefix = "(partial — recursion limit hit)" if recursion_hit else "(best-effort — quality gate not met)"
@@ -282,11 +290,9 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
                 if tc.get("name") == "submit_chat_answer":
                     draft = ((tc.get("args") or {}).get("answer") or "").strip()
                     if draft:
-                        cited = sorted(set(_RAW_CITE_RE.findall(draft))
-                                       | set((tc.get("args") or {}).get("sources") or []))
                         yield {"type": "final_answer",
                                "content": _with_iter_hint(f"{_prefix}\n\n{draft}", recursion_hit),
-                               "sources": cited}
+                               **_cites(draft, (tc.get("args") or {}).get("sources") or [])}
                         return
 
     # Best-effort: the last non-empty assistant message (usually a reflection).
@@ -294,10 +300,9 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
         if isinstance(m, AIMessage):
             text = m.content if isinstance(m.content, str) else str(m.content or "")
             if text.strip():
-                cited = sorted(set(_RAW_CITE_RE.findall(text)))
                 yield {"type": "final_answer",
                        "content": _with_iter_hint(f"{_prefix}\n\n{text}", recursion_hit),
-                       "sources": cited}
+                       **_cites(text)}
                 return
 
     # The agent gathered search results but never submitted or wrote prose
@@ -305,14 +310,13 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
     # instead of discarding everything.
     synth = _synthesize_fallback(question, all_messages, directive)
     if synth:
-        cited = sorted(set(_RAW_CITE_RE.findall(synth)))
         yield {
             "type": "final_answer",
             "content": _with_iter_hint(
                 f"(assembled from gathered notes — the agent did not submit an answer)\n\n{synth}",
                 recursion_hit,
             ),
-            "sources": cited,
+            **_cites(synth),
             "note": "Fallback synthesis from gathered tool results.",
         }
         return
@@ -320,7 +324,7 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
     if recursion_hit:
         yield {"type": "final_answer",
                "content": "(no answer — recursion limit hit before any reflection was emitted)",
-               "sources": []}
+               "sources": [], "wiki_sources": []}
         return
 
     yield {"type": "error",

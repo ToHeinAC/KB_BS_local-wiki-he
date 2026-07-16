@@ -318,3 +318,42 @@ def test_raw_read_nudges_submit_after_paginating(wiki_dir):
 
 def test_think_tool_passthrough():
     assert tools.TOOL_FUNCTIONS["think_tool"]("just thinking") == "just thinking"
+
+
+# --- Deep chat: wiki access ------------------------------------------------
+
+def test_chat_tools_expose_wiki_search_and_read():
+    """Deep chat can navigate the wiki (and thus follow `related:` links)."""
+    names = {t.name for t in tools.CHAT_TOOLS}
+    assert {"wiki_search", "wiki_read"} <= names
+    assert {"raw_search", "raw_read"} <= names  # still raw-grounded
+
+
+def test_submit_chat_counts_wiki_citations(monkeypatch):
+    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
+    monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
+    answer = "one two three four five [Source: raw.md] and [Wiki: page.md]"
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
+
+
+def test_submit_chat_wiki_cite_alone_does_not_meet_source_gate(monkeypatch):
+    """Wiki pages orient the agent; grounding still needs a second source."""
+    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
+    monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
+    answer = "one two three four five [Wiki: page.md]"
+    assert tools._submit_chat_impl(answer).startswith("REJECTED")
+
+
+def test_wiki_search_labels_shared_source_neighbours(monkeypatch):
+    monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", True)
+    monkeypatch.setattr(
+        tools.wiki_engine, "search_wiki",
+        lambda q: [{"filename": "a.md", "title": "A", "excerpt": "hit"}],
+    )
+    monkeypatch.setattr(
+        tools.wiki_engine, "linked_pages",
+        lambda seeds, limit: [{"filename": "b.md", "title": "B", "excerpt": "nbr",
+                               "via": "a.md", "kind": "shared-source"}],
+    )
+    out = tools._wiki_search_impl(query="x")
+    assert "shares a source with a.md" in out

@@ -57,6 +57,13 @@ timestamp: "YYYY-MM-DDT00:00:00Z"
 Cross-references are markdown links (`[Title](other-page.md)`) plus the
 `related:` frontmatter list — OKF treats both as relationships.
 
+`related:` is written by the ingest LLM, so it is **directional and sparse**: a
+page can only cite pages that already existed when it was written, and ~88% of
+real edges are one-way. Retrieval therefore never reads `related:` directly — it
+goes through `wiki_engine.linked_pages()`, which traverses the graph undirected
+(in-links + out-links) and adds implicit shared-source edges. See
+[architecture.md](architecture.md) §Link-aware retrieval.
+
 ## `index.md` and `log.md` formats (OKF; code-generated)
 
 - `index.md` — bundle root. Frontmatter declares `okf_version: "0.1"`; body has
