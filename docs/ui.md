@@ -45,6 +45,8 @@ The editorial language is delivered through a single theme-aware CSS block injec
 uv run streamlit run app.py --server.port 8520
 ```
 
+Open `http://localhost:8520/wiwi/`; the port root 404s. The app is served under the base path `/wiwi/` to match the nginx reverse proxy — see [tech.md](tech.md#streamlit-notes).
+
 ## Access model (login + maintainer layer)
 
 A login gate fronts every page; the sidebar DB selector is scoped to the signed-in user's `dbs` allowlist, and the chosen DB is applied to `db_context` before any page handler runs. It selects the **active** database — the single write target. Wiki Chat's separate "Search in" multiselect (same allowlist) widens *reads* across databases without changing where writes land. Two write-access tiers per DB:

@@ -39,7 +39,12 @@ cp .env.example .env
 uv run streamlit run src/app.py --server.port 8520
 ```
 
-Open [http://localhost:8520](http://localhost:8520).
+Open [http://localhost:8520/wiwi/](http://localhost:8520/wiwi/) — not the port
+root, which returns 404. `.streamlit/config.toml` sets `baseUrlPath = "wiwi"` so
+the app can be served under a path; see [Remote access](#remote-access).
+
+Keep `--server.port 8520` on the command line: `tunnel.sh` and the `restart-app`
+skill find the process by matching that flag.
 
 ## Configuration
 
@@ -53,13 +58,24 @@ Edit `.env` (copied from `.env.example`). The essentials to get started:
 
 **Full configuration reference** (per-role model overrides, ingest/QA tuning, research + chat gates, all timeouts) lives in one place: [IMPLEMENTATION.md §6 Configuration](IMPLEMENTATION.md#6-configuration). `.env.example` is the machine-readable template.
 
-## Remote access (Cloudflare quick tunnel)
+## Remote access
+
+The wiki is served publicly at **<https://ai.brenk.com/wiwi/>** by an nginx reverse proxy, which terminates TLS and maps that path onto port 8520. The URL is permanent. Two settings must agree, or the app renders blank — Streamlit's asset links are relative, and without the base path they resolve at the site root:
+
+| Side | Setting |
+|---|---|
+| nginx | `location /wiwi/` → `proxy_pass http://172.16.4.112:8520;` |
+| this app | `.streamlit/config.toml` → `[server] baseUrlPath = "wiwi"` |
+
+`src/gpu_widget.py` reads the same value to register its `_api/gpu` route under the prefix, so changing `baseUrlPath` carries the widget along. The proxy config and the full reasoning live in the orchestrator repo: `local_app-orchestrator/deploy/ai.brenk.com.conf` and `docs/reverse-proxy.md`. The app directory at <https://ai.brenk.com/> links here.
+
+### Cloudflare quick tunnel (retired)
 
 ```bash
 ./tunnel.sh
 ```
 
-Starts a temporary `*.trycloudflare.com` public URL for port 8520 — no Cloudflare account required. The tunnel stays up until port 8520 stops listening (or Ctrl-C). Requires [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
+Superseded by the reverse proxy and **kept only as a fallback**. It still opens a temporary `*.trycloudflare.com` URL for port 8520 — no Cloudflare account required — and stays up until port 8520 stops listening (or Ctrl-C). Since `baseUrlPath` was introduced, the URL it prints points at the port root and 404s: append `/wiwi/`. `tunnel.sh` does not do that for you, and nothing reads `/tmp/wiki-app-url.txt` any more — the app directory uses the permanent URL above. Requires [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/).
 
 ## License
 

@@ -1,11 +1,15 @@
 """Live GPU stats widget via same-origin route injection.
 
 Streamlit 1.57 serves its web app with Starlette/uvicorn (not Tornado). This
-module injects a ``/_api/gpu`` route into the live Starlette app so the sidebar
-iframe can poll the relative URL ``/_api/gpu`` every second. Because the URL is
-same-origin, this works locally and over SSH/Cloudflare tunnels with no CORS,
-no mixed-content issues, and no extra port — mirroring the researcher project's
-proven design.
+module injects a ``_api/gpu`` route into the live Starlette app so the sidebar
+iframe can poll it every second. Because the URL is same-origin, this works
+locally and over SSH/Cloudflare tunnels with no CORS, no mixed-content issues,
+and no extra port — mirroring the researcher project's proven design.
+
+Streamlit prefixes its *own* routes with ``server.baseUrlPath``, but a route
+injected here would stay at the server root, out of reach of the reverse proxy's
+``location /wiwi/``. So the route is registered under the same prefix, and the
+iframe fetches it with a *relative* URL that resolves inside it.
 
 The live ``Starlette`` instance is discovered via ``gc.get_objects()`` since it
 is only referenced indirectly (through ``uvicorn.Config.app``).
@@ -97,12 +101,22 @@ def _build_payload() -> str:
 # Starlette route injection (Streamlit >= 1.57)
 # ---------------------------------------------------------------------------
 
+def _base_path() -> str:
+    """Streamlit's base path as a URL prefix: ``""`` or ``"/wiwi"``.
+
+    Read from config rather than hard-coded, so the route follows
+    ``.streamlit/config.toml`` and the two cannot drift apart.
+    """
+    base = (st.config.get_option("server.baseUrlPath") or "").strip("/")
+    return f"/{base}" if base else ""
+
+
 def _inject_gpu_route() -> bool:
-    """Inject ``/_api/gpu`` into Streamlit's live Starlette app. Returns success.
+    """Inject the GPU route into Streamlit's live Starlette app. Returns success.
 
     Finds the live ``Starlette`` instance via gc (it is only referenced
-    indirectly through ``uvicorn.Config.app``) and prepends a ``/_api/gpu``
-    route so it is matched before the SPA static catch-all.
+    indirectly through ``uvicorn.Config.app``) and prepends the route so it is
+    matched before the SPA static catch-all.
     """
     try:
         from starlette.applications import Starlette
@@ -116,9 +130,11 @@ def _inject_gpu_route() -> bool:
         # The main Streamlit app has the most routes (health, media, ws, static, ...)
         app = max(apps, key=lambda a: len(a.router.routes))
 
+        route_path = f"{_base_path()}/_api/gpu"
+
         # Guard against double-registration (survives module reloads).
         for r in app.router.routes:
-            if getattr(r, "path", None) == "/_api/gpu":
+            if getattr(r, "path", None) == route_path:
                 return True
 
         # Sync endpoint — Starlette runs non-async handlers in a threadpool.
@@ -129,8 +145,8 @@ def _inject_gpu_route() -> bool:
                 headers={"Cache-Control": "no-store"},
             )
 
-        app.router.routes.insert(0, Route("/_api/gpu", endpoint=gpu_handler))
-        logger.info("Injected /_api/gpu Starlette route for GPU widget")
+        app.router.routes.insert(0, Route(route_path, endpoint=gpu_handler))
+        logger.info("Injected %s Starlette route for GPU widget", route_path)
         return True
 
     except Exception:
@@ -153,7 +169,7 @@ def _ensure_gpu_route() -> bool:
 
 
 # ---------------------------------------------------------------------------
-# HTML/JS template (fetches relative /_api/gpu)
+# HTML/JS template (fetches _api/gpu relative to the page)
 # ---------------------------------------------------------------------------
 
 def _gpu_html(accent: str = "#234637") -> str:
@@ -164,7 +180,10 @@ def _gpu_html(accent: str = "#234637") -> str:
 <script>
 const accent = "{accent}";
 function fetchGPU() {{
-  fetch("/_api/gpu")
+  // Relative, not "/_api/gpu": under the reverse proxy the page is served at
+  // /wiwi/, and a root-absolute URL would escape that prefix. This srcdoc
+  // iframe resolves relative URLs against the parent page.
+  fetch("./_api/gpu")
     .then(r => r.json())
     .then(data => {{
       const gpus = data.gpus || [];

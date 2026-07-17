@@ -116,7 +116,9 @@ The mockup simplifies a few planned details — tracked here so future iteration
 - **Test suite: ≈258 tests, no hard cap** — the source-of-truth count. PRD §4.5's original 100-cap was superseded 2026-05 (new modules with verifiable behaviour are exempt); keep the suite lean and high-signal, no low-value proliferation.
 - **NYT editorial UI style** (PRD §2.4).
 - **Apache-2.0 / MIT-compatible licensing** (CLAUDE.md §5.4).
-- **Streamlit port: 8520** (8511 reserved for another app on this host).
+- **Streamlit port: 8520** (8511 reserved for another app on this host), served
+  under the base path **`/wiwi/`** to match the nginx reverse proxy that publishes
+  it at `https://ai.brenk.com/wiwi/`. The port root 404s.
 
 ---
 
@@ -162,6 +164,9 @@ ollama pull gemma4:e4b          # or set OLLAMA_MODEL to any pulled model
 cp .env.example .env           # add TAVILY_API_KEY when Research is implemented
 uv run streamlit run src/app.py --server.port 8520
 ```
+
+Open `http://localhost:8520/wiwi/` — the port root 404s (`baseUrlPath` in
+`.streamlit/config.toml`, matching the nginx path).
 
 ---
 

@@ -4,3 +4,17 @@ backgroundColor          = "#f6f7f2"
 secondaryBackgroundColor = "#eaf0ec"
 textColor                = "#1a1f1c"
 font                     = "sans serif"
+
+[server]
+# Served under https://ai.brenk.com/wiwi/ by the nginx reverse proxy. This must
+# match the proxy's path, or the app renders blank: Streamlit's asset links are
+# relative, and without the base path they resolve at the site root.
+# src/gpu_widget.py reads this value to register its /_api/gpu route under the
+# same prefix — change one, and it follows.
+baseUrlPath = "wiwi"
+# Overrides enableXsrfProtection = false in ~/.streamlit/config.toml, for this
+# app only. That global default was harmless behind a rotating tunnel URL; this
+# app now has a permanent public URL.
+enableXsrfProtection = true
+# The port deliberately stays on the command line (--server.port 8520): tunnel.sh
+# and the restart-app skill find the process by matching that flag with pkill -f.

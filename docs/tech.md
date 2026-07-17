@@ -63,6 +63,8 @@ uv run streamlit run app.py --server.port 8520      # run app
 
 Streamlit is the chosen UI framework. Port is fixed at **8520** (8511 is reserved on this host). The app includes a safe-exit button using `lsof -ti:8520 | xargs -r kill -9`.
 
+The app is served under the base path **`/wiwi/`** (`baseUrlPath` in `.streamlit/config.toml`), matching the nginx reverse proxy that publishes it at `https://ai.brenk.com/wiwi/`. The two must agree or the app renders blank. The port root 404s. `src/gpu_widget.py` reads the same option to place its injected `_api/gpu` route under the prefix — Streamlit only prefixes its *own* routes. Keep `--server.port 8520` on the command line: `tunnel.sh` and the `restart-app` skill match the process by that flag.
+
 ## Licensing
 
 All implementation must be under Apache 2.0 or a more permissive licence (MIT) — CLAUDE.md §5.4.
