@@ -51,8 +51,13 @@ def _fts5_path() -> Path:
 
 
 def _backend() -> str:
-    """Active lexical backend: 'json' (legacy, default) or 'fts5' (Stage B)."""
-    return os.getenv("LEX_BACKEND", "json").strip().lower()
+    """Active lexical backend: 'fts5' (default) or 'json' (legacy fallback).
+
+    FTS5 is used only when the DB has a built `chunks.sqlite`; `query()` falls back
+    to the JSON backend otherwise, so a DB whose index predates FTS5 still works
+    until its next rebuild. Set LEX_BACKEND=json to force the legacy backend.
+    """
+    return os.getenv("LEX_BACKEND", "fts5").strip().lower()
 
 BM25_K1 = 1.5
 BM25_B = 0.75
@@ -248,7 +253,7 @@ def build(chunks: list[dict] | None = None) -> dict:
     _index_dir().mkdir(parents=True, exist_ok=True)
     _postings_path().write_text(json.dumps(postings, ensure_ascii=False))
     _stats_path().write_text(json.dumps(stats, ensure_ascii=False))
-    _build_fts5(fts_rows)  # dual-write; query() still defaults to the JSON backend
+    _build_fts5(fts_rows)  # dual-write; query() uses this when present (default)
     return {"chunks": n, "tokens": len(postings), "avg_dl": avg_dl}
 
 
@@ -303,8 +308,8 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
     Each hit: {chunk_id, score, source, scope, anchor, heading_path, char_start,
                char_end, text, preview, lang, matched_terms}.
 
-    Dispatches to the FTS5 backend when LEX_BACKEND=fts5 (Stage B dual-run), else
-    the legacy JSON-postings backend. Both return the identical hit-dict shape.
+    Dispatches to the FTS5 backend (default) when the DB has a built chunks.sqlite,
+    else the legacy JSON-postings backend. Both return the identical hit-dict shape.
     """
     if _backend() == "fts5" and _fts5_path().exists():
         return _query_fts5(q, top_k, scope)
