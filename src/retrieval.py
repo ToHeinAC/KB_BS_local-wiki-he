@@ -22,23 +22,38 @@ import lex_index
 RRF_K = 60
 _CANDIDATES = 40  # per-arm depth fed into fusion (idea.md: fuse deep, return shallow)
 
+# Per-arm weights. The dense arm is weighted higher: when the lexical arm misses a
+# paraphrase/synonym match entirely (it structurally can't reach it), a strong
+# semantic-only hit must still outrank the topically-related decoys the lexical arm
+# *does* return. Tuned on the discriminating chunk-level fixtures (bench/
+# fixture_{KI,Strahlenschutz}_chunk.json): semantic-slice MRR 0.65 -> 1.00 on both
+# English and German, with zero regression to the exact/topical controls.
+W_LEXICAL = 1.0
+W_SEMANTIC = 2.0
+
+
+def _arm_contribution(rank: int) -> float:
+    """One arm's RRF weight for a hit at 0-based `rank`, incl. a top-rank bonus."""
+    c = 1.0 / (RRF_K + rank + 1)
+    if rank == 0:
+        c += 0.05
+    elif rank in (1, 2):
+        c += 0.02
+    return c
+
 
 def _rrf_fuse(lex_hits: list[dict], sem_hits: list[dict], top_k: int) -> list[dict]:
-    """Reciprocal Rank Fusion of two ranked lists, keyed on chunk_id.
+    """Weighted Reciprocal Rank Fusion of two ranked lists, keyed on chunk_id.
 
-    score(d) = Σ_arms 1/(k + rank) + a small top-rank bonus (idea.md C.2). The
+    score(d) = Σ_arms w_arm · (1/(k + rank) + top-rank bonus) (idea.md C.2). The
     lexical hit dict wins ties (iterated first) so `matched_terms`/text survive.
     """
     score: dict[str, float] = {}
     hit: dict[str, dict] = {}
-    for hits in (lex_hits, sem_hits):
+    for hits, w in ((lex_hits, W_LEXICAL), (sem_hits, W_SEMANTIC)):
         for rank, h in enumerate(hits):
             cid = h["chunk_id"]
-            score[cid] = score.get(cid, 0.0) + 1.0 / (RRF_K + rank + 1)
-            if rank == 0:
-                score[cid] += 0.05
-            elif rank in (1, 2):
-                score[cid] += 0.02
+            score[cid] = score.get(cid, 0.0) + w * _arm_contribution(rank)
             hit.setdefault(cid, h)
     ranked = sorted(score, key=lambda c: (-score[c], c))[:top_k]
     out: list[dict] = []

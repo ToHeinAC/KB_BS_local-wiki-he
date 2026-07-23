@@ -141,3 +141,12 @@ def test_rrf_prefers_lexical_hit_dict_on_overlap():
     assert len(fused) == 1
     assert fused[0]["matched_terms"] == ["x"]  # lexical hit won the tie
     assert fused[0]["score"] > 0
+
+
+def test_rrf_weights_semantic_arm_over_lexical_only():
+    """A strong semantic-only hit outranks a lexical-only hit — the tuned behaviour
+    that recovers ranking when the lexical arm misses a paraphrase match entirely."""
+    lex = [{"chunk_id": "lex_decoy", "source": "s", "matched_terms": ["k"], "text": "d"}]
+    sem = [{"chunk_id": "sem_correct", "source": "s", "matched_terms": [], "text": "c"}]
+    fused = retrieval._rrf_fuse(lex, sem, top_k=5)
+    assert fused[0]["chunk_id"] == "sem_correct"  # dense arm weighted (W_SEMANTIC>W_LEXICAL)
