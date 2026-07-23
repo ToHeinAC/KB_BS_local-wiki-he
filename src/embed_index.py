@@ -40,6 +40,11 @@ import ollama_client
 import okf
 
 _EMBED_BATCH = 64
+# Cap each embed input so a pathologically long chunk/page can't exceed the embed
+# model's context window (bge-m3 = 8192 tokens) and fail the whole build. ~8000
+# chars is comfortably under that for DE/EN text. Truncation affects the EMBEDDED
+# text only — the chunk text returned to the UI and citations is never touched.
+_MAX_EMBED_CHARS = 8000
 
 
 def _model() -> str:
@@ -56,13 +61,52 @@ def _meta_path() -> Path:
 
 # --- embedding ---------------------------------------------------------------
 
-def embed_texts(texts: list[str]) -> np.ndarray:
-    """Embed texts via Ollama and L2-normalize each row (float32). Raises on failure."""
+def _embed_raw(texts: list[str]) -> np.ndarray:
+    """One Ollama embed call + L2-normalize each row (float32). Raises on failure."""
     vecs = ollama_client.embed(list(texts), _model())
     arr = np.asarray(vecs, dtype=np.float32)
     norms = np.linalg.norm(arr, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     return arr / norms
+
+
+def _too_long(exc: Exception) -> bool:
+    m = str(exc).lower()
+    return "context length" in m or "exceeds" in m or "too large" in m
+
+
+def _embed_resilient(texts: list[str]) -> np.ndarray:
+    """Embed a batch, isolating any input that overflows the model's context.
+
+    Char-capping alone can't guarantee the token count (dense text tokenizes to far
+    more tokens per char), so on a context-length 400 we split the batch to isolate
+    the offending input, then progressively hard-truncate just that input until it
+    fits. Other errors (e.g. Ollama down) propagate. Truncation affects the embedded
+    text only — never the stored chunk text or citations."""
+    try:
+        return _embed_raw(texts)
+    except Exception as exc:
+        if not _too_long(exc):
+            raise
+        if len(texts) == 1:
+            for cap in (4000, 2000, 1000, 500):
+                try:
+                    return _embed_raw([texts[0][:cap]])
+                except Exception as inner:
+                    if not _too_long(inner):
+                        raise
+            raise
+        mid = len(texts) // 2
+        return np.vstack([_embed_resilient(texts[:mid]), _embed_resilient(texts[mid:])])
+
+
+def embed_texts(texts: list[str]) -> np.ndarray:
+    """Embed texts via Ollama and L2-normalize each row (float32).
+
+    Each input is first truncated to `_MAX_EMBED_CHARS`; oversized-for-context inputs
+    are then handled resiliently (see `_embed_resilient`) so one pathological chunk
+    can't fail a whole DB's build."""
+    return _embed_resilient([t[:_MAX_EMBED_CHARS] for t in texts])
 
 
 @functools.lru_cache(maxsize=128)

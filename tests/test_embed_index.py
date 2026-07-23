@@ -80,6 +80,30 @@ def test_query_scope_filter(semantic_db):
     assert embed_index.query("revenue", scope="wiki") == []  # no wiki pages here
 
 
+def test_embed_texts_resilient_to_oversized_input(monkeypatch):
+    """A single context-overflowing input is isolated and truncated, not fatal —
+    the rest of the batch still embeds (guards whole-DB backfill against one bad chunk)."""
+    def fake_embed(texts, model_id):
+        out = []
+        for t in texts:
+            if len(t) > 1500:  # stand-in for the model's context limit
+                raise RuntimeError("the input length exceeds the context length (400)")
+            out.append([1.0, 0.0, 0.0])
+        return out
+
+    monkeypatch.setattr(embed_index.ollama_client, "embed", fake_embed)
+    arr = embed_index.embed_texts(["short a", "x" * 6000, "short b"])
+    assert arr.shape[0] == 3  # all three embedded; the oversized one got truncated
+
+
+def test_embed_texts_reraises_non_length_errors(monkeypatch):
+    """Connectivity/other errors must propagate, not trigger the truncation retry."""
+    monkeypatch.setattr(embed_index.ollama_client, "embed",
+                        lambda texts, model_id: (_ for _ in ()).throw(RuntimeError("connection refused")))
+    with pytest.raises(RuntimeError):
+        embed_index.embed_texts(["anything"])
+
+
 def test_query_empty_without_index(tmp_path, monkeypatch):
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("empty")
