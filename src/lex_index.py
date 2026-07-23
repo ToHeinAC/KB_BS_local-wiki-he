@@ -12,55 +12,39 @@ variant becomes a candidate. BM25 scoring then ranks by relevance.
 No external NLP deps: a small built-in German+English suffix stripper plays the
 role of a stemmer. Good enough for the project's domains (legal German, English
 investment docs) and keeps the dep footprint tiny.
+
+The store is a single SQLite FTS5 table (`data/<DB>/index/chunks.sqlite`). It
+holds the pre-expanded `variants()` token stream in an indexed `terms` column and
+supplies `bm25()` scoring, so the whole index is one file with no per-query JSON
+parse. The index is a pure derived artifact — `build()` regenerates it from
+`chunks/` + `wiki/` + `qa.jsonl` — and supports per-source incremental updates
+(`index_replace_source` / `index_replace_wiki_page` / `index_delete`) so ingest
+and delete don't rebuild the whole corpus.
 """
 
 from __future__ import annotations
 
 import json
-import math
-import os
 import re
 import sqlite3
 import unicodedata
 from pathlib import Path
 
 import frontmatter
-from dotenv import load_dotenv
 
 import chunker
 import db_context
 import qa_gen
-
-load_dotenv()
 
 
 def _index_dir() -> Path:
     return db_context.index_dir()
 
 
-def _postings_path() -> Path:
-    return _index_dir() / "postings.json"
-
-
-def _stats_path() -> Path:
-    return _index_dir() / "stats.json"
-
-
 def _fts5_path() -> Path:
     return _index_dir() / "chunks.sqlite"
 
 
-def _backend() -> str:
-    """Active lexical backend: 'fts5' (default) or 'json' (legacy fallback).
-
-    FTS5 is used only when the DB has a built `chunks.sqlite`; `query()` falls back
-    to the JSON backend otherwise, so a DB whose index predates FTS5 still works
-    until its next rebuild. Set LEX_BACKEND=json to force the legacy backend.
-    """
-    return os.getenv("LEX_BACKEND", "fts5").strip().lower()
-
-BM25_K1 = 1.5
-BM25_B = 0.75
 MIN_TOKEN_LEN = 2
 
 _STOPWORDS = {
@@ -144,261 +128,204 @@ def tokenize(text: str) -> list[str]:
 _WIKI_SYSTEM_PAGES = {"index.md", "log.md", "DESCRIPTION.md"}
 
 
+def _wiki_page_chunks(md: Path) -> list[dict]:
+    """Pseudo-chunks over one wiki page's body, tagged scope='wiki' (R-1).
+
+    The page title + filename stem are prepended so a term that lives only in the
+    title still matches; each chunk's `source` is the page filename and its `text`
+    is carried inline (wiki pseudo-chunks aren't persisted to data/chunks/).
+    System pages (index/log/DESCRIPTION) index to nothing.
+    """
+    if md.name in _WIKI_SYSTEM_PAGES:
+        return []
+    try:
+        post = frontmatter.load(str(md))
+        title = str(post.metadata.get("title", md.stem))
+        body = post.content
+    except Exception:
+        title, body = md.stem, md.read_text()
+    indexable = f"{title} {md.stem}\n\n{body}".strip()
+    if not indexable:
+        return []
+    out: list[dict] = []
+    for ch in chunker.split(indexable):
+        c = dict(ch)
+        c["chunk_id"] = f"wiki:{md.name}:{ch['chunk_id']}"
+        c["source"] = md.name
+        c["scope"] = "wiki"
+        out.append(c)
+    return out
+
+
 def _wiki_chunks() -> list[dict]:
-    """Pseudo-chunks over wiki page bodies, tagged scope='wiki' (R-1).
+    """Pseudo-chunks over all wiki page bodies (main + insights). See R-1.
 
     Lets BM25 search synthesized/merged wiki content — which may use different
-    vocabulary than the original sources — instead of an O(n·m) string scan. Each
-    chunk's `source` is the page filename and its `text` is stored inline (these
-    are not persisted to data/chunks/, so query() reads text from `chunk_meta`).
-    The page title + filename stem are prepended so a term that lives only in the
-    title still matches.
+    vocabulary than the original sources — instead of an O(n·m) string scan.
     """
     wiki = db_context.wiki_dir()
     if not wiki.exists():
         return []
     out: list[dict] = []
-    md_files = sorted(wiki.glob("*.md")) + sorted(wiki.glob("insights/*.md"))
-    for md in md_files:
-        if md.name in _WIKI_SYSTEM_PAGES:
-            continue
-        try:
-            post = frontmatter.load(str(md))
-            title = str(post.metadata.get("title", md.stem))
-            body = post.content
-        except Exception:
-            title, body = md.stem, md.read_text()
-        indexable = f"{title} {md.stem}\n\n{body}".strip()
-        if not indexable:
-            continue
-        for ch in chunker.split(indexable):
-            c = dict(ch)
-            c["chunk_id"] = f"wiki:{md.name}:{ch['chunk_id']}"
-            c["source"] = md.name
-            c["scope"] = "wiki"
-            out.append(c)
+    for md in sorted(wiki.glob("*.md")) + sorted(wiki.glob("insights/*.md")):
+        out.extend(_wiki_page_chunks(md))
     return out
+
+
+# --- FTS5 store --------------------------------------------------------------
+
+_FTS_CREATE = (
+    "CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5("
+    "terms, chunk_id UNINDEXED, source UNINDEXED, scope UNINDEXED, "
+    "anchor UNINDEXED, heading_path UNINDEXED, char_start UNINDEXED, "
+    "char_end UNINDEXED, lang UNINDEXED, text UNINDEXED, "
+    "tokenize='unicode61 remove_diacritics 0')"
+)
+_FTS_INSERT = (
+    "INSERT INTO chunks_fts (terms, chunk_id, source, scope, anchor, "
+    "heading_path, char_start, char_end, lang, text) VALUES (?,?,?,?,?,?,?,?,?,?)"
+)
+
+
+def _row_for_chunk(ch: dict, qa_by_chunk: dict) -> tuple:
+    """Build the FTS5 row for one chunk: the pre-expanded variant token stream
+    plus the metadata columns the hit dict is rebuilt from.
+
+    Hypothetical-question tokens (qa_gen) are folded into the same `terms` stream
+    so a chunk is retrievable by the questions it answers.
+    """
+    cid = ch["chunk_id"]
+    body_tokens = [t for t in tokenize(ch.get("text", ""))
+                   if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN]
+    qa_tokens = [t for t in tokenize(" ".join(qa_by_chunk.get(cid, [])))
+                 if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN]
+    terms: list[str] = []
+    for tok in body_tokens + qa_tokens:
+        terms.extend(variants(tok))
+    scope = ch.get("scope", "raw")
+    # Wiki pseudo-chunks aren't in data/chunks/; keep their text inline so the
+    # hit dict can supply it without a JSONL lookup.
+    inline = ch.get("text", "") if scope != "raw" else ""
+    return (
+        " ".join(terms), cid, ch.get("source", ""), scope, ch.get("anchor", ""),
+        json.dumps(ch.get("heading_path", []), ensure_ascii=False),
+        ch.get("char_start", 0), ch.get("char_end", 0), ch.get("lang", ""), inline,
+    )
+
+
+def _dedup(chunks: list[dict]):
+    """Yield chunks skipping repeated chunk_ids (same content across sources)."""
+    seen: set[str] = set()
+    for ch in chunks:
+        cid = ch["chunk_id"]
+        if cid in seen:
+            continue
+        seen.add(cid)
+        yield ch
 
 
 def build(chunks: list[dict] | None = None) -> dict:
-    """Build (or rebuild) the index over all chunks. Returns a small summary.
+    """Full (re)build of the FTS5 index over all chunks. Returns a small summary.
 
     When no chunks are passed, indexes raw source chunks (scope='raw') plus wiki
     page pseudo-chunks (scope='wiki') so both layers are searchable from one store.
+    Rebuilds from scratch; for single-source updates prefer the incremental
+    `index_replace_source` / `index_delete` helpers.
     """
     if chunks is None:
         chunks = chunker.all_chunks() + _wiki_chunks()
-    postings: dict[str, dict[str, int]] = {}
-    chunk_meta: dict[str, dict] = {}
-    chunk_dl: dict[str, int] = {}
-    df: dict[str, int] = {}
-    fts_rows: list[tuple] = []  # one row per chunk for the FTS5 mirror (Stage B)
-    qa_by_chunk = qa_gen.load()  # {chunk_id: [question, ...]}
-
-    for ch in chunks:
-        cid = ch["chunk_id"]
-        if cid in chunk_meta:
-            continue  # duplicate chunk (same content across sources)
-        body_tokens = [t for t in tokenize(ch["text"])
-                       if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN]
-        # Hypothetical-question tokens contribute to TF but NOT to doc length —
-        # otherwise BM25's b-normalization would penalize chunks for carrying
-        # their own retrieval hints.
-        qa_tokens = [t for t in tokenize(" ".join(qa_by_chunk.get(cid, [])))
-                     if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN]
-        surface_tokens = body_tokens + qa_tokens
-        dl = len(body_tokens)
-        chunk_dl[cid] = dl
-        scope = ch.get("scope", "raw")
-        meta = {
-            "source": ch.get("source", ""),
-            "scope": scope,
-            "anchor": ch.get("anchor", ""),
-            "heading_path": ch.get("heading_path", []),
-            "char_start": ch.get("char_start", 0),
-            "char_end": ch.get("char_end", 0),
-            "lang": ch.get("lang", ""),
-        }
-        if scope != "raw":
-            # Wiki pseudo-chunks aren't in data/chunks/; keep their text inline.
-            meta["text"] = ch.get("text", "")
-        chunk_meta[cid] = meta
-        seen_in_doc: set[str] = set()
-        chunk_terms: list[str] = []  # same variant stream, for the FTS5 mirror
-        for tok in surface_tokens:
-            for v in variants(tok):
-                chunk_terms.append(v)
-                postings.setdefault(v, {})
-                postings[v][cid] = postings[v].get(cid, 0) + 1
-                if v not in seen_in_doc:
-                    df[v] = df.get(v, 0) + 1
-                    seen_in_doc.add(v)
-        fts_rows.append((
-            " ".join(chunk_terms), cid, meta["source"], scope, meta["anchor"],
-            json.dumps(meta["heading_path"], ensure_ascii=False),
-            meta["char_start"], meta["char_end"], meta["lang"],
-            meta.get("text", ""),
-        ))
-
-    n = len(chunk_meta)
-    avg_dl = (sum(chunk_dl.values()) / n) if n else 0.0
-    stats = {
-        "n": n,
-        "avg_dl": avg_dl,
-        "df": df,
-        "chunk_dl": chunk_dl,
-        "chunk_meta": chunk_meta,
-    }
+    qa_by_chunk = qa_gen.load()
+    rows = [_row_for_chunk(ch, qa_by_chunk) for ch in _dedup(chunks)]
 
     _index_dir().mkdir(parents=True, exist_ok=True)
-    _postings_path().write_text(json.dumps(postings, ensure_ascii=False))
-    _stats_path().write_text(json.dumps(stats, ensure_ascii=False))
-    _build_fts5(fts_rows)  # dual-write; query() uses this when present (default)
-    return {"chunks": n, "tokens": len(postings), "avg_dl": avg_dl}
-
-
-def _build_fts5(rows: list[tuple]) -> None:
-    """Write the FTS5 mirror (`chunks.sqlite`) — full rebuild (incremental deferred).
-
-    Stores the same pre-expanded `variants()` token stream the JSON postings use, so
-    German morphology matching stays identical; FTS5 supplies bm25() scoring and a
-    single-file store with no per-query JSON parse. A failure here never breaks the
-    JSON build — the FTS5 backend is opt-in via LEX_BACKEND.
-    """
     path = _fts5_path()
+    if path.exists():
+        path.unlink()
+    con = sqlite3.connect(str(path))
     try:
-        if path.exists():
-            path.unlink()
-        con = sqlite3.connect(str(path))
-        try:
-            con.execute(
-                "CREATE VIRTUAL TABLE chunks_fts USING fts5("
-                "terms, chunk_id UNINDEXED, source UNINDEXED, scope UNINDEXED, "
-                "anchor UNINDEXED, heading_path UNINDEXED, char_start UNINDEXED, "
-                "char_end UNINDEXED, lang UNINDEXED, text UNINDEXED, "
-                "tokenize='unicode61 remove_diacritics 0')")
-            con.executemany(
-                "INSERT INTO chunks_fts (terms, chunk_id, source, scope, anchor, "
-                "heading_path, char_start, char_end, lang, text) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
-            con.commit()
-        finally:
-            con.close()
-    except sqlite3.Error:
-        # FTS5 not compiled in, or a write error — leave the JSON index authoritative.
-        if path.exists():
-            path.unlink()
+        con.execute(_FTS_CREATE)
+        con.executemany(_FTS_INSERT, rows)
+        con.commit()
+    finally:
+        con.close()
+    return {"chunks": len(rows)}
 
 
-def _load() -> tuple[dict, dict]:
-    if not _postings_path().exists() or not _stats_path().exists():
-        return {}, {"n": 0, "avg_dl": 0.0, "df": {}, "chunk_dl": {}, "chunk_meta": {}}
-    postings = json.loads(_postings_path().read_text())
-    stats = json.loads(_stats_path().read_text())
-    return postings, stats
+# --- Incremental updates (per source, keyed on the `source` column) ----------
 
+def index_replace_source(source: str, chunks: list[dict], qa: dict | None = None) -> None:
+    """Replace all rows for `source` with rows for `chunks` (delete + insert).
+
+    O(change), not O(corpus): only this source's rows are touched. Creates the
+    table/file if the index doesn't exist yet. `qa` may be passed to avoid a
+    reload; pass `{}` for wiki pages (their chunk_ids never carry QA questions).
+    """
+    if qa is None:
+        qa = qa_gen.load()
+    rows = [_row_for_chunk(ch, qa) for ch in _dedup(chunks)]
+    _index_dir().mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(str(_fts5_path()))
+    try:
+        con.execute(_FTS_CREATE)
+        con.execute("DELETE FROM chunks_fts WHERE source = ?", (source,))
+        con.executemany(_FTS_INSERT, rows)
+        con.commit()
+    finally:
+        con.close()
+
+
+def index_replace_wiki_page(name: str) -> None:
+    """Re-index a single wiki page's body (the `source` is its filename).
+
+    Used by incremental ingest so a page rewrite doesn't rebuild the whole index.
+    If the page no longer exists (renamed/removed) its rows are simply dropped.
+    """
+    md = db_context.wiki_dir() / name
+    if not md.exists():
+        index_delete(name)
+        return
+    index_replace_source(name, _wiki_page_chunks(md), qa={})
+
+
+def index_delete(source: str) -> None:
+    """Drop every row for `source`. No-op if the index doesn't exist yet."""
+    path = _fts5_path()
+    if not path.exists():
+        return
+    con = sqlite3.connect(str(path))
+    try:
+        con.execute(_FTS_CREATE)
+        con.execute("DELETE FROM chunks_fts WHERE source = ?", (source,))
+        con.commit()
+    finally:
+        con.close()
+
+
+# --- Query -------------------------------------------------------------------
 
 def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
-    """BM25 over chunks. Returns up to top_k hits.
+    """BM25 over the FTS5 chunk index. Returns up to top_k hits (empty if no index).
 
     `scope` filters by chunk scope: "raw" (source chunks), "wiki" (wiki page
-    bodies), or None (both). A chunk indexed before R-1 (no scope in meta) counts
-    as "raw" so existing raw queries are unaffected.
+    bodies), or None (both).
 
     Each hit: {chunk_id, score, source, scope, anchor, heading_path, char_start,
                char_end, text, preview, lang, matched_terms}.
-
-    Dispatches to the FTS5 backend (default) when the DB has a built chunks.sqlite,
-    else the legacy JSON-postings backend. Both return the identical hit-dict shape.
     """
-    if _backend() == "fts5" and _fts5_path().exists():
-        return _query_fts5(q, top_k, scope)
-    return _query_json(q, top_k, scope)
-
-
-def _query_json(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
-    """Legacy BM25 over the JSON postings index."""
-    postings, stats = _load()
-    n = stats.get("n", 0)
-    if n == 0:
+    if not _fts5_path().exists():
         return []
-    avg_dl = stats.get("avg_dl") or 1.0
-    df = stats.get("df", {})
-    chunk_dl = stats.get("chunk_dl", {})
-    chunk_meta = stats.get("chunk_meta", {})
-
-    expanded: list[str] = []
-    for tok in tokenize(q):
-        for v in variants(tok):
-            if v in postings and v not in expanded:
-                expanded.append(v)
-
-    if not expanded:
-        return []
-
-    scores: dict[str, float] = {}
-    matched: dict[str, set[str]] = {}
-    for term in expanded:
-        plist = postings.get(term, {})
-        n_t = df.get(term, len(plist)) or 1
-        idf = math.log(1 + (n - n_t + 0.5) / (n_t + 0.5))
-        for cid, tf in plist.items():
-            dl = chunk_dl.get(cid, int(avg_dl)) or 1
-            denom = tf + BM25_K1 * (1 - BM25_B + BM25_B * dl / avg_dl)
-            score = idf * (tf * (BM25_K1 + 1)) / denom
-            scores[cid] = scores.get(cid, 0.0) + score
-            matched.setdefault(cid, set()).add(term)
-
-    if scope is not None:
-        scores = {cid: s for cid, s in scores.items()
-                  if chunk_meta.get(cid, {}).get("scope", "raw") == scope}
-
-    ranked = sorted(scores.items(), key=lambda kv: -kv[1])[:top_k]
-    if not ranked:
-        return []
-
-    # Load chunk texts lazily from JSONL (cache per source). Wiki pseudo-chunks
-    # carry their text inline in meta (not persisted to data/chunks/).
-    text_cache: dict[str, dict[str, str]] = {}
-
-    def _text_for(cid: str, meta: dict) -> str:
-        if meta.get("text") is not None:
-            return meta["text"]
-        source = meta.get("source", "")
-        if source not in text_cache:
-            text_cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
-        return text_cache[source].get(cid, "")
-
-    out: list[dict] = []
-    for cid, score in ranked:
-        meta = chunk_meta.get(cid, {})
-        text = _text_for(cid, meta)
-        preview = text.replace("\n", " ").strip()
-        if len(preview) > 320:
-            preview = preview[:320] + "…"
-        out.append({
-            "chunk_id": cid,
-            "score": round(score, 3),
-            "source": meta.get("source", ""),
-            "scope": meta.get("scope", "raw"),
-            "anchor": meta.get("anchor", ""),
-            "heading_path": meta.get("heading_path", []),
-            "char_start": meta.get("char_start", 0),
-            "char_end": meta.get("char_end", 0),
-            "lang": meta.get("lang", ""),
-            "text": text,
-            "preview": preview,
-            "matched_terms": sorted(matched.get(cid, set())),
-        })
-    return out
+    return _query_fts5(q, top_k, scope)
 
 
 def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
-    """BM25 over the FTS5 mirror. Same hit-dict shape as `_query_json`.
+    """BM25 over the FTS5 index.
 
     Query tokens are expanded to the same `variants()` forms the index stored, so
-    German morphology matching is identical to the JSON backend. FTS5's `bm25()`
-    returns lower=better, so it is negated into the usual higher=better score.
+    German morphology matching is deterministic and identical at index and query
+    time. FTS5's `bm25()` returns lower=better, so it is negated into the usual
+    higher=better score. Results are deduplicated by chunk_id (a chunk shared by
+    two sources can appear twice after incremental updates); the higher-scored row
+    wins since rows arrive best-first.
     """
     expanded: list[str] = []
     for tok in tokenize(q):
@@ -417,7 +344,7 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]
         sql += " AND scope = ?"
         params.append(scope)
     sql += " ORDER BY score LIMIT ?"
-    params.append(top_k)
+    params.append(top_k * 2 + 8)  # over-fetch; dedup by chunk_id then trim to top_k
 
     con = sqlite3.connect(str(_fts5_path()))
     try:
@@ -439,7 +366,11 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]
         return text_cache[source].get(cid, "")
 
     out: list[dict] = []
+    seen: set[str] = set()
     for (cid, source, sc, anchor, hp_json, cs, ce, lang, inline, terms, score) in rows:
+        if cid in seen:
+            continue
+        seen.add(cid)
         text = _text_for(cid, source, inline)
         preview = text.replace("\n", " ").strip()
         if len(preview) > 320:
@@ -458,4 +389,6 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]
             "preview": preview,
             "matched_terms": sorted(exp_set.intersection(terms.split())),
         })
+        if len(out) >= top_k:
+            break
     return out

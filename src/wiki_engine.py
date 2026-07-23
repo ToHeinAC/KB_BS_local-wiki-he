@@ -683,7 +683,7 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
     Builds the chunk store, runs qa_gen on the whole document, and selects
     affected wiki pages — exactly once per uploaded source — then returns a
     `ctx` dict the per-piece synthesis and the final wrap-up consume.
-    `lex_index.build()` is deferred to `ingest_end`.
+    Lexical indexing is incremental (per-source) in `ingest_end`.
     """
     # Pin the page-writer to the source's language via the system prompt (always
     # preserved by Ollama, unlike the prompt tail where the 40 KB piece is
@@ -820,9 +820,16 @@ def ingest_end(ctx: dict, finalize: bool = True) -> dict:
     route/merge against earlier ones' on-disk pages.
     """
     _rebuild_index()
+    # Incrementally index this file's raw chunks + the wiki pages it wrote, on
+    # every file (batch or single) — replaces the former corpus-wide rebuild.
+    # Single-file ingest keeps identical end state with no full rebuild; in a
+    # batch each file becomes searchable as it lands (like sequential ingests).
+    if ctx["chunks"]:
+        lex_index.index_replace_source(ctx["source_name"],
+                                       chunker.load_chunks(ctx["source_name"]))
+    for name in dict.fromkeys(ctx["created"] + ctx["updated"]):
+        lex_index.index_replace_wiki_page(name)
     if finalize:
-        if ctx["chunks"]:
-            lex_index.build()
         if os.getenv("INGEST_DESCRIPTION", "1") == "1":
             try:
                 update_description(ctx)
@@ -1136,7 +1143,13 @@ def delete_source(source_name: str) -> dict:
     result["wiki_pages"] = sorted(removed_pages)
     result["related_scrubbed"] = scrubbed
 
-    lex_index.build()
+    # Incremental index update: drop the deleted raw source's chunks and the
+    # pseudo-chunks of any removed wiki page. Surviving pages only had frontmatter
+    # edited (sources/related/updated) — their indexed body text is unchanged — so
+    # they need no re-index.
+    lex_index.index_delete(source_name)
+    for rel in removed_pages:
+        lex_index.index_delete(Path(rel).name)
     _rebuild_index()
     if os.getenv("INGEST_DESCRIPTION", "1") == "1":
         try:

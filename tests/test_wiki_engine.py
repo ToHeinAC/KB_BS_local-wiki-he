@@ -185,33 +185,44 @@ def test_ingest_works_without_user_metadata(wiki_dir, monkeypatch):
     assert "User-supplied metadata" not in sent_prompt2
 
 
-# --- ingest_end finalize (batch deferral) ---
+# --- ingest_end indexing (incremental per source, no full rebuild) ---
 
-def test_ingest_end_finalize_false_skips_lex_build(wiki_dir, monkeypatch):
+def test_ingest_end_indexes_incrementally_no_full_rebuild(wiki_dir, monkeypatch):
     mock = MagicMock()
     mock.generate.return_value = {"response": _INGEST_RESPONSE}
     monkeypatch.setattr(ollama_client, "_client", lambda: mock)
     build_spy = MagicMock()
     monkeypatch.setattr(wiki_engine.lex_index, "build", build_spy)
-    ctx = wiki_engine.ingest_begin("some text", "mysrc.txt")
-    wiki_engine.ingest_piece(ctx, "some text")
+    wiki_engine.ingest("plutonium isotope criticality data", "mysrc.txt")
+    build_spy.assert_not_called()  # O(change) incremental, never a corpus rebuild
+    # the new raw source and the pages it wrote are immediately searchable
+    raw = wiki_engine.lex_index.query("plutonium", scope="raw")
+    assert any(h["source"] == "mysrc.txt" for h in raw)
+    wiki = wiki_engine.lex_index.query("Alpha", scope="wiki")
+    assert any(h["source"] == "concept-alpha.md" for h in wiki)
+
+
+def test_ingest_end_finalize_gates_description_only(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    monkeypatch.setenv("INGEST_DESCRIPTION", "1")
+    desc_spy = MagicMock()
+    monkeypatch.setattr(wiki_engine, "update_description", desc_spy)
+
+    # finalize=False: indexed (searchable) but the corpus-wide description is skipped
+    ctx = wiki_engine.ingest_begin("plutonium data", "a.txt")
+    wiki_engine.ingest_piece(ctx, "plutonium data")
     wiki_engine.ingest_end(ctx, finalize=False)
-    build_spy.assert_not_called()
-    # index.md is still refreshed so later batch files route against these pages
-    assert (wiki_dir / "index.md").read_text().strip()
-    assert (wiki_dir / "summary-mysrc.md").exists()
+    desc_spy.assert_not_called()
+    assert (wiki_dir / "index.md").read_text().strip()  # index.md still refreshed
+    assert wiki_engine.lex_index.query("plutonium", scope="raw")  # already searchable
 
-
-def test_ingest_end_finalize_true_builds_once(wiki_dir, monkeypatch):
-    mock = MagicMock()
-    mock.generate.return_value = {"response": _INGEST_RESPONSE}
-    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
-    build_spy = MagicMock()
-    monkeypatch.setattr(wiki_engine.lex_index, "build", build_spy)
-    ctx = wiki_engine.ingest_begin("some text", "mysrc.txt")
-    wiki_engine.ingest_piece(ctx, "some text")
-    wiki_engine.ingest_end(ctx, finalize=True)
-    build_spy.assert_called_once()
+    # finalize=True: description refreshed once
+    ctx2 = wiki_engine.ingest_begin("more data", "b.txt")
+    wiki_engine.ingest_piece(ctx2, "more data")
+    wiki_engine.ingest_end(ctx2, finalize=True)
+    desc_spy.assert_called_once()
 
 
 # --- contradiction resolution guards on effective-as-of (the batch data-quality stake) ---

@@ -108,3 +108,37 @@ def test_english_query(fresh_index):
 def test_no_results_for_unknown_query(fresh_index):
     hits = lex_index.query("xyzzy quux frobnicate")
     assert hits == []
+
+
+# --- incremental updates -----------------------------------------------------
+
+def test_query_returns_empty_without_index(tmp_path, monkeypatch):
+    import db_context
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("empty")
+    assert lex_index.query("anything") == []
+    assert not lex_index._fts5_path().exists()  # query must not create the file
+
+
+def test_index_delete_removes_only_that_source(fresh_index):
+    assert lex_index.query("revenue growth")                # SAP present first
+    lex_index.index_delete("SAP.md")
+    assert lex_index.query("revenue growth") == []          # SAP gone
+    assert lex_index.query("Rückstand")                     # StrlSchG untouched
+
+
+def test_index_replace_source_adds_then_replaces(fresh_index):
+    new = chunker.split("## Neu\nDie Kernspaltung setzt Neutronen frei.")
+    chunker.write_chunks("Neu.md", new)
+    lex_index.index_replace_source("Neu.md", chunker.load_chunks("Neu.md"))
+    hits = lex_index.query("Kernspaltung")
+    assert any(h["source"] == "Neu.md" for h in hits)
+
+    # replacing with different content drops the old rows for that source
+    repl = chunker.split("## Neu\nEs geht jetzt um Photosynthese.")
+    chunker.write_chunks("Neu.md", repl)
+    lex_index.index_replace_source("Neu.md", chunker.load_chunks("Neu.md"))
+    assert lex_index.query("Kernspaltung") == []            # old term gone
+    assert any(h["source"] == "Neu.md" for h in lex_index.query("Photosynthese"))
+    # a replace of one source leaves the others intact
+    assert lex_index.query("revenue growth")
