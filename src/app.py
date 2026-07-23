@@ -425,10 +425,18 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
     if search:
         results = wiki_engine.search_wiki(search)
         st.caption(f"{len(results)} result(s)")
+        max_score = max((r.get("score", 0.0) for r in results), default=0.0)
         for r in results:
             if st.button(r["title"], key=f"{key_prefix}_hit_{r['filename']}", use_container_width=True):
                 st.session_state[f"{key_prefix}_selected_page"] = r["filename"]
                 selected = r["filename"]
+            if max_score > 0:
+                st.progress(min(r.get("score", 0.0) / max_score, 1.0))
+            if r.get("excerpt"):
+                st.caption(r["excerpt"])
+            terms = r.get("matched_terms") or []
+            if terms:
+                st.caption("matched: " + " ".join(f"`{t}`" for t in terms))
     else:
         tree = wiki_engine.get_wiki_tree()
         group_labels = {

@@ -20,6 +20,7 @@ import json
 import math
 import os
 import re
+import sqlite3
 import unicodedata
 from pathlib import Path
 
@@ -43,6 +44,15 @@ def _postings_path() -> Path:
 
 def _stats_path() -> Path:
     return _index_dir() / "stats.json"
+
+
+def _fts5_path() -> Path:
+    return _index_dir() / "chunks.sqlite"
+
+
+def _backend() -> str:
+    """Active lexical backend: 'json' (legacy, default) or 'fts5' (Stage B)."""
+    return os.getenv("LEX_BACKEND", "json").strip().lower()
 
 BM25_K1 = 1.5
 BM25_B = 0.75
@@ -177,6 +187,7 @@ def build(chunks: list[dict] | None = None) -> dict:
     chunk_meta: dict[str, dict] = {}
     chunk_dl: dict[str, int] = {}
     df: dict[str, int] = {}
+    fts_rows: list[tuple] = []  # one row per chunk for the FTS5 mirror (Stage B)
     qa_by_chunk = qa_gen.load()  # {chunk_id: [question, ...]}
 
     for ch in chunks:
@@ -208,13 +219,21 @@ def build(chunks: list[dict] | None = None) -> dict:
             meta["text"] = ch.get("text", "")
         chunk_meta[cid] = meta
         seen_in_doc: set[str] = set()
+        chunk_terms: list[str] = []  # same variant stream, for the FTS5 mirror
         for tok in surface_tokens:
             for v in variants(tok):
+                chunk_terms.append(v)
                 postings.setdefault(v, {})
                 postings[v][cid] = postings[v].get(cid, 0) + 1
                 if v not in seen_in_doc:
                     df[v] = df.get(v, 0) + 1
                     seen_in_doc.add(v)
+        fts_rows.append((
+            " ".join(chunk_terms), cid, meta["source"], scope, meta["anchor"],
+            json.dumps(meta["heading_path"], ensure_ascii=False),
+            meta["char_start"], meta["char_end"], meta["lang"],
+            meta.get("text", ""),
+        ))
 
     n = len(chunk_meta)
     avg_dl = (sum(chunk_dl.values()) / n) if n else 0.0
@@ -229,7 +248,41 @@ def build(chunks: list[dict] | None = None) -> dict:
     _index_dir().mkdir(parents=True, exist_ok=True)
     _postings_path().write_text(json.dumps(postings, ensure_ascii=False))
     _stats_path().write_text(json.dumps(stats, ensure_ascii=False))
+    _build_fts5(fts_rows)  # dual-write; query() still defaults to the JSON backend
     return {"chunks": n, "tokens": len(postings), "avg_dl": avg_dl}
+
+
+def _build_fts5(rows: list[tuple]) -> None:
+    """Write the FTS5 mirror (`chunks.sqlite`) — full rebuild (incremental deferred).
+
+    Stores the same pre-expanded `variants()` token stream the JSON postings use, so
+    German morphology matching stays identical; FTS5 supplies bm25() scoring and a
+    single-file store with no per-query JSON parse. A failure here never breaks the
+    JSON build — the FTS5 backend is opt-in via LEX_BACKEND.
+    """
+    path = _fts5_path()
+    try:
+        if path.exists():
+            path.unlink()
+        con = sqlite3.connect(str(path))
+        try:
+            con.execute(
+                "CREATE VIRTUAL TABLE chunks_fts USING fts5("
+                "terms, chunk_id UNINDEXED, source UNINDEXED, scope UNINDEXED, "
+                "anchor UNINDEXED, heading_path UNINDEXED, char_start UNINDEXED, "
+                "char_end UNINDEXED, lang UNINDEXED, text UNINDEXED, "
+                "tokenize='unicode61 remove_diacritics 0')")
+            con.executemany(
+                "INSERT INTO chunks_fts (terms, chunk_id, source, scope, anchor, "
+                "heading_path, char_start, char_end, lang, text) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)", rows)
+            con.commit()
+        finally:
+            con.close()
+    except sqlite3.Error:
+        # FTS5 not compiled in, or a write error — leave the JSON index authoritative.
+        if path.exists():
+            path.unlink()
 
 
 def _load() -> tuple[dict, dict]:
@@ -249,7 +302,17 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
 
     Each hit: {chunk_id, score, source, scope, anchor, heading_path, char_start,
                char_end, text, preview, lang, matched_terms}.
+
+    Dispatches to the FTS5 backend when LEX_BACKEND=fts5 (Stage B dual-run), else
+    the legacy JSON-postings backend. Both return the identical hit-dict shape.
     """
+    if _backend() == "fts5" and _fts5_path().exists():
+        return _query_fts5(q, top_k, scope)
+    return _query_json(q, top_k, scope)
+
+
+def _query_json(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
+    """Legacy BM25 over the JSON postings index."""
     postings, stats = _load()
     n = stats.get("n", 0)
     if n == 0:
@@ -321,5 +384,73 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
             "text": text,
             "preview": preview,
             "matched_terms": sorted(matched.get(cid, set())),
+        })
+    return out
+
+
+def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
+    """BM25 over the FTS5 mirror. Same hit-dict shape as `_query_json`.
+
+    Query tokens are expanded to the same `variants()` forms the index stored, so
+    German morphology matching is identical to the JSON backend. FTS5's `bm25()`
+    returns lower=better, so it is negated into the usual higher=better score.
+    """
+    expanded: list[str] = []
+    for tok in tokenize(q):
+        for v in variants(tok):
+            if v not in expanded:
+                expanded.append(v)
+    if not expanded:
+        return []
+
+    match = " OR ".join(f'"{v}"' for v in expanded)
+    sql = ("SELECT chunk_id, source, scope, anchor, heading_path, char_start, "
+           "char_end, lang, text, terms, bm25(chunks_fts) AS score "
+           "FROM chunks_fts WHERE chunks_fts MATCH ?")
+    params: list = [match]
+    if scope is not None:
+        sql += " AND scope = ?"
+        params.append(scope)
+    sql += " ORDER BY score LIMIT ?"
+    params.append(top_k)
+
+    con = sqlite3.connect(str(_fts5_path()))
+    try:
+        rows = con.execute(sql, params).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        con.close()
+
+    exp_set = set(expanded)
+    text_cache: dict[str, dict[str, str]] = {}
+
+    def _text_for(cid: str, source: str, inline: str) -> str:
+        if inline:
+            return inline
+        if source not in text_cache:
+            text_cache[source] = {c["chunk_id"]: c["text"]
+                                  for c in chunker.load_chunks(source)}
+        return text_cache[source].get(cid, "")
+
+    out: list[dict] = []
+    for (cid, source, sc, anchor, hp_json, cs, ce, lang, inline, terms, score) in rows:
+        text = _text_for(cid, source, inline)
+        preview = text.replace("\n", " ").strip()
+        if len(preview) > 320:
+            preview = preview[:320] + "…"
+        out.append({
+            "chunk_id": cid,
+            "score": round(-score, 3),
+            "source": source,
+            "scope": sc,
+            "anchor": anchor,
+            "heading_path": json.loads(hp_json) if hp_json else [],
+            "char_start": cs,
+            "char_end": ce,
+            "lang": lang,
+            "text": text,
+            "preview": preview,
+            "matched_terms": sorted(exp_set.intersection(terms.split())),
         })
     return out

@@ -1,0 +1,48 @@
+{
+  "description": "LocalWiki retrieval fixture — KI (test DB, English AI/tech corpus)",
+  "collection": "KI",
+  "status": "DRAFT — labels drafted from verified source attribution; a human must review/expand before these numbers are trusted (idea.md §5.1: never model-generate ground truth). Aim for 30-50 cases.",
+  "expected_token_forms": "source filename (e.g. 'Local AI Deep Dive July 2026.md'), or 'source.md#fragment' where fragment matches the chunk anchor/heading, or a 16-hex chunk_id.",
+  "queries": [
+    { "id": "attention-title-exact", "type": "exact",
+      "query": "Attention Is All You Need",
+      "expected": ["NIPS-2017-attention-is-all-you-need-Paper.md"] },
+
+    { "id": "orbital-dc-exact", "type": "exact",
+      "query": "orbital data centers",
+      "expected": ["AI Compute Data Centers in Orbit Deep Analysis.md"] },
+
+    { "id": "attention-alias", "type": "alias",
+      "query": "self-attention transformer paper",
+      "expected": ["NIPS-2017-attention-is-all-you-need-Paper.md"] },
+
+    { "id": "moe-alias", "type": "alias",
+      "query": "MoE models",
+      "expected": ["Dense & MoE LLMs Architecture, Trends, and the Edge Computing Frontier.md"] },
+
+    { "id": "local-inference-semantic", "type": "semantic",
+      "query": "Why run language models on your own machine instead of the cloud?",
+      "expected": ["Local AI Deep Dive July 2026.md"] },
+
+    { "id": "agi-cost-semantic", "type": "semantic",
+      "query": "How do power and hardware costs limit progress toward superintelligence?",
+      "expected": ["From LLM to AGI ASI_Chips, Energy, Cost, and Monetization.md"] },
+
+    { "id": "space-compute-semantic", "type": "semantic",
+      "query": "What are the tradeoffs of putting compute in space?",
+      "expected": ["AI Compute Data Centers in Orbit Deep Analysis.md"] },
+
+    { "id": "moe-arch-topical", "type": "topical",
+      "query": "mixture of experts architecture",
+      "expected": ["Dense & MoE LLMs Architecture, Trends, and the Edge Computing Frontier.md"] },
+
+    { "id": "edge-llm-topical", "type": "topical",
+      "query": "edge computing for large language models",
+      "expected": ["Dense & MoE LLMs Architecture, Trends, and the Edge Computing Frontier.md"] },
+
+    { "id": "agent-cost-crossdomain", "type": "cross-domain",
+      "query": "compare the cost of running AI agents locally versus in the cloud",
+      "expected": ["OpenClaw Hermes Agent Deep Dive Comparison Cost Analysis.md",
+                   "Local AI Deep Dive July 2026.md"] }
+  ]
+}

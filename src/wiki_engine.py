@@ -1568,6 +1568,8 @@ def search_wiki(query: str) -> list[dict]:
             "filename": fname,
             "title": titles.get(fname, fname.replace(".md", "")),
             "excerpt": excerpt,
+            "score": h.get("score", 0.0),
+            "matched_terms": h.get("matched_terms", []),
         })
     return results
 
