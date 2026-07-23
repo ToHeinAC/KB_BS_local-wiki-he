@@ -1,0 +1,55 @@
+{
+  "description": "LocalWiki DISCRIMINATING chunk-level fixture — Strahlenschutz (real DE radiation-protection legal corpus). Expected tokens are exact chunk_ids. The 7 semantic cases pose an everyday/colloquial German question whose vocabulary is absent from the target chunk's formal statutory wording, so the lexical arm (even with variants() morphology) misses it in the top-10 while the dense arm finds it — every label authored chunk-first and verified on the live index. 3 exact + 2 topical controls use statutory keywords (lexical top-3) that hybrid must not regress.",
+  "collection": "Strahlenschutz",
+  "status": "DRAFT — hand-verified on the live Strahlenschutz index (bge-m3). semantic: lexical rank >10 AND semantic rank <=3, relevance confirmed by reading the § chunk. exact/topical: lexical rank <=3. Mirrors bench/fixture_KI_chunk.json to test idea.md's kill-criterion on real German legal prose.",
+  "expected_token_forms": "16-hex chunk_id (exact chunk match).",
+  "queries": [
+    { "id": "sem-occupational-dose", "type": "semantic",
+      "query": "Wie viel Strahlung darf ein Mitarbeiter höchstens pro Jahr abbekommen",
+      "expected": ["5bad0e2859e24e79"] },
+
+    { "id": "sem-radon-action", "type": "semantic",
+      "query": "Ab welcher Radonkonzentration in der Raumluft muss man Maßnahmen ergreifen",
+      "expected": ["7fdde715bf36e4db"] },
+
+    { "id": "sem-clearance", "type": "semantic",
+      "query": "Ab welchem Wert gilt strahlendes Material als unbedenklich und darf normal entsorgt werden",
+      "expected": ["bfe0211d93025b74"] },
+
+    { "id": "sem-repository", "type": "semantic",
+      "query": "Wo werden schwach strahlende Abfälle dauerhaft unter der Erde gelagert",
+      "expected": ["9a22ba5f6bc56553"] },
+
+    { "id": "sem-responsible", "type": "semantic",
+      "query": "Wer im Betrieb sorgt dafür dass die Strahlenschutzregeln eingehalten werden",
+      "expected": ["39693702596ebf8d"] },
+
+    { "id": "sem-lost-source", "type": "semantic",
+      "query": "Was ist zu melden wenn radioaktives Material abhandenkommt oder gestohlen wird",
+      "expected": ["fe9bb8c128b8c2b1"] },
+
+    { "id": "sem-inhalation-protection", "type": "semantic",
+      "query": "Welche Schutzkleidung und Ausrüstung schützt vor dem Einatmen radioaktiver Partikel",
+      "expected": ["04e73e228181be11"] },
+
+    { "id": "exact-radon-referenzwert", "type": "exact",
+      "query": "Referenzwert Radon-222-Aktivitätskonzentration 300 Becquerel je Kubikmeter",
+      "expected": ["7fdde715bf36e4db"] },
+
+    { "id": "exact-abhandenkommen", "type": "exact",
+      "query": "§ 167 Abhandenkommen radioaktiver Stoff Aufsichtsbehörde",
+      "expected": ["fe9bb8c128b8c2b1"] },
+
+    { "id": "exact-strahlenschutzanweisung", "type": "exact",
+      "query": "§ 45 Strahlenschutzanweisung Strahlenschutzverantwortliche",
+      "expected": ["39693702596ebf8d"] },
+
+    { "id": "topical-endlagerung", "type": "topical",
+      "query": "Endlagerung radioaktiver Abfälle tiefe geologische Formationen",
+      "expected": ["9a22ba5f6bc56553"] },
+
+    { "id": "topical-offene-stoffe", "type": "topical",
+      "query": "Schutz beim Umgang mit offenen radioaktiven Stoffen",
+      "expected": ["04e73e228181be11"] }
+  ]
+}
