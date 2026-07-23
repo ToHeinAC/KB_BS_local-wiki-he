@@ -81,7 +81,8 @@ This project must be implemented efficiently, without unnecessary code or comple
 ### 5.3 Tech
 The project uses the following technology choices:
 - All implementation must be in python and the pythonic way of implementation.
-- LangChain/LangGraph are permitted **only** inside the agent layer (`src/agent.py`, `src/chat_agent.py`, `src/tools.py`). Everywhere else: no LangChain, no vector DB, no embeddings, no cloud LLM APIs.
+- LangChain/LangGraph are permitted **only** inside the agent layer (`src/agent.py`, `src/chat_agent.py`, `src/tools.py`). Everywhere else: no LangChain, no cloud LLM APIs, no external vector database or service.
+- **Local, file-backed embeddings for retrieval are permitted** (Stage C, `src/embed_index.py`). Constraints that keep them within the "fully local, low-admin" spirit: vectors are computed via the already-required local Ollama `/api/embed` (no cloud embedding API); stored as a per-DB **derived artifact** (`data/<DB>/index/vectors.npy` + `vectors.json`) that `build()` regenerates from `chunks/` + `wiki/` — a pure cache, never a source of truth; searched by **brute-force cosine** (no ANN index, no vector service). The semantic arm is **optional and graceful**: a DB with no vectors, or an unreachable embed model, degrades to the lexical arm with zero behaviour change. The lexical FTS5 arm remains the grounding/citation source of truth.
 - `uv` is used for the virtual python environment setup and the running. Dependencies shall be defined in `pyproject.toml` and installed via `uv`.
 - Use python-dotenv for the environmental variable handling.
 - All domain Python modules live in `src/`. Run with `uv run streamlit run src/app.py --server.port 8520`.

@@ -37,6 +37,21 @@ def is_available() -> bool:
         return False
 
 
+def embed(texts: list[str], model_id: str) -> list[list[float]]:
+    """Return one embedding vector per input text via the local Ollama /api/embed.
+
+    Used by the semantic retrieval arm (src/embed_index.py). No cloud API.
+    """
+    try:
+        resp = _client().embed(model=model_id, input=list(texts))
+        vecs = resp["embeddings"] if isinstance(resp, dict) else getattr(resp, "embeddings")
+        if not vecs:
+            raise RuntimeError("empty embeddings response")
+        return vecs
+    except Exception as exc:
+        raise RuntimeError(f"Ollama embed failed ({model_id}): {exc}") from exc
+
+
 def generate(system: str, prompt: str, temperature: float = 0.3, model_id: str | None = None) -> str:
     try:
         resp = _client().generate(
