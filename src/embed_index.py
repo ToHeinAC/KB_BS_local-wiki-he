@@ -25,6 +25,7 @@ char anchors, or anything returned to the UI, so citations stay exact.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 from pathlib import Path
@@ -62,6 +63,14 @@ def embed_texts(texts: list[str]) -> np.ndarray:
     norms = np.linalg.norm(arr, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
     return arr / norms
+
+
+@functools.lru_cache(maxsize=128)
+def _embed_query(q: str, model: str) -> np.ndarray:
+    """Cached single-query embedding (float16). A chat turn hits several retrieval
+    paths with the same question; keyed on `model` so it invalidates on model change.
+    The returned array is shared — callers must treat it read-only."""
+    return embed_texts([q])[0].astype(np.float16)
 
 
 def _okf_prefix_map() -> dict[str, str]:
@@ -178,7 +187,7 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
     try:
         meta = json.loads(_meta_path().read_text())
         matrix = np.load(_vectors_path())
-        qv = embed_texts([q])[0].astype(np.float16)
+        qv = _embed_query(q, _model())
     except Exception:
         return []
     if matrix.size == 0:

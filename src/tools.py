@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 
 import chunker
 import db_context
-import lex_index
+import retrieval
 import okf
 import run_memory
 import wiki_engine
@@ -253,8 +253,11 @@ def _wiki_read_impl(filenames) -> str:
 
 
 def _raw_search_db(query: str, max_results: int) -> list[str]:
-    """Formatted raw-chunk hits for the *active* DB; [] when nothing matched."""
-    hits = lex_index.query(query, top_k=max_results, scope="raw")
+    """Formatted raw-chunk hits for the *active* DB; [] when nothing matched.
+
+    Hybrid retrieval (lexical + semantic RRF); degrades to pure lexical when the DB
+    has no embedding index (see src/retrieval.py)."""
+    hits = retrieval.search(query, top_k=max_results, scope="raw")
     parts = []
     for i, h in enumerate(hits, 1):
         anchor = h.get("anchor") or ""

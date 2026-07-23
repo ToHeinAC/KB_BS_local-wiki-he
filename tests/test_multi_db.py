@@ -105,11 +105,12 @@ def test_raw_search_reports_per_db_misses(two_dbs):
 def test_raw_search_splits_budget_across_dbs(two_dbs, monkeypatch):
     seen = []
 
-    def fake_query(q, top_k, scope=None):
+    def fake_search(q, top_k, scope=None):
         seen.append(top_k)
         return []
 
-    monkeypatch.setattr(lex_index, "query", fake_query)
+    # _raw_search_db now goes through the hybrid entry point (retrieval.search).
+    monkeypatch.setattr(tools.retrieval, "search", fake_search)
     db_context.set_search_scope(["Alpha", "Beta"])
     tools._raw_search_one("x", 6)
     assert seen == [3, 3]  # 6 split two ways, not 6 each

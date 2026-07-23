@@ -17,6 +17,7 @@ import lex_index
 import okf
 import ollama_client
 import qa_gen
+import retrieval
 import schema_loader
 from prompts import (
     ANSWER_PROMPT,
@@ -1231,13 +1232,13 @@ def _candidate_pages_for_query(question: str) -> list[str]:
             cands.append(f)
 
     try:
-        for h in lex_index.query(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki"):
+        for h in retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki"):
             _add(h.get("source", ""))
     except Exception:
         pass
     src_map = _source_to_pages()
     try:
-        for h in lex_index.query(question, top_k=_QUERY_CANDIDATE_TOPK, scope="raw"):
+        for h in retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope="raw"):
             for f in src_map.get((h.get("source") or "").strip(), []):
                 _add(f)
     except Exception:
@@ -1298,7 +1299,7 @@ def _gather_pages(question: str, system: str, budget: int) -> tuple[str, list[st
     # Q-3: inject the most relevant chunks per page (with anchors), not full pages.
     hits_by_page: dict[str, list[dict]] = {}
     try:
-        for h in lex_index.query(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki"):
+        for h in retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki"):
             hits_by_page.setdefault(h.get("source", ""), []).append(h)
     except Exception:
         pass
