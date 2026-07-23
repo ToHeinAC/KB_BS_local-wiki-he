@@ -1,0 +1,83 @@
+{
+  "description": "LocalWiki retrieval fixture — Strahlenschutz (real DE radiation-protection legal corpus). Hand-labelled at source-file granularity; the point is JSON-vs-FTS5 parity on German morphology, so labels favour a source that dominates the term's document frequency (measured, not model-generated).",
+  "collection": "Strahlenschutz",
+  "status": "DRAFT — labels hand-verified via per-source term frequency across chunks/*.jsonl. `morphology` cases use surface forms absent from the text (digraph ue/oe, plural/stem) so recall depends entirely on variants(); they are the German-specific parity claim.",
+  "expected_token_forms": "source filename as stored in chunks (e.g. 'StrlSchV.md', 'jc_8_bericht_deutschland_atomenergie_bf.md').",
+  "queries": [
+    { "id": "deckungssumme-exact", "type": "exact",
+      "query": "Deckungssumme",
+      "expected": ["AtDeckV.md"] },
+
+    { "id": "ueberpruefung-exact", "type": "exact",
+      "query": "Überprüfungskonferenz",
+      "expected": ["jc_8_bericht_deutschland_atomenergie_bf.md"] },
+
+    { "id": "roentgen-exact", "type": "exact",
+      "query": "Röntgeneinrichtung",
+      "expected": ["StrlSchG.md", "StrlSchV.md"] },
+
+    { "id": "bauartzulassung-exact", "type": "exact",
+      "query": "Bauartzulassung",
+      "expected": ["StrlSchG.md", "StrlSchV.md"] },
+
+    { "id": "brennelemente-alias", "type": "alias",
+      "query": "Lagerung abgebrannter Brennelemente",
+      "expected": ["jc_8_bericht_deutschland_atomenergie_bf.md"] },
+
+    { "id": "beruflich-exponiert-alias", "type": "alias",
+      "query": "beruflich strahlenexponierte Personen",
+      "expected": ["StrlSchG.md", "StrlSchV.md"] },
+
+    { "id": "ueber-digraph-morph", "type": "morphology",
+      "query": "Ueberpruefungskonferenz",
+      "expected": ["jc_8_bericht_deutschland_atomenergie_bf.md"] },
+
+    { "id": "schilddruese-digraph-morph", "type": "morphology",
+      "query": "Schilddruese Jodblockade",
+      "expected": ["jc_8_bericht_deutschland_atomenergie_bf.md"] },
+
+    { "id": "deckungssummen-plural-morph", "type": "morphology",
+      "query": "Deckungssummen",
+      "expected": ["AtDeckV.md"] },
+
+    { "id": "roentgen-digraph-morph", "type": "morphology",
+      "query": "Roentgeneinrichtung",
+      "expected": ["StrlSchG.md", "StrlSchV.md"] },
+
+    { "id": "deckungsvorsorge-semantic", "type": "semantic",
+      "query": "Wie wird die Deckungsvorsorge für kerntechnische Anlagen bemessen?",
+      "expected": ["AtDeckV.md"] },
+
+    { "id": "radon-schutz-semantic", "type": "semantic",
+      "query": "Welche Maßnahmen schützen vor Radon in Wohnräumen?",
+      "expected": ["Radon-Handbuch_BfS.md"] },
+
+    { "id": "endlager-semantic", "type": "semantic",
+      "query": "Wie werden radioaktive Abfälle in Deutschland endgelagert?",
+      "expected": ["jc_8_bericht_deutschland_atomenergie_bf.md"] },
+
+    { "id": "radon-topical", "type": "topical",
+      "query": "Radon Referenzwert Innenraum",
+      "expected": ["Radon-Handbuch_BfS.md"] },
+
+    { "id": "endlager-topical", "type": "topical",
+      "query": "Endlagerung radioaktiver Abfälle",
+      "expected": ["jc_8_bericht_deutschland_atomenergie_bf.md"] },
+
+    { "id": "stilllegung-topical", "type": "topical",
+      "query": "Stilllegung kerntechnischer Anlagen",
+      "expected": ["jc_8_bericht_deutschland_atomenergie_bf.md"] },
+
+    { "id": "strahlenschutzbeauftragter-topical", "type": "topical",
+      "query": "Aufgaben des Strahlenschutzbeauftragten",
+      "expected": ["StrlSchG.md"] },
+
+    { "id": "freigabe-crossdomain", "type": "cross-domain",
+      "query": "Freigabe radioaktiver Stoffe zur Entsorgung",
+      "expected": ["Freigabe.md", "StrlSchV.md"] },
+
+    { "id": "deckungsvorsorge-crossdomain", "type": "cross-domain",
+      "query": "Deckungsvorsorge nach dem Atomgesetz",
+      "expected": ["AtG.md", "AtDeckV.md"] }
+  ]
+}
