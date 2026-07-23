@@ -142,3 +142,26 @@ def test_validate_flags_missing_version_and_type(tmp_path):
     issues = okf.okf_validate(tmp_path)
     assert any("okf_version" in i for i in issues)
     assert any("bad.md" in i and "type" in i for i in issues)
+
+
+# --- collapse_duplicate_sections ---------------------------------------------
+
+def test_collapse_keeps_content_bearing_duplicate():
+    body = (
+        "## Key facts\n- A\n- B\n\n"                     # short outline
+        "## Key facts\n- Real fact one is much longer.\n- Real fact two.\n\n"
+        "## Details\nsome text\n"
+    )
+    out, removed = okf.collapse_duplicate_sections(body)
+    assert removed == 1
+    assert out.count("## Key facts") == 1
+    assert "Real fact one is much longer." in out   # kept the longer section
+    assert "- A\n- B" not in out                     # dropped the outline
+    assert "## Details" in out                       # untouched
+
+
+def test_collapse_noop_without_consecutive_duplicates():
+    body = "## A\nx\n\n## B\ny\n\n## A\nz\n"          # repeat, but not adjacent
+    out, removed = okf.collapse_duplicate_sections(body)
+    assert removed == 0
+    assert out == body

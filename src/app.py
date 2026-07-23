@@ -433,7 +433,12 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
             if max_score > 0:
                 st.progress(min(r.get("score", 0.0) / max_score, 1.0))
             if r.get("excerpt"):
-                st.caption(r["excerpt"])
+                # Strip markdown markers so a preview starting with "## …" renders
+                # as small plain caption text, not a giant heading.
+                plain = re.sub(r"[#*_`>]+", "", r["excerpt"])
+                plain = re.sub(r"\s+", " ", plain).strip().lstrip("-* ")
+                if plain:
+                    st.caption(plain)
             terms = r.get("matched_terms") or []
             if terms:
                 st.caption("matched: " + " ".join(f"`{t}`" for t in terms))

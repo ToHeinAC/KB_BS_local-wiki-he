@@ -184,6 +184,47 @@ def apply_to_page(content: str, *, db: str) -> str:
     return frontmatter.dumps(post) + "\n"
 
 
+# --- Duplicate-section cleanup ----------------------------------------------
+
+_H2_RE = re.compile(r"^##\s+(.+?)\s*$", re.MULTILINE)
+
+
+def collapse_duplicate_sections(body: str) -> tuple[str, int]:
+    """Collapse consecutive level-2 sections sharing a heading, keeping the
+    content-bearing one. Returns (new_body, sections_removed).
+
+    Targets a small-model ingest artifact where a page emits e.g. `## Key facts`
+    twice — once as an outline, once as real content. Deterministic: among a run of
+    adjacent same-name `##` sections it keeps the one with the most body text (ties
+    keep the first) and drops the rest. Non-consecutive repeats, subsection levels,
+    and all other content are left untouched.
+    """
+    heads = list(_H2_RE.finditer(body))
+    if len(heads) < 2:
+        return body, 0
+    preamble = body[: heads[0].start()]
+    sections: list[tuple[str, str, int]] = []  # (name, full_text, body_len)
+    for i, m in enumerate(heads):
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(body)
+        text = body[m.start():end]
+        body_len = len(text[m.end() - m.start():].strip())
+        sections.append((m.group(1).strip().lower(), text, body_len))
+
+    kept: list[str] = []
+    removed = 0
+    i = 0
+    while i < len(sections):
+        j = i
+        while j + 1 < len(sections) and sections[j + 1][0] == sections[i][0]:
+            j += 1
+        run = sections[i:j + 1]
+        best = max(range(len(run)), key=lambda k: run[k][2])
+        kept.append(run[best][1])
+        removed += len(run) - 1
+        i = j + 1
+    return preamble + "".join(kept), removed
+
+
 # --- Reserved files: log -----------------------------------------------------
 
 def add_log_entry(text: str, action: str, detail: str, *, day: str, time: str) -> str:
