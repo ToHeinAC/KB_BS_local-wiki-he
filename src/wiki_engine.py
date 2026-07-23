@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 import chunker
 import db_context
 import dedup
+import embed_index
 import lang
 import lex_index
 import okf
@@ -826,10 +827,21 @@ def ingest_end(ctx: dict, finalize: bool = True) -> dict:
     # Single-file ingest keeps identical end state with no full rebuild; in a
     # batch each file becomes searchable as it lands (like sequential ingests).
     if ctx["chunks"]:
-        lex_index.index_replace_source(ctx["source_name"],
-                                       chunker.load_chunks(ctx["source_name"]))
+        raw_chunks = chunker.load_chunks(ctx["source_name"])
+        lex_index.index_replace_source(ctx["source_name"], raw_chunks)
+        # Semantic arm: best-effort + gated on an existing model-matching index, so
+        # it keeps an already-embedded DB current without failing ingest or building
+        # a partial index on a never-backfilled DB.
+        try:
+            embed_index.index_replace_source(ctx["source_name"], raw_chunks)
+        except Exception:
+            pass
     for name in dict.fromkeys(ctx["created"] + ctx["updated"]):
         lex_index.index_replace_wiki_page(name)
+        try:
+            embed_index.index_replace_wiki_page(name)
+        except Exception:
+            pass
     if finalize:
         if os.getenv("INGEST_DESCRIPTION", "1") == "1":
             try:
@@ -1151,6 +1163,12 @@ def delete_source(source_name: str) -> dict:
     lex_index.index_delete(source_name)
     for rel in removed_pages:
         lex_index.index_delete(Path(rel).name)
+    try:
+        embed_index.index_delete(source_name)
+        for rel in removed_pages:
+            embed_index.index_delete(Path(rel).name)
+    except Exception:
+        pass  # semantic arm is best-effort; the vectors are a rebuildable cache
     _rebuild_index()
     if os.getenv("INGEST_DESCRIPTION", "1") == "1":
         try:

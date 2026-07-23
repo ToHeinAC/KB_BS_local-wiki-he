@@ -167,44 +167,106 @@ def _row_meta(ch: dict) -> dict:
     return meta
 
 
+def _embed_chunks(chunks: list[dict], *, progress=None) -> tuple[np.ndarray, list[dict]]:
+    """Embed chunks (dedup by chunk_id) → (float16 matrix, aligned row metadata).
+
+    Wiki chunks get the deterministic OKF identity prefix; the wiki-frontmatter scan
+    is skipped entirely when there are no wiki chunks (raw-only ingest)."""
+    seen: set[str] = set()
+    uniq = [ch for ch in chunks if not (ch["chunk_id"] in seen or seen.add(ch["chunk_id"]))]
+    if not uniq:
+        return np.zeros((0, 0), dtype=np.float16), []
+    prefix_map = _okf_prefix_map() if any(c.get("scope") == "wiki" for c in uniq) else {}
+    rows = [_row_meta(ch) for ch in uniq]
+    inputs = [_embed_text(ch, prefix_map) for ch in uniq]
+    mats: list[np.ndarray] = []
+    for i in range(0, len(inputs), _EMBED_BATCH):
+        mats.append(embed_texts(inputs[i:i + _EMBED_BATCH]))
+        if progress:
+            progress(min(i + _EMBED_BATCH, len(inputs)), len(inputs))
+    return np.vstack(mats).astype(np.float16), rows
+
+
 def build(chunks: list[dict] | None = None, *, progress=None) -> dict:
     """Full (re)build of the semantic index over all chunks. Returns a summary.
 
     Embeds raw source chunks (scope='raw') + wiki page pseudo-chunks (scope='wiki').
-    Writes vectors.npy + vectors.json atomically-ish (temp then replace). `progress`
-    is an optional callable(done, total) for CLI reporting.
+    Stamps the current model. `progress` is an optional callable(done, total).
     """
     if chunks is None:
         chunks = chunker.all_chunks() + lex_index._wiki_chunks()
-    # Deduplicate by chunk_id (same content across sources) to mirror the lex arm.
-    seen: set[str] = set()
-    uniq = [ch for ch in chunks if not (ch["chunk_id"] in seen or seen.add(ch["chunk_id"]))]
-    if not uniq:
-        _write(np.zeros((0, 0), dtype=np.float16), [])
-        return {"chunks": 0, "model": _model()}
-
-    prefix_map = _okf_prefix_map()
-    rows = [_row_meta(ch) for ch in uniq]
-    embed_texts_in = [_embed_text(ch, prefix_map) for ch in uniq]
-
-    mats: list[np.ndarray] = []
-    total = len(embed_texts_in)
-    for i in range(0, total, _EMBED_BATCH):
-        mats.append(embed_texts(embed_texts_in[i:i + _EMBED_BATCH]))
-        if progress:
-            progress(min(i + _EMBED_BATCH, total), total)
-    matrix = np.vstack(mats).astype(np.float16)
+    matrix, rows = _embed_chunks(chunks, progress=progress)
     _write(matrix, rows)
-    return {"chunks": len(rows), "model": _model(), "dim": int(matrix.shape[1])}
+    return {"chunks": len(rows), "model": _model(),
+            "dim": int(matrix.shape[1]) if matrix.size else 0}
 
 
-def _write(matrix: np.ndarray, rows: list[dict]) -> None:
+def _write(matrix: np.ndarray, rows: list[dict], *, model: str | None = None) -> None:
+    """Persist matrix + aligned rows. `model` defaults to the current model (full
+    build); incremental ops pass the existing index's model to avoid restamping."""
     db_context.index_dir().mkdir(parents=True, exist_ok=True)
     np.save(_vectors_path(), matrix)
     _meta_path().write_text(json.dumps(
-        {"model": _model(), "dim": int(matrix.shape[1]) if matrix.size else 0, "rows": rows},
+        {"model": model or _model(),
+         "dim": int(matrix.shape[1]) if matrix.size else 0, "rows": rows},
         ensure_ascii=False,
     ))
+
+
+# --- Incremental updates (per source; mirror lex_index) ----------------------
+
+def index_delete(source: str) -> None:
+    """Drop every row for `source` from the vector index. No-op if no index."""
+    if not _vectors_path().exists() or not _meta_path().exists():
+        return
+    try:
+        meta = json.loads(_meta_path().read_text())
+    except Exception:
+        return
+    rows = meta.get("rows", [])
+    keep = [i for i, r in enumerate(rows) if r.get("source") != source]
+    if len(keep) == len(rows):
+        return  # nothing for this source
+    matrix = np.load(_vectors_path())
+    dim = matrix.shape[1] if matrix.ndim == 2 and matrix.size else 0
+    new_matrix = matrix[keep] if keep else np.zeros((0, dim), dtype=np.float16)
+    _write(new_matrix, [rows[i] for i in keep], model=meta.get("model"))
+
+
+def index_replace_source(source: str, chunks: list[dict]) -> None:
+    """Re-embed one source's chunks and replace its rows. O(change) embed calls.
+
+    Only touches an EXISTING, model-matching index (`available()`); DBs with no
+    vectors stay lexical-only until a deliberate full backfill, so the semantic
+    index never ends up with partial corpus coverage."""
+    if not available():
+        return
+    meta = json.loads(_meta_path().read_text())
+    model = meta["model"]
+    matrix = np.load(_vectors_path())
+    dim = matrix.shape[1] if matrix.ndim == 2 and matrix.size else 0
+    keep = [i for i, r in enumerate(meta["rows"]) if r.get("source") != source]
+    kept_rows = [meta["rows"][i] for i in keep]
+    kept_mat = matrix[keep] if keep else np.zeros((0, dim), dtype=np.float16)
+
+    new_mat, new_rows = _embed_chunks(chunks)
+    if not new_rows:
+        _write(kept_mat, kept_rows, model=model)
+        return
+    combined_mat = np.vstack([kept_mat, new_mat]) if kept_mat.size else new_mat
+    _write(combined_mat, kept_rows + new_rows, model=model)
+
+
+def index_replace_wiki_page(name: str) -> None:
+    """Re-embed a single wiki page's body (its `source` is the filename). No-op
+    without an existing model-matching index; drops rows if the page is gone."""
+    if not available():
+        return
+    md = db_context.wiki_dir() / name
+    if not md.exists():
+        index_delete(name)
+        return
+    index_replace_source(name, lex_index._wiki_page_chunks(md))
 
 
 # --- query -------------------------------------------------------------------

@@ -104,6 +104,46 @@ def test_embed_texts_reraises_non_length_errors(monkeypatch):
         embed_index.embed_texts(["anything"])
 
 
+def test_index_delete_removes_only_that_source(semantic_db):
+    import json
+    before = len(json.loads(embed_index._meta_path().read_text())["rows"])
+    assert embed_index.query("revenue")  # sap present
+    embed_index.index_delete("sap.md")
+    after = json.loads(embed_index._meta_path().read_text())["rows"]
+    assert all(r["source"] != "sap.md" for r in after)
+    assert len(after) < before
+    assert embed_index.query("neutron dose reactor")  # radon.md untouched
+
+
+def test_index_replace_source_adds_then_replaces(semantic_db):
+    import json
+    chunker.write_chunks("new.md", chunker.split("## New\nphotosynthesis in green plants"))
+    embed_index.index_replace_source("new.md", chunker.load_chunks("new.md"))
+    rows = json.loads(embed_index._meta_path().read_text())["rows"]
+    assert any(r["source"] == "new.md" for r in rows)
+    # matrix stays aligned with rows after an incremental append
+    assert np.load(embed_index._vectors_path()).shape[0] == len(rows)
+    # replacing shrinks/reshapes that source's rows, leaves others intact
+    chunker.write_chunks("new.md", chunker.split("## New\ncloud revenue"))
+    embed_index.index_replace_source("new.md", chunker.load_chunks("new.md"))
+    rows2 = json.loads(embed_index._meta_path().read_text())["rows"]
+    assert np.load(embed_index._vectors_path()).shape[0] == len(rows2)
+    assert any(r["source"] == "radon.md" for r in rows2)  # other source survived
+
+
+def test_incremental_noop_without_existing_index(tmp_path, monkeypatch):
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("fresh")
+    monkeypatch.setenv("EMBED_MODEL", "toy")
+    monkeypatch.setattr(embed_index.ollama_client, "embed",
+                        lambda texts, model_id: [_toy_vec(t) for t in texts])
+    chunker.write_chunks("x.md", chunker.split("## X\nradon dose"))
+    # no vectors built yet -> incremental is a no-op (no partial index created)
+    embed_index.index_replace_source("x.md", chunker.load_chunks("x.md"))
+    assert not embed_index._vectors_path().exists()
+    assert not embed_index.available()
+
+
 def test_query_empty_without_index(tmp_path, monkeypatch):
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("empty")
