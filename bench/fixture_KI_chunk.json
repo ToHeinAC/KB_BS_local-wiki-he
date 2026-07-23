@@ -1,0 +1,51 @@
+{
+  "description": "LocalWiki DISCRIMINATING chunk-level fixture — KI (test DB). Expected tokens are exact chunk_ids, not source files. The semantic slice is deliberately hard: each query paraphrases a specific chunk's fact with vocabulary ABSENT from that chunk, so the lexical arm misses it in the top-10 (recall@10 headroom) while the dense arm can still find it. Authored chunk-first and every label verified against the live index (lexical rank vs semantic rank) — see the exact/topical slice for lexical-favouring controls that hybrid must not regress.",
+  "collection": "KI",
+  "status": "DRAFT — hand-verified on the live KI index (bge-m3). semantic cases: lexical rank >10 AND semantic rank <=3, relevance confirmed by reading the chunk. exact/topical: lexical rank 1. This fixture exists to give recall@10 the headroom the source-level fixtures lack, so idea.md's kill-criterion is measurable.",
+  "expected_token_forms": "16-hex chunk_id (exact chunk match).",
+  "queries": [
+    { "id": "sem-train-hardware", "type": "semantic",
+      "query": "what graphics cards were used and how long did training take for the base transformer",
+      "expected": ["cdaf35b29132945e"] },
+
+    { "id": "sem-orbit-latency", "type": "semantic",
+      "query": "how long does a signal take to travel to orbit and back and why that hurts interactivity",
+      "expected": ["49626f329245c227"] },
+
+    { "id": "sem-launch-cost", "type": "semantic",
+      "query": "what makes launching hardware into space so expensive per kilogram",
+      "expected": ["eb4fef77e57e4a12"] },
+
+    { "id": "sem-mac-model", "type": "semantic",
+      "query": "which open model can run on a laptop with an apple chip",
+      "expected": ["66b2eafc021002d8"] },
+
+    { "id": "sem-onprem-privacy", "type": "semantic",
+      "query": "keeping company data in-house on your own servers rather than a public cloud",
+      "expected": ["8cab215bb1746b1c"] },
+
+    { "id": "sem-german-onprem", "type": "semantic",
+      "query": "the requirement that the whole solution must run inside the company premises with backups",
+      "expected": ["b5496838cf0f2266"] },
+
+    { "id": "exact-sdpa", "type": "exact",
+      "query": "Scaled Dot-Product Attention",
+      "expected": ["8e4b1d83755d5e25"] },
+
+    { "id": "exact-bpe", "type": "exact",
+      "query": "byte-pair encoding WMT 2014 English-German dataset",
+      "expected": ["e89efaaeaa511714"] },
+
+    { "id": "exact-falcon", "type": "exact",
+      "query": "Falcon 9 launch cost per kilogram to low earth orbit",
+      "expected": ["eb4fef77e57e4a12"] },
+
+    { "id": "topical-posenc", "type": "topical",
+      "query": "positional encoding sine and cosine functions",
+      "expected": ["1bee231eb2b0da04"] },
+
+    { "id": "topical-multihead", "type": "topical",
+      "query": "multi-head attention queries keys values",
+      "expected": ["07c7683f67298ee8"] }
+  ]
+}
