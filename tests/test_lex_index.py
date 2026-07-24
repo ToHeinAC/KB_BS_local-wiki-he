@@ -110,6 +110,21 @@ def test_no_results_for_unknown_query(fresh_index):
     assert hits == []
 
 
+def test_index_health_reports_missing_index(tmp_path, monkeypatch):
+    """A DB built before the FTS5 cutover has no store — query() is silently empty,
+    so index_health() is what lets the UI say "no index" instead of "no match"."""
+    import db_context
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("legacy")
+    assert lex_index.index_health() == {"raw": 0, "wiki": 0}
+
+
+def test_index_health_counts_built_rows(fresh_index):
+    health = lex_index.index_health()
+    assert health["raw"] > 0
+    assert health["raw"] + health["wiki"] == fresh_index["chunks"]
+
+
 # --- incremental updates -----------------------------------------------------
 
 def test_query_returns_empty_without_index(tmp_path, monkeypatch):

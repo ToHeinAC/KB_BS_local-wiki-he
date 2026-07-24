@@ -303,6 +303,27 @@ def index_delete(source: str) -> None:
 
 # --- Query -------------------------------------------------------------------
 
+def index_health() -> dict:
+    """Row counts per scope for the active DB's FTS5 store: `{raw, wiki}`.
+
+    Both zero means the index is missing or empty — `query()` silently returns []
+    in that state, so callers use this to tell "no match" apart from "no index"
+    (databases last built before the FTS5 cutover have no `chunks.sqlite`).
+    """
+    path = _fts5_path()
+    if not path.exists():
+        return {"raw": 0, "wiki": 0}
+    con = sqlite3.connect(str(path))
+    try:
+        rows = con.execute("SELECT scope, count(*) FROM chunks_fts GROUP BY scope").fetchall()
+    except sqlite3.Error:
+        return {"raw": 0, "wiki": 0}
+    finally:
+        con.close()
+    counts = dict(rows)
+    return {"raw": int(counts.get("raw", 0)), "wiki": int(counts.get("wiki", 0))}
+
+
 def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
     """BM25 over the FTS5 chunk index. Returns up to top_k hits (empty if no index).
 

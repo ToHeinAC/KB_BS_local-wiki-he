@@ -16,6 +16,7 @@ import db_context
 import dedup
 import file_processor
 import gpu_widget
+import lex_index
 import md_convert
 import metadata_extract
 import ollama_client
@@ -258,6 +259,27 @@ st.markdown(
         background-color: {_t['bg']} !important;
     }}
 
+    /* ── Segmented control (primary navigation) ──
+       Streamlit's testid is stButtonGroup, and the selected pill is marked with
+       kind="segmented_controlActive" — not aria-checked. */
+    [data-testid="stButtonGroup"] button {{
+        background-color: {_t['widget_bg']} !important;
+        border-color: {_t['border']} !important;
+    }}
+    [data-testid="stButtonGroup"] button * {{
+        color: {_t['text']} !important;
+    }}
+    [data-testid="stButtonGroup"] button:hover {{
+        background-color: {_t['hover']} !important;
+    }}
+    [data-testid="stButtonGroup"] button[kind="segmented_controlActive"] {{
+        background-color: {_t['primary']} !important;
+        border-color: {_t['primary']} !important;
+    }}
+    [data-testid="stButtonGroup"] button[kind="segmented_controlActive"] * {{
+        color: #ffffff !important;
+    }}
+
     /* ── Expanders (use page bg so widget-bg buttons inside stand out as boxes) ── */
     [data-testid="stExpander"] {{
         border: 1px solid {_t['border']} !important;
@@ -320,7 +342,10 @@ st.markdown(
         border-top-color: {_t['primary']} !important;
     }}
 
-    .block-container {{ padding-top: 1.5rem; padding-bottom: 2rem; }}
+    /* Streamlit's fixed stHeader is opaque and overlays the top of the main
+       column — at 1.5rem the top bar's first line (the DATABASE / OPTIONS
+       headings) was painted over and looked missing. Clear the header. */
+    .block-container {{ padding-top: 4rem; padding-bottom: 2rem; }}
 
     /* Multiselect selected-item tags: orange */
     [data-baseweb="tag"] {{
@@ -415,6 +440,23 @@ def _raw_source_button(filename: str, key: str) -> None:
         st.markdown(f"- `{filename}`")
 
 
+def _warn_if_no_lex_index() -> bool:
+    """Warn when the active DB has no lexical index. Returns True if it is missing.
+
+    Databases last built before the FTS5 cutover (commit `d25fbe8`) have no
+    `index/chunks.sqlite`, and `lex_index.query()` returns [] for them — every
+    search and both chat modes come back empty with no error. Say so instead.
+    """
+    if lex_index.index_health()["wiki"]:
+        return False
+    st.warning(
+        "**No search index for this database.** Search and chat answers will come "
+        "back empty until it is rebuilt: sidebar → **🛠 Maintenance** → "
+        "**Search index** → *Rebuild search index*."
+    )
+    return True
+
+
 def _render_wiki_nav(key_prefix: str) -> str | None:
     """Render wiki navigation tree in a narrow column. Returns clicked filename or None."""
     search = st.text_input(
@@ -424,9 +466,11 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
     selected: str | None = None
     if search:
         results = wiki_engine.search_wiki(search)
+        if not results and _warn_if_no_lex_index():
+            return None
         st.caption(f"{len(results)} result(s)")
         max_score = max((r.get("score", 0.0) for r in results), default=0.0)
-        for r in results:
+        for _i, r in enumerate(results):
             if st.button(r["title"], key=f"{key_prefix}_hit_{r['filename']}", use_container_width=True):
                 st.session_state[f"{key_prefix}_selected_page"] = r["filename"]
                 selected = r["filename"]
@@ -442,6 +486,8 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
             terms = r.get("matched_terms") or []
             if terms:
                 st.caption("matched: " + " ".join(f"`{t}`" for t in terms))
+            if _i < len(results) - 1:
+                st.markdown("---")
     else:
         tree = wiki_engine.get_wiki_tree()
         group_labels = {
@@ -552,6 +598,21 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                 st.session_state["last_research_error"] = step["content"]
 
 
+def _bar_label(text: str) -> None:
+    """Small uppercase heading above a top-bar control.
+
+    Rendered as markdown rather than the widget's own `label=`: Streamlit's
+    widget labels do not surface here (both the selectbox and the segmented
+    control came out label-less in the browser), and the inline `!important`
+    is needed to beat the blanket `.stApp *` colour rule.
+    """
+    st.markdown(
+        f"<div style='font-size:0.72rem;font-weight:600;letter-spacing:0.09em;"
+        f"color:{_t['text_muted']} !important;margin:0 0 0.2rem 2px'>{text}</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _page_header(title: str, subtitle: str = "") -> None:
     st.markdown(f"## {title}")
     if subtitle:
@@ -644,41 +705,25 @@ gpu_widget.render_gpu_sidebar(accent=_t["primary"])
 
 st.sidebar.markdown("---")
 
-st.sidebar.caption("DATABASE")
-_db_choice = st.sidebar.selectbox(
-    "Database",
-    options=_allowed_dbs,
-    index=_allowed_dbs.index(st.session_state["active_db"]),
-    key="db_selector",
-    label_visibility="collapsed",
-)
-if _db_choice != st.session_state["active_db"]:
-    st.session_state["active_db"] = _db_choice
-    db_context.set_active_db(_db_choice)
-    # Clear per-DB session state to avoid cross-DB leakage.
-    for _k in ("messages", "chat_followup", "research_history",
-               "last_research_q", "last_research_answer", "last_report",
-               "research_sources", "explorer_selected_page", "last_contradictions",
-               "pending_batch", "batch_confirmed", "batch_prepared", "batch_key",
-               "convert_editor", "chat_scope"):
-        st.session_state.pop(_k, None)
+# Maintenance is the only sidebar destination: infrequent, admin-ish, kept away
+# from the four daily-use wiki views in the main window.
+_maint_active = st.session_state.get("nav_maintenance", False)
+if _maint_active:
+    st.markdown(
+        f"""<style>
+        [data-testid="stSidebar"] .st-key-maint_nav_btn button {{
+            background-color: {_t['primary']} !important;
+            border-color: {_t['primary']} !important;
+        }}
+        [data-testid="stSidebar"] .st-key-maint_nav_btn button * {{
+            color: #ffffff !important;
+        }}
+        </style>""",
+        unsafe_allow_html=True,
+    )
+if st.sidebar.button("🛠 Maintenance", key="maint_nav_btn", use_container_width=True):
+    st.session_state["nav_maintenance"] = True
     st.rerun()
-
-st.sidebar.markdown("---")
-
-st.sidebar.caption("NAVIGATION")
-_nav_options = ["Wiki Explorer", "Wiki Chat", "Research", "Maintenance"]
-if _can_maintain:
-    _nav_options.insert(0, "Upload")
-page = st.sidebar.radio(
-    "Navigate",
-    _nav_options,
-    label_visibility="collapsed",
-    key="page_nav",
-)
-
-s = wiki_engine.stats()
-st.sidebar.markdown(f"**{s['pages']}** pages &nbsp;·&nbsp; **{s['raw_files']}** sources", unsafe_allow_html=True)
 
 st.sidebar.markdown("---")
 st.sidebar.caption(f"Signed in as **{_user}**")
@@ -691,6 +736,59 @@ if _logout_col.button("Logout", key="logout_btn"):
                "last_report", "research_sources"):
         st.session_state.pop(_k, None)
     st.rerun()
+
+
+# --- top bar: active database + primary navigation ---
+# Runs before the page dispatch so `set_active_db` still lands before any page
+# handler reads paths.
+_bar_db, _bar_nav = st.columns([1, 3])
+
+with _bar_db:
+    _bar_label("DATABASE")
+    _db_choice = st.selectbox(
+        "Database",
+        options=_allowed_dbs,
+        index=_allowed_dbs.index(st.session_state["active_db"]),
+        key="db_selector",
+        label_visibility="collapsed",
+    )
+    _s = wiki_engine.stats()
+    st.caption(f"**{_s['pages']}** pages &nbsp;·&nbsp; **{_s['raw_files']}** sources",
+               unsafe_allow_html=True)
+if _db_choice != st.session_state["active_db"]:
+    st.session_state["active_db"] = _db_choice
+    db_context.set_active_db(_db_choice)
+    # Clear per-DB session state to avoid cross-DB leakage.
+    for _k in ("messages", "chat_followup", "research_history",
+               "last_research_q", "last_research_answer", "last_report",
+               "research_sources", "explorer_selected_page", "last_contradictions",
+               "pending_batch", "batch_confirmed", "batch_prepared", "batch_key",
+               "convert_editor", "chat_scope"):
+        st.session_state.pop(_k, None)
+    st.rerun()
+
+with _bar_nav:
+    if not _maint_active:
+        _bar_label("OPTIONS")
+    if _maint_active:
+        page = "Maintenance"
+        if st.button("← Back to Wiki", key="back_to_wiki"):
+            st.session_state["nav_maintenance"] = False
+            st.rerun()
+    else:
+        _nav_options = ["Wiki Explorer", "Wiki Chat", "Research"]
+        if _can_maintain:
+            _nav_options.insert(0, "Upload")
+        # Upload disappears on a DB the user does not maintain. Written *before*
+        # the widget: a post-instantiation write to a widget key raises.
+        if st.session_state.get("wiki_view") not in _nav_options:
+            st.session_state["wiki_view"] = _nav_options[0]
+        # segmented_control, not st.tabs: tabs execute every branch on every rerun
+        # and the Upload branch's st.stop() would blank the other tabs.
+        page = st.segmented_control(
+            "OPTIONS", _nav_options, required=True, key="wiki_view",
+            label_visibility="collapsed",
+        )
 
 
 # --- pages ---
@@ -1017,6 +1115,7 @@ var net=new vis.Network(document.getElementById('g'),
 
 elif page == "Wiki Chat":
     _page_header("Wiki Chat", "Fast mode reads wiki pages; Deep mode reasons over original documents.")
+    _warn_if_no_lex_index()
 
     if "messages" not in st.session_state:
         st.session_state["messages"] = []
@@ -1299,11 +1398,37 @@ elif page == "Maintenance":
     c2.metric("Raw sources", s["raw_files"])
     c3.metric("Data size (MB)", round(s["data_bytes"] / 1_048_576, 2))
 
-    _tab_labels = ["Delete source", "Link graph health", "Lint", "Activity log", "Reset all data"]
+    _tab_labels = ["Search index", "Delete source", "Link graph health", "Lint",
+                   "Activity log", "Reset all data"]
     if auth.is_admin(_user):
         _tab_labels.append("Admin")
     _tabs = st.tabs(_tab_labels)
-    tab_del, tab_graph, tab_lint, tab_log, tab_reset = _tabs[:5]
+    tab_index, tab_del, tab_graph, tab_lint, tab_log, tab_reset = _tabs[:6]
+
+    with tab_index:
+        _health = lex_index.index_health()
+        st.caption(
+            "Lexical BM25 index (`index/chunks.sqlite`) — the grounding source for "
+            "search, both chat modes, and the research agent. It is a derived cache: "
+            "rebuilding reads `chunks/` + `wiki/` only, never the LLM."
+        )
+        _ic1, _ic2 = st.columns(2)
+        _ic1.metric("Source chunks indexed", _health["raw"])
+        _ic2.metric("Wiki page chunks indexed", _health["wiki"])
+        if not _health["wiki"]:
+            st.warning(
+                "**No index for this database.** Databases last built before the FTS5 "
+                "cutover have none, so every search and chat answer comes back empty. "
+                "Rebuild to fix it."
+            )
+        if _can_maintain:
+            if st.button("Rebuild search index", key="rebuild_index_btn"):
+                with st.spinner("Rebuilding index…"):
+                    _res = wiki_engine.rebuild_lex_index()
+                st.success(f"Indexed {_res['chunks']} chunks.")
+                st.rerun()
+        else:
+            st.info("Only maintainers of this database can rebuild the index.")
 
     with tab_graph:
         orphans = wiki_engine.find_orphans()
