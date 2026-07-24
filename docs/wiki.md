@@ -62,7 +62,7 @@ page can only cite pages that already existed when it was written, and ~88% of
 real edges are one-way. Retrieval therefore never reads `related:` directly — it
 goes through `wiki_engine.linked_pages()`, which traverses the graph undirected
 (in-links + out-links) and adds implicit shared-source edges. See
-[architecture.md](architecture.md) §Link-aware retrieval.
+[retrieval.md](retrieval.md) §Link-aware retrieval.
 
 ## `index.md` and `log.md` formats (OKF; code-generated)
 

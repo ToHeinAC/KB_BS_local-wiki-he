@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in — Markdown, or PDF / DOCX / images that are auto-converted to Markdown (local OCR + rewrite, vendored from [MD-maker](https://github.com/ToHeinAC/MD-maker)) — and a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** All pages implemented — three-stage ingest (`ingest_begin` / `ingest_piece` / `ingest_end`) drives a structural chunk store + BM25 lexical index + 1–5 hypothetical questions per source (folded into BM25 TF) under `data/chunks/` and `data/index/` → wiki (tree-by-type + BM25 full-text search over page bodies + typed-graph viz with `derived-from` source edges) → chat (Fast: one-shot RAG over wiki pages with hybrid BM25→LLM page selection + section-level chunk synthesis; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25; live trace + download) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report; inline report + download). Both agent modes include an `evaluate_condition` tool that deterministically evaluates logical / regulatory conditions (thresholds, membership, ranges, AND/OR/NOT trees) over LLM-extracted facts — Python does the comparison, not the model. Affected-page selection during ingest is BM25-driven (no extra LLM call) and merges into existing pages with a rank-weighted budget. Long-source ingest (e.g. 488 KB legal docs): ~7 min. ≈258-test suite.
+> **Status:** All pages implemented — three-stage ingest (`ingest_begin` / `ingest_piece` / `ingest_end`) drives a structural chunk store + a lexical FTS5/BM25 index + an optional local-embedding semantic arm fused with it via RRF (hybrid retrieval, degrades gracefully to lexical-only) + 1–5 hypothetical questions per source (folded into BM25 TF) under `data/chunks/` and `data/index/` → wiki (tree-by-type + BM25 full-text search over page bodies + typed-graph viz with `derived-from` source edges) → chat (Fast: one-shot RAG over wiki pages with hybrid BM25→LLM page selection + section-level chunk synthesis; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25; live trace + download) → research (LangGraph deep researcher: plan → wiki-first → triage → web search → quality-gated report; inline report + download). Both agent modes include an `evaluate_condition` tool that deterministically evaluates logical / regulatory conditions (thresholds, membership, ranges, AND/OR/NOT trees) over LLM-extracted facts — Python does the comparison, not the model. Affected-page selection during ingest is BM25-driven (no extra LLM call) and merges into existing pages with a rank-weighted budget. Long-source ingest (e.g. 488 KB legal docs): ~7 min. 350-test suite.
 
 The generated `wiki/` folder is a conformant **[Open Knowledge Format (OKF v0.1)](docs/okf.md)** bundle — typed markdown pages, `okf_version`-declaring `index.md`, date-grouped `log.md`, and `## Citations`. Conformance is stamped deterministically in code (`src/okf.py`), never by the LLM, so it holds even on `gemma4:e4b`.
 
@@ -30,8 +30,23 @@ cd KB_BS_local-wiki-he
 uv sync
 ollama pull gemma4:e4b          # or any model — set OLLAMA_MODEL in .env
 ollama pull deepseek-ocr:3b     # only needed to upload non-Markdown files (PDF/DOCX/images)
+ollama pull bge-m3              # semantic retrieval arm (optional; lexical-only without it)
 cp .env.example .env
 ```
+
+### Optional: cross-encoder reranking (Stage D)
+
+Improves precision on the Deep chat/research answer paths. Entirely optional —
+without it, retrieval uses lexical + semantic fusion and behaves exactly as before.
+
+```bash
+uv sync --extra rerank          # builds llama-cpp-python from source (needs a C compiler)
+mkdir -p models && curl -L -o models/bge-reranker-v2-m3-Q8_0.gguf \
+  https://huggingface.co/gpustack/bge-reranker-v2-m3-GGUF/resolve/main/bge-reranker-v2-m3-Q8_0.gguf
+```
+
+Install from sdist as shown: the project's prebuilt `linux_x86_64` wheels are
+musl-linked and fail to import on glibc. Set `RERANK_ENABLED=0` to switch it off.
 
 ## Run
 

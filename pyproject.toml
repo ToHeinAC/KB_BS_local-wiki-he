@@ -30,6 +30,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# Stage D cross-encoder reranker. Optional on purpose: retrieval degrades to plain
+# RRF fusion without it (src/rerank.py). NOTE: the prebuilt "linux_x86_64" wheels on
+# abetlen.github.io are musl-linked and fail to import on glibc — install from sdist.
+rerank = ["llama-cpp-python>=0.3.19"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

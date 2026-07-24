@@ -105,7 +105,7 @@ def test_raw_search_reports_per_db_misses(two_dbs):
 def test_raw_search_splits_budget_across_dbs(two_dbs, monkeypatch):
     seen = []
 
-    def fake_search(q, top_k, scope=None):
+    def fake_search(q, top_k, scope=None, use_rerank=False):
         seen.append(top_k)
         return []
 

@@ -16,6 +16,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import sys
 from collections import defaultdict
@@ -26,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import db_context  # noqa: E402
 import embed_index  # noqa: E402
 import lex_index  # noqa: E402
+import rerank  # noqa: E402
 import retrieval  # noqa: E402
 
 PRECISION_K = 5
@@ -35,6 +37,9 @@ _SEARCHERS = {
     "lexical": lex_index.query,   # arm A only (FTS5 BM25)
     "semantic": embed_index.query,  # arm B only (cosine)
     "hybrid": retrieval.search,   # RRF fusion of A + B
+    # Stage D: fusion + cross-encoder rerank. Scored against `hybrid` on the same
+    # fixture — idea.md's kill-criterion is "no precision@5 gain ⇒ drop the model".
+    "rerank": functools.partial(retrieval.search, use_rerank=True),
 }
 
 
@@ -100,7 +105,8 @@ def main() -> int:
     ap.add_argument("--scope", default="both", choices=["raw", "wiki", "both"],
                     help="default retrieval scope; a case may override with its own 'scope'")
     ap.add_argument("--mode", default="lexical", choices=list(_SEARCHERS),
-                    help="retrieval arm: lexical (default), semantic, or hybrid (RRF)")
+                    help="retrieval arm: lexical (default), semantic, hybrid (RRF), "
+                         "or rerank (hybrid + Stage D cross-encoder)")
     args = ap.parse_args()
 
     db_context.set_active_db(args.db)
@@ -110,10 +116,17 @@ def main() -> int:
         return 2
     cases = json.loads(fixture_path.read_text())["queries"]
 
-    if args.mode in ("semantic", "hybrid") and not embed_index.available():
+    if args.mode in ("semantic", "hybrid", "rerank") and not embed_index.available():
         print(f"ERROR: mode={args.mode} needs a semantic index for '{args.db}'.\n"
               f"Pull an embed model and run: uv run python scripts/backfill_embeddings.py {args.db}",
               file=sys.stderr)
+        return 2
+    # The reranker fails open by design, so a missing GGUF would silently score as
+    # plain hybrid and look like "no gain". Fail loudly instead.
+    if args.mode == "rerank" and not rerank.available():
+        print("ERROR: mode=rerank needs llama-cpp-python + a reranker GGUF at "
+              f"{rerank._model_path()} (RERANK_MODEL). Without it the run would "
+              "silently measure plain hybrid.", file=sys.stderr)
         return 2
 
     search_fn = _SEARCHERS[args.mode]

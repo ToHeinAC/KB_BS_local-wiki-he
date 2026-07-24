@@ -11,6 +11,10 @@ Track open work and resolved items here. Keep entries short; link to PRs/commits
 
 ## Open
 
+- **3 failing tests in `tests/test_file_processor.py`** (`test_truncation_respects_max_chars`, `test_result_len_at_most_max_chars`, `test_large_file_content_after_max_absent`). Pre-existing — they fail on a clean tree too, so they predate the 2026-07-24 nav/search work. Suite is otherwise 361/364 green. Either `chunk_text`'s truncation contract or the tests' expectation of it has drifted; decide which is right before touching either.
+- **Stale `postings.json` / `stats.json` in most `data/<DB>/index/`.** Dead artifacts of the JSON-postings backend retired in `d25fbe8`; nothing reads them (~4 MB in KI alone). Safe to delete, but they are inside user databases, so removal needs an explicit go-ahead.
+- **No migration hook for derived indexes.** `d25fbe8` changed the on-disk index format with no upgrade path, which silently broke retrieval on 10 of 12 databases until 2026-07-24. A startup check (`lex_index.index_health()` per DB) or a one-shot migration script would have caught it; today only the Maintenance banner does, and only once a user visits the DB.
+
 # Karpathy Wiki Knowledge System — Deep Dive & LocalWiki Implementation Review
 
 ## Executive Summary
@@ -269,6 +273,16 @@ This is purely additive and significantly improves wiki usability as the knowled
 The implementation captures ~70% of the Karpathy pattern's structure correctly and is a solid foundation. The missing 30% is concentrated in the knowledge-update feedback loops — the mechanics that make knowledge compound rather than merely accumulate.
 
 ## Resolved
+
+### 2026-07-24 — documentation budget
+
+`docs/architecture.md` (≈45 k) and `docs/changelog.md` (≈46 k) were both over the
+35 000-char rule. Applied the remedies noted here: the retrieval layer (chunk store, both
+arms, RRF fusion, Stage D rerank, and the Query / multi-DB / link-aware dataflows) moved to
+**`docs/retrieval.md`**, leaving architecture at ≈32 k; entries before 2026-06 moved to
+**`docs/changelog-archive.md`**, leaving the live log at ≈34 k. Cross-references in
+`AGENTS.md`, `IMPLEMENTATION.md`, `docs/wiki.md` and `docs/ui.md` were repointed. The log
+is append-only, so the next tranche will need the same treatment.
 
 ### 2026-05-06 — Karpathy-pattern compounding mechanics
 

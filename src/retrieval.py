@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import embed_index
 import lex_index
+import rerank
 
 RRF_K = 60
 _CANDIDATES = 40  # per-arm depth fed into fusion (idea.md: fuse deep, return shallow)
@@ -64,13 +65,22 @@ def _rrf_fuse(lex_hits: list[dict], sem_hits: list[dict], top_k: int) -> list[di
     return out
 
 
-def search(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
+def search(q: str, top_k: int = 10, scope: str | None = None,
+           use_rerank: bool = False) -> list[dict]:
     """Hybrid lexical+semantic retrieval. Falls back to pure lexical when the
-    semantic arm is unavailable (identical to `lex_index.query`)."""
+    semantic arm is unavailable (identical to `lex_index.query`).
+
+    `use_rerank` adds the Stage D cross-encoder pass. It splits the two consumers
+    per idea.md §6.9.2: the Fast path (browsing, per-keystroke) stays fusion-only,
+    while the Deep answer paths — which commit to a citation — pay for precision.
+    Unavailable reranker ⇒ plain fused order, so this can never break search.
+    """
+    reranking = use_rerank and rerank.available()
+    depth = max(top_k, rerank.candidates()) if reranking else top_k
     lex_hits = lex_index.query(q, top_k=_CANDIDATES, scope=scope)
     if not embed_index.available():
-        return lex_hits[:top_k]
-    sem_hits = embed_index.query(q, top_k=_CANDIDATES, scope=scope)
-    if not sem_hits:
-        return lex_hits[:top_k]
-    return _rrf_fuse(lex_hits, sem_hits, top_k)
+        fused = lex_hits[:depth]
+    else:
+        sem_hits = embed_index.query(q, top_k=_CANDIDATES, scope=scope)
+        fused = lex_hits[:depth] if not sem_hits else _rrf_fuse(lex_hits, sem_hits, depth)
+    return rerank.rerank(q, fused, top_k) if reranking else fused[:top_k]

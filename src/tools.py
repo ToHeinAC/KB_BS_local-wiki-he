@@ -257,7 +257,7 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
 
     Hybrid retrieval (lexical + semantic RRF); degrades to pure lexical when the DB
     has no embedding index (see src/retrieval.py)."""
-    hits = retrieval.search(query, top_k=max_results, scope="raw")
+    hits = retrieval.search(query, top_k=max_results, scope="raw", use_rerank=True)
     parts = []
     for i, h in enumerate(hits, 1):
         anchor = h.get("anchor") or ""

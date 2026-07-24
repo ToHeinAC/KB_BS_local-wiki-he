@@ -49,3 +49,6 @@ tmp/
 
 # Data folder
 data/
+
+# Local model weights (GGUF reranker, Stage D)
+models/

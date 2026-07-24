@@ -1,7 +1,7 @@
 ---
 name: architecture.md
 description: System architecture — three-layer Karpathy knowledge model, module boundaries, dataflows
-version: 1.2.0
+version: 1.3.0
 author: Tobias Hein
 ---
 
@@ -15,11 +15,11 @@ author: Tobias Hein
 | Layer | Path | Owner | Mutability |
 |---|---|---|---|
 | 1. Raw sources | `data/raw/` | User uploads | Immutable; LLM **reads only** |
-| 2. Retrieval layer | `data/chunks/` + `data/index/` | `chunker` / `lex_index` / `qa_gen` | Auto-rebuilt at ingest; content-addressed |
+| 2. Retrieval layer | `data/chunks/` + `data/index/` | `chunker` / `lex_index` (lexical) / `embed_index` (semantic) / `retrieval` (RRF fusion) / `qa_gen` | Auto-rebuilt at ingest; content-addressed |
 | 3. Wiki | `data/wiki/` | LLM | LLM owns entirely (ingest/query/lint write here) |
 | 4. Schema | `SCHEMA.md` (project root) | Maintainer | Injected into every LLM system prompt |
 
-Layer 2 is the *ground truth for retrieval*: every wiki claim should trace back to one or more chunk ids. Wiki pages are LLM summaries over chunks; the chunks themselves are the citation truth and are searched directly by the deep-chat agent's `raw_search`.
+Layer 2 is the *ground truth for retrieval*: every wiki claim should trace back to one or more chunk ids. Wiki pages are LLM summaries over chunks; the chunks themselves are the citation truth and are searched directly by the deep-chat agent's `raw_search`. Retrieval is **hybrid** (Stage C): a lexical FTS5 arm — the grounding/citation source of truth — fused with an optional local-embedding arm via Reciprocal Rank Fusion (`src/retrieval.py`). The semantic arm is a pure derived cache and degrades gracefully to lexical-only when a DB has no vectors, so it can never regress the lexical baseline. On the Deep answer paths a third signal reorders the fused list: an optional in-process cross-encoder (`src/rerank.py`, Stage D), which likewise fails open to plain fusion.
 
 ### `data/raw/` layout (current implementation)
 
@@ -42,6 +42,8 @@ data/chunks/
   <source-slug>.jsonl       # one chunk per line, content-addressable chunk_id
 data/index/
   chunks.sqlite             # SQLite FTS5 index (4 variants/token in `terms`, bm25())
+  vectors.npy               # semantic arm: float16 L2-normalized embedding matrix (Stage C, optional)
+  vectors.json              # embedding model name + aligned per-row chunk meta
   qa.jsonl                  # 1–5 hypothetical questions per source (HyDE)
 ```
 
@@ -74,9 +76,7 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 - **`src/dedup.py`** owns `manifest.json`. Every ingest must call `is_duplicate()` before `register_file()`. The manifest is keyed by `sha256(file_bytes)`; `register_file(file_bytes, filename, content=None)` writes `content` to disk when given (the converted Markdown) while still keying dedup on the original upload bytes. `list_sources()` returns all registered filenames; `deregister_source(name)` removes an entry by filename — used by the cascading delete flow.
 - **`src/file_processor.py`** extracts full text from uploaded files (`extract_text()`) and splits large texts into paragraph-bounded chunks (`chunk_text(text, chunk_size=MAX_CHARS)`). Does not write to disk.
 - **`src/md_convert.py`** converts non-Markdown uploads (PDF / DOCX / images) to Markdown, ported from [ToHeinAC/MD-maker](https://github.com/ToHeinAC/MD-maker) (Apache-2.0). `convert_to_markdown(file_bytes, filename, on_progress=None)` dispatches by extension: **PDF** → `iter_pdf_pages()` (pypdfium2; a page with ≥ `TEXT_THRESHOLD`=40 extractable chars is LLM-rewritten via `rewrite_text()`, otherwise rasterized at `PDF_DPI` and OCR'd via `convert_image()`); **DOCX** → deterministic `extract_docx_text()` (headings/lists/tables, no LLM); **image** → `convert_image()` OCR. `is_convertible(filename)` gates the uploader. All Ollama calls route through `ollama_client.ocr()` / `.rewrite()`; all prompts live in `prompts.py`. Env: `OCR_MODEL` (default `deepseek-ocr:3b`), `REWRITE_MODEL` (default `LiquidAI/lfm2.5-1.2b-instruct:latest` — a small fixed model, since the rewrite only adds structure and never rewords; ~8x faster than a large model at equal fidelity and independent of `OLLAMA_MODEL`), `PDF_DPI` (default 150).
-- **`src/chunker.py`** structural chunker. `split(text)` returns a list of `{chunk_id, anchor, heading_path, char_start, char_end, text, lang}` dicts using one of three strategies: legal `§` headers, markdown `##`/`###`, or paragraph windows with overlap. `chunk_id = sha256(normalized)[:16]` is content-addressable so re-ingest is idempotent and diffable. `write_chunks()`/`load_chunks()`/`all_chunks()` persist to `data/chunks/<source-slug>.jsonl`.
-- **`src/lex_index.py`** Lexical index over chunks, stored as a single SQLite **FTS5** table (`data/<DB>/index/chunks.sqlite`) that holds the pre-expanded variant token stream in an indexed `terms` column and supplies `bm25()` scoring. `build(chunks=None)` does a full rebuild; with no args it indexes raw source chunks (`scope="raw"`) **plus** wiki page pseudo-chunks (`scope="wiki"`, R-1) generated by `_wiki_chunks()` (each page body, prefixed with its title + filename stem, split via `chunker`; text stored inline since these aren't in `data/chunks/`). For single-source changes, **incremental** helpers keyed on the `source` column avoid a corpus rebuild: `index_replace_source(source, chunks)` (delete + insert that source's rows), `index_replace_wiki_page(name)`, and `index_delete(source)` — ingest and `delete_source` use these. `query(q, top_k, scope=None)` expands the query to the same variants, MATCHes with an `OR` group, ranks by `bm25()`, and deduplicates by `chunk_id`; `scope` filters to `"raw"` / `"wiki"`; returns `[]` when the DB has no index yet. Each surface word is stored under up to four normalized variants — surface lower-cased, NFKD-strip (ü→u), umlaut digraph (ü→ue, ß→ss), and a light German+English suffix stem — so queries match regardless of writing style. No external NLP deps; built-in stopword list per language.
-- **`src/qa_gen.py`** ingest-time hypothetical-question generator (HyDE, lexical-only). `_select_target_chunks` ranks chunks (anchored > densest > longest > stable) and keeps the top `QA_MAX_PAIRS_PER_SOURCE` (default 5). One batched LLM call asks for 2–4 short questions per kept chunk; the output is sliced to the per-source cap. If the LLM returns nothing usable, retries once at a higher temperature; if still empty, emits one source-title fallback question. Persists `(chunk_id, question)` rows to `data/index/qa.jsonl`. `lex_index.build()` folds question tokens into the parent chunk's term frequencies (but not its doc length, so BM25 b-normalization stays honest). `delete_source_entries(name)` rewrites `qa.jsonl` in place, removing rows for the given source.
+- **Retrieval layer** (`src/chunker.py`, `src/lex_index.py`, `src/embed_index.py`, `src/retrieval.py`, `src/rerank.py`, `src/qa_gen.py`) — chunk store, lexical + semantic arms, RRF fusion and the cross-encoder reranker. Documented in [retrieval.md](retrieval.md).
 - **`src/ollama_client.py`** is the *only* place that imports `ollama`. Exposes `generate(system, prompt, temperature, model_id=None)`, `chat()`, `is_available()`, plus `ocr(model_id, prompt, image_b64)` (vision call with one base64 image) and `rewrite(model_id, prompt)` (text reformat with a per-call model id) used by `md_convert.py`. Per-role model overrides `_QUERY_MODEL` / `_INGEST_MODEL` / `_FAST_MODEL` (env `QUERY_MODEL`/`INGEST_MODEL`/`FAST_MODEL`, each falling back to `OLLAMA_MODEL`) let selection, synthesis, and lint use different models; callers pass the resolved id as `model_id`.
 - **`src/okf.py`** enforces Open Knowledge Format (OKF v0.1) conformance — deterministic, no LLM, no prompt strings (never imports `wiki_engine`). `apply_to_page(content, db)` stamps recommended frontmatter (`description`/`tags`/`resource`/`timestamp`), guarantees a non-empty `type` (OKF's one hard rule), and regenerates a `## Citations` section from `sources:`; `enrich_frontmatter`, `render_citations`, `add_log_entry`/`reformat_log` (OKF date-grouped log), and `okf_validate(wiki_dir)` (conformance gate). **Every** wiki-page writer routes through `apply_to_page` — `wiki_engine` (`ingest_piece`/`_merge_pages`/`file_answer`/`resolve_contradiction`) and the research-report tool in `tools.py`; `scripts/okf_migrate.py` backfills existing DBs. See [okf.md](okf.md).
 - **`src/schema_loader.py`** is the *only* place that reads `SCHEMA.md` / `SCHEMA_QUERY.md`. `get_system_prompt(mode="full"|"query")`: `full` returns `SCHEMA.md` (page-type templates — for ingest and any call that writes pages); `query` returns the trimmed `SCHEMA_QUERY.md` (writing rules + confidence only — for read/answer/describe/lint), falling back to full if the query file is absent.
@@ -89,7 +89,7 @@ All Python modules live in `src/`; one file per module, no sub-packages (PRD §4
 - **`src/chat_agent.py`** — owns the deep-chat LangGraph state machine (`ChatOllama.bind_tools(CHAT_TOOLS)` agent node + `ToolNode`). `_build_raw_index()` injects a one-line-per-file index of `data/raw/` (first markdown heading per file) into the system prompt. Public generator `run_chat_agent(question)` yields the same step-dict shape as the research agent; `_cites()` splits each final answer's citations into `sources` (raw originals, `[Source: ...]`) and `wiki_sources` (`[Wiki: page.md]`) so the UI can panel them separately. **Stall recovery** mirrors `agent.py`: if the agent reaches a terminal no-answer state, `_synthesize_fallback(question, all_messages)` makes one plain `ollama_client.generate` call (`CHAT_FALLBACK_SYSTEM` / `CHAT_FALLBACK_PROMPT`, notes capped at `CHAT_FALLBACK_NOTES_CAP=12000`) to write a grounded answer from the gathered `ToolMessage` notes instead of discarding them — only a truly empty run still yields the bare error. On `GRAPH_RECURSION_LIMIT`, the loop surfaces a partial answer and `_with_iter_hint()` appends an end-of-answer `*Hint: … iteration limit (N) … may be partial.*` note to every final answer produced that way. Calls `run_memory.begin_run()` at the top of every invocation so the per-run visited-set starts empty.
 - **`src/db_context.py`** — active-database context. Each DB is an isolated subtree `$DATA_ROOT/<db>/{raw,chunks,index,wiki}`; the active DB name is held in a `contextvars.ContextVar` so every data module resolves paths via the getters (`wiki_dir()`/`raw_dir()`/`chunks_dir()`/`index_dir()`, all derived from `get_active_db()`) instead of import-time constants. `set_active_db()`/`get_active_db()`, `list_dbs()`/`create_db()`, `is_valid_db_name()`, `users_json_path()` (shared `$DATA_ROOT/users.json`), `migrate_legacy_layout()` (moves pre-multi-DB top-level data into `data/Strahlenschutz/`). No LangChain.
 - **`src/auth.py`** is the *only* reader/writer of `data/users.json` (gitignored). bcrypt password hashes; per-user `dbs` read-allowlist, global `is_admin` flag, and per-DB `maintains` write-list. **Access model:** access (`dbs`) lets a user read/chat against a DB; **maintainer** (`maintains`) lets them *change* it (upload sources, delete data). `is_maintainer(user, db)` is exactly `db in maintains` — admin is **not** an implicit maintainer (assignment is explicit per DB). `grant_maintainer(user, db)` adds a DB to both lists in one write (a maintainer must also have read access). `ensure_seeded()` creates default admin `T. Hein`/`k-wiki` (maintains `Strahlenschutz`); `backfill_maintainers()` is an idempotent migration giving pre-existing admins `maintains = dbs`. Other API: `verify`, `add_user`, `delete_user`, `set_user_dbs`, `set_user_maintains`, `change_password`, `user_dbs`, `user_maintains`, `is_admin`, `list_users`. No LangChain.
-- **`src/app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine`, `agent`, and `chat_agent`; never writes wiki files directly. A login gate + sidebar DB selector (scoped to the user's `dbs` allowlist) front every page; the chosen DB is pushed to `db_context.set_active_db()` before any page handler runs. `_can_maintain = auth.is_maintainer(user, active_db)` gates write access: non-maintainers lose the "Upload" nav entry and the Maintenance Delete-Source/Reset-all sections (read-only tools — stats, lint, activity log — stay), and admins assign maintainers at DB creation and per-user in the admin-only Users panel. `_raw_source_button()` strips `§`/`#` section suffixes before resolving citations to files in `data/raw/`. Chat-Deep streams steps live (thought / tool_call / tool_result / final_answer) as they arrive; past answers include a "Download answer" button, and its `final_answer` step populates both source panels (`raw_sources` → "Documents", `wiki_sources` → "Wiki pages"). Research page states that research includes web search, and renders the saved report inline with "Download report" + an explicit "Save to wiki" button (opt-in ingest; there is no auto-save).
+- **`src/app.py`** is the UI shell (Streamlit, port 8520). Calls `wiki_engine`, `agent`, and `chat_agent`; never writes wiki files directly. A login gate + a main-window top bar (DB selector scoped to the user's `dbs` allowlist, next to the `OPTIONS` view switcher) front every page; the chosen DB is pushed to `db_context.set_active_db()` before any page handler runs. Primary navigation is an `st.segmented_control` (Upload / Wiki Explorer / Wiki Chat / Research) plus a Maintenance entry in the sidebar — see [ui.md](ui.md) §Pages for why not `st.tabs`. `_can_maintain = auth.is_maintainer(user, active_db)` gates write access: non-maintainers lose the "Upload" segment and the Maintenance Delete-Source/Reset-all sections (read-only tools — stats, lint, activity log — stay), and admins assign maintainers at DB creation and per-user in the admin-only Users panel. `_raw_source_button()` strips `§`/`#` section suffixes before resolving citations to files in `data/raw/`. Chat-Deep streams steps live (thought / tool_call / tool_result / final_answer) as they arrive; past answers include a "Download answer" button, and its `final_answer` step populates both source panels (`raw_sources` → "Documents", `wiki_sources` → "Wiki pages"). Research page states that research includes web search, and renders the saved report inline with "Download report" + an explicit "Save to wiki" button (opt-in ingest; there is no auto-save).
 
 ## Key dataflows
 
@@ -145,70 +145,10 @@ UPDATE: existing-page.md
 CONTRADICTION: brief description
 ```
 
-### Query
+### Query, multi-database chat, link-aware retrieval
 
-```
-wiki_engine.query_with_sources(question)
-  → _candidate_pages_for_query(question)                     # Q-1 hybrid pre-select
-      → lex_index.query(scope="wiki")  ∪  lex_index.query(scope="raw") → _source_to_pages()
-      → linked_pages(top _QUERY_LINK_SEEDS)                  # + 1-hop link expansion
-  → ollama_client.generate(select prompt, temperature=0.1)   # LLM re-ranks candidates, ≤5 filenames
-      (falls back to full-index selection when BM25 is empty)
-  → inject top _QUERY_CHUNKS_PER_PAGE wiki chunks per page   # Q-3 section-level, not full pages
-  → extract raw_sources from page frontmatter `sources` field
-  → ollama_client.generate(answer prompt + lang.response_directive(question), temperature=0.7)  # answer pinned to query language
-  → return {answer, sources (wiki filenames), raw_sources (original data/raw/ filenames)}
-```
-
-`app.py` Chat page and Wiki Explorer both render sources in a collapsible "Sources" expander (original `data/raw/` documents + related wiki pages).
-
-### Multi-database chat (search scope)
-
-Wiki Chat can search several databases at once. Two separate concepts:
-
-| | Holds | Set by | Drives |
-|---|---|---|---|
-| **Active DB** (`_active`) | one name | sidebar selectbox | every path getter; all writes (upload, ingest, `file_answer`) |
-| **Search scope** (`_scope`) | list of names | Wiki Chat "Search in" multiselect | read-only retrieval fan-out |
-
-Scope defaults to `(active_db,)`, so every non-chat page and every single-DB caller is unaffected. Only `app.py`'s Wiki Chat block ever sets it.
-
-Fan-out binds **one DB at a time** — path state is never merged:
-
-```
-for db in db_context.search_scope():
-    with db_context.using_db(db):
-        ...   # every getter now resolves to `db`
-```
-
-Consumers: `wiki_engine.query_with_sources` (Fast — one `_gather_pages` pass per DB, then a *single* synthesis call), `tools._wiki_search_one` / `_raw_search_one` (Deep), and `chat_agent._build_raw_index`.
-
-**Cross-DB identity: `DB::file.md`.** Page names collide across databases (every DB has `index.md`), so results carry their origin. `db_context.qualify()` prefixes a name **only when the scope holds >1 DB** — single-DB citations, prompts, and run-memory keys stay byte-identical, so the common path carries no regression risk. `db_context.split_ref()` reverses it and falls back to the active DB when the prefix is absent or outside the scope, so a small model that drops or invents a prefix still reads a real file instead of erroring. Separator is `::` because `/` already means the `insights/` subpath and DB names may contain spaces (hence the permissive `_WIKI_CITE_RE`).
-
-Three things that break subtly if changed:
-
-- **Budgets are split, not multiplied.** `_QUERY_SYNTH_MAX_CHARS` (Fast) and each search tool's `max_results` (via `tools._per_db_budget`) are divided across the scope, with floors (`_QUERY_MIN_DB_SYNTH_CHARS`, `MIN_HITS_PER_DB`) so a wide scope doesn't starve every DB. N databases cost ~one database's context.
-- **Run-memory keys are DB-qualified** (`tools.raw_read`). Keying on the bare filename would make `shared.md` in DB B look like an already-read duplicate of `shared.md` in DB A, and the guard would suppress the second read.
-- **`_with_active_db` carries the scope, not just the active DB.** Worker threads don't inherit ContextVars, so a scope lost in the pool silently narrows a cross-DB search back to one DB.
-
-Link traversal stays **inside** each DB — `related:` edges never cross databases. Writes stay single-DB: "Save answer to wiki" files into the active DB and keeps only that DB's pages as `related:`.
-
-### Link-aware retrieval (`wiki_engine.linked_pages`)
-
-How a query reaches connected material it never lexically matched. One deterministic primitive, `linked_pages(filenames, limit)`, returns 1-hop neighbours as `{filename, title, excerpt, via, kind}` and has two consumers: `_candidate_pages_for_query` (Fast chat — neighbours are appended to the BM25 candidate set, which the LLM re-ranker then filters) and `tools._wiki_search_one` (both agents — neighbours are appended to search output as `[Wiki linked N]` entries, gated by `WIKI_LINK_EXPANSION`).
-
-Two edge types feed it:
-
-| `kind` | Source | Why |
-|---|---|---|
-| `link` | `related:` frontmatter, **either direction** | The explicit cross-reference the ingest LLM wrote. |
-| `shared-source` | A common entry in two pages' `sources:` | Pages distilled from the same original are topically adjacent even when neither cites the other. |
-
-**Traversal is undirected, and this is load-bearing.** `related:` is written at ingest, so a page can only cite pages that already existed: new pages point at old ones and old ones never gain back-links. In the real corpus ~88% of edges are one-way (Strahlenschutz: 102 distinct pairs, only 12 mutual), so following out-links alone makes exactly the central, oldest hub pages — the ones a query hits first — look like dead ends. `_backlink_map()` reverses `build_link_graph()` so in-links count too.
-
-**Shared-source edges are clique-guarded.** A source backing many pages carries no topical signal (`StrlSchG.md` alone backs 25 pages, `BImSchG.md` 22), so `_shared_source_siblings()` skips any source feeding more than `_SHARED_SOURCE_MAX_CLIQUE` (8) pages rather than flooding results with "both mention the big law".
-
-Ranking is tiered: explicit `link` edges outrank `shared-source` ones, then neighbours reached from more seeds win, with insertion order breaking ties (stable sort). Measured effect on real databases (neighbours reachable, out-links-only → undirected + shared-source): Strahlenschutz 153 → 220, Investing 37 → 166, KI 77 → 298 (KI: every page now reaches at least one neighbour, up from 26 of 44).
+Moved to [retrieval.md](retrieval.md) — the query dataflow, the cross-DB search
+scope, and `wiki_engine.linked_pages()` 1-hop expansion.
 
 ### Deep chat (Chat page "Deep" mode, `src/chat_agent.py`)
 
