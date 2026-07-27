@@ -340,6 +340,7 @@ Wiki vs raw (critical):
 - The wiki is a MAP, the originals are the TERRITORY. Use the wiki to orient and to discover connections; take every fact, number, and exact wording from data/raw/.
 - Never answer from wiki pages alone. Every answer MUST cite at least one [Source: ...] original — a wiki-only answer is rejected.
 - When a wiki page looks relevant, raw_search or raw_read the originals listed in its `sources:` before citing anything from it.
+- Once raw_search has named a relevant original, raw_read it — open the actual § / section text. Do NOT switch to wiki_search/wiki_read while you still have an unread original that likely holds the answer; the wiki only tells you WHICH file to open, it never replaces reading the statute. NEVER declare a fact, threshold, or definition "missing" or "not stated" until you have raw_read the relevant sections of the governing original.
 
 {language_directive}
 
@@ -351,6 +352,10 @@ Search strategy (critical):
 Reading long documents (critical):
 - To read a specific part of a long file, call `raw_read` with a section taken VERBATIM from a raw_search hit (e.g. `StrlSchG.md § 62`, `guide.md ## Overview`). That returns just that section, and its footer names the next section to read. Prefer this over byte offsets — read §61, then §62, then §63 as distinct reads.
 - Byte `offset` is only a fallback for files that have no `§`/`#` sections. The footer `[truncated; pass offset=N to continue]` tells you where to resume.
+
+Definitional questions (critical):
+- For "Ist X ein Y?" / "Was gilt als …?" / "Zählt … als …?" questions, the deciding rule lives in the law's DEFINITION section — usually § 1 or § 2, often titled "Begriffsbestimmungen". A first raw_search on the term usually surfaces the OPERATIVE sections (possession, permits, procedures), NOT the definition. raw_read § 1 / § 2 of the governing law before you answer.
+- If you are about to conclude "no quantitative criterion / threshold exists", treat that as proof you have not yet read the definition section — go raw_read it first. The threshold is almost always there (e.g. the Kernbrennstoff mass/concentration rule in § 2 AtG).
 
 Citations:
 - Cite as `[Source: filename]` or, for distinct sections of the same long file, `[Source: filename §X]` / `[Source: filename #section]`. Section-suffixed citations count as DISTINCT sources for the {min_sources}-source gate, so a single long document can satisfy it via two sections — do NOT pad with unrelated files.
