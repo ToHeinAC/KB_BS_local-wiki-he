@@ -16,6 +16,7 @@ import db_context
 import dedup
 import file_processor
 import gpu_widget
+import graph_widget
 import lex_index
 import md_convert
 import metadata_extract
@@ -423,6 +424,144 @@ def _show_node_details(node_id: str, graph: dict) -> None:
         st.markdown("\n".join(rows))
     else:
         st.caption("No connections.")
+
+
+def _render_legacy_graph() -> None:
+    """The original vis.js typed graph (GRAPH_RENDERER=legacy).
+
+    Kept as the default until the neural renderer has parity; unchanged apart
+    from being lifted out of the page body so the feature flag can pick one.
+    """
+    try:
+        import json as _json
+        graph = wiki_engine.build_typed_graph()
+        tcol1, tcol2 = st.columns(2)
+        show_names = tcol1.toggle("Node names", value=True)
+        show_sources = tcol2.toggle("Source nodes", value=True)
+
+        def _abbrev(text: str, n: int = 5) -> str:
+            return " ".join(str(text).replace("-", " ").split()[:n])
+
+        nodes_data: list[dict] = []
+        edges_data: list[dict] = []
+        keep_ids: set[str] = set()
+        for node in graph["nodes"]:
+            if node["type"] == "source" and not show_sources:
+                continue
+            keep_ids.add(node["id"])
+            label = node["label"]
+            nodes_data.append({
+                "id": node["id"],
+                "group": node["type"],
+                "label": (_abbrev(label) if node["type"] == "page" else label) if show_names else "",
+                "title": label,
+            })
+        for edge in graph["edges"]:
+            if edge["from"] not in keep_ids or edge["to"] not in keep_ids:
+                continue
+            edges_data.append({
+                "from": edge["from"],
+                "to": edge["to"],
+                "group": edge["type"],
+                "dashes": edge["type"] == "derived-from",
+                "color": "#d97a3a" if edge["type"] == "derived-from" else "#aaa",
+                "arrows": "to" if edge["type"] == "derived-from" else "",
+            })
+
+        html = f"""<!DOCTYPE html><html><head>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"
+  integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<style>body{{margin:0}}#g{{width:100%;height:595px;background:#fff;border:1px solid #ddd}}</style>
+</head><body>
+<div id="g"></div>
+<script>
+var net=new vis.Network(document.getElementById('g'),
+  {{nodes:new vis.DataSet({_json.dumps(nodes_data)}),
+    edges:new vis.DataSet({_json.dumps(edges_data)})}},
+  {{groups:{{
+      page:{{shape:"dot",size:18,color:{{background:"#97c2fc",border:"#2B7CE9"}}}},
+      source:{{shape:"diamond",size:22,color:{{background:"#f3b27a",border:"#d97a3a"}}}}
+    }},
+    nodes:{{font:{{size:14,color:"#234637"}}}},
+    edges:{{font:{{size:11,color:"#555",align:"middle"}},
+            smooth:{{type:"continuous"}}}},
+    physics:{{barnesHut:{{gravitationalConstant:-5000,springLength:120,springConstant:0.04}},
+              stabilization:{{fit:true,iterations:300}}}}}});
+</script></body></html>"""
+        st.components.v1.html(html, height=620, scrolling=True)
+        st.caption(
+            "**Legend:** blue dot = concept/entity, orange diamond = source document. "
+            "Solid grey = `related-to` (concept ↔ concept, incl. shared-source clique). "
+            "Dashed orange → = `derived-from` (concept → source)."
+        )
+        orphans = wiki_engine.find_orphans()
+        if orphans:
+            st.caption(f"**{len(orphans)} orphan(s)** (no in-links): " + ", ".join(f"`{o}`" for o in orphans[:20]))
+
+        st.markdown("### Inspect a node")
+        node_options = {n["label"]: n["id"] for n in graph["nodes"]}
+        picked_label = st.selectbox(
+            "Open details for a node",
+            options=["—"] + sorted(node_options.keys()),
+            key="explorer_inspect_pick",
+            label_visibility="collapsed",
+        )
+        if picked_label and picked_label != "—":
+            _show_node_details(node_options[picked_label], graph)
+    except Exception as exc:
+        st.error(f"Graph render failed: {exc}")
+
+
+def _render_neural_graph() -> None:
+    """Canvas galaxy/neural renderer over the same typed graph.
+
+    Mode and overlays are Streamlit widgets (native chrome, and they persist in
+    session state across reruns); pan/zoom/hover/search stay inside the canvas.
+    A node click comes back through the component protocol — no page reload, so
+    the session survives (see src/graph_widget.py).
+    """
+    ccol1, ccol2 = st.columns([1, 2])
+    mode = ccol1.segmented_control(
+        "Mode", ["Galaxy", "Neural"], default="Galaxy",
+        key="graph_mode", label_visibility="collapsed",
+    ) or "Galaxy"
+    overlay_labels = {
+        "Hubs": "hubs", "Bridges": "bridges", "Orphans": "orphans",
+        "Stale": "stale", "Low confidence": "confidence",
+    }
+    picked = ccol2.multiselect(
+        "Overlays", list(overlay_labels), default=["Hubs"],
+        key="graph_overlays", label_visibility="collapsed",
+        placeholder="Overlays",
+    )
+    try:
+        clicked = graph_widget.render_graph(
+            mode=mode.lower(),
+            overlays=[overlay_labels[p] for p in picked],
+        )
+    except Exception as exc:
+        st.error(f"Graph render failed: {exc}")
+        return
+
+    stats = graph_widget.graph_stats()
+    st.caption(
+        f"{len(stats['nodes'])} nodes · {len(stats['edges'])} edges · "
+        f"{stats['communities']} clusters. Hover for the 2-hop neighbourhood, "
+        "click a page to open it."
+    )
+
+    # `n` is a click counter: without it, clicking the same node twice would
+    # send an identical value and Streamlit would not rerun.
+    if clicked and clicked.get("n") != st.session_state.get("graph_click_n"):
+        st.session_state["graph_click_n"] = clicked["n"]
+        node = clicked["node"]
+        if clicked.get("kind") == "page":
+            st.session_state["explorer_selected_page"] = node
+            _show_md_dialog(node, wiki_engine.read_page_parsed(node)["content"])
+        else:
+            st.info(f"`{node.removeprefix('source::')}` is an original document, not a wiki page.")
+
 
 
 def _raw_source_button(filename: str, key: str) -> None:
@@ -1062,85 +1201,10 @@ elif page == "Wiki Explorer":
                     parsed = wiki_engine.read_page_parsed(clicked)
                     _show_md_dialog(clicked, parsed["content"])
             with main_col:
-                try:
-                    import json as _json
-                    graph = wiki_engine.build_typed_graph()
-                    tcol1, tcol2 = st.columns(2)
-                    show_names = tcol1.toggle("Node names", value=True)
-                    show_sources = tcol2.toggle("Source nodes", value=True)
-
-                    def _abbrev(text: str, n: int = 5) -> str:
-                        return " ".join(str(text).replace("-", " ").split()[:n])
-
-                    nodes_data: list[dict] = []
-                    edges_data: list[dict] = []
-                    keep_ids: set[str] = set()
-                    for node in graph["nodes"]:
-                        if node["type"] == "source" and not show_sources:
-                            continue
-                        keep_ids.add(node["id"])
-                        label = node["label"]
-                        nodes_data.append({
-                            "id": node["id"],
-                            "group": node["type"],
-                            "label": (_abbrev(label) if node["type"] == "page" else label) if show_names else "",
-                            "title": label,
-                        })
-                    for edge in graph["edges"]:
-                        if edge["from"] not in keep_ids or edge["to"] not in keep_ids:
-                            continue
-                        edges_data.append({
-                            "from": edge["from"],
-                            "to": edge["to"],
-                            "group": edge["type"],
-                            "dashes": edge["type"] == "derived-from",
-                            "color": "#d97a3a" if edge["type"] == "derived-from" else "#aaa",
-                            "arrows": "to" if edge["type"] == "derived-from" else "",
-                        })
-
-                    html = f"""<!DOCTYPE html><html><head>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"
-  integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ=="
-  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-<style>body{{margin:0}}#g{{width:100%;height:595px;background:#fff;border:1px solid #ddd}}</style>
-</head><body>
-<div id="g"></div>
-<script>
-var net=new vis.Network(document.getElementById('g'),
-  {{nodes:new vis.DataSet({_json.dumps(nodes_data)}),
-    edges:new vis.DataSet({_json.dumps(edges_data)})}},
-  {{groups:{{
-      page:{{shape:"dot",size:18,color:{{background:"#97c2fc",border:"#2B7CE9"}}}},
-      source:{{shape:"diamond",size:22,color:{{background:"#f3b27a",border:"#d97a3a"}}}}
-    }},
-    nodes:{{font:{{size:14,color:"#234637"}}}},
-    edges:{{font:{{size:11,color:"#555",align:"middle"}},
-            smooth:{{type:"continuous"}}}},
-    physics:{{barnesHut:{{gravitationalConstant:-5000,springLength:120,springConstant:0.04}},
-              stabilization:{{fit:true,iterations:300}}}}}});
-</script></body></html>"""
-                    st.components.v1.html(html, height=620, scrolling=True)
-                    st.caption(
-                        "**Legend:** blue dot = concept/entity, orange diamond = source document. "
-                        "Solid grey = `related-to` (concept ↔ concept, incl. shared-source clique). "
-                        "Dashed orange → = `derived-from` (concept → source)."
-                    )
-                    orphans = wiki_engine.find_orphans()
-                    if orphans:
-                        st.caption(f"**{len(orphans)} orphan(s)** (no in-links): " + ", ".join(f"`{o}`" for o in orphans[:20]))
-
-                    st.markdown("### Inspect a node")
-                    node_options = {n["label"]: n["id"] for n in graph["nodes"]}
-                    picked_label = st.selectbox(
-                        "Open details for a node",
-                        options=["—"] + sorted(node_options.keys()),
-                        key="explorer_inspect_pick",
-                        label_visibility="collapsed",
-                    )
-                    if picked_label and picked_label != "—":
-                        _show_node_details(node_options[picked_label], graph)
-                except Exception as exc:
-                    st.error(f"Graph render failed: {exc}")
+                if graph_widget.RENDERER == "neural":
+                    _render_neural_graph()
+                else:
+                    _render_legacy_graph()
 
 
 elif page == "Wiki Chat":
