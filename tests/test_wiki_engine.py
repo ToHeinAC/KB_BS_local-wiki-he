@@ -427,6 +427,25 @@ def test_query_synthesis_injects_chunks_not_full_page(wiki_dir, monkeypatch):
     assert "ZZZFILLER" not in ap            # unrelated sections are NOT injected (chunk-level, not full page)
 
 
+def test_query_abstains_below_threshold_and_skips_synthesis(wiki_dir, monkeypatch):
+    """Stage E: when calibrate.assess is not confident, return an abstain result and
+    never call the LLM synthesis (idea.md §3.5 — no answer from weak context)."""
+    hits = [{"source": "dose.md", "rerank_score": -6.0}]
+    monkeypatch.setattr(
+        wiki_engine, "_gather_pages",
+        lambda q, s, b: ("--- dose.md ---\nweak context", ["dose.md"], set(), hits),
+    )
+    monkeypatch.setattr(wiki_engine.calibrate, "assess",
+                        lambda h, db=None: (False, 0.26, {"source": "dose.md"}))
+    gen = MagicMock()
+    monkeypatch.setattr(ollama_client, "_client", lambda: gen)
+
+    out = wiki_engine.query_with_sources("some clearly off-topic question")
+    assert out.get("abstained") is True
+    assert "dose.md" in out["answer"]        # names the closest page
+    gen.generate.assert_not_called()         # synthesis LLM call skipped
+
+
 # --- E-1: staleness ---
 
 def test_is_page_stale_default_ttl():

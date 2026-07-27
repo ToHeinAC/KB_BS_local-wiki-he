@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from prompts import INGEST_LANGUAGE_DIRECTIVE, RESPONSE_LANGUAGE_DIRECTIVE
+from prompts import ABSTAIN_MESSAGE, INGEST_LANGUAGE_DIRECTIVE, RESPONSE_LANGUAGE_DIRECTIVE
 
 _TOKEN_RE = re.compile(r"[a-zäöüß]+")
 
@@ -54,3 +54,9 @@ def response_directive(text: str, default: str = "de") -> str:
 def ingest_directive(text: str, default: str = "de") -> str:
     """Page-language directive matched to the source ``text`` (ingest path)."""
     return INGEST_LANGUAGE_DIRECTIVE[detect(text, default)]
+
+
+def abstain_message(query: str, db: str, page: str, score: float,
+                    default: str = "de") -> str:
+    """Stage E abstention text in the query's language (see prompts.ABSTAIN_MESSAGE)."""
+    return ABSTAIN_MESSAGE[detect(query, default)].format(db=db, page=page, score=score)

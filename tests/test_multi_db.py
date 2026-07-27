@@ -296,7 +296,7 @@ def test_query_with_sources_splits_synthesis_budget(two_dbs, monkeypatch):
     monkeypatch.setattr(wiki_engine, "_QUERY_MIN_DB_SYNTH_CHARS", 100)
     budgets = []
     monkeypatch.setattr(wiki_engine, "_gather_pages",
-                        lambda q, s, b: budgets.append(b) or ("", [], set()))
+                        lambda q, s, b: budgets.append(b) or ("", [], set(), []))
     monkeypatch.setattr(wiki_engine.ollama_client, "generate", lambda s, p, **kw: "a")
     monkeypatch.setattr(wiki_engine.schema_loader, "get_system_prompt", lambda mode: "sys")
     db_context.set_search_scope(["Alpha", "Beta"])

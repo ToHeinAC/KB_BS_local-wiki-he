@@ -1,0 +1,16 @@
+{
+  "description": "Stage E should-ABSTAIN set for KI. Queries deliberately OUTSIDE KI's domain (KI = AI/LLMs/transformers/agents + orbital data centers + Claude Code). None has an in-corpus answer, so a correctly-calibrated retriever's best rerank_score should fall below the abstention threshold τ. Paired with fixture_KI_chunk.json (should-ANSWER) to measure query-level separation. KI is the disposable test DB.",
+  "collection": "KI",
+  "queries": [
+    { "id": "neg-sourdough", "query": "how do I bake a sourdough bread from scratch at home" },
+    { "id": "neg-revolution", "query": "what were the main causes of the French Revolution" },
+    { "id": "neg-backpain", "query": "best physiotherapy exercises for chronic lower back pain" },
+    { "id": "neg-beesting", "query": "how to treat an allergic reaction to a bee sting" },
+    { "id": "neg-offside", "query": "the offside rule in football explained for beginners" },
+    { "id": "neg-prune", "query": "how to prune apple trees in late winter" },
+    { "id": "neg-carbonara", "query": "authentic italian carbonara recipe with guanciale and pecorino" },
+    { "id": "neg-vitamind", "query": "symptoms and treatment of vitamin D deficiency" },
+    { "id": "neg-winestain", "query": "best way to remove a red wine stain from a wool carpet" },
+    { "id": "neg-oilpaint", "query": "beginner tips for oil painting on canvas" }
+  ]
+}

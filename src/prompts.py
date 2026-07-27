@@ -26,6 +26,23 @@ RESPONSE_LANGUAGE_DIRECTIVE = {
     ),
 }
 
+# --- Stage E abstention (calibrated "no confident answer") --------------------
+# User-facing, per-language. Formatted in code (src/calibrate is deterministic) with
+# {db}, {page}, {score}; the placeholders and page name stay verbatim across languages.
+ABSTAIN_MESSAGE = {
+    "de": (
+        "In der Wissensbasis **{db}** beantwortet keine Seite diese Frage mit "
+        "ausreichender Sicherheit. Nächstliegend: `{page}` (Relevanz {score:.2f}).\n\n"
+        "Nächste Schritte: Originalquellen durchsuchen · Web-Recherche starten · "
+        "eine passende Quelle einpflegen."
+    ),
+    "en": (
+        "No page in the **{db}** knowledge base confidently answers this. "
+        "Closest: `{page}` (relevance {score:.2f}).\n\n"
+        "Next steps: search the raw sources · run web research · ingest a source."
+    ),
+}
+
 INGEST_LANGUAGE_DIRECTIVE = {
     "de": (
         "SPRACHE (verbindlich): Schreibe den Fließtext und die Zwischenüberschriften "

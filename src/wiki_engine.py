@@ -9,6 +9,7 @@ from pathlib import Path
 import frontmatter
 from dotenv import load_dotenv
 
+import calibrate
 import chunker
 import db_context
 import dedup
@@ -1305,20 +1306,24 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
     return [s for s in selected if (_wiki() / s).exists()][:5]
 
 
-def _gather_pages(question: str, system: str, budget: int) -> tuple[str, list[str], set[str]]:
+def _gather_pages(question: str, system: str,
+                  budget: int) -> tuple[str, list[str], set[str], list[dict]]:
     """Collect synthesis context from the *active* DB (see `query_with_sources`).
 
-    Returns (pages_text, wiki_sources, raw_sources); the source names are
-    DB-qualified when the search scope spans several DBs.
+    Returns (pages_text, wiki_sources, raw_sources, wiki_hits); the source names are
+    DB-qualified when the search scope spans several DBs. `wiki_hits` (carrying
+    `rerank_score` when the reranker ran) feeds the Stage E abstention check upstream.
     """
     index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
     selected = _select_pages(question, system, index_text)
 
     # Q-3: inject the most relevant chunks per page (with anchors), not full pages.
     hits_by_page: dict[str, list[dict]] = {}
+    wiki_hits: list[dict] = []
     try:
         for h in retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki", use_rerank=True):
             hits_by_page.setdefault(h.get("source", ""), []).append(h)
+            wiki_hits.append(h)
     except Exception:
         pass
 
@@ -1350,7 +1355,7 @@ def _gather_pages(question: str, system: str, budget: int) -> tuple[str, list[st
         if len(pages_text) >= budget:
             pages_text = pages_text[:budget] + "\n…[truncated]"
             break
-    return pages_text, used_sources, raw_sources_set
+    return pages_text, used_sources, raw_sources_set, wiki_hits
 
 
 def query_with_sources(question: str) -> dict:
@@ -1367,14 +1372,29 @@ def query_with_sources(question: str) -> dict:
     blocks: list[str] = []
     used_sources: list[str] = []
     raw_sources_set: set[str] = set()
+    # Stage E: abstain only when every contributing DB was calibrated AND its best passage
+    # fell below τ. `assess` fail-opens (confident) on an uncalibrated DB / no reranker, so
+    # abstain_all survives only under a genuine calibrated below-threshold signal.
+    abstain_all = True
+    best_rel, best_page, best_db = 0.0, "", scope[0] if scope else db_context.get_active_db()
     for db in scope:
         with db_context.using_db(db):
-            text, used, raws = _gather_pages(question, system, budget)
+            text, used, raws, hits = _gather_pages(question, system, budget)
+            confident, rel, closest = calibrate.assess(hits, db=db)
+        if confident:
+            abstain_all = False
+        if closest is not None and rel > best_rel:
+            best_rel, best_page, best_db = rel, closest.get("source", ""), db
         if not text.strip():
             continue
         blocks.append(f"\n\n===== Database: {db} ====={text}" if len(scope) > 1 else text)
         used_sources.extend(used)
         raw_sources_set.update(raws)
+
+    if abstain_all and best_page:  # calibrated no-confident-answer → skip the LLM synth
+        return {"answer": lang.abstain_message(question, best_db, best_page, best_rel),
+                "sources": used_sources, "raw_sources": sorted(raw_sources_set),
+                "abstained": True}
 
     pages_text = "".join(blocks) or "(no relevant pages found)"
     answer_prompt = ANSWER_PROMPT.format(

@@ -16,6 +16,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 
+import calibrate
 import chunker
 import db_context
 import retrieval
@@ -258,8 +259,11 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
     Hybrid retrieval (lexical + semantic RRF); degrades to pure lexical when the DB
     has no embedding index (see src/retrieval.py)."""
     hits = retrieval.search(query, top_k=max_results, scope="raw", use_rerank=True)
+    mem = run_memory.current()
     parts = []
     for i, h in enumerate(hits, 1):
+        if mem is not None and "rerank_score" in h:  # Stage E: track best passage seen
+            mem.note_relevance(float(h["rerank_score"]))
         anchor = h.get("anchor") or ""
         cite_suffix = f" {anchor}" if anchor else ""
         parts.append(
@@ -492,6 +496,22 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
             f"REJECTED: answer cites {len(unique)} unique sources ({len(raw_unique)} from "
             f"data/raw/), minimum is {CHAT_MIN_SOURCES} including at least one "
             "[Source: ...] document. Run more raw_search/raw_read and cite additional files."
+        )
+    # Stage E (soft): if no retrieved passage cleared the calibrated confidence threshold,
+    # nudge the agent once to abstain rather than assert a weakly-grounded answer. Bounded
+    # to a single fire (low_conf_nudged) so it can never stall the loop; a down reranker /
+    # uncalibrated DB leaves threshold() None and skips this entirely (fail-safe).
+    mem = run_memory.current()
+    tau = calibrate.threshold()
+    if (mem is not None and tau is not None and mem.best_relevance is not None
+            and mem.best_relevance < tau and not mem.low_conf_nudged):
+        mem.low_conf_nudged = True
+        return (
+            "LOW CONFIDENCE: no retrieved passage cleared the confidence threshold for this "
+            "knowledge base. If you cannot ground this in a clearly relevant [Source: ...] "
+            "passage, state plainly that the knowledge base does not confidently answer the "
+            "question and point to searching the raw sources, running web research, or "
+            "ingesting a source — do not assert a weakly-supported answer. Then submit again."
         )
     return f"ACCEPTED: {words} words, {len(unique)} sources cited."
 

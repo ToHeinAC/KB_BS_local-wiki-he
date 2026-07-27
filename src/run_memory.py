@@ -20,10 +20,18 @@ class RunMemory:
     reads: dict[str, int] = field(default_factory=dict)
     searches: dict[str, int] = field(default_factory=dict)
     step: int = 0
+    # Stage E: best cross-encoder rerank_score seen this run, and whether the low-
+    # confidence nudge has already fired (bounds it to one extra iteration).
+    best_relevance: float | None = None
+    low_conf_nudged: bool = False
 
     def tick(self) -> int:
         self.step += 1
         return self.step
+
+    def note_relevance(self, score: float) -> None:
+        if self.best_relevance is None or score > self.best_relevance:
+            self.best_relevance = score
 
     def seen_read(self, key: str) -> int | None:
         return self.reads.get(key)

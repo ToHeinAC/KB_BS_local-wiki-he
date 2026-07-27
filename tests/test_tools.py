@@ -344,6 +344,31 @@ def test_submit_chat_wiki_cite_alone_does_not_meet_source_gate(monkeypatch):
     assert tools._submit_chat_impl(answer).startswith("REJECTED")
 
 
+def test_submit_chat_low_confidence_nudges_once(monkeypatch, tmp_path):
+    """Stage E soft gate: when no passage cleared τ, nudge to abstain — exactly once,
+    so it can never stall the loop."""
+    import json
+
+    import db_context
+    import run_memory
+
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("KI")
+    idx = tmp_path / "KI" / "index"
+    idx.mkdir(parents=True)
+    (idx / "calibration.json").write_text(json.dumps({"tau": -4.14}))
+    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
+    monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
+    answer = "one two three four five [Source: raw.md] and [Wiki: page.md]"
+    try:
+        mem = run_memory.begin_run()
+        mem.note_relevance(-6.0)  # best passage below τ
+        assert tools._submit_chat_impl(answer).startswith("LOW CONFIDENCE")
+        assert tools._submit_chat_impl(answer).startswith("ACCEPTED")  # bounded to one fire
+    finally:
+        run_memory.begin_run()  # clear the run scratchpad so it can't leak to later tests
+
+
 def test_wiki_search_labels_shared_source_neighbours(monkeypatch):
     monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", True)
     monkeypatch.setattr(
