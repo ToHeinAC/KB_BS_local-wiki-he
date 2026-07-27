@@ -97,3 +97,30 @@ def test_master_switch_off(monkeypatch, tmp_path):
     monkeypatch.setenv("ABSTAIN_ENABLED", "0")
     confident, _, _ = calibrate.assess(_hits(-9.0), db="KI")
     assert confident is True
+
+
+# --- justify: the search-ladder rung-4 audit record --------------------------
+
+def test_justify_splits_by_tau_highest_first():
+    rec = calibrate.justify([("a", -2.0), ("b", -5.0), ("c", 1.0)], tau=-4.0)
+    assert rec["kept"] == [("c", 1.0), ("a", -2.0)]   # sorted high→low, both clear τ
+    assert rec["below_tau"] == [("b", -5.0)]
+    assert rec["over_cap"] == []
+    assert rec["tau"] == -4.0
+
+
+def test_justify_failopen_on_none_tau_keeps_all():
+    rec = calibrate.justify([("a", -9.0), ("b", 0.0)], tau=None)
+    assert {n for n, _ in rec["kept"]} == {"a", "b"}
+    assert rec["below_tau"] == []
+
+
+def test_justify_none_score_kept_and_sorted_last():
+    rec = calibrate.justify([("scored", -1.0), ("unscored", None)], tau=-4.0)
+    assert rec["kept"] == [("scored", -1.0), ("unscored", None)]  # None never below τ, sorts last
+
+
+def test_justify_cap_moves_surplus_to_over_cap():
+    rec = calibrate.justify([("a", 3.0), ("b", 2.0), ("c", 1.0)], tau=-4.0, cap=2)
+    assert rec["kept"] == [("a", 3.0), ("b", 2.0)]
+    assert rec["over_cap"] == [("c", 1.0)]

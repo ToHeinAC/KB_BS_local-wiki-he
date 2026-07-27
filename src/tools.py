@@ -26,6 +26,7 @@ import wiki_engine
 from prompts import (
     EVALUATE_CONDITION_DESCRIPTION,
     FETCH_WEBPAGE_DESCRIPTION,
+    LOW_CONFIDENCE_NUDGE,
     RAW_READ_DESCRIPTION,
     RAW_SEARCH_DESCRIPTION,
     SUBMIT_CHAT_DESCRIPTION,
@@ -264,6 +265,7 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
     for i, h in enumerate(hits, 1):
         if mem is not None and "rerank_score" in h:  # Stage E: track best passage seen
             mem.note_relevance(float(h["rerank_score"]))
+            mem.note_source_relevance(db_context.qualify(h["source"]), float(h["rerank_score"]))
         anchor = h.get("anchor") or ""
         cite_suffix = f" {anchor}" if anchor else ""
         parts.append(
@@ -477,6 +479,36 @@ def _raw_read_impl(filenames, offset: int = 0) -> str:
     return "\n\n".join(outs)
 
 
+def _low_confidence_nudge() -> str | None:
+    """Stage E soft gate shared by both submit paths (idea.md §6.9.1 rung 5).
+
+    Returns the one-shot abstain nudge when this run's best passage fell below the
+    calibrated τ, else None. Bounded to a single fire (`low_conf_nudged`) so it can never
+    stall the loop; fail-safe — an uncalibrated DB / no reranker (tau or best_relevance
+    None) never nudges.
+    """
+    mem = run_memory.current()
+    tau = calibrate.threshold()
+    if (mem is not None and tau is not None and mem.best_relevance is not None
+            and mem.best_relevance < tau and not mem.low_conf_nudged):
+        mem.low_conf_nudged = True
+        return LOW_CONFIDENCE_NUDGE
+    return None
+
+
+def current_run_audit(db: str | None = None) -> dict | None:
+    """Search-ladder audit for the just-finished agentic run (Deep chat / research).
+
+    Reads the per-source best rerank_scores accumulated in run memory and splits them by
+    the DB's τ into a render-ready record (see `calibrate.justify`). Returns None when the
+    run scored no source (e.g. wiki/web-only), so the caller can skip the audit panel.
+    """
+    mem = run_memory.current()
+    if mem is None or not mem.relevance_by_source:
+        return None
+    return calibrate.justify(list(mem.relevance_by_source.items()), calibrate.threshold(db))
+
+
 def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     words = len(re.findall(r"\w+", answer or ""))
     cited = set(_RAW_CITE_RE.findall(answer or ""))
@@ -497,22 +529,9 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
             f"data/raw/), minimum is {CHAT_MIN_SOURCES} including at least one "
             "[Source: ...] document. Run more raw_search/raw_read and cite additional files."
         )
-    # Stage E (soft): if no retrieved passage cleared the calibrated confidence threshold,
-    # nudge the agent once to abstain rather than assert a weakly-grounded answer. Bounded
-    # to a single fire (low_conf_nudged) so it can never stall the loop; a down reranker /
-    # uncalibrated DB leaves threshold() None and skips this entirely (fail-safe).
-    mem = run_memory.current()
-    tau = calibrate.threshold()
-    if (mem is not None and tau is not None and mem.best_relevance is not None
-            and mem.best_relevance < tau and not mem.low_conf_nudged):
-        mem.low_conf_nudged = True
-        return (
-            "LOW CONFIDENCE: no retrieved passage cleared the confidence threshold for this "
-            "knowledge base. If you cannot ground this in a clearly relevant [Source: ...] "
-            "passage, state plainly that the knowledge base does not confidently answer the "
-            "question and point to searching the raw sources, running web research, or "
-            "ingesting a source — do not assert a weakly-supported answer. Then submit again."
-        )
+    nudge = _low_confidence_nudge()
+    if nudge:
+        return nudge
     return f"ACCEPTED: {words} words, {len(unique)} sources cited."
 
 
@@ -535,6 +554,9 @@ def _submit_final_impl(title: str, answer: str) -> str:
             f"(URLs + [Wiki: ...] + [Source: ...] citations), minimum is {MIN_URLS}. "
             "Run more searches and cite additional sources."
         )
+    nudge = _low_confidence_nudge()
+    if nudge:
+        return nudge
     dest_dir = db_context.wiki_dir() / "comparisons"
     dest_dir.mkdir(parents=True, exist_ok=True)
     date = datetime.now(timezone.utc).strftime("%Y-%m-%d")

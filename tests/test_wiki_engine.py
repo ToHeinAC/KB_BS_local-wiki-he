@@ -433,7 +433,8 @@ def test_query_abstains_below_threshold_and_skips_synthesis(wiki_dir, monkeypatc
     hits = [{"source": "dose.md", "rerank_score": -6.0}]
     monkeypatch.setattr(
         wiki_engine, "_gather_pages",
-        lambda q, s, b: ("--- dose.md ---\nweak context", ["dose.md"], set(), hits),
+        lambda q, s, b: ("--- dose.md ---\nweak context", ["dose.md"], set(), hits,
+                         {"tau": None, "kept": [], "below_tau": [], "over_cap": []}),
     )
     monkeypatch.setattr(wiki_engine.calibrate, "assess",
                         lambda h, db=None: (False, 0.26, {"source": "dose.md"}))
@@ -444,6 +445,40 @@ def test_query_abstains_below_threshold_and_skips_synthesis(wiki_dir, monkeypatc
     assert out.get("abstained") is True
     assert "dose.md" in out["answer"]        # names the closest page
     gen.generate.assert_not_called()         # synthesis LLM call skipped
+
+
+# --- search-ladder rung 4: τ-gated justified set (idea.md §6.9.1) ---
+
+def _two_page_gather(wiki_dir, monkeypatch):
+    (wiki_dir / "hot.md").write_text('---\ntitle: Hot\ntype: concept\nsources: ["s.md"]\n---\nbody')
+    (wiki_dir / "cold.md").write_text('---\ntitle: Cold\ntype: concept\nsources: ["s.md"]\n---\nbody')
+    monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i: ["hot.md", "cold.md"])
+    monkeypatch.setattr(
+        wiki_engine.retrieval, "search",
+        lambda q, top_k, scope, use_rerank=False: [
+            {"source": "hot.md", "text": "hot ctx", "rerank_score": -1.0},
+            {"source": "cold.md", "text": "cold ctx", "rerank_score": -8.0},
+        ],
+    )
+
+
+def test_gather_pages_tau_gates_below_threshold(wiki_dir, monkeypatch):
+    _two_page_gather(wiki_dir, monkeypatch)
+    monkeypatch.setattr(wiki_engine.calibrate, "threshold", lambda db=None: -4.0)
+    text, used, _raws, _hits, audit = wiki_engine._gather_pages("q", "sys", 10000)
+    assert used == ["hot.md"]                       # cold dropped by τ, keeps picker order
+    assert "cold ctx" not in text
+    assert audit["kept"] == [("hot.md", -1.0)]
+    assert audit["below_tau"] == [("cold.md", -8.0)]
+
+
+def test_gather_pages_failopen_keeps_all_when_uncalibrated(wiki_dir, monkeypatch):
+    """Non-regression: no τ (uncalibrated / no reranker) ⇒ every picked page survives."""
+    _two_page_gather(wiki_dir, monkeypatch)
+    monkeypatch.setattr(wiki_engine.calibrate, "threshold", lambda db=None: None)
+    _text, used, _raws, _hits, audit = wiki_engine._gather_pages("q", "sys", 10000)
+    assert used == ["hot.md", "cold.md"]
+    assert audit["below_tau"] == []
 
 
 # --- E-1: staleness ---

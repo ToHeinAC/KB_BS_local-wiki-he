@@ -20,6 +20,7 @@ import lex_index
 import md_convert
 import metadata_extract
 import ollama_client
+import tools
 import wiki_engine
 import agent as research_agent
 import chat_agent
@@ -550,6 +551,7 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
     st.session_state["last_research_answer"] = ""
     st.session_state["last_research_error"] = ""
     st.session_state["last_research_q"] = display_q
+    st.session_state["last_research_audit"] = None
     st.session_state.pop("research_saved", None)
     _interpreted = question_to_run if question_to_run.strip() != display_q.strip() else None
     st.session_state["last_research_interpreted"] = _interpreted
@@ -596,6 +598,8 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
             elif stype == "error":
                 st.error(step["content"])
                 st.session_state["last_research_error"] = step["content"]
+    # Search-ladder audit for the finished run (per-source scores vs τ).
+    st.session_state["last_research_audit"] = tools.current_run_audit()
 
 
 def _bar_label(text: str) -> None:
@@ -634,6 +638,32 @@ def _render_chat_sources(sources: list[str], raw_sources: list[str], key_prefix:
             st.markdown("**Original documents (data/raw/)**")
             for r in raw_sources:
                 _raw_source_button(r, f"{key_prefix}_raw_{r}")
+
+
+def _render_why_sources(audit: dict | None) -> None:
+    """Search-ladder audit panel (idea.md §6.9.1): which sources were kept vs dropped
+    below the calibrated τ. Silent when no source carried a rerank score (τ off / no
+    reranker), so a fusion-only DB shows no empty panel."""
+    if not audit:
+        return
+    kept = audit.get("kept") or []
+    below = audit.get("below_tau") or []
+    over = audit.get("over_cap") or []
+    if not (kept or below or over):
+        return
+    tau = audit.get("tau")
+
+    def _fmt(s: float | None) -> str:
+        return "n/a" if s is None else f"{s:.2f}"
+
+    tau_txt = f", {len(below)} below τ={tau:.1f}" if (below and tau is not None) else ""
+    with st.expander(f"Why these sources ({len(kept)} kept{tau_txt})", expanded=False):
+        for name, s in kept:
+            st.markdown(f"✓ `{name}` — {_fmt(s)}")
+        for name, s in below:
+            st.markdown(f"✗ `{name}` — {_fmt(s)} (below τ)")
+        for name, s in over:
+            st.markdown(f"✗ `{name}` — {_fmt(s)} (over cap)")
 
 
 # --- sidebar ---
@@ -1179,6 +1209,8 @@ elif page == "Wiki Chat":
                 if msg["role"] == "assistant" and msg.get("interpreted"):
                     st.caption(f"🔎 Interpreted as: {msg['interpreted']}")
                 st.markdown(msg["content"])
+                if msg["role"] == "assistant":
+                    _render_why_sources(msg.get("audit"))
                 if msg["role"] == "assistant" and msg.get("question") and not msg["content"].startswith("Error:"):
                     if st.button("↪ Follow up", key=f"followup_{i}", help="Continue from this answer"):
                         st.session_state["chat_followup"] = {"q": msg["question"], "a": msg["content"]}
@@ -1246,11 +1278,13 @@ elif page == "Wiki Chat":
                     answer = res["answer"]
                     sources = res["sources"]
                     raw_sources = res["raw_sources"]
+                    audit = res.get("audit")
                 except RuntimeError as e:
-                    answer, sources, raw_sources = f"Error: {e}", [], []
+                    answer, sources, raw_sources, audit = f"Error: {e}", [], [], None
             st.session_state["messages"].append(
                 {"role": "assistant", "content": answer, "question": prompt,
-                 "sources": sources, "raw_sources": raw_sources, "interpreted": interpreted}
+                 "sources": sources, "raw_sources": raw_sources, "interpreted": interpreted,
+                 "audit": audit}
             )
         else:
             steps: list[dict] = []
@@ -1280,10 +1314,13 @@ elif page == "Wiki Chat":
                         wiki_pages = step.get("wiki_sources", []) or []
                     elif stype == "error" and not answer:
                         answer = f"Error: {step['content']}"
+            # Deep chat: audit-log only (loop/abstention unchanged) — read the per-source
+            # scores the run accumulated in run memory (idea.md §6.9.1 guardrail).
+            _audit = tools.current_run_audit()
             st.session_state["messages"].append(
                 {"role": "assistant", "content": answer or "(no answer)", "question": prompt,
                  "sources": wiki_pages, "raw_sources": raw_sources, "steps": steps,
-                 "interpreted": interpreted}
+                 "interpreted": interpreted, "audit": _audit}
             )
         st.rerun()
 
@@ -1350,6 +1387,7 @@ elif page == "Research":
                 st.markdown(f"Report saved: `{_rel}`")
             _ans = st.session_state["last_research_answer"]
             st.markdown(_ans)
+            _render_why_sources(st.session_state.get("last_research_audit"))
             _dl_col, _save_col = st.columns(2)
             _dl_col.download_button(
                 "Download report",

@@ -68,6 +68,29 @@ def _best(hits: list[dict]) -> tuple[float | None, dict | None]:
     return max(scored, key=lambda t: t[0]) if scored else (None, None)
 
 
+def justify(scored: list[tuple[str, float | None]], tau: float | None,
+            cap: int | None = None) -> dict:
+    """Split (name, best_score) pairs into an audit record for the search ladder.
+
+    Rung 4 of the ladder (idea.md §6.9.1): open the *justified set* — every candidate
+    whose evidence clears τ — and log which were kept, dropped below τ, or cut by the cap.
+    Fail-open, like the rest of Stage E: a None τ (uncalibrated / no reranker) or a None
+    score (candidate the reranker never scored) is KEPT — the gate only ever drops a
+    candidate on a genuine below-τ signal. Highest score first, unscored last.
+
+    Returns {tau, kept, below_tau, over_cap}, each list a list of (name, score) pairs.
+    """
+    ordered = sorted(scored, key=lambda p: (p[1] is None, -(p[1] or 0.0)))
+    kept: list[tuple[str, float | None]] = []
+    below: list[tuple[str, float | None]] = []
+    for name, s in ordered:
+        (below if (tau is not None and s is not None and s < tau) else kept).append((name, s))
+    over_cap: list[tuple[str, float | None]] = []
+    if cap is not None and len(kept) > cap:
+        kept, over_cap = kept[:cap], kept[cap:]
+    return {"tau": tau, "kept": kept, "below_tau": below, "over_cap": over_cap}
+
+
 def assess(hits: list[dict], db: str | None = None) -> tuple[bool, float, dict | None]:
     """Decide whether retrieval is confident enough to answer.
 

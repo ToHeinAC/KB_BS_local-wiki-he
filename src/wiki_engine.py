@@ -1307,12 +1307,13 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
 
 
 def _gather_pages(question: str, system: str,
-                  budget: int) -> tuple[str, list[str], set[str], list[dict]]:
+                  budget: int) -> tuple[str, list[str], set[str], list[dict], dict]:
     """Collect synthesis context from the *active* DB (see `query_with_sources`).
 
-    Returns (pages_text, wiki_sources, raw_sources, wiki_hits); the source names are
-    DB-qualified when the search scope spans several DBs. `wiki_hits` (carrying
-    `rerank_score` when the reranker ran) feeds the Stage E abstention check upstream.
+    Returns (pages_text, wiki_sources, raw_sources, wiki_hits, audit); the source names
+    are DB-qualified when the search scope spans several DBs. `wiki_hits` (carrying
+    `rerank_score` when the reranker ran) feeds the Stage E abstention check upstream;
+    `audit` is the search-ladder record of which pages were kept vs dropped below τ.
     """
     index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
     selected = _select_pages(question, system, index_text)
@@ -1326,6 +1327,18 @@ def _gather_pages(question: str, system: str,
             wiki_hits.append(h)
     except Exception:
         pass
+
+    # Search-ladder rung 4 (idea.md §6.9.1): τ-gate the picked pages by their best
+    # reranked-chunk score, keeping the picker's order for synthesis. Fail-open — an
+    # uncalibrated DB / no reranker leaves τ None, so `justify` keeps every page and this
+    # is behaviour-identical to fusion-only.
+    def _best_score(fn: str) -> float | None:
+        scores = [float(h["rerank_score"]) for h in hits_by_page.get(fn, []) if "rerank_score" in h]
+        return max(scores) if scores else None
+    audit = calibrate.justify(
+        [(db_context.qualify(f), _best_score(f)) for f in selected], calibrate.threshold())
+    _below = {n for n, _ in audit["below_tau"]}
+    selected = [f for f in selected if db_context.qualify(f) not in _below]
 
     pages_text = ""
     used_sources: list[str] = []
@@ -1355,7 +1368,7 @@ def _gather_pages(question: str, system: str,
         if len(pages_text) >= budget:
             pages_text = pages_text[:budget] + "\n…[truncated]"
             break
-    return pages_text, used_sources, raw_sources_set, wiki_hits
+    return pages_text, used_sources, raw_sources_set, wiki_hits, audit
 
 
 def query_with_sources(question: str) -> dict:
@@ -1377,10 +1390,15 @@ def query_with_sources(question: str) -> dict:
     # abstain_all survives only under a genuine calibrated below-threshold signal.
     abstain_all = True
     best_rel, best_page, best_db = 0.0, "", scope[0] if scope else db_context.get_active_db()
+    audit = {"tau": None, "kept": [], "below_tau": [], "over_cap": []}
     for db in scope:
         with db_context.using_db(db):
-            text, used, raws, hits = _gather_pages(question, system, budget)
+            text, used, raws, hits, db_audit = _gather_pages(question, system, budget)
             confident, rel, closest = calibrate.assess(hits, db=db)
+        if audit["tau"] is None:
+            audit["tau"] = db_audit.get("tau")
+        for _k in ("kept", "below_tau", "over_cap"):
+            audit[_k].extend(db_audit.get(_k, []))
         if confident:
             abstain_all = False
         if closest is not None and rel > best_rel:
@@ -1394,7 +1412,7 @@ def query_with_sources(question: str) -> dict:
     if abstain_all and best_page:  # calibrated no-confident-answer → skip the LLM synth
         return {"answer": lang.abstain_message(question, best_db, best_page, best_rel),
                 "sources": used_sources, "raw_sources": sorted(raw_sources_set),
-                "abstained": True}
+                "abstained": True, "audit": audit}
 
     pages_text = "".join(blocks) or "(no relevant pages found)"
     answer_prompt = ANSWER_PROMPT.format(
@@ -1402,7 +1420,8 @@ def query_with_sources(question: str) -> dict:
         language_directive=lang.response_directive(question),
     )
     answer = ollama_client.generate(system, answer_prompt, temperature=0.7)
-    return {"answer": answer, "sources": used_sources, "raw_sources": sorted(raw_sources_set)}
+    return {"answer": answer, "sources": used_sources,
+            "raw_sources": sorted(raw_sources_set), "audit": audit}
 
 
 def lint() -> str:

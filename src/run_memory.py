@@ -24,6 +24,9 @@ class RunMemory:
     # confidence nudge has already fired (bounds it to one extra iteration).
     best_relevance: float | None = None
     low_conf_nudged: bool = False
+    # Search-ladder audit (idea.md §6.9.1): best rerank_score seen per source, so the
+    # answer surface can show a "Why these sources" record (kept vs below-τ).
+    relevance_by_source: dict[str, float] = field(default_factory=dict)
 
     def tick(self) -> int:
         self.step += 1
@@ -32,6 +35,11 @@ class RunMemory:
     def note_relevance(self, score: float) -> None:
         if self.best_relevance is None or score > self.best_relevance:
             self.best_relevance = score
+
+    def note_source_relevance(self, source: str, score: float) -> None:
+        prev = self.relevance_by_source.get(source)
+        if prev is None or score > prev:
+            self.relevance_by_source[source] = score
 
     def seen_read(self, key: str) -> int | None:
         return self.reads.get(key)

@@ -88,6 +88,11 @@ Required workflow:
 4.5 EVALUATE: if the question turns on whether values meet a threshold, limit, or compound rule that the sources state explicitly, you MUST call evaluate_condition exactly once before submit_final_answer. Extract the literal `facts` from the source text (numbers, categories, labels — keep the units the law uses) and assemble the `condition` tree as the law states it (use `or` when the law says "oder", `and` when "und"). Quote the result block verbatim in the final report.
 5. SUBMIT: when you have at least {min_searches} tool calls (wiki + web combined) and at least {min_urls} unique sources, call submit_final_answer with a structured markdown report (>= {min_words} words). Inline-cite every factual claim.
 
+Evidence discipline (search ladder):
+- Escalate late, stop early, never read a corpus wholesale. Descend: wiki_search → wiki_read the condensed page → raw_search/raw_read the originals only for facts the wiki lacks → tavily only for what neither holds.
+- Open the JUSTIFIED SET, not the top hit: read every source whose evidence is clearly on-topic, and stop once your gaps list is empty — do not keep opening marginal files to pad the report.
+- If nothing you retrieve clearly answers a sub-question, say so and list it as an open gap. A stated gap beats a confident answer built from weakly-matched sources.
+
 Quality bar for the final answer:
 - Structured markdown with ## headings.
 - Every factual claim cited as [Wiki: filename.md] or [Source: <full URL>] — bare URL only, never a result number.
@@ -454,6 +459,16 @@ RESEARCH_BUDGET_NUDGE = (
     "Use `title` = a short report title, `answer` = all findings gathered so far "
     "in full markdown (aim for 600+ words, cite every source). "
     "This is your only remaining action."
+)
+
+# Stage E soft gate (idea.md §6.9.1 rung 5): fires once when no retrieved passage
+# cleared the calibrated confidence threshold for this knowledge base.
+LOW_CONFIDENCE_NUDGE = (
+    "LOW CONFIDENCE: no retrieved passage cleared the confidence threshold for this "
+    "knowledge base. If you cannot ground this in a clearly relevant [Source: ...] "
+    "passage, state plainly that the knowledge base does not confidently answer the "
+    "question and point to searching the raw sources, running web research, or "
+    "ingesting a source — do not assert a weakly-supported answer. Then submit again."
 )
 
 RESEARCH_FALLBACK_SYSTEM = (

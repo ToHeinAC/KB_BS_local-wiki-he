@@ -369,6 +369,63 @@ def test_submit_chat_low_confidence_nudges_once(monkeypatch, tmp_path):
         run_memory.begin_run()  # clear the run scratchpad so it can't leak to later tests
 
 
+def test_submit_final_low_confidence_nudges_once(monkeypatch, tmp_path):
+    """Stage E soft gate on the research path — mirrors the chat gate: nudge to abstain
+    exactly once when no passage cleared τ, then accept (never stalls the loop)."""
+    import json
+
+    import db_context
+
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("KI")
+    idx = tmp_path / "KI" / "index"
+    idx.mkdir(parents=True)
+    (idx / "calibration.json").write_text(json.dumps({"tau": -4.14}))
+    monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
+    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "MIN_URLS", 1)
+    answer = "one two three [Source: raw.md]"
+    try:
+        mem = run_memory.begin_run()
+        mem.note_relevance(-6.0)  # best passage below τ
+        assert tools._submit_final_impl("T", answer).startswith("LOW CONFIDENCE")
+        assert tools._submit_final_impl("T", answer).startswith("ACCEPTED")  # bounded to one fire
+    finally:
+        run_memory.begin_run()
+
+
+def test_current_run_audit_splits_sources_by_tau(monkeypatch, tmp_path):
+    """current_run_audit builds the ladder record from per-source scores in run memory."""
+    import json
+
+    import db_context
+
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("KI")
+    idx = tmp_path / "KI" / "index"
+    idx.mkdir(parents=True)
+    (idx / "calibration.json").write_text(json.dumps({"tau": -4.0}))
+    try:
+        mem = run_memory.begin_run()
+        mem.note_source_relevance("good.md", -1.0)
+        mem.note_source_relevance("good.md", -8.0)   # keeps the max
+        mem.note_source_relevance("weak.md", -6.0)
+        audit = tools.current_run_audit()
+        assert audit["kept"] == [("good.md", -1.0)]
+        assert audit["below_tau"] == [("weak.md", -6.0)]
+    finally:
+        run_memory.begin_run()
+
+
+def test_current_run_audit_none_when_no_scored_source():
+    """Wiki/web-only run scored no source ⇒ no audit panel."""
+    try:
+        run_memory.begin_run()
+        assert tools.current_run_audit() is None
+    finally:
+        run_memory.begin_run()
+
+
 def test_wiki_search_labels_shared_source_neighbours(monkeypatch):
     monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", True)
     monkeypatch.setattr(
