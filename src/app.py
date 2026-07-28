@@ -533,12 +533,19 @@ def _render_neural_graph() -> None:
         "Hubs": "hubs", "Bridges": "bridges", "Orphans": "orphans",
         "Stale": "stale", "Low confidence": "confidence",
     }
-    ccol1, ccol2 = st.columns([1, 2])
-    by_degree = ccol1.toggle(
+    layout_labels = {"Galaxy": "galaxy", "Ranked": "arc", "Clusters": "radial"}
+    ccol1, ccol2, ccol3 = st.columns([2, 1, 2])
+    layout = ccol1.segmented_control(
+        "Layout", list(layout_labels), default="Galaxy", key="graph_layout",
+        label_visibility="collapsed",
+        help="Galaxy: force layout. Ranked: the metric's head as a stable column. "
+             "Clusters: pages on a ring by cluster, links bundled.",
+    )
+    by_degree = ccol2.toggle(
         "Connections", key="graph_by_degree",
         help="Off: dots and the ranked chart show PageRank. On: number of connections.",
     )
-    picked = ccol2.multiselect(
+    picked = ccol3.multiselect(
         "Overlays", list(overlay_labels), default=["Hubs"],
         key="graph_overlays", label_visibility="collapsed",
         placeholder="Overlays",
@@ -552,6 +559,9 @@ def _render_neural_graph() -> None:
             clicked = graph_widget.render_graph(
                 overlays=[overlay_labels[p] for p in picked],
                 size_by="degree" if by_degree else "pagerank",
+                # Clearing the segmented control returns None; the map still
+                # has to be drawn in *some* geometry.
+                layout=layout_labels.get(layout, "galaxy"),
             )
         except Exception as exc:
             st.error(f"Graph render failed: {exc}")

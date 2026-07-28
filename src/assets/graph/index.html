@@ -72,6 +72,10 @@
   #legend .row { display: flex; align-items: center; gap: 7px; margin: 3px 0; }
   #legend .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
   #legend .meta { color: var(--muted); margin-top: 7px; font-size: 11px; }
+  /* Ranked layout encodes the metric in colour, so the legend becomes the
+     rank ramp instead of the category key — a category swatch there would
+     describe an encoding the canvas is not using. */
+  #legend .ramp { height: 8px; width: 100%; border-radius: 4px; }
 
   #info { top: 12px; right: 12px; width: 250px; display: none; }
   #info h2 { margin: 0 0 6px; font-size: 14px; font-weight: 600; }
@@ -96,6 +100,7 @@
   }
   #rank .r:first-of-type { border-top: 0; }
   #rank .r:hover .name { color: #fff; }
+  #rank .r.on .name { color: #fff; font-weight: 600; }
   #rank .n { width: 17px; text-align: right; font-weight: 700; font-size: 11px; flex: none; }
   #rank .c { width: 46px; display: flex; justify-content: center; flex: none; }
   #rank .c span { border-radius: 50%; display: block; }
@@ -159,12 +164,29 @@ let S = {                    // everything that survives a Streamlit rerun
   sig: null,                 // payload signature; changes => rebuild layout
   nodes: [], edges: [], adj: new Map(),
   overlays: [], strings: {}, accent: "#4a9eff", sizeBy: "pagerank",
+  layout: "galaxy",          // galaxy | arc | radial
+  counts: null,              // payload-level totals, for the legend
+  cats: [],
+  arcCount: 0,               // nodes the arc layout actually placed
+  parents: new Map(),        // community -> bundling control point (radial)
+  ring: 0,                   // ring radius (radial)
   rankColors: null,          // id -> rank colour, set while a selection is live
   maxPr: 1e-9, maxDeg: 1,
   view: { x: 0, y: 0, k: 1 },
   hover: null, selected: null, query: "", clicks: 0,
   alpha: 1, t: 0,
 };
+
+function metricOf(n) {
+  return S.sizeBy === "degree" ? n.deg : n.pr;
+}
+
+// Descending by the active metric, ties broken by label so the order — and
+// therefore both deterministic layouts — is identical on every machine.
+function byMetric(pool) {
+  return pool.slice().sort(
+    (a, b) => metricOf(b) - metricOf(a) || a.label.localeCompare(b.label));
+}
 
 // --- node radius -----------------------------------------------------------
 // One metric at a time — PageRank (default) or connections — so a dot's size
@@ -183,25 +205,19 @@ function applySizes() {
 function ingest(payload) {
   S.maxPr = Math.max(...payload.nodes.map((n) => n.pr), 1e-9);
   S.maxDeg = Math.max(...payload.nodes.map((n) => n.deg), 1);
-  const groups = new Map();
-  S.nodes = payload.nodes.map((n) => {
-    // Community-seeded start positions: the layout converges faster and the
-    // map keeps a recognisable shape between runs.
-    if (!groups.has(n.comm)) groups.set(n.comm, groups.size);
-    return Object.assign({}, n, {
-      x: 0, y: 0, vx: 0, vy: 0,
-      r: radiusOf(n),
-      phase: Math.random() * Math.PI * 2,
-    });
-  });
-  const total = Math.max(groups.size, 1);
+  S.nodes = payload.nodes.map((n) => Object.assign({}, n, {
+    x: 0, y: 0, vx: 0, vy: 0,
+    gx: undefined, gy: undefined,   // remembered galaxy position
+    vis: true,
+    r: radiusOf(n),
+    phase: Math.random() * Math.PI * 2,
+  }));
   const byId = new Map(S.nodes.map((n) => [n.id, n]));
-  S.nodes.forEach((n) => {
-    const a = (groups.get(n.comm) / total) * Math.PI * 2;
-    const spread = 60 + 180 * Math.random();
-    n.x = Math.cos(a) * 260 + (Math.random() - 0.5) * spread;
-    n.y = Math.sin(a) * 260 + (Math.random() - 0.5) * spread;
-  });
+  S.counts = {
+    nodes: payload.nodes.length, edges: payload.edges.length,
+    communities: payload.communities, truncated: payload.truncated,
+  };
+  S.cats = [...new Set(payload.nodes.map((n) => n.cat))].sort();
 
   S.edges = payload.edges
     .map((e) => ({ s: byId.get(e.s), t: byId.get(e.t), type: e.type, pulse: Math.random() }))
@@ -213,9 +229,127 @@ function ingest(payload) {
     S.adj.get(e.t.id).add(e.s.id);
   });
 
-  S.alpha = 1;
-  S.view = { x: 0, y: 0, k: 1 };
+  relayout();
   emptyEl.style.display = S.nodes.length ? "none" : "flex";
+}
+
+// --- layouts ---------------------------------------------------------------
+// Three geometries over one payload. Nothing here derives structure: `comm`,
+// `pr`, `deg` and the edge list all arrive from Python. `galaxy` is the force
+// layout; `arc` and `radial` are closed-form, deterministic and identical on
+// every visit — which is the point of having them, because a force layout can
+// never put a page in the same place twice.
+const ARC_MAX = 60;    // arc mode draws the metric's head, not its tail
+const ARC_STEP = 24;   // minimum px between rows
+const RADIAL_GAP = 2;  // empty ring slots between communities
+
+function relayout() {
+  S.view = { x: 0, y: 0, k: 1 };
+  if (S.layout === "arc") layoutArc();
+  else if (S.layout === "radial") layoutRadial();
+  else layoutGalaxy();
+}
+
+/** Zoom so a bounding box of `size` world px fits the canvas. Never zooms in. */
+function fitTo(size) {
+  const room = Math.min(cv.clientWidth, cv.clientHeight) - 48;
+  if (room > 0 && size > 0) S.view.k = Math.max(0.25, Math.min(1, room / size));
+}
+
+function layoutGalaxy() {
+  S.nodes.forEach((n) => { n.vis = true; });
+  // Returning to galaxy restores the map the user already read, rather than
+  // reseeding a different one — the force layout is random, so a rebuild would
+  // silently relocate every page.
+  if (S.nodes.length && S.nodes[0].gx !== undefined) {
+    S.nodes.forEach((n) => { n.x = n.gx; n.y = n.gy; n.vx = 0; n.vy = 0; });
+    S.alpha = 0.04;  // settle, don't rebuild
+    return;
+  }
+  // Community-seeded start positions: the layout converges faster and the
+  // map keeps a recognisable shape between runs.
+  const groups = new Map();
+  S.nodes.forEach((n) => {
+    if (!groups.has(n.comm)) groups.set(n.comm, groups.size);
+  });
+  const total = Math.max(groups.size, 1);
+  S.nodes.forEach((n) => {
+    const a = (groups.get(n.comm) / total) * Math.PI * 2;
+    const spread = 60 + 180 * Math.random();
+    n.x = Math.cos(a) * 260 + (Math.random() - 0.5) * spread;
+    n.y = Math.sin(a) * 260 + (Math.random() - 0.5) * spread;
+    n.vx = 0; n.vy = 0;
+  });
+  S.alpha = 1;
+}
+
+// One column ordered by the metric, edges as arcs bowing off to the right —
+// the ranked chart made into the layout itself. Deliberately capped: past a
+// few dozen rows the column outruns the viewport and the arcs become a hairball.
+function layoutArc() {
+  const ranked = byMetric(S.nodes);
+  const shown = ranked.slice(0, ARC_MAX);
+  const vis = new Set(shown.map((n) => n.id));
+  S.nodes.forEach((n) => { n.vis = vis.has(n.id); });
+  S.arcCount = shown.length;
+
+  let y = 0;
+  shown.forEach((n, i) => {
+    // Bigger circles claim more room, so the ranking stays legible at the head
+    // where the radii are largest.
+    if (i) y += Math.max(ARC_STEP, shown[i - 1].r + n.r + 9);
+    n.x = -170; n.y = y; n.vx = 0; n.vy = 0;
+  });
+  const mid = y / 2;
+  shown.forEach((n) => { n.y -= mid; });
+  S.alpha = 0;
+  fitTo(y + 80);
+}
+
+// Hierarchical edge bundling: pages sit on a ring grouped by Louvain
+// community, and every link is routed through its endpoints' community
+// centroids. Within-community links bundle into short inward loops, so what is
+// left crossing the middle is exactly the cross-cluster structure — the thing a
+// hairball hides and the `bridge` metric already measures.
+function layoutRadial() {
+  S.nodes.forEach((n) => { n.vis = true; });
+  const ordered = S.nodes.slice().sort(
+    (a, b) => a.comm - b.comm || metricOf(b) - metricOf(a)
+              || a.label.localeCompare(b.label));
+  const comms = [...new Set(ordered.map((n) => n.comm))];
+  const slots = Math.max(ordered.length + comms.length * RADIAL_GAP, 1);
+  const R = Math.max(210, (slots * 15) / (2 * Math.PI));
+  S.ring = R;
+
+  const span = new Map();  // comm -> [firstAngle, lastAngle]
+  let slot = 0, prev = null;
+  ordered.forEach((n) => {
+    if (prev !== null && n.comm !== prev) slot += RADIAL_GAP;
+    prev = n.comm;
+    const a = (slot / slots) * Math.PI * 2 - Math.PI / 2;
+    n.ang = a;
+    n.x = Math.cos(a) * R;
+    n.y = Math.sin(a) * R;
+    n.vx = 0; n.vy = 0;
+    const s = span.get(n.comm);
+    span.set(n.comm, s ? [s[0], a] : [a, a]);
+    slot++;
+  });
+
+  S.spans = span;
+  S.parents = new Map();
+  span.forEach(([a0, a1], comm) => {
+    const mid = (a0 + a1) / 2;
+    // Members of a community are contiguous on the ring by construction, so a
+    // plain midpoint is the centroid — no angular wrap to handle.
+    S.parents.set(comm, { x: Math.cos(mid) * R * 0.42, y: Math.sin(mid) * R * 0.42 });
+  });
+  S.alpha = 0;
+  fitTo(2 * R + 90);
+}
+
+function commColor(comm) {
+  return `hsl(${(comm * 47) % 360}, 55%, 58%)`;
 }
 
 // --- force layout ----------------------------------------------------------
@@ -223,7 +357,8 @@ function ingest(payload) {
 // uniform grid is enough here because the graph is sparse and clustered.
 const CELL = 120;
 function tick() {
-  if (S.alpha < 0.005) return;
+  // The deterministic layouts are closed-form: simulating them would undo them.
+  if (S.layout !== "galaxy" || S.alpha < 0.005) return;
   const grid = new Map();
   const key = (x, y) => `${Math.round(x / CELL)}:${Math.round(y / CELL)}`;
   S.nodes.forEach((n) => {
@@ -266,6 +401,7 @@ function tick() {
   S.nodes.forEach((n) => {
     n.x += (n.vx *= 0.82) * S.alpha;
     n.y += (n.vy *= 0.82) * S.alpha;
+    n.gx = n.x; n.gy = n.y;  // so a return to galaxy restores this exact map
   });
   S.alpha *= 0.985;
 }
@@ -309,6 +445,37 @@ function matches(n) {
   return S.query && n.label.toLowerCase().includes(S.query);
 }
 
+/** Continue the current path from `e.s` to `e.t` in the active layout's shape. */
+function edgePath(e) {
+  if (S.layout === "arc") {
+    // Both endpoints share an x, so a single control point to the right turns
+    // the link into a clean semicircle-ish arc scaled to the rank distance.
+    const cx = e.s.x + 40 + 0.55 * Math.abs(e.t.y - e.s.y);
+    ctx.quadraticCurveTo(cx, (e.s.y + e.t.y) / 2, e.t.x, e.t.y);
+    return;
+  }
+  if (S.layout === "radial") {
+    const ps = S.parents.get(e.s.comm) || { x: 0, y: 0 };
+    const pt = S.parents.get(e.t.comm) || { x: 0, y: 0 };
+    ctx.bezierCurveTo(ps.x, ps.y, pt.x, pt.y, e.t.x, e.t.y);
+    return;
+  }
+  ctx.lineTo(e.t.x, e.t.y);
+}
+
+/** Community arcs just outside the ring — the grouping the bundling assumes. */
+function drawRing() {
+  if (!S.spans) return;
+  ctx.lineWidth = 3 / S.view.k;
+  S.spans.forEach(([a0, a1], comm) => {
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = commColor(comm);
+    ctx.beginPath();
+    ctx.arc(0, 0, S.ring + 16, a0 - 0.006, a1 + 0.006);
+    ctx.stroke();
+  });
+}
+
 function draw() {
   const w = cv.clientWidth, h = cv.clientHeight;
   const dpr = window.devicePixelRatio || 1;
@@ -327,22 +494,28 @@ function draw() {
   // Node positions are drawn exactly where the layout put them — no per-frame
   // drift. Selecting a node must never appear to move the map.
 
+  if (S.layout === "radial") drawRing();
+
   // Edges
+  const curved = S.layout !== "galaxy";
   S.edges.forEach((e) => {
+    if (!e.s.vis || !e.t.vis) return;
     const lit = !focus || (focus.has(e.s.id) && focus.has(e.t.id));
     const x1 = e.s.x, y1 = e.s.y, x2 = e.t.x, y2 = e.t.y;
-    ctx.globalAlpha = lit ? 0.62 : 0.05;
+    ctx.globalAlpha = lit ? (curved ? 0.5 : 0.62) : 0.05;
     ctx.strokeStyle = e.type === "derived-from" ? "#ff922b" : S.accent;
     ctx.lineWidth = (e.type === "derived-from" ? 0.5 : 0.9) / S.view.k;
     if (e.type === "derived-from") ctx.setLineDash([3 / S.view.k, 3 / S.view.k]);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
+    edgePath(e);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Synapse pulse travels along the edge; never under reduced motion.
-    if (lit && !REDUCED_MOTION) {
+    // Synapse pulse travels along the edge; never under reduced motion, and
+    // never on the curved layouts — the pulse interpolates a straight line, so
+    // on an arc or a bundle it would visibly leave the wire.
+    if (lit && !curved && !REDUCED_MOTION) {
       const p = (e.pulse + S.t * 0.004) % 1;
       ctx.globalAlpha = 0.75 * (1 - Math.abs(p * 2 - 1));
       ctx.fillStyle = S.accent;
@@ -359,6 +532,7 @@ function draw() {
   const showLowConf = S.overlays.includes("confidence");
 
   S.nodes.forEach((n) => {
+    if (!n.vis) return;
     const lit = !focus || focus.has(n.id);
     const hit = matches(n);
     const x = n.x, y = n.y;
@@ -413,15 +587,20 @@ function draw() {
 
     // Labels stay readable rather than complete: hubs and whatever is in
     // focus / matched, and only once zoomed enough to have room. In the
-    // single-metric modes the ranked panel carries the names instead.
-    const named = hit || n.id === S.hover || n.id === S.selected ||
+    // single-metric modes the ranked panel carries the names instead. The arc
+    // layout is the exception — it is capped and evenly spaced, so every row
+    // has room for its name, which is most of why it is readable at all.
+    const arc = S.layout === "arc";
+    const named = arc || hit || n.id === S.hover || n.id === S.selected ||
                   (lit && (n.hub || S.view.k > 1.5) && n.r > 5);
     if (named && lit) {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = "#e8ecff";
       ctx.font = `${Math.max(9, 11 / S.view.k)}px -apple-system, "Segoe UI", sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(n.label.slice(0, 38), x, y - n.r - 5 / S.view.k);
+      // Arcs bow to the right, so names go left and never cross a wire.
+      ctx.textAlign = arc ? "right" : "center";
+      if (arc) ctx.fillText(n.label.slice(0, 42), x - n.r - 9, y + 4);
+      else ctx.fillText(n.label.slice(0, 38), x, y - n.r - 5 / S.view.k);
     }
   });
 
@@ -449,6 +628,7 @@ function nodeAt(ev) {
   const p = toWorld(ev);
   let best = null, bestD = Infinity;
   S.nodes.forEach((n) => {
+    if (!n.vis) return;  // a node the layout dropped has no position to hit
     const d = Math.hypot(n.x - p.x, n.y - p.y);
     if (d < Math.max(n.r + 6, 10) && d < bestD) { best = n; bestD = d; }
   });
@@ -551,19 +731,24 @@ function renderRank() {
   }
   const t = S.strings;
   const pr = S.sizeBy === "pagerank";
-  const focus = S.selected ? focusSet() : null;
+  // The arc layout *is* the ranking of the whole graph, so it is never scoped
+  // to a selection — that would recolour the column out from under the reader.
+  const arc = S.layout === "arc";
+  const focus = !arc && S.selected ? focusSet() : null;
   const pool = focus ? S.nodes.filter((n) => focus.has(n.id)) : S.nodes;
   const val = (n) => (pr ? n.pr : n.deg);
   const ranked = pool.slice().sort((a, b) => val(b) - val(a) || a.label.localeCompare(b.label));
   const shown = ranked.slice(0, RANK_TOP);
   const max = val(shown[0]) || 1;
-  // One scale for the chart and the canvas, so a selected subgraph's dots carry
-  // the same violet→red rank colours as the rows. Spread across the *visible*
-  // rows; anything ranked below them shares the tail colour.
-  const scale = (i) => Math.min(i / Math.max(shown.length - 1, 1), 1);
-  S.rankColors = focus
+  // One scale for the chart and the canvas, so a dot carries the same
+  // violet→red rank colour as its row. The ramp spans whatever the canvas is
+  // showing — the arc column, or the visible rows — and anything below the end
+  // of it shares the tail colour.
+  const ramp = Math.max((arc ? Math.min(S.arcCount, ranked.length) : shown.length) - 1, 1);
+  const scale = (i) => Math.min(i / ramp, 1);
+  S.rankColors = (focus || arc)
     ? new Map(ranked.map((n, i) => [n.id, rankColor(scale(i))]))
-    : null;  // no selection => the map stays categorical
+    : null;  // nothing selected in a structural layout => the map stays categorical
 
   rankEl.innerHTML =
     `<h3>${esc(pr ? t.rankPr : t.rankDeg)}</h3>` +
@@ -572,7 +757,8 @@ function renderRank() {
     shown.map((n, i) => {
       const d = Math.max(9, Math.round(42 * Math.sqrt(val(n) / max)));
       const c = rankColor(scale(i));
-      return `<div class="r" data-id="${esc(n.id)}" title="${esc(n.label)}">` +
+      const on = n.id === S.selected ? " on" : "";
+      return `<div class="r${on}" data-id="${esc(n.id)}" title="${esc(n.label)}">` +
         `<span class="n" style="color:${c}">${i + 1}</span>` +
         `<span class="c"><span style="width:${d}px;height:${d}px;background:${c}"></span></span>` +
         `<span class="name">${esc(n.label)}</span>` +
@@ -581,7 +767,18 @@ function renderRank() {
   rankEl.style.display = "block";
 }
 
-// A row is the same handle as the dot: click selects, double click opens.
+// A row is the same handle as the dot: hover lights the same 2-hop
+// neighbourhood the dot would, click selects, double click opens. Without the
+// hover binding the chart is a list *beside* the map rather than a way into it,
+// and the reader has to find the named dot by eye.
+document.getElementById("rank").addEventListener("mouseover", (e) => {
+  const row = e.target.closest(".r");
+  // The pointer is over the panel, not the canvas, so nothing else is writing
+  // `S.hover` here — the canvas's own mousemove cannot fire at the same time.
+  if (row) S.hover = row.dataset.id;
+});
+document.getElementById("rank").addEventListener("mouseleave", () => { S.hover = null; });
+
 document.getElementById("rank").addEventListener("click", (e) => {
   const row = e.target.closest(".r");
   if (!row) return;
@@ -597,17 +794,33 @@ document.getElementById("rank").addEventListener("dblclick", (e) => {
   if (n) Streamlit.setValue({ node: n.id, kind: n.kind, n: ++S.clicks });
 });
 
-function renderLegend(payload) {
+// The legend describes the encoding actually on screen. In the arc layout that
+// is the rank ramp, not the category palette — showing a category key there
+// would explain a colouring the canvas is not using.
+function renderLegend() {
+  if (!S.counts) return;
   const t = S.strings;
-  const cats = [...new Set(payload.nodes.map((n) => n.cat))].sort();
-  legendEl.innerHTML =
-    cats.map((c) =>
-      `<div class="row"><span class="dot" style="background:${CAT_COLOR[c] || ORPHAN_COLOR}"></span>${esc(c)}</div>`
-    ).join("") +
-    `<div class="meta">${payload.nodes.length} ${esc(t.nodes)} · ` +
-    `${payload.edges.length} ${esc(t.edges)} · ` +
-    `${payload.communities} ${esc(t.clusters)}` +
-    (payload.truncated ? ` · ${esc(t.truncated)}` : "") + `</div>`;
+  const c = S.counts;
+  const arc = S.layout === "arc";
+  const metric = S.sizeBy === "degree" ? t.links : t.pagerank;
+  const key = arc
+    ? `<div class="row"><span class="ramp" style="background:linear-gradient(90deg,` +
+      `${rankColor(0)},${rankColor(0.5)},${rankColor(1)})"></span></div>` +
+      `<div class="meta">${esc(fmt(t.rankOf, { n: S.arcCount }))} · ` +
+      `${esc(fmt(t.sizeIs, { metric }))}</div>`
+    : S.cats.map((cat) =>
+        `<div class="row"><span class="dot" style="background:${CAT_COLOR[cat] || ORPHAN_COLOR}"></span>${esc(cat)}</div>`
+      ).join("");
+  legendEl.innerHTML = key +
+    `<div class="meta">${c.nodes} ${esc(t.nodes)} · ` +
+    `${c.edges} ${esc(t.edges)} · ` +
+    `${c.communities} ${esc(t.clusters)}` +
+    (c.truncated ? ` · ${esc(t.truncated)}` : "") + `</div>`;
+}
+
+/** `{n}` / `{metric}` placeholders in the pinned chrome strings. */
+function fmt(tpl, vars) {
+  return String(tpl || "").replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 }
 
 function esc(s) {
@@ -619,8 +832,11 @@ function esc(s) {
 function onRender(args) {
   const payload = args.graph;
   const sizeBy = args.sizeBy || "pagerank";
+  const layout = args.layout || "galaxy";
   const sizeChanged = sizeBy !== S.sizeBy;
+  const layoutChanged = layout !== S.layout;
   S.sizeBy = sizeBy;
+  S.layout = layout;
   S.overlays = args.overlays || [];
   // Backdrop is decorative and env-controlled (GRAPH_BACKDROP); `none` leaves
   // the flat `--bg` the page already has behind the transparent canvas.
@@ -639,10 +855,14 @@ function onRender(args) {
   if (sig !== S.sig) {
     S.sig = sig;
     ingest(payload);
-    renderLegend(payload);
-  } else if (sizeChanged) {
-    applySizes();  // radius only — positions are deliberately left alone
+  } else if (sizeChanged || layoutChanged) {
+    applySizes();
+    // In galaxy mode the metric only re-radiuses: switching it must not scatter
+    // the map. The deterministic layouts *order by* the metric, so there a
+    // change of metric is a change of layout.
+    if (layoutChanged || S.layout !== "galaxy") relayout();
   }
+  renderLegend();
   if (args.selected && args.selected !== S.selected) {
     S.selected = args.selected;
     const n = S.nodes.find((x) => x.id === args.selected);

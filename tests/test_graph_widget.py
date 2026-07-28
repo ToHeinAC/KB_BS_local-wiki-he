@@ -21,7 +21,7 @@ sys.path.insert(0, "src")
 import db_context, graph_widget
 db_context.DATA_ROOT = Path({root!r})
 db_context.set_active_db("test")
-graph_widget.render_graph(overlays={overlays!r}, size_by={size_by!r})
+graph_widget.render_graph(overlays={overlays!r}, size_by={size_by!r}, layout={layout!r})
 """
 
 
@@ -38,9 +38,11 @@ def app(wiki_dir, tmp_path):
         "confidence: low\n---\n\nBeta body.\n"
     )
 
-    def _run(overlays=("hubs",), size_by="pagerank"):
+    def _run(overlays=("hubs",), size_by="pagerank", layout="galaxy"):
         graph_widget._payload.clear()  # the fixture wiki is new on every test
-        src = SCRIPT.format(root=str(tmp_path), overlays=list(overlays), size_by=size_by)
+        src = SCRIPT.format(
+            root=str(tmp_path), overlays=list(overlays), size_by=size_by, layout=layout
+        )
         return AppTest.from_string(src, default_timeout=60).run()
 
     return _run
@@ -64,7 +66,8 @@ def test_component_mounts_with_payload(app):
 def test_payload_carries_every_key_the_renderer_reads(app):
     """index.html reads these by name; a rename here is a silently blank canvas."""
     _, args = _component_args(app())
-    assert {"graph", "overlays", "sizeBy", "backdrop", "strings", "accent", "height"} <= set(args)
+    assert {"graph", "overlays", "sizeBy", "layout", "backdrop", "strings",
+            "accent", "height"} <= set(args)
     node = args["graph"]["nodes"][0]
     assert {"id", "label", "cat", "kind", "comm", "deg", "pr", "bridge",
             "confidence", "stale", "orphan", "hub", "bridgeHub", "tags"} <= set(node)
@@ -76,6 +79,19 @@ def test_controls_reach_the_renderer(app):
     _, args = _component_args(app(overlays=["stale", "bridges"], size_by="pagerank"))
     assert args["overlays"] == ["stale", "bridges"]
     assert args["sizeBy"] == "pagerank"
+
+
+@pytest.mark.parametrize("layout", ["galaxy", "arc", "radial"])
+def test_layout_reaches_the_renderer(app, layout):
+    """The layout is a pure frontend switch — same payload, different geometry."""
+    _, args = _component_args(app(layout=layout))
+    assert args["layout"] == layout
+
+
+def test_layout_chrome_strings_are_pinned(app):
+    """`arc` mode relabels the legend, so its strings must ship with the chrome."""
+    _, args = _component_args(app(layout="arc"))
+    assert {"rankOf", "sizeIs"} <= set(args["strings"])
 
 
 def test_chrome_language_follows_the_bundle(app):

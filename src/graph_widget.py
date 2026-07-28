@@ -53,6 +53,7 @@ _STRINGS = {
         "rankPr": "Nach PageRank sortiert", "rankDeg": "Nach Verbindungen sortiert",
         "rankAll": "gesamter Graph", "rankSel": "Auswahl",
         "empty": "Noch keine verknüpften Seiten.",
+        "rankOf": "Rang 1 … {n}", "sizeIs": "Fläche = {metric}",
     },
     "en": {
         "search": "Search pages…", "type": "Type", "links": "Links",
@@ -64,6 +65,7 @@ _STRINGS = {
         "rankPr": "Ranked by PageRank", "rankDeg": "Ranked by connections",
         "rankAll": "whole graph", "rankSel": "selection",
         "empty": "No linked pages yet.",
+        "rankOf": "rank 1 … {n}", "sizeIs": "area = {metric}",
     },
 }
 
@@ -99,12 +101,25 @@ def _payload(signature: str) -> dict:
 
 
 def render_graph(
-    *, overlays: list[str], size_by: str = "pagerank", height: int = 720
+    *,
+    overlays: list[str],
+    size_by: str = "pagerank",
+    layout: str = "galaxy",
+    height: int = 720,
 ) -> dict | None:
     """Draw the graph. Returns the double-clicked node `{node, kind, n}` or None.
 
     `size_by` picks the metric a dot's radius and the ranked-circle chart show:
     `pagerank` (default) or `degree`.
+
+    `layout` picks the geometry the *same* payload is drawn in — no analytics
+    change with it, only where the dots land:
+
+    * `galaxy`  — the force layout (default): cluster shape at a glance.
+    * `arc`     — the metric's head as a deterministic ranked column with arc
+      edges. Stable between visits, which a force layout can never be.
+    * `radial`  — every page on a ring grouped by Louvain community, edges
+      bundled through the community centroids (hierarchical edge bundling).
     """
     payload = _payload(_bundle_signature())
     strings = _STRINGS.get(payload["lang"], _STRINGS["en"])
@@ -112,6 +127,7 @@ def render_graph(
         graph=payload,
         overlays=overlays,
         sizeBy=size_by,
+        layout=layout,
         backdrop=BACKDROP,
         strings=strings,
         accent=st.get_option("theme.primaryColor") or "#4a9eff",
