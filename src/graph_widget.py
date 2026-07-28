@@ -124,3 +124,8 @@ def render_graph(
 def graph_stats() -> dict:
     """Payload-level counts for captions, without re-exporting."""
     return _payload(_bundle_signature())
+
+
+def graph_health() -> dict:
+    """Health summary of the same cached payload the canvas is drawing."""
+    return graph_export.health(_payload(_bundle_signature()))

@@ -82,8 +82,10 @@ The **login gate** is centered in a constrained middle column (`st.columns([1, 1
 
 ## Graph view (Wiki Explorer)
 
-**Graph is the Explorer's default view** (first radio option) and spans the full page width — the tree navigator
-and its page search stay in Tree view rather than being duplicated in a side column.
+**Graph is the Explorer's default view** (first radio option). Under `legacy` it spans the full page width; under
+`neural` the canvas takes ~92 % of the width with the **side panel** collapsed to a one-button rail, and drops to
+`st.columns([3, 1])` when the panel is opened (see §Side panel below). The tree
+navigator and its page search stay in Tree view rather than being duplicated in a side column.
 
 Both views share `st.session_state["explorer_selected_page"]`, so switching **into Tree clears it** (`explorer_view_mode` tracks the transition): Tree always opens on the database overview rather than on whatever node was opened in the graph.
 
@@ -95,7 +97,7 @@ Two renderers behind `GRAPH_RENDERER` (`.env`), both drawing the **same** typed 
 Facts that cost a debugging round-trip each; do not re-derive them:
 
 * **Single click selects, double click opens.** A click fills the canvas's own info panel (top right) with the node's properties and lights its 2-hop neighbourhood, entirely client-side — no rerun. Only a double click posts back to Python to open the page, so reading the graph is free and opening is deliberate.
-* **Node opening must NOT navigate the top window.** The tempting design — `window.top.location = "<base>/?page=<slug>"` plus `st.query_params` — is a full page load, and this app gates on `st.session_state["user"]` with the active DB in session state. The click would therefore land the user on the login screen. Navigation instead goes through the **Streamlit component protocol**: the iframe posts `streamlit:setComponentValue` on double click, Streamlit reruns the script, and `_render_neural_graph()` sets `explorer_selected_page` and opens the page dialog. Session, chat history and reader position all survive.
+* **Node opening must NOT navigate the top window.** The tempting design — `window.top.location = "<base>/?page=<slug>"` plus `st.query_params` — is a full page load, and this app gates on `st.session_state["user"]` with the active DB in session state. The click would therefore land the user on the login screen. Navigation instead goes through the **Streamlit component protocol**: the iframe posts `streamlit:setComponentValue` on double click, Streamlit reruns the script, and `_render_neural_graph()` sets `explorer_selected_page` and the side panel renders it. Session, chat history and reader position all survive.
 * **The returned value carries a click counter (`n`).** Streamlit only reruns when a component's value *changes*, so double-clicking the same node twice with a bare id would be a no-op the second time.
 * **The component is declared, not `components.html`-embedded.** `declare_component(path=…)` serves `src/assets/graph/` through Streamlit itself, which is what makes it bidirectional *and* base-path-correct under `/wiwi/` — no `gpu_widget.py`-style Starlette route injection needed. It needs **no npm build**: the directory is plain static files and the four protocol messages (`componentReady`, `setFrameHeight`, `setComponentValue`, and the inbound `streamlit:render`) are hand-rolled in the page.
 * **`declare_component` silently skips registration outside a ScriptRunContext**, leaving the iframe on a 404. Hence `graph_widget._component()` declares lazily on first render rather than at import time.
@@ -107,6 +109,30 @@ Facts that cost a debugging round-trip each; do not re-derive them:
 * **A selection recolours its own subgraph by rank** (`S.rankColors`, consumed by `nodeColor()`): the selected node's neighbourhood takes the same violet → red rank colours as the chart rows, so a row and its dot are the same colour. With nothing selected the map stays categorical (`CAT_COLOR`). The scale spans the *visible* rows; anything ranked below them shares the tail colour.
 * **Overlays are a Streamlit widget, not canvas buttons** — they persist in `st.session_state` across the reruns that clicks and ingest cause; pan / zoom / hover / search stay inside the canvas, where a rerun would be wasteful.
 * **Node positions never drift.** The default view draws every node and edge fully lit; hover/selection only changes brightness, never coordinates, so clicking a node cannot appear to reshuffle the map.
+
+### Side panel (neural renderer)
+
+**The panel is collapsed by default** (`explorer_panel_open`, default `False`): the map is what this view is for, so
+it keeps the width until the reader or the health view is asked for. Collapsed, the right column is a `«` rail
+(`st.columns([12, 1])`); open, it is `st.columns([3, 1])` with a `»` at the top of the panel. Streamlit has no drawer
+widget — the "drawer" *is* the column ratio, re-picked each run from that flag.
+
+Double-clicking a node opens the panel with it. Because the widths for a run are fixed **before** the component
+renders, that path sets the flag and `st.rerun()`s (the payload is cached, so the extra run is cheap); the
+already-open case renders in the same run. A source-node double click reports through `st.toast()`, not the panel —
+the collapsed rail is too narrow to read a message in.
+
+`_render_explorer_panel()` then has exactly two states, so the open panel is never empty:
+
+* **A page is open** (`explorer_selected_page`) → the reader: title, `✕` back button, the page body inside a fixed-height `st.container(height=560)` scroll region beside the canvas, a download button, and the Sources expander (originals via `_raw_source_button`, related pages as buttons that re-target the panel).
+* **Nothing open** → the **health view** (`_render_graph_health()`): Pages / Orphans / Stale metrics, the top clusters ranked by growth (`+N` = pages updated inside `graph_export.HEALTH_WINDOW_DAYS`, 30), and expanders listing orphaned / stale / low-confidence pages whose entries open in the reader.
+
+Two rules behind this:
+
+* **No modal.** A page opened from the graph must render *beside* it, not over it — `st.dialog` hides the map the node was clicked on, which defeats reading the two together. `_show_md_dialog()` remains for the Tree view and the chat/research source lists, where there is no map to occlude.
+* **The health view reads the drawn payload, never the wiki again.** `graph_widget.graph_health()` → `graph_export.health()` consumes the flags already stamped into the cached payload (`orphan` / `stale` / `confidence` / `comm`), so the panel's counts and the canvas's overlays cannot drift apart, and the panel costs no extra graph build. Clusters are labelled by their highest-PageRank *page*, and counts exclude source nodes — a raw document has no health of its own.
+
+Click handling sits **between** the two columns (`with graph_col:` … process click … `with panel_col:`), which is what lets an open panel render the just-opened page on the same run.
 
 ## Error states (UI surface)
 

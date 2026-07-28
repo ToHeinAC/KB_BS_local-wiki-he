@@ -21,7 +21,7 @@ disagree.
 from __future__ import annotations
 
 import os
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import networkx as nx
 from networkx.algorithms.community import louvain_communities
@@ -33,6 +33,9 @@ import wiki_engine
 # renderer is interactive at a few thousand nodes; beyond that the force layout,
 # not the analytics, is what falls over.
 MAX_NODES = int(os.getenv("GRAPH_MAX_NODES", "4000"))
+
+# "Recently touched" for the health panel's growth column.
+HEALTH_WINDOW_DAYS = 30
 
 # Louvain is stochastic; a fixed seed keeps the map recognisable run-to-run.
 _LOUVAIN_SEED = 42
@@ -171,6 +174,55 @@ def export(today=None) -> dict:
         "lang": lang.detect(" ".join(n["label"] for n in nodes)),
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
+
+
+def health(payload: dict, today=None) -> dict:
+    """Bundle health from an exported payload: what is growing, what sits alone.
+
+    Pure and deterministic — it reads only what `export()` already stamped, so
+    the panel can never disagree with the dots on the canvas (orphan, stale and
+    low-confidence are the payload's own flags, not a second computation).
+    Counts cover *pages* only: a raw source document has no health of its own.
+    """
+    pages = [n for n in payload["nodes"] if n["kind"] == "page"]
+    cutoff = (today or datetime.now(timezone.utc).date())
+    cutoff = cutoff - timedelta(days=HEALTH_WINDOW_DAYS)
+
+    clusters: dict[int, dict] = {}
+    for node in pages:
+        c = clusters.setdefault(node["comm"], {"size": 0, "recent": 0, "top": node})
+        c["size"] += 1
+        if _is_recent(node["updated"], cutoff):
+            c["recent"] += 1
+        if node["pr"] > c["top"]["pr"]:
+            c["top"] = node
+
+    return {
+        "pages": len(pages),
+        "sources": len(payload["nodes"]) - len(pages),
+        "orphans": sorted(n["id"] for n in pages if n["orphan"]),
+        "stale": sorted(n["id"] for n in pages if n["stale"]),
+        "low_confidence": sorted(n["id"] for n in pages if n["confidence"] == "low"),
+        # Growth first, then size: the panel answers "which clusters are moving".
+        "clusters": sorted(
+            (
+                {"id": cid, "label": c["top"]["label"], "size": c["size"], "recent": c["recent"]}
+                for cid, c in clusters.items()
+            ),
+            key=lambda c: (-c["recent"], -c["size"], c["label"]),
+        ),
+        "window_days": HEALTH_WINDOW_DAYS,
+    }
+
+
+def _is_recent(updated: str | None, cutoff) -> bool:
+    """`updated` is the ISO date `export()` stamped, or None on a bare page."""
+    if not updated:
+        return False
+    try:
+        return date.fromisoformat(updated) >= cutoff
+    except ValueError:
+        return False
 
 
 def _iso_or_none(value) -> str | None:

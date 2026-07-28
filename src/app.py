@@ -520,6 +520,14 @@ def _render_neural_graph() -> None:
     state across reruns); pan/zoom/hover/search/selection stay inside the canvas.
     Only a *double* click comes back through the component protocol — no page
     reload, so the session survives (see src/graph_widget.py).
+
+    An opened page lands in the side panel, never in a modal: a dialog hides the
+    graph it was opened from, so the map and the page cannot be read together.
+    The panel is **collapsed by default** — the map is the point of this view, so
+    it gets the width until the reader or the health view is asked for. Collapsed
+    leaves a one-button rail (`«`); opening a node opens the panel with it.
+    The controls stay above the split so the panel column never nests columns
+    twice.
     """
     overlay_labels = {
         "Hubs": "hubs", "Bridges": "bridges", "Orphans": "orphans",
@@ -535,32 +543,124 @@ def _render_neural_graph() -> None:
         key="graph_overlays", label_visibility="collapsed",
         placeholder="Overlays",
     )
-    try:
-        clicked = graph_widget.render_graph(
-            overlays=[overlay_labels[p] for p in picked],
-            size_by="degree" if by_degree else "pagerank",
-        )
-    except Exception as exc:
-        st.error(f"Graph render failed: {exc}")
-        return
-
-    stats = graph_widget.graph_stats()
-    st.caption(
-        f"{len(stats['nodes'])} nodes · {len(stats['edges'])} edges · "
-        f"{stats['communities']} clusters. Hover for the 2-hop neighbourhood, "
-        "click a node for its properties, double-click to open the page."
+    panel_open = st.session_state.get("explorer_panel_open", False)
+    graph_col, panel_col = st.columns(
+        [3, 1] if panel_open else [12, 1], gap="medium" if panel_open else "small"
     )
+    with graph_col:
+        try:
+            clicked = graph_widget.render_graph(
+                overlays=[overlay_labels[p] for p in picked],
+                size_by="degree" if by_degree else "pagerank",
+            )
+        except Exception as exc:
+            st.error(f"Graph render failed: {exc}")
+            return
+
+        stats = graph_widget.graph_stats()
+        st.caption(
+            f"{len(stats['nodes'])} nodes · {len(stats['edges'])} edges · "
+            f"{stats['communities']} clusters. Hover for the 2-hop neighbourhood, "
+            "click a node for its properties, double-click to open the page."
+        )
 
     # `n` is a click counter: without it, clicking the same node twice would
-    # send an identical value and Streamlit would not rerun.
+    # send an identical value and Streamlit would not rerun. Handled between the
+    # two columns so the panel below renders the page that was just opened —
+    # unless the panel was collapsed, where the column widths for this run are
+    # already fixed and only a rerun can widen it.
     if clicked and clicked.get("n") != st.session_state.get("graph_click_n"):
         st.session_state["graph_click_n"] = clicked["n"]
-        node = clicked["node"]
         if clicked.get("kind") == "page":
-            st.session_state["explorer_selected_page"] = node
-            _show_md_dialog(node, wiki_engine.read_page_parsed(node)["content"])
+            st.session_state["explorer_selected_page"] = clicked["node"]
+            if not panel_open:
+                st.session_state["explorer_panel_open"] = True
+                st.rerun()
         else:
-            st.info(f"`{node.removeprefix('source::')}` is an original document, not a wiki page.")
+            # A toast, not a panel message: the collapsed rail is too narrow to
+            # read one, and this needs no space of its own.
+            st.toast(f"{clicked['node'].removeprefix('source::')} is an original "
+                     "document, not a wiki page.")
+
+    with panel_col:
+        if not panel_open:
+            if st.button("«", key="explorer_panel_expand", help="Details"):
+                st.session_state["explorer_panel_open"] = True
+                st.rerun()
+            return
+        if st.button("»", key="explorer_panel_collapse", help="Collapse the side panel"):
+            st.session_state["explorer_panel_open"] = False
+            st.rerun()
+        _render_explorer_panel()
+
+
+def _render_explorer_panel() -> None:
+    """The graph's side panel: the opened page, or the bundle's health view."""
+    selected = st.session_state.get("explorer_selected_page")
+    if not selected:
+        _render_graph_health()
+        return
+    head_col, close_col = st.columns([5, 1])
+    head_col.markdown(f"#### {selected}")
+    if close_col.button("✕", key="explorer_panel_close", help="Back to health"):
+        st.session_state.pop("explorer_selected_page", None)
+        st.rerun()
+    try:
+        parsed = wiki_engine.read_page_parsed(selected)
+    except Exception as exc:
+        st.warning(f"Could not load page: {exc}")
+        return
+    with st.container(height=560, border=False):
+        st.markdown(parsed["content"])
+    st.download_button(
+        "Download page", data=parsed["content"], file_name=selected,
+        mime="text/markdown", key=f"dl_graph_page_{selected}",
+    )
+    if parsed["sources"] or parsed["related"]:
+        with st.expander("Sources", expanded=False):
+            for s in parsed["sources"]:
+                _raw_source_button(s, f"dl_graph_{s}")
+            for r in parsed["related"]:
+                if st.button(r, key=f"open_related_{r}"):
+                    st.session_state["explorer_selected_page"] = r
+                    st.rerun()
+
+
+def _render_graph_health() -> None:
+    """Which clusters are growing, and what sits alone (idea.md §6.9.3).
+
+    Reads the flags `graph_export` already stamped into the drawn payload, so
+    the numbers here and the dots on the canvas cannot drift apart.
+    """
+    health = graph_widget.graph_health()
+    st.markdown("#### Bundle health")
+    st.caption("Double-click a node to read it here.")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Pages", health["pages"])
+    c2.metric("Orphans", len(health["orphans"]))
+    c3.metric("Stale", len(health["stale"]))
+
+    st.markdown(f"**Clusters** — updated in the last {health['window_days']} days")
+    for cluster in health["clusters"][:6]:
+        growth = f" · **+{cluster['recent']}**" if cluster["recent"] else ""
+        st.markdown(f"- {cluster['label']} — {cluster['size']} pages{growth}")
+    if not health["clusters"]:
+        st.caption("No pages yet.")
+
+    for label, ids in (
+        ("Orphaned", health["orphans"]),
+        ("Stale", health["stale"]),
+        ("Low confidence", health["low_confidence"]),
+    ):
+        if not ids:
+            continue
+        with st.expander(f"{label} ({len(ids)})", expanded=False):
+            for page in ids[:25]:
+                if st.button(page, key=f"health_open_{label}_{page}"):
+                    st.session_state["explorer_selected_page"] = page
+                    st.rerun()
+            if len(ids) > 25:
+                st.caption(f"…and {len(ids) - 25} more.")
 
 
 

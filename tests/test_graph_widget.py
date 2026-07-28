@@ -11,6 +11,7 @@ import json
 import pytest
 from streamlit.testing.v1 import AppTest
 
+import graph_export
 import graph_widget
 
 SCRIPT = """
@@ -87,3 +88,11 @@ def test_chrome_language_follows_the_bundle(app):
 def test_accent_comes_from_the_streamlit_theme(app):
     _, args = _component_args(app())
     assert args["accent"].startswith("#")
+
+
+def test_health_reads_the_drawn_payload(app):
+    """The side panel must summarise the same payload the canvas got."""
+    app()  # populates the cache for the fixture bundle
+    health = graph_widget.graph_health()
+    assert health == graph_export.health(graph_widget.graph_stats())
+    assert health["pages"] == 2 and health["low_confidence"] == ["beta.md"]

@@ -142,3 +142,50 @@ def test_max_nodes_guardrail(wiki_dir, monkeypatch):
 def test_empty_wiki_is_safe(wiki_dir):
     payload = graph_export.export()
     assert payload["nodes"] == [] and payload["edges"] == []
+
+
+# --- health view (§6.9.3 item 5) ---------------------------------------------
+
+
+def test_health_counts_pages_not_sources(bundle):
+    h = graph_export.health(graph_export.export(), today=date(2026, 7, 28))
+    assert h["pages"] == 4
+    assert h["sources"] == 2
+    assert h["orphans"] == ["lonely.md"]
+    assert h["low_confidence"] == ["beta.md"]
+
+
+def test_health_growth_window(bundle):
+    payload = graph_export.export()
+    recent = graph_export.health(payload, today=date(2026, 7, 28))
+    # All four pages carry updated: 2026-07-01 — inside a 30-day window …
+    assert sum(c["recent"] for c in recent["clusters"]) == 4
+    # … and outside it once the window has passed.
+    later = graph_export.health(payload, today=date(2026, 12, 31))
+    assert sum(c["recent"] for c in later["clusters"]) == 0
+    assert recent["window_days"] == graph_export.HEALTH_WINDOW_DAYS
+
+
+def test_health_clusters_are_labelled_and_ranked(bundle):
+    h = graph_export.health(graph_export.export(), today=date(2026, 7, 28))
+    assert h["clusters"], "every page belongs to a cluster"
+    # Labelled by their most central page, never by a source document.
+    for cluster in h["clusters"]:
+        assert cluster["size"] >= 1
+        assert not cluster["label"].startswith("source::")
+    # Ranked by growth, then size — the "which clusters are growing" question.
+    ranked = [(-c["recent"], -c["size"], c["label"]) for c in h["clusters"]]
+    assert ranked == sorted(ranked)
+    # Pages are partitioned across clusters, sources excluded.
+    assert sum(c["size"] for c in h["clusters"]) == h["pages"]
+
+
+def test_health_stale_agrees_with_the_payload(wiki_dir):
+    _page(wiki_dir, "fresh.md", title="Fresh", updated="2026-01-01", expires=90)
+    payload = graph_export.export(today=date(2026, 4, 2))
+    assert graph_export.health(payload)["stale"] == ["fresh.md"]
+
+
+def test_health_on_empty_wiki(wiki_dir):
+    h = graph_export.health(graph_export.export())
+    assert h["pages"] == 0 and h["clusters"] == [] and h["orphans"] == []
