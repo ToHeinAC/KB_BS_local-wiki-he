@@ -546,9 +546,20 @@ def _render_neural_graph() -> None:
         help="Off: dots and the ranked chart show PageRank. On: number of connections.",
     )
     picked = ccol3.multiselect(
-        "Overlays", list(overlay_labels), default=["Hubs"],
-        key="graph_overlays", label_visibility="collapsed",
-        placeholder="Overlays",
+        "Style Options", list(overlay_labels), default=["Hubs"],
+        key="graph_overlays", placeholder="Style Options",
+        help=(
+            "Highlights only — no node is added or hidden.\n\n"
+            "- **Hubs** — pages in the top 10% by PageRank (most central): "
+            "wider glow.\n"
+            "- **Bridges** — pages in the top 10% by betweenness (they connect "
+            "otherwise separate clusters): light ring.\n"
+            "- **Orphans** — pages with no links at all, in or out: grey dot.\n"
+            "- **Stale** — pages past their freshness window "
+            "(`updated` + `expires_after_days`): pulsing amber ring.\n"
+            "- **Low confidence** — pages with `confidence: low` in their "
+            "frontmatter: dimmed dot."
+        ),
     )
     panel_open = st.session_state.get("explorer_panel_open", False)
     graph_col, panel_col = st.columns(
