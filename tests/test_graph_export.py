@@ -1,4 +1,4 @@
-"""Tests for the neural-galaxy graph payload (src/graph_export.py)."""
+"""Tests for the neural graph payload (src/graph_export.py)."""
 
 from datetime import date
 

@@ -82,20 +82,31 @@ The **login gate** is centered in a constrained middle column (`st.columns([1, 1
 
 ## Graph view (Wiki Explorer)
 
+**Graph is the Explorer's default view** (first radio option) and spans the full page width — the tree navigator
+and its page search stay in Tree view rather than being duplicated in a side column.
+
+Both views share `st.session_state["explorer_selected_page"]`, so switching **into Tree clears it** (`explorer_view_mode` tracks the transition): Tree always opens on the database overview rather than on whatever node was opened in the graph.
+
 Two renderers behind `GRAPH_RENDERER` (`.env`), both drawing the **same** typed graph from `wiki_engine.build_typed_graph()`:
 
 * `legacy` (default) — the inline vis.js network, `_render_legacy_graph()` in `app.py`.
-* `neural` — the canvas galaxy/neural renderer, `_render_neural_graph()` → `src/graph_widget.py` → `src/assets/graph/index.html`.
+* `neural` — the canvas neural renderer, `_render_neural_graph()` → `src/graph_widget.py` → `src/assets/graph/index.html`.
 
 Facts that cost a debugging round-trip each; do not re-derive them:
 
-* **Node click must NOT navigate the top window.** The tempting design — `window.top.location = "<base>/?page=<slug>"` plus `st.query_params` — is a full page load, and this app gates on `st.session_state["user"]` with the active DB in session state. The click would therefore land the user on the login screen. Navigation instead goes through the **Streamlit component protocol**: the iframe posts `streamlit:setComponentValue`, Streamlit reruns the script, and `_render_neural_graph()` sets `explorer_selected_page` and opens the page dialog. Session, chat history and reader position all survive.
-* **The returned value carries a click counter (`n`).** Streamlit only reruns when a component's value *changes*, so clicking the same node twice with a bare id would be a no-op the second time.
+* **Single click selects, double click opens.** A click fills the canvas's own info panel (top right) with the node's properties and lights its 2-hop neighbourhood, entirely client-side — no rerun. Only a double click posts back to Python to open the page, so reading the graph is free and opening is deliberate.
+* **Node opening must NOT navigate the top window.** The tempting design — `window.top.location = "<base>/?page=<slug>"` plus `st.query_params` — is a full page load, and this app gates on `st.session_state["user"]` with the active DB in session state. The click would therefore land the user on the login screen. Navigation instead goes through the **Streamlit component protocol**: the iframe posts `streamlit:setComponentValue` on double click, Streamlit reruns the script, and `_render_neural_graph()` sets `explorer_selected_page` and opens the page dialog. Session, chat history and reader position all survive.
+* **The returned value carries a click counter (`n`).** Streamlit only reruns when a component's value *changes*, so double-clicking the same node twice with a bare id would be a no-op the second time.
 * **The component is declared, not `components.html`-embedded.** `declare_component(path=…)` serves `src/assets/graph/` through Streamlit itself, which is what makes it bidirectional *and* base-path-correct under `/wiwi/` — no `gpu_widget.py`-style Starlette route injection needed. It needs **no npm build**: the directory is plain static files and the four protocol messages (`componentReady`, `setFrameHeight`, `setComponentValue`, and the inbound `streamlit:render`) are hand-rolled in the page.
 * **`declare_component` silently skips registration outside a ScriptRunContext**, leaving the iframe on a 404. Hence `graph_widget._component()` declares lazily on first render rather than at import time.
-* **The canvas is dark on purpose**, against the app's light Forest palette — the galaxy/neural aesthetic depends on it. Only the accent tracks the theme (`theme.primaryColor`).
+* **The canvas is dark on purpose**, against the app's light Forest palette — the neural aesthetic depends on it. Only the accent tracks the theme (`theme.primaryColor`).
+* **The backdrop is a Hubble galaxy image** (`src/assets/graph/galaxy.jpg`, credit NASA/ESA — see `NOTICE`), served from the component directory like everything else, so it stays same-origin and CDN-free. It is **optional**: `GRAPH_BACKDROP=galaxy` (default) or `none` for flat black — decorative only, nothing about the graph or its interactions changes. It is heavily dimmed (`filter: brightness(.42)`) under a radial `#veil`, because the dots must remain the brightest thing on screen, and it parallaxes at 12 % of the pan and 8 % of the zoom (`parallax()`, written only when the transform actually changes). The canvas itself is now **cleared, not filled** — `html/body` keep `--bg` so a failed image load degrades to the old flat black.
 * **Analytics are computed in Python and stamped into the payload** (`src/graph_export.py`) — PageRank, betweenness, Louvain, staleness, orphan/hub flags. The renderer re-derives nothing, matching the OKF/language rule that structure is decided in code. Staleness in particular reuses `wiki_engine.is_page_stale`, so the amber ring and the nav tree's ⚠️ cannot disagree.
-* **Mode and overlays are Streamlit widgets, not canvas buttons** — they persist in `st.session_state` across the reruns that clicks and ingest cause; pan / zoom / hover / search stay inside the canvas, where a rerun would be wasteful.
+* **One metric at a time, chosen by a toggle** (off = `pagerank`, the default; on = `degree` → `size_by`). A dot's radius therefore means exactly one thing. Switching only re-radiuses nodes in place — `applySizes()` never touches coordinates.
+* **A ranked-circle chart sits in the canvas's bottom-right corner** (`#rank`, `renderRank()`): the top 15 nodes ordered by the selected metric, circle diameter ∝ √metric, rank spectrum violet → red, with the value beside each name. It answers the ordering question ("which pages carry this wiki?") that a force layout cannot. It is **scoped to the selection**: with a node selected it ranks that node's 2-hop neighbourhood, otherwise the whole graph. Rows are handles like the dots themselves — click selects, double click opens the page.
+* **A selection recolours its own subgraph by rank** (`S.rankColors`, consumed by `nodeColor()`): the selected node's neighbourhood takes the same violet → red rank colours as the chart rows, so a row and its dot are the same colour. With nothing selected the map stays categorical (`CAT_COLOR`). The scale spans the *visible* rows; anything ranked below them shares the tail colour.
+* **Overlays are a Streamlit widget, not canvas buttons** — they persist in `st.session_state` across the reruns that clicks and ingest cause; pan / zoom / hover / search stay inside the canvas, where a rerun would be wasteful.
+* **Node positions never drift.** The default view draws every node and edge fully lit; hover/selection only changes brightness, never coordinates, so clicking a node cannot appear to reshuffle the map.
 
 ## Error states (UI surface)
 

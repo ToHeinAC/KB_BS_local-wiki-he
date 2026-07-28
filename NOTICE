@@ -11,3 +11,11 @@ This product includes software adapted from:
   (PDF page routing, DOCX extraction, image/OCR helpers) and the
   conversion prompts in src/prompts.py (OCR_SYSTEM_PROMPT, OCR_USER_PROMPT,
   OCR_DEEPSEEK_PROMPT, MD_REWRITE_PROMPT) are derived from MD-maker.
+
+This product includes the following third-party asset:
+
+  src/assets/graph/galaxy.jpg — Hubble Space Telescope image of a spiral
+  galaxy, credit NASA/ESA. Used as the decorative backdrop of the wiki graph
+  renderer. NASA imagery is public domain; ESA/Hubble material is released
+  under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), which this
+  attribution satisfies.

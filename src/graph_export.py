@@ -1,4 +1,4 @@
-"""Graph payload + deterministic analytics for the neural-galaxy renderer.
+"""Graph payload + deterministic analytics for the neural renderer.
 
 The renderer is a *navigator into the wiki reader*, not a second knowledge model,
 so this module derives **no structure of its own**: nodes and edges come verbatim

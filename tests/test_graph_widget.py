@@ -20,7 +20,7 @@ sys.path.insert(0, "src")
 import db_context, graph_widget
 db_context.DATA_ROOT = Path({root!r})
 db_context.set_active_db("test")
-graph_widget.render_graph(mode={mode!r}, overlays={overlays!r})
+graph_widget.render_graph(overlays={overlays!r}, size_by={size_by!r})
 """
 
 
@@ -37,9 +37,9 @@ def app(wiki_dir, tmp_path):
         "confidence: low\n---\n\nBeta body.\n"
     )
 
-    def _run(mode="galaxy", overlays=("hubs",)):
+    def _run(overlays=("hubs",), size_by="pagerank"):
         graph_widget._payload.clear()  # the fixture wiki is new on every test
-        src = SCRIPT.format(root=str(tmp_path), mode=mode, overlays=list(overlays))
+        src = SCRIPT.format(root=str(tmp_path), overlays=list(overlays), size_by=size_by)
         return AppTest.from_string(src, default_timeout=60).run()
 
     return _run
@@ -63,7 +63,7 @@ def test_component_mounts_with_payload(app):
 def test_payload_carries_every_key_the_renderer_reads(app):
     """index.html reads these by name; a rename here is a silently blank canvas."""
     _, args = _component_args(app())
-    assert {"graph", "mode", "overlays", "strings", "accent", "height"} <= set(args)
+    assert {"graph", "overlays", "sizeBy", "backdrop", "strings", "accent", "height"} <= set(args)
     node = args["graph"]["nodes"][0]
     assert {"id", "label", "cat", "kind", "comm", "deg", "pr", "bridge",
             "confidence", "stale", "orphan", "hub", "bridgeHub", "tags"} <= set(node)
@@ -72,9 +72,9 @@ def test_payload_carries_every_key_the_renderer_reads(app):
 
 
 def test_controls_reach_the_renderer(app):
-    _, args = _component_args(app(mode="neural", overlays=["stale", "bridges"]))
-    assert args["mode"] == "neural"
+    _, args = _component_args(app(overlays=["stale", "bridges"], size_by="pagerank"))
     assert args["overlays"] == ["stale", "bridges"]
+    assert args["sizeBy"] == "pagerank"
 
 
 def test_chrome_language_follows_the_bundle(app):

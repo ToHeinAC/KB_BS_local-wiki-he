@@ -514,22 +514,22 @@ var net=new vis.Network(document.getElementById('g'),
 
 
 def _render_neural_graph() -> None:
-    """Canvas galaxy/neural renderer over the same typed graph.
+    """Canvas neural renderer over the same typed graph.
 
-    Mode and overlays are Streamlit widgets (native chrome, and they persist in
-    session state across reruns); pan/zoom/hover/search stay inside the canvas.
-    A node click comes back through the component protocol — no page reload, so
-    the session survives (see src/graph_widget.py).
+    Overlays are a Streamlit widget (native chrome, and it persists in session
+    state across reruns); pan/zoom/hover/search/selection stay inside the canvas.
+    Only a *double* click comes back through the component protocol — no page
+    reload, so the session survives (see src/graph_widget.py).
     """
-    ccol1, ccol2 = st.columns([1, 2])
-    mode = ccol1.segmented_control(
-        "Mode", ["Galaxy", "Neural"], default="Galaxy",
-        key="graph_mode", label_visibility="collapsed",
-    ) or "Galaxy"
     overlay_labels = {
         "Hubs": "hubs", "Bridges": "bridges", "Orphans": "orphans",
         "Stale": "stale", "Low confidence": "confidence",
     }
+    ccol1, ccol2 = st.columns([1, 2])
+    by_degree = ccol1.toggle(
+        "Connections", key="graph_by_degree",
+        help="Off: dots and the ranked chart show PageRank. On: number of connections.",
+    )
     picked = ccol2.multiselect(
         "Overlays", list(overlay_labels), default=["Hubs"],
         key="graph_overlays", label_visibility="collapsed",
@@ -537,8 +537,8 @@ def _render_neural_graph() -> None:
     )
     try:
         clicked = graph_widget.render_graph(
-            mode=mode.lower(),
             overlays=[overlay_labels[p] for p in picked],
+            size_by="degree" if by_degree else "pagerank",
         )
     except Exception as exc:
         st.error(f"Graph render failed: {exc}")
@@ -548,7 +548,7 @@ def _render_neural_graph() -> None:
     st.caption(
         f"{len(stats['nodes'])} nodes · {len(stats['edges'])} edges · "
         f"{stats['communities']} clusters. Hover for the 2-hop neighbourhood, "
-        "click a page to open it."
+        "click a node for its properties, double-click to open the page."
     )
 
     # `n` is a click counter: without it, clicking the same node twice would
@@ -1150,9 +1150,16 @@ elif page == "Wiki Explorer":
         st.info("No wiki pages yet. Upload a document to get started.")
     else:
         view_mode = st.radio(
-            "View", ["Tree", "Graph"],
+            "View", ["Graph", "Tree"],
             horizontal=True, label_visibility="collapsed",
         )
+        # Switching into Tree always lands on the database overview: both views
+        # share `explorer_selected_page`, so without this a node opened in the
+        # graph would silently preselect the reader instead.
+        if view_mode != st.session_state.get("explorer_view_mode"):
+            st.session_state["explorer_view_mode"] = view_mode
+            if view_mode == "Tree":
+                st.session_state.pop("explorer_selected_page", None)
 
         if view_mode == "Tree":
             main_col, nav_col = st.columns([2, 1])
@@ -1193,18 +1200,11 @@ elif page == "Wiki Explorer":
                         st.markdown("---")
                         st.markdown(overview)
 
-        else:  # Graph
-            main_col, nav_col = st.columns([3, 1])
-            with nav_col:
-                clicked = _render_wiki_nav("explorer_graph")
-                if clicked:
-                    parsed = wiki_engine.read_page_parsed(clicked)
-                    _show_md_dialog(clicked, parsed["content"])
-            with main_col:
-                if graph_widget.RENDERER == "neural":
-                    _render_neural_graph()
-                else:
-                    _render_legacy_graph()
+        else:  # Graph — full width; the nav tree and its search live in Tree view.
+            if graph_widget.RENDERER == "neural":
+                _render_neural_graph()
+            else:
+                _render_legacy_graph()
 
 
 elif page == "Wiki Chat":

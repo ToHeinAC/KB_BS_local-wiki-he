@@ -1,8 +1,9 @@
-"""Streamlit mount for the neural-galaxy graph renderer.
+"""Streamlit mount for the neural graph renderer.
 
 Declared as a **static-path** component (`src/assets/graph/`), not a
 `components.html` srcdoc, for one reason: a static component is bidirectional,
-so a node click comes back into Python as a return value.
+so a node double-click comes back into Python as a return value (a single
+click only selects, and never leaves the canvas).
 
 The obvious alternative — navigating the top window to `?page=<slug>` — is a
 full page load, and this app gates on `st.session_state["user"]` (app.py) with
@@ -33,6 +34,11 @@ _ASSETS = Path(__file__).parent / "assets" / "graph"
 
 RENDERER = os.getenv("GRAPH_RENDERER", "legacy").strip().lower()
 
+# Backdrop behind the canvas: `galaxy` (the Hubble image shipped in the asset
+# dir) or `none` (flat `--bg`). Decorative only — nothing about the graph, its
+# analytics or its interactions changes with it.
+BACKDROP = os.getenv("GRAPH_BACKDROP", "galaxy").strip().lower()
+
 # Widget chrome only. Page labels are already language-correct — they come from
 # the pages' own `title` — so this is the same DE/EN split the rest of the app
 # pins, applied to the handful of strings the renderer draws itself.
@@ -42,8 +48,10 @@ _STRINGS = {
         "pagerank": "PageRank", "bridge": "Brücken-Score", "community": "Cluster",
         "confidence": "Konfidenz", "updated": "Aktualisiert",
         "nodes": "Knoten", "edges": "Kanten", "clusters": "Cluster",
-        "truncated": "gekürzt", "opened": "Klick öffnet die Seite im Reader",
+        "truncated": "gekürzt", "opened": "Doppelklick öffnet die Seite im Reader",
         "sourceNode": "Quelldokument (keine Wiki-Seite)",
+        "rankPr": "Nach PageRank sortiert", "rankDeg": "Nach Verbindungen sortiert",
+        "rankAll": "gesamter Graph", "rankSel": "Auswahl",
         "empty": "Noch keine verknüpften Seiten.",
     },
     "en": {
@@ -51,8 +59,10 @@ _STRINGS = {
         "pagerank": "PageRank", "bridge": "Bridge score", "community": "Cluster",
         "confidence": "Confidence", "updated": "Updated",
         "nodes": "nodes", "edges": "edges", "clusters": "clusters",
-        "truncated": "truncated", "opened": "Click opens the page in the reader",
+        "truncated": "truncated", "opened": "Double-click opens the page in the reader",
         "sourceNode": "Source document (not a wiki page)",
+        "rankPr": "Ranked by PageRank", "rankDeg": "Ranked by connections",
+        "rankAll": "whole graph", "rankSel": "selection",
         "empty": "No linked pages yet.",
     },
 }
@@ -88,14 +98,21 @@ def _payload(signature: str) -> dict:
     return graph_export.export()
 
 
-def render_graph(*, mode: str, overlays: list[str], height: int = 720) -> dict | None:
-    """Draw the graph. Returns the clicked node `{node, kind, n}` or None."""
+def render_graph(
+    *, overlays: list[str], size_by: str = "pagerank", height: int = 720
+) -> dict | None:
+    """Draw the graph. Returns the double-clicked node `{node, kind, n}` or None.
+
+    `size_by` picks the metric a dot's radius and the ranked-circle chart show:
+    `pagerank` (default) or `degree`.
+    """
     payload = _payload(_bundle_signature())
     strings = _STRINGS.get(payload["lang"], _STRINGS["en"])
     return _component()(
         graph=payload,
-        mode=mode,
         overlays=overlays,
+        sizeBy=size_by,
+        backdrop=BACKDROP,
         strings=strings,
         accent=st.get_option("theme.primaryColor") or "#4a9eff",
         selected=st.session_state.get("explorer_selected_page"),
