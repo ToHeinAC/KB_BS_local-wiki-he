@@ -724,16 +724,20 @@ function rankColor(f) {
 
 function renderRank() {
   const rankEl = document.getElementById("rank");
-  if (!S.nodes.length) {
-    rankEl.style.display = "none";
-    S.rankColors = null;
-    return;
-  }
   const t = S.strings;
   const pr = S.sizeBy === "pagerank";
   // The arc layout *is* the ranking of the whole graph, so it is never scoped
   // to a selection — that would recolour the column out from under the reader.
   const arc = S.layout === "arc";
+  // Unscoped, the chart is a second view of the whole graph competing with the
+  // map for the reader's attention; it earns its corner once a selection gives
+  // it a sub-graph to order. The arc layout is the exception — there the chart
+  // is the view, so it stays up with or without a selection.
+  if (!S.nodes.length || (!arc && !S.selected)) {
+    rankEl.style.display = "none";
+    S.rankColors = null;
+    return;
+  }
   const focus = !arc && S.selected ? focusSet() : null;
   const pool = focus ? S.nodes.filter((n) => focus.has(n.id)) : S.nodes;
   const val = (n) => (pr ? n.pr : n.deg);
@@ -746,9 +750,10 @@ function renderRank() {
   // of it shares the tail colour.
   const ramp = Math.max((arc ? Math.min(S.arcCount, ranked.length) : shown.length) - 1, 1);
   const scale = (i) => Math.min(i / ramp, 1);
-  S.rankColors = (focus || arc)
-    ? new Map(ranked.map((n, i) => [n.id, rankColor(scale(i))]))
-    : null;  // nothing selected in a structural layout => the map stays categorical
+  // Past the guard there is always either a focus or the arc column, so the
+  // canvas takes the rank colours whenever the chart is up (and the guard's
+  // `null` keeps it categorical whenever it is not).
+  S.rankColors = new Map(ranked.map((n, i) => [n.id, rankColor(scale(i))]));
 
   rankEl.innerHTML =
     `<h3>${esc(pr ? t.rankPr : t.rankDeg)}</h3>` +

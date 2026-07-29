@@ -92,8 +92,14 @@ st.markdown(
     .stApp {{
         background-color: {_t['bg']} !important;
     }}
+    /* Narrower than Streamlit's ~21rem default: nothing in here needs the
+       width, and the main column gets it instead. 280px is about the floor —
+       the GPU line (gpu_widget.py, 13px monospace, nowrap) is ~225px wide and
+       clips below roughly 260px. */
     [data-testid="stSidebar"] {{
         background-color: {_t['sidebar_bg']} !important;
+        width: 280px !important;
+        min-width: 280px !important;
     }}
     /* Main content area & block containers */
     [data-testid="block-container"],
@@ -524,8 +530,9 @@ def _render_neural_graph() -> None:
     An opened page lands in the side panel, never in a modal: a dialog hides the
     graph it was opened from, so the map and the page cannot be read together.
     The panel is **collapsed by default** — the map is the point of this view, so
-    it gets the width until the reader or the health view is asked for. Collapsed
-    leaves a one-button rail (`«`); opening a node opens the panel with it.
+    it gets the width until the reader or the health view is asked for; open, it
+    takes a third of the row. Collapsed leaves a one-button rail (`«`); opening a
+    node opens the panel with it.
     The controls stay above the split so the panel column never nests columns
     twice.
     """
@@ -563,7 +570,7 @@ def _render_neural_graph() -> None:
     )
     panel_open = st.session_state.get("explorer_panel_open", False)
     graph_col, panel_col = st.columns(
-        [3, 1] if panel_open else [12, 1], gap="medium" if panel_open else "small"
+        [2, 1] if panel_open else [12, 1], gap="medium" if panel_open else "small"
     )
     with graph_col:
         try:
