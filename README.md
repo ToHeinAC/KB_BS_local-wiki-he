@@ -70,6 +70,7 @@ Edit `.env` (copied from `.env.example`). The essentials to get started:
 | `OLLAMA_MODEL` | `gemma4:e4b` | Ollama model to use |
 | `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
 | `TAVILY_API_KEY` | — | Required only for the Research page (web search) |
+| `FRONTEND` | `default` | Visual skin: `default` (editorial) or `newspaper` (broadsheet). Chrome only — same pages and behaviour |
 
 **Full configuration reference** (per-role model overrides, ingest/QA tuning, research + chat gates, all timeouts) lives in one place: [IMPLEMENTATION.md §6 Configuration](IMPLEMENTATION.md#6-configuration). `.env.example` is the machine-readable template.
 

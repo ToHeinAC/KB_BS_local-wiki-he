@@ -106,6 +106,7 @@ def render_graph(
     size_by: str = "pagerank",
     layout: str = "galaxy",
     height: int = 720,
+    paper: bool = False,
 ) -> dict | None:
     """Draw the graph. Returns the double-clicked node `{node, kind, n}` or None.
 
@@ -129,6 +130,7 @@ def render_graph(
         sizeBy=size_by,
         layout=layout,
         backdrop=BACKDROP,
+        paper=paper,
         strings=strings,
         accent=st.get_option("theme.primaryColor") or "#4a9eff",
         selected=st.session_state.get("explorer_selected_page"),

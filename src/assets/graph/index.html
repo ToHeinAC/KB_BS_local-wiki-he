@@ -25,6 +25,8 @@
     --muted: #8b93b0;
     --line: rgba(140, 155, 200, 0.22);
     --accent: #4a9eff;
+    --hi: #fff;                          /* highlighted row text */
+    --hair: rgba(140, 155, 200, 0.16);   /* row separators */
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); }
@@ -95,12 +97,12 @@
   #rank .scope { color: var(--muted); font-size: 11px; margin-bottom: 8px; }
   #rank .r {
     display: flex; align-items: center; gap: 8px;
-    padding: 2px 0; border-top: 1px dashed rgba(140, 155, 200, 0.16);
+    padding: 2px 0; border-top: 1px dashed var(--hair);
     cursor: pointer;
   }
   #rank .r:first-of-type { border-top: 0; }
-  #rank .r:hover .name { color: #fff; }
-  #rank .r.on .name { color: #fff; font-weight: 600; }
+  #rank .r:hover .name { color: var(--hi); }
+  #rank .r.on .name { color: var(--hi); font-weight: 600; }
   #rank .n { width: 17px; text-align: right; font-weight: 700; font-size: 11px; flex: none; }
   #rank .c { width: 46px; display: flex; justify-content: center; flex: none; }
   #rank .c span { border-radius: 50%; display: block; }
@@ -142,15 +144,64 @@ const Streamlit = {
   setValue: (value) => post({ type: "streamlit:setComponentValue", value, dataType: "json" }),
 };
 
-const CAT_COLOR = {
-  concept: "#38d9a9",
-  entity: "#4a9eff",
-  "source-summary": "#ffd43b",
-  report: "#9775fa",
-  insight: "#f783ac",
-  source: "#ff922b",
+// Two palettes over one renderer. `dark` is the default — the neon-on-black
+// night canvas the app itself shows. `paper` is the print plate the newspaper
+// frontend asks for (render_graph(paper=True)): flat paper, tonal inks, no
+// backdrop and no bloom, because a halo on a light page reads as a smudge.
+// Every colour literal the canvas draws goes through the active palette `P`;
+// the CSS-side colours go through `vars`, applied to :root on each render.
+const PALETTES = {
+  dark: {
+    cat: {
+      concept: "#38d9a9",
+      entity: "#4a9eff",
+      "source-summary": "#ffd43b",
+      report: "#9775fa",
+      insight: "#f783ac",
+      source: "#ff922b",
+    },
+    orphan: "#6b7280",
+    derived: "#ff922b",   // the one visually distinct edge role
+    label: "#e8ecff",
+    bridge: "#e8ecff",
+    stale: "#ffa421",
+    ring: "#ffffff",      // selection ring
+    glow: true,
+    ramp: [62, 52],       // rank ramp saturation / lightness
+    vars: {
+      "--bg": "#05060d", "--panel": "rgba(12, 16, 30, 0.82)",
+      "--ink": "#e8ecff", "--muted": "#8b93b0",
+      "--line": "rgba(140, 155, 200, 0.22)",
+      "--hi": "#fff", "--hair": "rgba(140, 155, 200, 0.16)",
+    },
+  },
+  paper: {
+    cat: {
+      concept: "#3b342a",
+      entity: "#1f3a52",
+      "source-summary": "#5b6b2f",
+      report: "#4a3a5c",
+      insight: "#7a3b2a",
+      source: "#7a3b2a",
+    },
+    orphan: "#9a927f",
+    accent: "#7a3b2a",    // overrides the Streamlit theme colour on paper
+    edge: "#3b342a",
+    derived: "#7a3b2a",
+    label: "#1c1a15",
+    bridge: "#1c1a15",
+    stale: "#7a3b2a",
+    ring: "#1c1a15",
+    glow: false,
+    ramp: [45, 38],       // same hue sweep, darkened to read on light paper
+    vars: {
+      "--bg": "#efeada", "--panel": "rgba(244, 241, 230, 0.92)",
+      "--ink": "#1c1a15", "--muted": "#6b6355", "--line": "#b9b1a0",
+      "--hi": "#1c1a15", "--hair": "#b9b1a0",
+    },
+  },
 };
-const ORPHAN_COLOR = "#6b7280";
+let P = PALETTES.dark;
 const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const cv = document.getElementById("cv");
@@ -423,8 +474,8 @@ function nodeColor(n) {
   // everything else keeps its category colour.
   const ranked = S.rankColors && S.rankColors.get(n.id);
   if (ranked) return ranked;
-  if (n.orphan && S.overlays.includes("orphans")) return ORPHAN_COLOR;
-  return CAT_COLOR[n.cat] || ORPHAN_COLOR;
+  if (n.orphan && S.overlays.includes("orphans")) return P.orphan;
+  return P.cat[n.cat] || P.orphan;
 }
 
 function focusSet() {
@@ -503,7 +554,7 @@ function draw() {
     const lit = !focus || (focus.has(e.s.id) && focus.has(e.t.id));
     const x1 = e.s.x, y1 = e.s.y, x2 = e.t.x, y2 = e.t.y;
     ctx.globalAlpha = lit ? (curved ? 0.5 : 0.62) : 0.05;
-    ctx.strokeStyle = e.type === "derived-from" ? "#ff922b" : S.accent;
+    ctx.strokeStyle = e.type === "derived-from" ? P.derived : (P.edge || S.accent);
     ctx.lineWidth = (e.type === "derived-from" ? 0.5 : 0.9) / S.view.k;
     if (e.type === "derived-from") ctx.setLineDash([3 / S.view.k, 3 / S.view.k]);
     ctx.beginPath();
@@ -544,14 +595,16 @@ function draw() {
     // Every dot glows, so the default view reads as fully lit; hubs and search
     // hits just bloom wider.
     const glow = (showHubs && n.hub ? 3.4 : 1) * (hit ? 3 : 1);
-    const g = ctx.createRadialGradient(x, y, 0, x, y, n.r * 3.2 * glow);
-    g.addColorStop(0, color);
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.globalAlpha = alpha * 0.28;
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, n.r * 3.2 * glow, 0, 7);
-    ctx.fill();
+    if (P.glow) {
+      const g = ctx.createRadialGradient(x, y, 0, x, y, n.r * 3.2 * glow);
+      g.addColorStop(0, color);
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.globalAlpha = alpha * 0.28;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, n.r * 3.2 * glow, 0, 7);
+      ctx.fill();
+    }
 
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
@@ -559,9 +612,18 @@ function draw() {
     ctx.arc(x, y, n.r, 0, 7);
     ctx.fill();
 
+    // On paper the bloom is replaced by an engraved outline on the same circle:
+    // hubs and search hits still stand out, but every dot stays a crisp disc.
+    if (!P.glow) {
+      ctx.globalAlpha = alpha * (glow > 1 ? 0.9 : 0.45);
+      ctx.strokeStyle = P.label;
+      ctx.lineWidth = (glow > 1 ? 1.4 : 0.8) / S.view.k;
+      ctx.stroke();
+    }
+
     if (showBridges && n.bridgeHub) {
       ctx.globalAlpha = alpha * 0.9;
-      ctx.strokeStyle = "#e8ecff";
+      ctx.strokeStyle = P.bridge;
       ctx.lineWidth = 1.2 / S.view.k;
       ctx.beginPath();
       ctx.arc(x, y, n.r + 3.5, 0, 7);
@@ -570,7 +632,7 @@ function draw() {
     if (showStale && n.stale) {
       const beat = REDUCED_MOTION ? 0.8 : 0.5 + 0.5 * Math.sin(S.t * 0.05 + n.phase);
       ctx.globalAlpha = alpha * beat;
-      ctx.strokeStyle = "#ffa421";
+      ctx.strokeStyle = P.stale;
       ctx.lineWidth = 1.6 / S.view.k;
       ctx.beginPath();
       ctx.arc(x, y, n.r + 6, 0, 7);
@@ -578,7 +640,7 @@ function draw() {
     }
     if (n.id === S.selected) {
       ctx.globalAlpha = 1;
-      ctx.strokeStyle = "#ffffff";
+      ctx.strokeStyle = P.ring;
       ctx.lineWidth = 1.8 / S.view.k;
       ctx.beginPath();
       ctx.arc(x, y, n.r + 5, 0, 7);
@@ -595,7 +657,7 @@ function draw() {
                   (lit && (n.hub || S.view.k > 1.5) && n.r > 5);
     if (named && lit) {
       ctx.globalAlpha = alpha;
-      ctx.fillStyle = "#e8ecff";
+      ctx.fillStyle = P.label;
       ctx.font = `${Math.max(9, 11 / S.view.k)}px -apple-system, "Segoe UI", sans-serif`;
       // Arcs bow to the right, so names go left and never cross a wire.
       ctx.textAlign = arc ? "right" : "center";
@@ -719,7 +781,7 @@ function showInfo(n) {
 const RANK_TOP = 15;
 
 function rankColor(f) {
-  return `hsl(${Math.round(275 - 275 * f)}, 62%, 52%)`;
+  return `hsl(${Math.round(275 - 275 * f)}, ${P.ramp[0]}%, ${P.ramp[1]}%)`;
 }
 
 function renderRank() {
@@ -814,7 +876,7 @@ function renderLegend() {
       `<div class="meta">${esc(fmt(t.rankOf, { n: S.arcCount }))} · ` +
       `${esc(fmt(t.sizeIs, { metric }))}</div>`
     : S.cats.map((cat) =>
-        `<div class="row"><span class="dot" style="background:${CAT_COLOR[cat] || ORPHAN_COLOR}"></span>${esc(cat)}</div>`
+        `<div class="row"><span class="dot" style="background:${P.cat[cat] || P.orphan}"></span>${esc(cat)}</div>`
       ).join("");
   legendEl.innerHTML = key +
     `<div class="meta">${c.nodes} ${esc(t.nodes)} · ` +
@@ -843,14 +905,18 @@ function onRender(args) {
   S.sizeBy = sizeBy;
   S.layout = layout;
   S.overlays = args.overlays || [];
+  P = args.paper ? PALETTES.paper : PALETTES.dark;
   // Backdrop is decorative and env-controlled (GRAPH_BACKDROP); `none` leaves
-  // the flat `--bg` the page already has behind the transparent canvas.
-  const sky = args.backdrop !== "none";
+  // the flat `--bg` the page already has behind the transparent canvas. Paper
+  // mode is flat paper by definition, so it drops the image and the vignette.
+  const sky = args.backdrop !== "none" && !args.paper;
   skyEl.style.display = sky ? "block" : "none";
   document.getElementById("veil").style.display = sky ? "block" : "none";
   S.strings = args.strings || {};
-  S.accent = args.accent || "#4a9eff";
-  document.documentElement.style.setProperty("--accent", S.accent);
+  S.accent = P.accent || args.accent || "#4a9eff";
+  const root = document.documentElement.style;
+  Object.entries(P.vars).forEach(([k, v]) => root.setProperty(k, v));
+  root.setProperty("--accent", S.accent);
   searchEl.placeholder = S.strings.search || "Search…";
   emptyEl.textContent = S.strings.empty || "";
 

@@ -21,6 +21,7 @@ import lex_index
 import md_convert
 import metadata_extract
 import ollama_client
+import theme
 import tools
 import wiki_engine
 import agent as research_agent
@@ -33,349 +34,15 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
+# Frontend skin (src/theme.py). `FRONTEND` in .env picks it: `default` keeps the
+# editorial Forest/Slate palette, `newspaper` swaps in the broadsheet chrome.
+# `_t` keeps the same token names either way — gpu_widget and the conditional
+# style blocks below read them by name.
 if "theme" not in st.session_state:
     st.session_state["theme"] = "Forest"
 
-_THEMES = {
-    "Forest": {
-        "bg": "#f6f7f2",
-        "sidebar_bg": "#eaf0ec",
-        "widget_bg": "#ffffff",
-        "text": "#1a1f1c",
-        "text_muted": "#5a6b5e",
-        "primary": "#234637",
-        "border": "#d4dbd6",
-        "hover": "rgba(35,70,55,0.10)",
-        "metric_bg": "#ffffff",
-    },
-    "Slate": {
-        "bg": "#0f1117",
-        "sidebar_bg": "#1a1d27",
-        "widget_bg": "#262b3a",
-        "text": "#e8ecf0",
-        "text_muted": "#8892a4",
-        "primary": "#4f9cf9",
-        "border": "#2e3347",
-        "hover": "rgba(79,156,249,0.12)",
-        "metric_bg": "#1e2233",
-    },
-}
-
-_t = _THEMES.get(st.session_state.get("theme", "Forest"))
-
-st.markdown(
-    f"""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap');
-
-    /* ── Global text & font ── */
-    html, body {{
-        font-family: 'Inter', system-ui, sans-serif;
-        font-size: 15px;
-    }}
-    /* Catch ALL elements' color — overrides Streamlit's inline textColor from config.toml.
-       Do NOT set font-family here: it breaks Material icon ligatures. */
-    .stApp, .stApp * {{
-        color: {_t['text']} !important;
-    }}
-    /* Re-assert the Material icon font so ligatures render as glyphs, not text */
-    [data-testid="stIconMaterial"],
-    span.material-icons,
-    span.material-icons-outlined,
-    .material-symbols-rounded,
-    .material-symbols-outlined,
-    [class*="material-symbols"] {{
-        font-family: 'Material Symbols Rounded', 'Material Icons' !important;
-    }}
-
-    /* ── Backgrounds ── */
-    .stApp {{
-        background-color: {_t['bg']} !important;
-    }}
-    /* Narrower than Streamlit's ~21rem default: nothing in here needs the
-       width, and the main column gets it instead. 280px is about the floor —
-       the GPU line (gpu_widget.py, 13px monospace, nowrap) is ~225px wide and
-       clips below roughly 260px. */
-    [data-testid="stSidebar"] {{
-        background-color: {_t['sidebar_bg']} !important;
-        width: 280px !important;
-        min-width: 280px !important;
-    }}
-    /* Main content area & block containers */
-    [data-testid="block-container"],
-    [data-testid="stVerticalBlock"],
-    section.main > div {{
-        background-color: {_t['bg']} !important;
-    }}
-
-    /* ── Headings ── */
-    h1, h2, h3 {{
-        font-family: 'Libre Baskerville', Georgia, serif !important;
-        font-weight: 700;
-    }}
-    h1 {{ font-size: 1.75rem; margin-bottom: 0.25rem; }}
-    [data-testid="stSidebar"] h2 {{ white-space: nowrap; font-size: 1.25rem; }}
-
-    /* ── Input widgets ── */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {{
-        background-color: {_t['widget_bg']} !important;
-        color: {_t['text']} !important;
-        border-color: {_t['border']} !important;
-        border-radius: 6px !important;
-    }}
-    .stTextInput > div > div > input::placeholder,
-    .stTextArea > div > div > textarea::placeholder {{
-        color: {_t['text_muted']} !important;
-        opacity: 1 !important;
-    }}
-    /* Selectbox */
-    .stSelectbox > div > div,
-    .stSelectbox > div > div > div {{
-        background-color: {_t['widget_bg']} !important;
-        color: {_t['text']} !important;
-        border-color: {_t['border']} !important;
-        border-radius: 6px !important;
-    }}
-
-    /* ── Buttons ── */
-    .stButton > button {{
-        border-radius: 6px !important;
-        font-weight: 500 !important;
-        text-transform: none !important;
-        font-size: 0.875rem !important;
-        border: 1px solid {_t['border']} !important;
-        background-color: {_t['widget_bg']} !important;
-        color: {_t['text']} !important;
-        transition: background-color 0.15s ease, box-shadow 0.15s ease !important;
-    }}
-    .stButton > button:hover {{
-        background-color: {_t['hover']} !important;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
-    }}
-    .stButton > button[kind="primary"],
-    .stButton > button[kind="primary"]:hover {{
-        background-color: {_t['primary']} !important;
-        color: #ffffff !important;
-        border-color: {_t['primary']} !important;
-    }}
-    /* The label lives in a nested <p>, which `.stApp *` would paint dark. */
-    .stButton > button[kind="primary"] *,
-    .stButton > button[kind="primary"]:hover *,
-    [data-testid="stFormSubmitButton"] button[kind="primary"] *,
-    [data-testid="stFormSubmitButton"] button[kind="primary"]:hover * {{
-        color: #ffffff !important;
-    }}
-    /* Form submit buttons (not caught by .stButton) */
-    [data-testid="stFormSubmitButton"] button {{
-        border-radius: 6px !important;
-        font-weight: 500 !important;
-        border: 1px solid {_t['border']} !important;
-        background-color: {_t['widget_bg']} !important;
-        color: {_t['text']} !important;
-    }}
-    [data-testid="stFormSubmitButton"] button[kind="primary"],
-    [data-testid="stFormSubmitButton"] button[kind="primary"]:hover {{
-        background-color: {_t['primary']} !important;
-        color: #ffffff !important;
-        border-color: {_t['primary']} !important;
-    }}
-    /* Download buttons */
-    .stDownloadButton > button {{
-        background-color: {_t['widget_bg']} !important;
-        color: {_t['text']} !important;
-        border: 1px solid {_t['border']} !important;
-        border-radius: 6px !important;
-    }}
-
-    /* ── File uploader (dropzone uses config secondaryBackgroundColor — force theme) ── */
-    [data-testid="stFileUploaderDropzone"],
-    [data-testid="stFileUploader"] section {{
-        background-color: {_t['widget_bg']} !important;
-        border: 1px solid {_t['border']} !important;
-    }}
-    [data-testid="stFileUploaderDropzoneInstructions"],
-    [data-testid="stFileUploaderDropzoneInstructions"] * {{
-        color: {_t['text_muted']} !important;
-    }}
-    [data-testid="stFileUploader"] button {{
-        background-color: {_t['bg']} !important;
-        color: {_t['text']} !important;
-        border: 1px solid {_t['border']} !important;
-    }}
-
-    /* ── Sidebar buttons (nav style) ── */
-    [data-testid="stSidebar"] .stButton > button {{
-        background: transparent !important;
-        border: none !important;
-        text-align: left !important;
-        padding: 0.3rem 0.5rem !important;
-        border-radius: 4px !important;
-        width: 100% !important;
-        color: {_t['text']} !important;
-    }}
-    [data-testid="stSidebar"] .stButton > button:hover,
-    [data-testid="stSidebar"] .stButton > button:focus,
-    [data-testid="stSidebar"] .stButton > button:active {{
-        background: {_t['hover']} !important;
-        color: {_t['text']} !important;
-        box-shadow: none !important;
-    }}
-    /* Reset & Logout: identical boxed buttons (override transparent nav style) */
-    [data-testid="stSidebar"] .st-key-reset_btn button,
-    [data-testid="stSidebar"] .st-key-logout_btn button {{
-        background-color: {_t['widget_bg']} !important;
-        border: 1px solid {_t['border']} !important;
-        text-align: center !important;
-        padding: 0.35rem 0.75rem !important;
-        border-radius: 6px !important;
-    }}
-    [data-testid="stSidebar"] .st-key-reset_btn button:hover,
-    [data-testid="stSidebar"] .st-key-logout_btn button:hover {{
-        background-color: {_t['hover']} !important;
-        border-color: {_t['primary']} !important;
-    }}
-    /* Lint, Delete source, Start research: same boxed style as Reset/Logout */
-    .st-key-run_lint_btn button,
-    .st-key-delete_source_btn button,
-    .st-key-start_research_btn button {{
-        background-color: {_t['widget_bg']} !important;
-        border: 1px solid {_t['border']} !important;
-        text-align: center !important;
-        padding: 0.35rem 0.75rem !important;
-        border-radius: 6px !important;
-        color: {_t['text']} !important;
-    }}
-    .st-key-run_lint_btn button:hover,
-    .st-key-delete_source_btn button:hover,
-    .st-key-start_research_btn button:hover {{
-        background-color: {_t['hover']} !important;
-        border-color: {_t['primary']} !important;
-    }}
-    /* Collapsed explorer rail: its column is only a hair wider than the button,
-       so pin the button to the right edge rather than leaving the slack sitting
-       between it and the edge of the page. */
-    .st-key-explorer_panel_expand {{
-        display: flex !important;
-        justify-content: flex-end !important;
-    }}
-    .st-key-explorer_panel_expand button {{
-        min-width: 0 !important;
-    }}
-
-    /* ── Radio / Checkbox / Toggle ── */
-    .stRadio > div, .stCheckbox > label, .stRadio label {{
-        color: {_t['text']} !important;
-    }}
-
-    /* ── Tabs ── */
-    [data-testid="stTabs"] button,
-    [data-testid="stTabs"] button p {{
-        color: {_t['text']} !important;
-    }}
-    [data-testid="stTabs"] [data-baseweb="tab-list"] {{
-        background-color: {_t['bg']} !important;
-    }}
-
-    /* ── Segmented control (primary navigation) ──
-       Streamlit's testid is stButtonGroup, and the selected pill is marked with
-       kind="segmented_controlActive" — not aria-checked. */
-    [data-testid="stButtonGroup"] button {{
-        background-color: {_t['widget_bg']} !important;
-        border-color: {_t['border']} !important;
-    }}
-    [data-testid="stButtonGroup"] button * {{
-        color: {_t['text']} !important;
-    }}
-    [data-testid="stButtonGroup"] button:hover {{
-        background-color: {_t['hover']} !important;
-    }}
-    [data-testid="stButtonGroup"] button[kind="segmented_controlActive"] {{
-        background-color: {_t['primary']} !important;
-        border-color: {_t['primary']} !important;
-    }}
-    [data-testid="stButtonGroup"] button[kind="segmented_controlActive"] * {{
-        color: #ffffff !important;
-    }}
-
-    /* ── Expanders (use page bg so widget-bg buttons inside stand out as boxes) ── */
-    [data-testid="stExpander"] {{
-        border: 1px solid {_t['border']} !important;
-        background-color: {_t['bg']} !important;
-        border-radius: 6px !important;
-    }}
-    [data-testid="stExpander"] summary,
-    [data-testid="stExpander"] summary p,
-    [data-testid="stExpander"] summary span {{
-        color: {_t['text']} !important;
-    }}
-    /* Nav/list buttons inside expanders: lighter than the expander, clear border */
-    [data-testid="stExpander"] .stButton > button {{
-        background-color: {_t['widget_bg']} !important;
-        color: {_t['text']} !important;
-        border: 1px solid {_t['border']} !important;
-        margin-bottom: 0.25rem !important;
-    }}
-    [data-testid="stExpander"] .stButton > button:hover {{
-        background-color: {_t['hover']} !important;
-        border-color: {_t['primary']} !important;
-    }}
-
-    /* ── Chat messages ── */
-    [data-testid="stChatMessage"],
-    [data-testid="stChatMessage"] * {{
-        background-color: {_t['widget_bg']} !important;
-        color: {_t['text']} !important;
-    }}
-
-    /* ── Alert / info / warning / error boxes ── */
-    [data-testid="stAlert"],
-    [data-testid="stAlert"] * {{
-        color: {_t['text']} !important;
-    }}
-
-    /* ── Metric cards ── */
-    [data-testid="stMetric"] {{
-        background: {_t['metric_bg']} !important;
-        border: 1px solid {_t['border']};
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
-    }}
-    [data-testid="stMetricValue"],
-    [data-testid="stMetricLabel"] {{
-        color: {_t['text']} !important;
-    }}
-
-    /* ── Dividers ── */
-    hr {{ border: none; border-top: 1px solid {_t['border']}; margin: 1.25rem 0; }}
-
-    /* ── Container borders (st.container(border=True)) ── */
-    [data-testid="stVerticalBlockBorderWrapper"] > div {{
-        border-color: {_t['border']} !important;
-        background-color: {_t['widget_bg']} !important;
-    }}
-
-    /* ── Spinner ── */
-    .stSpinner > div {{
-        border-top-color: {_t['primary']} !important;
-    }}
-
-    /* Streamlit's fixed stHeader is opaque and overlays the top of the main
-       column — at 1.5rem the top bar's first line (the DATABASE / OPTIONS
-       headings) was painted over and looked missing. Clear the header. */
-    .block-container {{ padding-top: 4rem; padding-bottom: 2rem; }}
-
-    /* Multiselect selected-item tags: orange */
-    [data-baseweb="tag"] {{
-        background-color: #e07b20 !important;
-    }}
-    [data-baseweb="tag"] span {{
-        color: #ffffff !important;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+_t = theme.inject_css()
+_NEWSPAPER = theme.is_newspaper()
 
 
 _CHUNK_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*$")
@@ -551,18 +218,24 @@ def _render_neural_graph() -> None:
         "Stale": "stale", "Low confidence": "confidence",
     }
     layout_labels = {"Galaxy": "galaxy", "Ranked": "arc", "Clusters": "radial"}
-    ccol1, ccol2, ccol3 = st.columns([2, 1, 2])
-    layout = ccol1.segmented_control(
+    # Layout is the one control most visits touch, so it gets the full width on
+    # its own row. The metric and the overlays are refinements of what is already
+    # drawn — they live behind a collapsed disclosure rather than competing with
+    # it. Both still instantiate every run (an expander renders its body whether
+    # open or shut), so their session-state persistence is unchanged.
+    layout = st.segmented_control(
         "Layout", list(layout_labels), default="Galaxy", key="graph_layout",
-        label_visibility="collapsed",
+        label_visibility="collapsed", width="stretch",
         help="Galaxy: force layout. Ranked: the metric's head as a stable column. "
              "Clusters: pages on a ring by cluster, links bundled.",
     )
-    by_degree = ccol2.toggle(
+    with st.expander("Advanced", expanded=False):
+        acol1, acol2 = st.columns([1, 2])
+    by_degree = acol1.toggle(
         "Connections", key="graph_by_degree",
         help="Off: dots and the ranked chart show PageRank. On: number of connections.",
     )
-    picked = ccol3.multiselect(
+    picked = acol2.multiselect(
         "Style Options", list(overlay_labels), default=["Hubs"],
         key="graph_overlays", placeholder="Style Options",
         help=(
@@ -590,6 +263,9 @@ def _render_neural_graph() -> None:
                 # Clearing the segmented control returns None; the map still
                 # has to be drawn in *some* geometry.
                 layout=layout_labels.get(layout, "galaxy"),
+                # Newspaper skin draws the same graph as an engraved plate; the
+                # dark canvas would be a hole in the page.
+                paper=_NEWSPAPER,
             )
         except Exception as exc:
             st.error(f"Graph render failed: {exc}")
@@ -1012,6 +688,13 @@ gpu_widget.render_gpu_sidebar(accent=_t["primary"])
 
 st.sidebar.markdown("---")
 
+# Newspaper skin only: the edition (= database) picker belongs in the left rail,
+# where the mock puts it, and the main column belongs to the masthead. Claimed
+# here so it lands under the logo; filled by the top-bar block further down.
+_db_slot = st.sidebar.container() if _NEWSPAPER else None
+if _NEWSPAPER:
+    st.sidebar.markdown("---")
+
 # Maintenance is the only sidebar destination: infrequent, admin-ish, kept away
 # from the four daily-use wiki views in the main window.
 _maint_active = st.session_state.get("nav_maintenance", False)
@@ -1048,10 +731,26 @@ if _logout_col.button("Logout", key="logout_btn"):
 # --- top bar: active database + primary navigation ---
 # Runs before the page dispatch so `set_active_db` still lands before any page
 # handler reads paths.
-_bar_db, _bar_nav = st.columns([1, 3])
+_s = wiki_engine.stats()
+
+if _NEWSPAPER:
+    # Nameplate takes the full width; the DB picker sits in the rail slot and
+    # the nav rules span the fold, so no side-by-side columns here.
+    theme.masthead(
+        edition=st.session_state["active_db"],
+        pages=_s["pages"],
+        sources=_s["raw_files"],
+        model=ollama_client._MODEL,
+    )
+    _bar_db, _bar_nav = _db_slot, st.container()
+else:
+    # The nav is the page's header, so it spans the full width on its own row;
+    # the DB selector keeps a narrow column above it.
+    _bar_db = st.columns([1, 3])[0]
+    _bar_nav = st.container()
 
 with _bar_db:
-    _bar_label("DATABASE")
+    _bar_label("EDITION" if _NEWSPAPER else "DATABASE")
     _db_choice = st.selectbox(
         "Database",
         options=_allowed_dbs,
@@ -1059,9 +758,10 @@ with _bar_db:
         key="db_selector",
         label_visibility="collapsed",
     )
-    _s = wiki_engine.stats()
-    st.caption(f"**{_s['pages']}** pages &nbsp;·&nbsp; **{_s['raw_files']}** sources",
-               unsafe_allow_html=True)
+    # The masthead dateline already carries the counts in newspaper mode.
+    if not _NEWSPAPER:
+        st.caption(f"**{_s['pages']}** pages &nbsp;·&nbsp; **{_s['raw_files']}** sources",
+                   unsafe_allow_html=True)
 if _db_choice != st.session_state["active_db"]:
     st.session_state["active_db"] = _db_choice
     db_context.set_active_db(_db_choice)
@@ -1075,7 +775,7 @@ if _db_choice != st.session_state["active_db"]:
     st.rerun()
 
 with _bar_nav:
-    if not _maint_active:
+    if not _maint_active and not _NEWSPAPER:
         _bar_label("OPTIONS")
     if _maint_active:
         page = "Maintenance"
@@ -1094,14 +794,16 @@ with _bar_nav:
         # and the Upload branch's st.stop() would blank the other tabs.
         page = st.segmented_control(
             "OPTIONS", _nav_options, required=True, key="wiki_view",
-            label_visibility="collapsed",
+            label_visibility="collapsed", width="stretch",
         )
 
 
 # --- pages ---
 
 if page == "Upload":
-    _page_header("Upload a Document", "Markdown, PDF, DOCX, and images — non-Markdown files are auto-converted before ingest.")
+    # No title: the active nav pill already names the page. Only the part the
+    # pill cannot say stays.
+    st.caption("Markdown, PDF, DOCX, and images — non-Markdown files are auto-converted before ingest.")
     if not _can_maintain:
         st.error("You are not a maintainer of this database. Ask an admin for maintainer rights.")
         st.stop()
@@ -1282,14 +984,15 @@ if page == "Upload":
 
 
 elif page == "Wiki Explorer":
-    _page_header("Wiki Explorer")
     pages = wiki_engine.list_pages()
     if not pages:
         st.info("No wiki pages yet. Upload a document to get started.")
     else:
-        view_mode = st.radio(
-            "View", ["Graph", "Tree"],
-            horizontal=True, label_visibility="collapsed",
+        # A two-option segmented control, like every other view switch in the
+        # app — the radio read as a form field rather than a toggle.
+        view_mode = st.segmented_control(
+            "View", ["Graph", "Tree"], required=True, default="Graph",
+            key="explorer_view", label_visibility="collapsed",
         )
         # Switching into Tree always lands on the database overview: both views
         # share `explorer_selected_page`, so without this a node opened in the
@@ -1346,7 +1049,7 @@ elif page == "Wiki Explorer":
 
 
 elif page == "Wiki Chat":
-    _page_header("Wiki Chat", "Fast mode reads wiki pages; Deep mode reasons over original documents.")
+    st.caption("Fast mode reads wiki pages; Deep mode reasons over original documents.")
     _warn_if_no_lex_index()
 
     if "messages" not in st.session_state:
@@ -1528,7 +1231,6 @@ elif page == "Wiki Chat":
 
 
 elif page == "Research":
-    _page_header("Research Agent")
     st.caption(
         "Research mode includes web search — the agent starts at the local wiki, "
         "then searches the web and fetches pages to fill the gaps."
@@ -1638,14 +1340,23 @@ elif page == "Maintenance":
     c2.metric("Raw sources", s["raw_files"])
     c3.metric("Data size (MB)", round(s["data_bytes"] / 1_048_576, 2))
 
-    _tab_labels = ["Search index", "Delete source", "Link graph health", "Lint",
-                   "Activity log", "Reset all data"]
+    # Same segmented control as the primary nav, for the same reason (see
+    # docs/ui.md §Pages): st.tabs evaluates every branch on every rerun, so the
+    # index health read, the orphan scan and the log read all ran on each click.
+    _maint_options = ["Search index", "Delete source", "Link graph health", "Lint",
+                      "Activity log"]
     if auth.is_admin(_user):
-        _tab_labels.append("Admin")
-    _tabs = st.tabs(_tab_labels)
-    tab_index, tab_del, tab_graph, tab_lint, tab_log, tab_reset = _tabs[:6]
+        _maint_options.append("Admin")
+    # Admin disappears when the user is not one. Written *before* the widget:
+    # a post-instantiation write to a widget key raises.
+    if st.session_state.get("maint_view") not in _maint_options:
+        st.session_state["maint_view"] = _maint_options[0]
+    _maint_view = st.segmented_control(
+        "Maintenance section", _maint_options, required=True, key="maint_view",
+        label_visibility="collapsed", width="stretch",
+    )
 
-    with tab_index:
+    if _maint_view == "Search index":
         _health = lex_index.index_health()
         st.caption(
             "Lexical BM25 index (`index/chunks.sqlite`) — the grounding source for "
@@ -1670,7 +1381,7 @@ elif page == "Maintenance":
         else:
             st.info("Only maintainers of this database can rebuild the index.")
 
-    with tab_graph:
+    elif _maint_view == "Link graph health":
         orphans = wiki_engine.find_orphans()
         if orphans:
             st.warning(f"**{len(orphans)} orphan(s)** — pages with no `related` in-links.")
@@ -1678,7 +1389,7 @@ elif page == "Maintenance":
         else:
             st.success("No orphans — every page is linked from at least one other page.")
 
-    with tab_lint:
+    elif _maint_view == "Lint":
         st.caption("Ask the LLM to review wiki quality: contradictions, orphans, gaps, suggestions.")
         if st.button("Run lint", key="run_lint_btn"):
             with st.spinner("Running lint (may take a minute)…"):
@@ -1688,7 +1399,7 @@ elif page == "Maintenance":
                 except RuntimeError as e:
                     st.error(str(e))
 
-    with tab_del:
+    elif _maint_view == "Delete source":
         if _can_maintain:
             _sources = dedup.list_sources()
             if not _sources:
@@ -1713,26 +1424,14 @@ elif page == "Maintenance":
         else:
             st.info("Delete actions require maintainer rights for this database.")
 
-    with tab_reset:
-        if _can_maintain:
-            st.error(
-                "Deletes EVERY raw source, chunk, QA pair, lexical index entry, and "
-                "wiki page. Wiki is re-initialised empty. Used to start tests fresh."
-            )
-            _reset_ok = st.checkbox("I understand this wipes all ingested data")
-            if st.button("Reset all data", disabled=not _reset_ok):
-                with st.spinner("Wiping…"):
-                    _counts = wiki_engine.reset_all_data()
-                st.success(f"Cleared: {_counts}")
-                st.rerun()
-        else:
-            st.info("Reset actions require maintainer rights for this database.")
-
-    with tab_log:
+    elif _maint_view == "Activity log":
         st.code(wiki_engine.read_log(), language=None)
 
-    if auth.is_admin(_user):
-        with _tabs[5]:
+    elif _maint_view == "Admin" and auth.is_admin(_user):
+        # `st.container()` only to keep this block's indentation; it was
+        # previously mis-wired to `_tabs[5]` (Reset all data), which is why the
+        # Admin tab rendered empty.
+        with st.container():
             st.subheader("Databases (admin)")
             _existing_dbs = db_context.list_dbs()
             st.markdown("**Existing:** " + (", ".join(f"`{d}`" for d in _existing_dbs) or "(none)"))
@@ -1813,3 +1512,7 @@ elif page == "Maintenance":
                     st.rerun()
                 except ValueError as e:
                     st.error(str(e))
+
+
+if _NEWSPAPER:
+    theme.colophon()
