@@ -252,6 +252,16 @@ st.markdown(
         background-color: {_t['hover']} !important;
         border-color: {_t['primary']} !important;
     }}
+    /* Collapsed explorer rail: its column is only a hair wider than the button,
+       so pin the button to the right edge rather than leaving the slack sitting
+       between it and the edge of the page. */
+    .st-key-explorer_panel_expand {{
+        display: flex !important;
+        justify-content: flex-end !important;
+    }}
+    .st-key-explorer_panel_expand button {{
+        min-width: 0 !important;
+    }}
 
     /* ── Radio / Checkbox / Toggle ── */
     .stRadio > div, .stCheckbox > label, .stRadio label {{
@@ -570,7 +580,7 @@ def _render_neural_graph() -> None:
     )
     panel_open = st.session_state.get("explorer_panel_open", False)
     graph_col, panel_col = st.columns(
-        [2, 1] if panel_open else [12, 1], gap="medium" if panel_open else "small"
+        [2, 1] if panel_open else [30, 1], gap="medium" if panel_open else "small"
     )
     with graph_col:
         try:
