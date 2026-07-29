@@ -196,8 +196,15 @@ var net=new vis.Network(document.getElementById('g'),
         st.error(f"Graph render failed: {exc}")
 
 
-def _render_neural_graph() -> None:
+_GRAPH_LAYOUTS = {"Galaxy": "galaxy", "Ranked": "arc", "Clusters": "radial"}
+
+
+def _render_neural_graph(layout: str) -> None:
     """Canvas neural renderer over the same typed graph.
+
+    `layout` arrives already resolved to its internal key: the switch is drawn by
+    the Explorer page so it can share a row with the Graph|Tree toggle, which
+    means this function no longer owns it.
 
     Overlays are a Streamlit widget (native chrome, and it persists in session
     state across reruns); pan/zoom/hover/search/selection stay inside the canvas.
@@ -217,19 +224,11 @@ def _render_neural_graph() -> None:
         "Hubs": "hubs", "Bridges": "bridges", "Orphans": "orphans",
         "Stale": "stale", "Low confidence": "confidence",
     }
-    layout_labels = {"Galaxy": "galaxy", "Ranked": "arc", "Clusters": "radial"}
-    # Layout is the one control most visits touch, so it gets the full width on
-    # its own row. The metric and the overlays are refinements of what is already
-    # drawn — they live behind a collapsed disclosure rather than competing with
-    # it. Both still instantiate every run (an expander renders its body whether
-    # open or shut), so their session-state persistence is unchanged.
-    layout = st.segmented_control(
-        "Layout", list(layout_labels), default="Galaxy", key="graph_layout",
-        label_visibility="collapsed", width="stretch",
-        help="Galaxy: force layout. Ranked: the metric's head as a stable column. "
-             "Clusters: pages on a ring by cluster, links bundled.",
-    )
-    with st.expander("Advanced", expanded=False):
+    # The metric and the overlays refine what is already drawn, so they live
+    # behind a collapsed disclosure rather than competing with the layout switch.
+    # Both still instantiate every run (an expander renders its body whether open
+    # or shut), so their session-state persistence is unchanged.
+    with st.expander("Advanced", expanded=False, key="graph_advanced"):
         acol1, acol2 = st.columns([1, 2])
     by_degree = acol1.toggle(
         "Connections", key="graph_by_degree",
@@ -260,9 +259,7 @@ def _render_neural_graph() -> None:
             clicked = graph_widget.render_graph(
                 overlays=[overlay_labels[p] for p in picked],
                 size_by="degree" if by_degree else "pagerank",
-                # Clearing the segmented control returns None; the map still
-                # has to be drawn in *some* geometry.
-                layout=layout_labels.get(layout, "galaxy"),
+                layout=layout,
                 # Newspaper skin draws the same graph as an engraved plate; the
                 # dark canvas would be a hole in the page.
                 paper=_NEWSPAPER,
@@ -988,12 +985,36 @@ elif page == "Wiki Explorer":
     if not pages:
         st.info("No wiki pages yet. Upload a document to get started.")
     else:
-        # A two-option segmented control, like every other view switch in the
-        # app — the radio read as a form field rather than a toggle.
-        view_mode = st.segmented_control(
-            "View", ["Graph", "Tree"], required=True, default="Graph",
-            key="explorer_view", label_visibility="collapsed",
-        )
+        # One control row: the view toggle, a rule, then the layout switch —
+        # they pick the same thing (what the main area shows), so they read as
+        # one decision rather than two stacked ones. The layout switch is drawn
+        # here, not inside `_render_neural_graph`, so it can share this row; the
+        # columns are laid out before `view_mode` is known, which is fine —
+        # nothing is written into them until after.
+        _vcol, _sepcol, _lcol = st.columns([5, 0.25, 5])
+        with _vcol:
+            view_mode = st.segmented_control(
+                "View", ["Graph", "Tree"], required=True, default="Graph",
+                key="explorer_view", label_visibility="collapsed", width="stretch",
+            )
+        _neural = graph_widget.RENDERER == "neural"
+        graph_layout = "galaxy"
+        if view_mode == "Graph" and _neural:
+            _sepcol.markdown(
+                "<div style='text-align:center;padding-top:0.4rem;opacity:0.45;"
+                "font-size:1.15rem'>|</div>",
+                unsafe_allow_html=True,
+            )
+            with _lcol:
+                _picked_layout = st.segmented_control(
+                    "Layout", list(_GRAPH_LAYOUTS), default="Galaxy",
+                    key="graph_layout", label_visibility="collapsed", width="stretch",
+                    help="Galaxy: force layout. Ranked: the metric's head as a stable "
+                         "column. Clusters: pages on a ring by cluster, links bundled.",
+                )
+            # Clearing the control returns None; the map still has to be drawn
+            # in *some* geometry.
+            graph_layout = _GRAPH_LAYOUTS.get(_picked_layout, "galaxy")
         # Switching into Tree always lands on the database overview: both views
         # share `explorer_selected_page`, so without this a node opened in the
         # graph would silently preselect the reader instead.
@@ -1042,8 +1063,8 @@ elif page == "Wiki Explorer":
                         st.markdown(overview)
 
         else:  # Graph — full width; the nav tree and its search live in Tree view.
-            if graph_widget.RENDERER == "neural":
-                _render_neural_graph()
+            if _neural:
+                _render_neural_graph(graph_layout)
             else:
                 _render_legacy_graph()
 
@@ -1072,22 +1093,29 @@ elif page == "Wiki Chat":
         _render_chat_sources_panel()
 
     with main_col:
-        if st.button("🆕 New chat", key="new_chat"):
-            st.session_state.pop("messages", None)
-            st.session_state.pop("chat_followup", None)
-            st.rerun()
-
-        mode = st.radio(
-            "Mode", ["Fast", "Deep"], horizontal=True, key="chat_mode",
-            help="Fast: one-shot retrieval over wiki pages. Deep: agentic loop over data/raw/ originals (~2x slower than Research, but more grounded).",
+        # The mode is the one control every turn depends on, so it stands alone
+        # as a two-option toggle; the caption above the page already explains
+        # what Fast and Deep do.
+        mode = st.segmented_control(
+            "Mode", ["Fast", "Deep"], required=True, default="Fast",
+            key="chat_mode", label_visibility="collapsed",
         )
 
-        st.multiselect(
-            "Search in", options=_allowed_dbs, key="chat_scope",
-            help="Databases this chat searches. Answers cite cross-database results "
-                 "as `Database::file.md`. Uploads and 'Save answer to wiki' still go "
-                 "to the active database in the sidebar.",
-        )
+        # Scope and reset are per-session decisions, not per-turn ones.
+        with st.expander("Advanced", expanded=False, key="chat_advanced"):
+            st.multiselect(
+                "Search in", options=_allowed_dbs, key="chat_scope",
+                help="Databases this chat searches. Answers cite cross-database results "
+                     "as `Database::file.md`. Uploads and 'Save answer to wiki' still go "
+                     "to the active database in the sidebar.",
+            )
+            if st.button("🆕 New chat", key="new_chat"):
+                st.session_state.pop("messages", None)
+                st.session_state.pop("chat_followup", None)
+                st.rerun()
+
+        # Kept outside the expander: a scope wider than the active DB changes how
+        # every answer is cited, so it must stay visible when Advanced is shut.
         if len(st.session_state["chat_scope"]) > 1:
             st.caption(
                 f"🔎 Searching {len(st.session_state['chat_scope'])} databases: "
@@ -1166,8 +1194,13 @@ elif page == "Wiki Chat":
                 st.session_state.pop("chat_followup", None)
                 st.rerun()
 
-    # chat_input at root level for sticky-bottom behavior
-    if prompt := st.chat_input("Ask something…"):
+    # In the page flow, not pinned to the viewport: `st.chat_input` only sticks
+    # to the bottom of the window when it is a direct child of the main body, so
+    # a plain container puts it inline — under the conversation and above the
+    # newspaper colophon, instead of floating over it.
+    with st.container():
+        prompt = st.chat_input("Ask something…")
+    if prompt:
         fu = st.session_state.pop("chat_followup", None)
         if fu:
             with st.spinner("Rephrasing follow-up…"):

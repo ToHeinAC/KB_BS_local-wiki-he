@@ -356,15 +356,26 @@ def _base_css(t: dict) -> str:
        Graph|Tree) must keep their content width. */
     .st-key-wiki_view [data-testid="stButtonGroup"],
     .st-key-maint_view [data-testid="stButtonGroup"],
+    .st-key-explorer_view [data-testid="stButtonGroup"],
     .st-key-graph_layout [data-testid="stButtonGroup"] {{
         display: flex !important;
         width: 100% !important;
     }}
     .st-key-wiki_view [data-testid="stButtonGroup"] button,
     .st-key-maint_view [data-testid="stButtonGroup"] button,
+    .st-key-explorer_view [data-testid="stButtonGroup"] button,
     .st-key-graph_layout [data-testid="stButtonGroup"] button {{
         flex: 1 1 0 !important;
         padding: 0.6rem 0.5rem !important;
+    }}
+    /* `Advanced` is a disclosure for refinements, not a section head — it should
+       sit below the controls it hides in the type hierarchy. Class-scoped, so it
+       also outranks the newspaper skin's blanket expander-summary rule. */
+    .st-key-graph_advanced [data-testid="stExpander"] summary,
+    .st-key-graph_advanced [data-testid="stExpander"] summary *,
+    .st-key-chat_advanced [data-testid="stExpander"] summary,
+    .st-key-chat_advanced [data-testid="stExpander"] summary * {{
+        font-size: 0.78rem !important;
     }}
     /* Only the two page-level navs are set larger than a widget label; the
        graph Layout switch is a control inside a page, not a page header. */

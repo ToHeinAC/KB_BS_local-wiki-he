@@ -52,3 +52,6 @@ data/
 
 # Local model weights (GGUF reranker, Stage D)
 models/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+graft/
