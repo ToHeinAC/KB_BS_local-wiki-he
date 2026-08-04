@@ -517,6 +517,72 @@ def _record_research_urls(step: dict) -> None:
             panel.append(src)
 
 
+def _render_research_step(step: dict) -> None:
+    """One trace step. Intermediate results go in collapsed expanders; the
+    one-line control-flow steps stay inline so the trace stays scannable.
+
+    Used both live (as steps stream in) and on replay from session state, so a
+    refresh shows exactly the trace the run produced.
+    """
+    stype = step["type"]
+    if stype == "thought":
+        with st.expander(step.get("label") or "Thought", expanded=False):
+            st.markdown(step["content"])
+    elif stype == "notice":
+        # Deep mode could not finish on the local model; the generator
+        # continues into Quick mode after this step.
+        st.warning(step["content"])
+    elif stype == "tool_call":
+        args = step.get("args") or {}
+        # `ResearchComplete` is a zero-field sentinel — rendering `— {}` for it
+        # reads as a failed call. Show the name alone and explain it instead.
+        if step.get("terminal"):
+            st.success(f"**{step['name']}** — research phase finished")
+        elif args:
+            st.info(f"**{step['name']}** — `{str(args)[:300]}`")
+        else:
+            st.info(f"**{step['name']}**")
+        if step.get("note"):
+            st.caption(step["note"])
+    elif stype == "tool_result":
+        n = len(step.get("sources") or [])
+        label = f"Result: {step['name']}" + (f" — {n} source(s)" if n else "")
+        with st.expander(label, expanded=False):
+            if step.get("note"):
+                st.caption(step["note"])
+            for src in step.get("sources") or []:
+                st.markdown(f"- [{src['title'] or src['url']}]({src['url']})")
+            st.text(step["result"][:2000])
+    elif stype == "error":
+        st.error(step["content"])
+
+
+def _render_research_metrics(metrics: dict | None) -> None:
+    """Key metrics for a finished Deep run. `Sources checked` is dropped when it
+    would just repeat the search count (per the spec: only show it if it differs)."""
+    if not metrics:
+        return
+    tiles = [("Sub-tasks", metrics.get("tasks", 0)),
+             ("Web searches", metrics.get("searches", 0))]
+    checked = metrics.get("sources_checked", 0)
+    if checked != metrics.get("searches", 0):
+        tiles.append(("Sources checked", checked))
+    tiles.append(("Sources cited", metrics.get("sources_cited", 0)))
+    cols = st.columns(len(tiles))
+    for col, (label, value) in zip(cols, tiles):
+        col.metric(label, value)
+
+
+def _render_research_trace(steps: list[dict] | None) -> None:
+    """Replay the persisted agent trace under the report."""
+    if not steps:
+        return
+    st.markdown(f"**Agent trace** — {len(steps)} steps")
+    st.caption("Each intermediate result is collapsed; expand to inspect.")
+    for step in steps:
+        _render_research_step(step)
+
+
 def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str,
                          deep: bool = False) -> None:
     st.session_state["research_sources"] = []
@@ -524,6 +590,8 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
     st.session_state["last_research_error"] = ""
     st.session_state["last_research_q"] = display_q
     st.session_state["last_research_audit"] = None
+    st.session_state["last_research_steps"] = []
+    st.session_state["last_research_metrics"] = None
     st.session_state.pop("research_saved", None)
     _interpreted = question_to_run if question_to_run.strip() != display_q.strip() else None
     st.session_state["last_research_interpreted"] = _interpreted
@@ -531,27 +599,27 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
     steps_container = st.container()
     _runner = (deep_research_agent.run_deep_research if deep
                else research_agent.run_research_agent)
+    _trace = st.session_state["last_research_steps"]
     with steps_container:
         for step in _runner(question_to_run, wiki_context):
             stype = step["type"]
-            if stype == "thought":
-                with st.expander("Thought", expanded=False):
-                    st.markdown(step["content"])
-            elif stype == "notice":
-                # Deep mode could not finish on the local model; the generator
-                # continues into Quick mode after this step.
-                st.warning(step["content"])
-            elif stype == "tool_call":
-                st.info(f"**{step['name']}** — `{step['args']}`")
+            # Persist every step so the trace survives the caller's st.rerun().
+            if stype != "final_answer":
+                _trace.append(step)
+            if stype in ("thought", "notice", "tool_call", "tool_result", "error"):
+                _render_research_step(step)
+            if stype == "tool_call":
                 st.session_state.setdefault("research_sources", []).append(
                     {"tool": step["name"], "query": str(step["args"])[:80]}
                 )
             elif stype == "tool_result":
                 _record_research_urls(step)
-                with st.expander(f"Result: {step['name']}", expanded=False):
-                    st.text(step["result"][:800])
-            elif stype == "final_answer":
+            elif stype == "error":
+                st.session_state["last_research_error"] = step["content"]
+
+            if stype == "final_answer":
                 _record_research_urls(step)
+                st.session_state["last_research_metrics"] = step.get("metrics")
                 st.success("Research complete.")
                 if step.get("report_path"):
                     st.session_state["last_report"] = step["report_path"]
@@ -575,9 +643,6 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                     "report": (("comparisons/" + step["report_path"].split("comparisons/")[-1])
                                if step.get("report_path") else None),
                 })
-            elif stype == "error":
-                st.error(step["content"])
-                st.session_state["last_research_error"] = step["content"]
     # Search-ladder audit for the finished run (per-source scores vs τ).
     st.session_state["last_research_audit"] = tools.current_run_audit()
 
@@ -750,7 +815,8 @@ if _rst_col.button("Reset", key="reset_btn", help="Unload model from VRAM and re
 if _logout_col.button("Logout", key="logout_btn"):
     for _k in ("user", "active_db", "messages", "chat_followup", "chat_scope",
                "research_history", "last_research_q", "last_research_answer",
-               "last_report", "research_sources"):
+               "last_report", "research_sources", "last_research_steps",
+               "last_research_metrics"):
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -795,7 +861,8 @@ if _db_choice != st.session_state["active_db"]:
     # Clear per-DB session state to avoid cross-DB leakage.
     for _k in ("messages", "chat_followup", "research_history",
                "last_research_q", "last_research_answer", "last_report",
-               "research_sources", "explorer_selected_page", "last_contradictions",
+               "research_sources", "last_research_steps", "last_research_metrics",
+               "explorer_selected_page", "last_contradictions",
                "pending_batch", "batch_confirmed", "batch_prepared", "batch_key",
                "convert_editor", "chat_scope"):
         st.session_state.pop(_k, None)
@@ -1325,7 +1392,8 @@ elif page == "Research":
         if st.button("🆕 New research", key="new_research"):
             for _k in ("research_history", "last_research_q", "last_research_answer",
                        "last_research_interpreted", "last_report", "research_sources",
-                       "last_research_error", "research_followup_input", "research_saved"):
+                       "last_research_error", "research_followup_input", "research_saved",
+                       "last_research_steps", "last_research_metrics"):
                 st.session_state.pop(_k, None)
             st.rerun()
 
@@ -1363,6 +1431,7 @@ elif page == "Research":
             if st.session_state.get("last_report"):
                 _rel = "comparisons/" + st.session_state["last_report"].split("comparisons/")[-1]
                 st.markdown(f"Report saved: `{_rel}`")
+            _render_research_metrics(st.session_state.get("last_research_metrics"))
             _ans = st.session_state["last_research_answer"]
             st.markdown(_ans)
             _render_why_sources(st.session_state.get("last_research_audit"))
@@ -1388,10 +1457,12 @@ elif page == "Research":
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Save to wiki failed: {exc}")
+            st.markdown("---")
+            _render_research_trace(st.session_state.get("last_research_steps"))
         elif st.session_state.get("last_research_error"):
             st.markdown("---")
             st.error(st.session_state["last_research_error"])
-            st.caption("The live trace above is cleared on refresh — the line above is why the run produced no answer.")
+            _render_research_trace(st.session_state.get("last_research_steps"))
 
         if st.session_state.get("last_research_q"):
             st.markdown("---")

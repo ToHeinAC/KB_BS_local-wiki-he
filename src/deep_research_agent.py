@@ -61,12 +61,41 @@ CLARIFICATION = os.getenv("DEEP_RESEARCH_CLARIFICATION", "false").lower() == "tr
 # which is where the Perplexity-style citation cards come from.
 _SOURCE_RE = re.compile(r"^--- SOURCE \d+: (.*?) ---\s*\nURL: (\S+)", re.MULTILINE)
 
+# One `tavily_search` call emits exactly one of these headers, whatever the
+# number of queries it batched. Counting them is the only reliable way to size
+# the search effort: the researcher subgraphs never stream their tool calls, and
+# `compress_research`'s prose summary of "queries made" is LLM-written guesswork.
+_SEARCH_CALL_RE = re.compile(r"^(Search results:|No valid search results found)", re.MULTILINE)
+
+# URLs cited in the finished report (upstream ends it with `### Sources`,
+# `[n] Title: URL`). Trailing sentence punctuation is stripped by the caller.
+_URL_RE = re.compile(r"https?://[^\s<>\])}\"']+")
+
 # `final_report_generation` swallows its own exceptions into the report string
 # rather than raising, so a failed run looks like a successful one.
 _REPORT_ERROR_PREFIX = "Error generating final report"
 
 # State keys whose values are message lists worth streaming to the UI.
 _MESSAGE_KEYS = ("messages", "supervisor_messages", "researcher_messages")
+
+# What each of the supervisor's tools actually does. Surfaced to the UI as a
+# caption so the trace is readable without knowing the vendored graph.
+#
+# `ResearchComplete` is the one that looks broken but isn't: it is a *sentinel*
+# — a pydantic model with **zero fields** (`state.py`), so `args` is correctly
+# and always `{}`. `supervisor_tools` matches on its name and jumps straight to
+# END without appending a ToolMessage, so it is also the one tool call that
+# never gets a result. Empty args + no result is the expected shape, not a
+# failure; the UI must not render it as `ResearchComplete — {}`.
+TOOL_NOTES = {
+    "ConductResearch": "Delegates one sub-topic to a researcher subgraph (its own search loop).",
+    "think_tool": "Strategic reflection — recorded in the transcript, nothing is executed.",
+    "ResearchComplete": (
+        "Sentinel with no arguments and no result: the supervisor is signalling that "
+        "the research phase is done, and the graph moves on to writing the report."
+    ),
+    "web_search": "Tavily results, summarised per URL by the local model.",
+}
 
 
 def _configurable() -> dict:
@@ -97,6 +126,13 @@ def _configurable() -> dict:
 def _extract_sources(text: str) -> list[dict]:
     """Pull {url, title} citation cards out of a web_search tool result."""
     return [{"title": t.strip(), "url": u} for t, u in _SOURCE_RE.findall(text or "")]
+
+
+def _report_urls(report: str) -> set[str]:
+    """Unique URLs the finished report actually cites (its `### Sources` list
+    plus any inline links). Trailing sentence punctuation is stripped so
+    `…example.org/x.` and `…example.org/x` count once."""
+    return {u.rstrip(".,;:") for u in _URL_RE.findall(report or "")}
 
 
 def _slug(text: str) -> str:
@@ -130,16 +166,25 @@ def _message_steps(msg) -> Generator[dict, None, None]:
     if isinstance(msg, AIMessage):
         text = msg.content if isinstance(msg.content, str) else str(msg.content or "")
         if text.strip():
-            yield {"type": "thought", "content": text}
+            yield {"type": "thought", "label": "Supervisor reasoning", "content": text}
         for tc in getattr(msg, "tool_calls", None) or []:
-            yield {"type": "tool_call", "name": tc.get("name"), "args": tc.get("args") or {}}
+            name = tc.get("name")
+            yield {
+                "type": "tool_call",
+                "name": name,
+                "args": tc.get("args") or {},
+                "note": TOOL_NOTES.get(name, ""),
+                "terminal": name == "ResearchComplete",
+            }
     elif isinstance(msg, ToolMessage):
         content = msg.content if isinstance(msg.content, str) else str(msg.content)
         yield {
             "type": "tool_result",
             "name": msg.name,
             "result": content,
+            "note": TOOL_NOTES.get(msg.name, ""),
             "sources": _extract_sources(content),
+            "searches": len(_SEARCH_CALL_RE.findall(content)),
         }
 
 
@@ -155,15 +200,16 @@ def _update_steps(update: dict) -> Generator[dict, None, None]:
     """
     brief = update.get("research_brief")
     if brief:
-        yield {"type": "thought", "content": f"**Research brief**\n\n{brief}"}
+        yield {"type": "thought", "label": "Research brief", "content": brief}
     compressed = update.get("compressed_research")
     if compressed:
-        yield {"type": "thought", "content": f"**Sub-topic findings**\n\n{compressed}"}
+        yield {"type": "thought", "label": "Sub-topic findings", "content": compressed}
     for notes in update.get("raw_notes") or []:
         sources = _extract_sources(notes)
         if sources:
-            yield {"type": "tool_result", "name": "web_search",
-                   "result": notes, "sources": sources}
+            yield {"type": "tool_result", "name": "web_search", "result": notes,
+                   "note": TOOL_NOTES["web_search"], "sources": sources,
+                   "searches": len(_SEARCH_CALL_RE.findall(notes))}
     for key in _MESSAGE_KEYS:
         for msg in update.get(key) or []:
             yield from _message_steps(msg)
@@ -175,10 +221,15 @@ def _step_key(step: dict):
     A parent node's update echoes the whole accumulated sub-state (the
     `research_supervisor` node re-emits every supervisor message the subgraph
     already streamed), so the same step arrives more than once per run.
+
+    Text-bearing steps are keyed on their body alone, ignoring type and name:
+    `supervisor_tools` wraps each researcher's `compressed_research` in a
+    `ConductResearch` ToolMessage, so the identical text would otherwise show up
+    twice — once as the "Sub-topic findings" thought, once as a tool result.
     """
     if step["type"] == "tool_call":
         return ("tool_call", step["name"], str(step["args"]))
-    return (step["type"], step.get("name"), (step.get("content") or step.get("result", ""))[:400])
+    return ("body", (step.get("content") or step.get("result", ""))[:400])
 
 
 def _astream_sync(question: str, directive: str):
@@ -223,6 +274,7 @@ def _run_graph(question: str, directive: str) -> Generator[dict, None, None]:
     carrying the reason Deep mode could not produce one."""
     report, sources, failure = "", [], ""
     emitted: set = set()
+    tasks = searches = 0
     try:
         for node, delta in _astream_sync(question, directive):
             if node == "final_report_generation":
@@ -237,6 +289,9 @@ def _run_graph(question: str, directive: str) -> Generator[dict, None, None]:
                 emitted.add(key)
                 if step["type"] == "tool_result":
                     sources.extend(step["sources"])
+                    searches += step.get("searches", 0)
+                elif step["type"] == "tool_call" and step["name"] == "ConductResearch":
+                    tasks += 1
                 yield step
     except Exception as exc:
         failure = f"{type(exc).__name__}: {exc}"
@@ -260,6 +315,12 @@ def _run_graph(question: str, directive: str) -> Generator[dict, None, None]:
         "content": report,
         "report_path": _save_report(question, report, uniq),
         "sources": uniq,
+        "metrics": {
+            "tasks": tasks,
+            "searches": searches,
+            "sources_checked": len(uniq),
+            "sources_cited": len(_report_urls(report)),
+        },
     }
 
 

@@ -134,6 +134,23 @@ def test_replayed_parent_updates_are_not_emitted_twice(monkeypatch, wiki_dir):
                 and "brief text" in s["content"]]) == 1
 
 
+def test_compressed_findings_are_not_shown_twice(monkeypatch, wiki_dir):
+    """`supervisor_tools` re-wraps each researcher's `compressed_research` in a
+    ConductResearch ToolMessage, so the same text arrives as both a thought and
+    a tool result. The trace must show it once."""
+    findings = "Sub-topic findings text that is identical in both places."
+    tm = ToolMessage(content=findings, name="ConductResearch", tool_call_id="1")
+    _script(monkeypatch, [
+        ("compress_research", {"compressed_research": findings}),
+        ("supervisor", {"supervisor_messages": [tm]}),
+        _report_event(),
+    ])
+    steps = list(dra.run_deep_research("q?"))
+    bodies = [s for s in steps if findings in (s.get("content") or s.get("result") or "")]
+    assert len(bodies) == 1
+    assert bodies[0]["type"] == "thought"
+
+
 def test_final_report_node_messages_are_not_echoed_as_a_thought(monkeypatch, wiki_dir):
     report = "## The whole report body"
     _script(monkeypatch, [
@@ -184,6 +201,76 @@ def test_final_answer_sources_are_deduped_by_url(monkeypatch, wiki_dir):
     final = list(dra.run_deep_research("q?"))[-1]
     assert [s["url"] for s in final["sources"]] == [
         "https://example.org/a", "https://example.org/b"]
+
+
+# --- ResearchComplete: zero-field sentinel, no result ----------------------
+
+def test_research_complete_is_marked_terminal_and_explained(monkeypatch, wiki_dir):
+    """It is a pydantic model with no fields, so `args` is legitimately `{}` and
+    `supervisor_tools` returns no ToolMessage for it. The UI needs to know that
+    so it doesn't render a bare `— {}` as if the call had failed."""
+    ai = AIMessage(content="", tool_calls=[
+        {"name": "ResearchComplete", "args": {}, "id": "1", "type": "tool_call"}])
+    _script(monkeypatch, [("supervisor", {"supervisor_messages": [ai]}), _report_event()])
+    call = [s for s in dra.run_deep_research("q?") if s["type"] == "tool_call"][0]
+    assert call["args"] == {}
+    assert call["terminal"] is True
+    assert "no arguments and no result" in call["note"]
+
+
+def test_non_terminal_tool_calls_carry_a_note_but_are_not_terminal(monkeypatch, wiki_dir):
+    ai = AIMessage(content="", tool_calls=[
+        {"name": "ConductResearch", "args": {"research_topic": "X"}, "id": "1",
+         "type": "tool_call"}])
+    _script(monkeypatch, [("supervisor", {"supervisor_messages": [ai]}), _report_event()])
+    call = [s for s in dra.run_deep_research("q?") if s["type"] == "tool_call"][0]
+    assert call["terminal"] is False
+    assert "sub-topic" in call["note"]
+
+
+# --- trace labels + metrics ------------------------------------------------
+
+def test_thoughts_carry_labels_for_the_trace_expanders(monkeypatch, wiki_dir):
+    _script(monkeypatch, [
+        ("write_research_brief", {"research_brief": "b"}),
+        ("compress_research", {"compressed_research": "c"}),
+        ("supervisor", {"supervisor_messages": [AIMessage(content="reasoning")]}),
+        _report_event(),
+    ])
+    labels = [s.get("label") for s in dra.run_deep_research("q?") if s["type"] == "thought"]
+    assert labels == ["Research brief", "Sub-topic findings", "Supervisor reasoning"]
+
+
+def test_metrics_counted_across_the_run(monkeypatch, wiki_dir):
+    ai = AIMessage(content="", tool_calls=[
+        {"name": "ConductResearch", "args": {"research_topic": "X"}, "id": "1",
+         "type": "tool_call"},
+        {"name": "ConductResearch", "args": {"research_topic": "Y"}, "id": "2",
+         "type": "tool_call"}])
+    # two tavily_search calls' worth of output, three unique URLs between them
+    notes = TAVILY_RESULT + "\nSearch results: \n\n--- SOURCE 1: Third ---\nURL: https://example.org/c\n\nSUMMARY:\nx\n"
+    report = ("Body citing https://example.org/a and https://example.org/b.\n\n"
+              "### Sources\n[1] A: https://example.org/a\n[2] B: https://example.org/b\n")
+    _script(monkeypatch, [
+        ("supervisor", {"supervisor_messages": [ai]}),
+        ("research_supervisor", {"raw_notes": [notes]}),
+        _report_event(report),
+    ])
+    m = list(dra.run_deep_research("q?"))[-1]["metrics"]
+    assert m == {"tasks": 2, "searches": 2, "sources_checked": 3, "sources_cited": 2}
+
+
+def test_report_urls_dedupe_and_strip_trailing_punctuation():
+    assert dra._report_urls("see https://a.org/x. and https://a.org/x again") == {"https://a.org/x"}
+    assert dra._report_urls("") == set()
+
+
+def test_metrics_zero_when_the_graph_did_no_research(monkeypatch, wiki_dir):
+    """The observed small-model failure mode: a report written straight from
+    model knowledge. The run still succeeds, so the metrics are the only tell."""
+    _script(monkeypatch, [_report_event("A report with no sources at all.")])
+    m = list(dra.run_deep_research("q?"))[-1]["metrics"]
+    assert m == {"tasks": 0, "searches": 0, "sources_checked": 0, "sources_cited": 0}
 
 
 # --- fall back to Quick ----------------------------------------------------
