@@ -1408,9 +1408,20 @@ elif page == "Research":
                 label_visibility="collapsed",
             )
 
-        if st.button("Start research", key="start_research_btn", use_container_width=True, disabled=not (tavily_key and question)):
-            _run_research_stream(question, question, wiki_context or "", deep=_deep)
-            st.rerun()
+        # Gated on the API key only, never on `question`. A `st.text_input`
+        # returns the value from the last *completed* rerun, and typing does not
+        # rerun — so mid-typing `question` is still "" and a
+        # `disabled=not question` button shows a not-allowed cursor while being
+        # perfectly clickable (the click blurs the input, which commits the text
+        # and reruns). Validate on click instead; an empty box is rare and a
+        # message beats a lying cursor.
+        if st.button("Start research", key="start_research_btn",
+                     use_container_width=True, disabled=not tavily_key):
+            if not question.strip():
+                st.warning("Enter a research question first.")
+            else:
+                _run_research_stream(question, question, wiki_context or "", deep=_deep)
+                st.rerun()
 
         _rhist = st.session_state.get("research_history", [])
         if len(_rhist) > 1:
@@ -1468,13 +1479,18 @@ elif page == "Research":
             st.markdown("---")
             st.markdown("**↪ Follow-up research**")
             fq = st.text_input("Ask a follow-up about the last research answer", key="research_followup_input")
-            if st.button("Ask follow-up", key="research_followup_go", disabled=not (tavily_key and fq)):
-                with st.spinner("Rephrasing follow-up…"):
-                    standalone = wiki_engine.condense_followup(
-                        st.session_state["last_research_q"],
-                        st.session_state.get("last_research_answer", ""), fq)
-                _run_research_stream(standalone, fq, "", deep=_deep)
-                st.rerun()
+            # Same stale-widget-value reasoning as "Start research" above.
+            if st.button("Ask follow-up", key="research_followup_go",
+                         disabled=not tavily_key):
+                if not fq.strip():
+                    st.warning("Enter a follow-up question first.")
+                else:
+                    with st.spinner("Rephrasing follow-up…"):
+                        standalone = wiki_engine.condense_followup(
+                            st.session_state["last_research_q"],
+                            st.session_state.get("last_research_answer", ""), fq)
+                    _run_research_stream(standalone, fq, "", deep=_deep)
+                    st.rerun()
 
 
 elif page == "Maintenance":
