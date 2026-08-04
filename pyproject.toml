@@ -23,6 +23,15 @@ dependencies = [
     "langgraph>=0.2",
     "langchain-ollama>=0.2",
     "langchain-core>=0.3",
+    # Deep Research (web mode) — the four imports the vendored open_deep_research
+    # modules need beyond the above. See src/vendor/README.md for why the upstream
+    # package is vendored rather than depended on.
+    "langchain>=0.3",
+    "aiohttp>=3.9",
+    "langchain-mcp-adapters>=0.1.6",
+    # <2 required: mcp 2.x dropped mcp.shared.context.RequestContext, which
+    # langchain-mcp-adapters imports at module load.
+    "mcp>=1.9.4,<2",
     "httpx>=0.27",
     "markdownify>=0.13",
     "bcrypt>=4.0",

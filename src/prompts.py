@@ -500,6 +500,23 @@ Research notes (tool results):
 Write a structured markdown answer with ## headings. Inline-cite every claim with the [Wiki: filename.md] or [Source: ...] tags exactly as they appear in the notes. If the notes are insufficient to answer fully, state what is known and list the remaining gaps explicitly."""
 
 
+# --- Deep Research, web mode (deep_research_agent.py) ----------------------
+# The vendored open_deep_research graph carries its own node prompts
+# (src/vendor/open_deep_research/prompts.py); it is driven through
+# Configuration, not prompt edits. The only thing we prepend is the
+# language pin, which rides on the user turn so it reaches both the
+# research brief and the final report.
+
+DEEP_RESEARCH_QUESTION = """{question}
+
+{language_directive}"""
+
+DEEP_RESEARCH_FALLBACK_NOTICE = (
+    "Deep Research (web) could not complete on the local model — falling back to "
+    "Quick mode for this run. Reason: {reason}"
+)
+
+
 # --- Document → Markdown conversion (md_convert.py) -------------------------
 # Ported from ToHeinAC/MD-maker (Apache-2.0). See md_convert.py header.
 

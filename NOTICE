@@ -12,6 +12,19 @@ This product includes software adapted from:
   conversion prompts in src/prompts.py (OCR_SYSTEM_PROMPT, OCR_USER_PROMPT,
   OCR_DEEPSEEK_PROMPT, MD_REWRITE_PROMPT) are derived from MD-maker.
 
+This product includes vendored software:
+
+  open_deep_research (https://github.com/langchain-ai/open_deep_research)
+  Copyright (c) 2025 LangChain
+  Licensed under the MIT License.
+
+  Five modules (deep_researcher, configuration, state, prompts, utils) are
+  vendored verbatim under src/vendor/open_deep_research/, pinned at commit
+  d337ae32ed4ff8f4c6fbe192ba3bf1b2d6610799 (v0.0.16), with only their internal
+  import paths rewritten. They power the Research page's Deep mode. The full
+  MIT licence text is retained at src/vendor/open_deep_research/LICENSE; see
+  src/vendor/README.md for provenance and the re-vendoring recipe.
+
 This product includes the following third-party asset:
 
   src/assets/graph/galaxy.jpg — Hubble Space Telescope image of a spiral

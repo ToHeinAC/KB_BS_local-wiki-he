@@ -5,6 +5,7 @@ import os
 import re
 import tempfile
 from pathlib import Path
+from urllib.parse import urlparse
 
 import streamlit as st
 from dotenv import load_dotenv
@@ -25,6 +26,7 @@ import theme
 import tools
 import wiki_engine
 import agent as research_agent
+import deep_research_agent
 import chat_agent
 
 st.set_page_config(
@@ -485,18 +487,38 @@ def _render_chat_sources_panel() -> None:
 
 
 def _render_research_sources_panel() -> None:
+    """Tool calls plus, in Deep mode, per-URL citation cards.
+
+    Both modes append `{tool, query}` entries; Deep mode additionally appends
+    `{url, title}` entries as web_search results stream in.
+    """
     sources = st.session_state.get("research_sources", [])
     if not sources:
         st.caption("Sources appear here during research.")
         return
     for i, src in enumerate(sources):
-        st.markdown(f"**{src['tool']}**")
-        st.caption(src["query"])
+        if src.get("url"):
+            st.markdown(f"[{src.get('title') or src['url']}]({src['url']})")
+            st.caption(urlparse(src["url"]).netloc)
+        else:
+            st.markdown(f"**{src['tool']}**")
+            st.caption(src["query"])
         if i < len(sources) - 1:
             st.markdown("---")
 
 
-def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str) -> None:
+def _record_research_urls(step: dict) -> None:
+    """Append newly-seen web citations from a Deep-mode step, de-duped by URL."""
+    panel = st.session_state.setdefault("research_sources", [])
+    known = {s["url"] for s in panel if s.get("url")}
+    for src in step.get("sources") or []:
+        if src["url"] not in known:
+            known.add(src["url"])
+            panel.append(src)
+
+
+def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str,
+                         deep: bool = False) -> None:
     st.session_state["research_sources"] = []
     st.session_state["last_research_answer"] = ""
     st.session_state["last_research_error"] = ""
@@ -507,21 +529,29 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
     st.session_state["last_research_interpreted"] = _interpreted
     st.markdown(f"**Research question:** {display_q}")
     steps_container = st.container()
+    _runner = (deep_research_agent.run_deep_research if deep
+               else research_agent.run_research_agent)
     with steps_container:
-        for step in research_agent.run_research_agent(question_to_run, wiki_context):
+        for step in _runner(question_to_run, wiki_context):
             stype = step["type"]
             if stype == "thought":
                 with st.expander("Thought", expanded=False):
                     st.markdown(step["content"])
+            elif stype == "notice":
+                # Deep mode could not finish on the local model; the generator
+                # continues into Quick mode after this step.
+                st.warning(step["content"])
             elif stype == "tool_call":
                 st.info(f"**{step['name']}** — `{step['args']}`")
                 st.session_state.setdefault("research_sources", []).append(
                     {"tool": step["name"], "query": str(step["args"])[:80]}
                 )
             elif stype == "tool_result":
+                _record_research_urls(step)
                 with st.expander(f"Result: {step['name']}", expanded=False):
                     st.text(step["result"][:800])
             elif stype == "final_answer":
+                _record_research_urls(step)
                 st.success("Research complete.")
                 if step.get("report_path"):
                     st.session_state["last_report"] = step["report_path"]
@@ -1265,8 +1295,9 @@ elif page == "Wiki Chat":
 
 elif page == "Research":
     st.caption(
-        "Research mode includes web search — the agent starts at the local wiki, "
-        "then searches the web and fetches pages to fill the gaps."
+        "**Quick** starts at the local wiki, then searches the web to fill the gaps. "
+        "**Deep** is web-only: it splits the question into sub-topics, researches each "
+        "one, and writes a report cited to web URLs — slower, and it ignores the wiki."
     )
     tavily_key = os.getenv("TAVILY_API_KEY", "")
 
@@ -1283,6 +1314,14 @@ elif page == "Research":
         _render_research_sources_panel()
 
     with main_col:
+        # Mirrors the Chat page's Fast/Deep toggle — the mode is the one control
+        # every run depends on, so it stands alone above the question.
+        research_mode = st.segmented_control(
+            "Research mode", ["Quick", "Deep"], required=True, default="Quick",
+            key="research_mode", label_visibility="collapsed",
+        )
+        _deep = research_mode == "Deep"
+
         if st.button("🆕 New research", key="new_research"):
             for _k in ("research_history", "last_research_q", "last_research_answer",
                        "last_research_interpreted", "last_report", "research_sources",
@@ -1292,7 +1331,9 @@ elif page == "Research":
 
         question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
 
-        with st.expander("Extra wiki paste (optional — the agent browses the wiki on its own)"):
+        _paste_label = ("Extra wiki paste (unused in Deep mode — it is web-only)" if _deep
+                        else "Extra wiki paste (optional — the agent browses the wiki on its own)")
+        with st.expander(_paste_label):
             wiki_context = st.text_area(
                 "Optional extra context. Leave blank — the agent will run wiki_search first automatically.",
                 height=120,
@@ -1300,7 +1341,7 @@ elif page == "Research":
             )
 
         if st.button("Start research", key="start_research_btn", use_container_width=True, disabled=not (tavily_key and question)):
-            _run_research_stream(question, question, wiki_context or "")
+            _run_research_stream(question, question, wiki_context or "", deep=_deep)
             st.rerun()
 
         _rhist = st.session_state.get("research_history", [])
@@ -1361,7 +1402,7 @@ elif page == "Research":
                     standalone = wiki_engine.condense_followup(
                         st.session_state["last_research_q"],
                         st.session_state.get("last_research_answer", ""), fq)
-                _run_research_stream(standalone, fq, "")
+                _run_research_stream(standalone, fq, "", deep=_deep)
                 st.rerun()
 
 
