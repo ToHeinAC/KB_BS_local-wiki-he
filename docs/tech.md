@@ -24,6 +24,9 @@ author: Tobias Hein
 | Deep researcher graph | `langgraph` | 0.2 |
 | Deep researcher LLM adapter | `langchain-ollama` | 0.2 |
 | Deep researcher core | `langchain-core` | 0.3 |
+| Deep Research (web) — `init_chat_model` | `langchain` | 0.3 |
+| Deep Research (web) — vendored graph I/O | `aiohttp` | 3.9 |
+| Deep Research (web) — vendored MCP import | `langchain-mcp-adapters` / `mcp` | 0.1.6 / ≥1.9.4,**<2** |
 | Webpage fetch (research) | `httpx` | 0.27 |
 | HTML→Markdown (research) | `markdownify` | 0.13 |
 | PDF extraction (text path) | `pypdf` | 4.0 |
@@ -40,10 +43,11 @@ Dev: `pytest ≥ 8.0`.
 
 ## Forbidden
 
-- **No LangChain** outside the deep-research agent layer (`src/agent.py`, `src/tools.py`). LangGraph + `langchain-ollama` are scoped to that layer only — see [`architecture.md`](architecture.md) §Deep researcher.
-- **No vector database. No embeddings.**
-- **No cloud LLM APIs** (OpenAI, Anthropic, Bedrock, …).
-- **No asyncio.** Parallelism in the research layer uses `concurrent.futures.ThreadPoolExecutor` (I/O only); LLM calls stay sequential.
+- **No LangChain** outside the agent layer (`src/agent.py`, `src/chat_agent.py`, `src/tools.py`, `src/deep_research_agent.py`) and the vendored tree `src/vendor/`. See [`architecture.md`](architecture.md) §Deep researcher.
+- **No vector database. No embeddings.** *(Superseded by Stage C: local file-backed embeddings are permitted — see [`retrieval.md`](retrieval.md).)*
+- **No cloud LLM APIs** (OpenAI, Anthropic, Bedrock, …). Holds for Deep Research too: the vendored graph runs every model role on Ollama and reads no cloud key — see [`deep_research.md`](deep_research.md).
+- **No asyncio.** Parallelism in the research layer uses `concurrent.futures.ThreadPoolExecutor` (I/O only); LLM calls stay sequential. **Scoped exception:** the vendored Deep-Research graph is natively async; `deep_research_agent.run_deep_research` keeps that behind a plain sync generator.
+- **No hand-editing `src/vendor/`.** It is vendored third-party source, changed only by re-vendoring — see [`../src/vendor/README.md`](../src/vendor/README.md).
 - **No database** of any kind — files + JSON only.
 - **No Docker** in the primary workflow.
 - **No configuration UI** — `.env` is the only config surface.
@@ -57,7 +61,7 @@ uv run pytest                                       # run tests
 uv run streamlit run app.py --server.port 8520      # run app
 ```
 
-`pyproject.toml` and `uv.lock` are checked in.
+`pyproject.toml` is checked in; `uv.lock` is gitignored (`.gitignore:16`), so `uv sync` resolves against the declared ranges.
 
 ## Streamlit notes
 

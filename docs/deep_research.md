@@ -1,166 +1,168 @@
 ---
 name: deep_research.md
-description: Implementation plan for a second Research mode — a web-only Open Deep Research supervisor pipeline (vendored, Ollama + Tavily)
-version: 1.0.0
+description: Research page "Deep" mode — a web-only Open Deep Research supervisor pipeline (vendored, Ollama + Tavily)
+version: 2.0.0
 author: Tobias Hein
-status: Planned — design only, not yet built
+status: Implemented
 ---
 
 # Deep Research (web mode)
 
-> **Status: PLAN, not implemented.** This document is a forward-looking design for a *new* Research mode.
-> No code described here exists yet (`src/deep_research_agent.py` is unbuilt).
-> Authoritative spec for the existing researcher: [`PRD.md`](../PRD.md) §3.7–3.8; current implementation
-> map: [`IMPLEMENTATION.md`](../IMPLEMENTATION.md) §3. The current single-loop researcher is documented in
-> [architecture.md](architecture.md) §Deep researcher.
+The Research page runs **two** agents, chosen by a `Quick` / `Deep` segmented control:
 
-## Intent
-
-The Research page today runs **one** agent: `src/agent.py`, a LangGraph `StateGraph(MessagesState)`
-ReAct loop (`agent → tools → agent`) that is **local-first** — it consults the wiki/raw KB first and
-uses Tavily only for gaps. That becomes the **"Quick"** mode.
-
-This plan adds a second, **"Deep Research"** mode: a **web-only, Perplexity-style** multi-agent pipeline
-that decomposes a question, researches sub-topics in parallel, and synthesises a cited report — by
-**vendoring [`open_deep_research`](https://github.com/langchain-ai/open_deep_research)** (langchain-ai)
-and pointing it at local Ollama + Tavily. Deep mode does **not** touch the wiki/raw KB; its citations are
-web URLs only.
-
-Guard rails this plan stays inside:
-- **Licence.** `open_deep_research` is **MIT** — a strict subset of "Apache-2.0 or more permissive"; OK. *(Re-confirm at pin time.)*
-- **Agent-layer only.** All LangGraph/LangChain lives in the new agent-layer module `src/deep_research_agent.py`, consistent with the §5.3 scope rule.
-- **Async is permitted for this feature.** The project's general "no async" rule (`AGENTS.md`/`IMPLEMENTATION.md` §5) is **waived here** by explicit decision — the vendored graph is natively async and is adopted as-is.
-- **No new network dependency.** Tavily is already used and gated on `TAVILY_API_KEY`; Deep mode reuses it.
-
-## Architecture — the vendored graph
-
-Upstream topology (adopt as-is, override only config):
-
-```
-deep_researcher            state: AgentState / AgentInputState        exported graph var: deep_researcher
-  START
-   → clarify_with_user        (disabled here — Research is one-shot)
-   → write_research_brief      (ResearchQuestion schema)
-   → research_supervisor       ── supervisor_subgraph ──────────────────────────────┐
-   → final_report_generation                                                        │
-   → END                                                                            │
-                                                                                    │
-  supervisor_subgraph:                                                              │
-     supervisor        (tools: ConductResearch, ResearchComplete, think_tool)       │
-     supervisor_tools  → asyncio.gather → N × researcher_subgraph  ◄────────────────┘
-                                            (researcher → researcher_tools → compress_research)
-```
-
-- **Supervisor** plans and delegates via the `ConductResearch` tool; `supervisor_tools` fans out up to
-  `max_concurrent_research_units` researcher subgraphs concurrently and gathers their compressed findings.
-- **Each researcher** is its own small ReAct loop over the search tools, then `compress_research`
-  summarises its findings.
-- **`final_report_generation`** synthesises all compressed findings into the cited markdown report
-  (with token-limit retry).
-
-### Configuration surface (upstream field → our setting)
-
-`open_deep_research`'s `Configuration` exposes model choices as `"provider:model"` strings plus per-role
-max-token caps, built through `init_chat_model(configurable_fields=("model", "max_tokens", "api_key"))`.
-
-| Upstream field | Upstream default | Our setting | Why |
-|---|---|---|---|
-| `research_model` / `final_report_model` / `compression_model` | `openai:gpt-4.1` | `ollama:<_QUERY_MODEL>` | local only |
-| `summarization_model` | `openai:gpt-4.1-mini` | `ollama:<_QUERY_MODEL>` (or `_FAST_MODEL`) | local only |
-| `research_model_max_tokens` etc. | 8192–10000 | cap to fit `num_ctx` / VRAM | small-model safety |
-| `search_api` | `SearchAPI.TAVILY` | keep `TAVILY` | reuse `TAVILY_API_KEY` |
-| `allow_clarification` | `True` | **`False`** | Research page is one-shot; no interactive turn |
-| `max_concurrent_research_units` | 5 | **1–2** | Ollama serialises; VRAM |
-| `max_researcher_iterations` | 6 | env-tunable | budget |
-| `max_react_tool_calls` | 10 | env-tunable | budget |
-
-**Model base_url note.** `Configuration` makes only `model` / `max_tokens` / `api_key` configurable — Ollama's
-`base_url` is *not* a config field. Wire it by setting the model strings to `ollama:<_QUERY_MODEL>` and
-ensuring `langchain_ollama` targets `ollama_client._HOST` (set `OLLAMA_HOST` before graph build, or pass
-`base_url` as a default kwarg). The chosen mechanism is verified end-to-end via `ollama_client.loaded_model()`.
-
-## Integration seams (what the build will add)
-
-- **New module `src/deep_research_agent.py`** (agent layer). Public entry:
-  `run_deep_research(question: str) -> Generator[dict, None, None]`, emitting the **same step-dict shape**
-  the Research page already renders (`thought`, `tool_call`, `tool_result`, `final_answer` + `report_path`,
-  `error` — the contract at `src/agent.py:3-9`). It builds the vendored `deep_researcher` graph with our
-  `Configuration` (Ollama models, Tavily, clarification off, concurrency/iteration budgets from env).
-
-- **Sync/async bridge (lightweight — async is allowed).** The vendored graph is async (`asyncio.gather`);
-  Streamlit reruns are synchronous, so `run_deep_research` stays a plain **sync generator** that pumps
-  `deep_researcher.astream(...)` on a dedicated event loop (`run_until_complete(anext(...))` per event,
-  mapping each to a step-dict). No background thread, no queue — the event loop is created and closed
-  within the generator's lifetime.
-
-- **Streaming / citation adapter.** Map LangGraph node events → step-dicts, and extract web URLs + titles
-  from researcher tool results so the Research page can render **per-URL Perplexity-style citation cards**.
-  Today `_render_research_sources_panel` (`src/app.py:487-497`) records only `{tool, query}`; this is where
-  URL/title enrichment lands. The `final_report_generation` markdown is saved to `comparisons/` and read
-  back exactly like the Quick path (`src/app.py:528-532`).
-
-- **UI: a Quick / Deep toggle on the Research page**, mirroring the Chat Fast/Deep pattern
-  (`src/app.py:1099-1102`). Page dispatch stays at `elif page == "Research":` (`src/app.py:1266`); the nav
-  string (`src/app.py:783`) is unchanged. Quick → `research_agent.run_research_agent(...)`; Deep →
-  `deep_research_agent.run_deep_research(...)`, both through the existing `_run_research_stream`
-  (`src/app.py:499-552`). Add a per-mode session-state key alongside the reset lists
-  (`src/app.py:721-724, 767-771, 1287-1290`).
-
-### Reuse map (don't reinvent)
-
-| Need | Reuse |
-|---|---|
-| Local model + host | `ollama_client._QUERY_MODEL` / `_HOST` / `_FAST_MODEL` (`src/ollama_client.py:9-17`) |
-| Web search | Tavily gate on `TAVILY_API_KEY`; upstream `SearchAPI.TAVILY` |
-| Streaming render | step-dict contract + `_run_research_stream` / `_render_research_sources_panel` (`src/app.py`) |
-| Report persistence | `comparisons/` save + readback (`src/app.py:528-532`) |
-| Language pinning | `lang.response_directive()` to pin the final report to the query language (DE/EN) |
-| Prompts | any node system-prompt overrides go in `src/prompts.py` (the "no inline prompts" rule holds) |
-
-## Configuration & env
-
-New `DEEP_RESEARCH_*` keys, added next to the existing `RESEARCH_*` block in `.env.example` (~L71-78) and
-registered in `IMPLEMENTATION.md` §6:
-
-| Var | Default | Purpose |
+| | Quick | Deep |
 |---|---|---|
-| `DEEP_RESEARCH_MODEL` | `<QUERY_MODEL>` | Override the Ollama tag for all four roles |
-| `DEEP_RESEARCH_CONCURRENCY` | `1` | `max_concurrent_research_units` (Ollama serialises; keep low) |
-| `DEEP_RESEARCH_MAX_ITERATIONS` | `4` | `max_researcher_iterations` budget |
-| `DEEP_RESEARCH_MAX_TOOL_CALLS` | `6` | `max_react_tool_calls` per researcher |
-| `DEEP_RESEARCH_MAX_TOKENS` | `8192` | per-role `*_model_max_tokens` cap |
-| `DEEP_RESEARCH_CLARIFICATION` | `false` | `allow_clarification` (keep off for one-shot) |
+| Module | `src/agent.py` | `src/deep_research_agent.py` |
+| Topology | one ReAct loop (`agent → tools → agent`) | supervisor → N researcher subgraphs → report |
+| Sources | wiki/raw **first**, web for gaps | **web only** |
+| Citations | `[Wiki: …]`, `[Source: …]`, URLs | web URLs |
+| Quality gate | `RESEARCH_MIN_*` in `tools.submit_final_answer` | none (upstream pipeline) |
 
-## Risks & mitigations
+Deep mode is the vendored [`open_deep_research`](https://github.com/langchain-ai/open_deep_research)
+graph pointed at local Ollama + Tavily. It does **not** touch the wiki or `data/raw/`.
 
-1. **Small local models (gemma3:4b / e4b) are weak at structured output + tool calling**, which this graph
-   leans on heavily (`ResearchQuestion` schema, `ConductResearch` tool, `max_structured_output_retries`).
-   Mitigate: prefer a tool-calling-capable tag; `allow_clarification=False`; low concurrency; **fall back to
-   Quick mode** on repeated structured-output failure rather than erroring.
-2. **"Parallel" sub-researchers serialise on one Ollama instance** (single model, VRAM, request
-   serialisation) — set `max_concurrent_research_units` to 1–2 and document that concurrency ≠ speedup here.
-3. **Dependency surface.** Vendoring pulls extra LangChain packages (e.g. `langchain-openai`, upstream pins)
-   into a project whose §5 rules forbid cloud LLM APIs. Cloud deps stay **optional/unused** (all models
-   overridden to Ollama). Record this in `IMPLEMENTATION.md` §4 (deviations) / §5 (scoped exception),
-   as the current LangGraph researcher already is. *(Async is not a deviation — it is approved for this
-   feature.)*
-4. **Package identity / licence to verify at build time.** The repo installs via `uv sync`; confirm the
-   exact spec — likely `uv add "open-deep-research @ git+https://github.com/langchain-ai/open_deep_research"`
-   — and re-confirm MIT before pinning.
+## Why the package is vendored, not depended on
 
-## Verification (for the future build)
+Upstream's `pyproject.toml` declares ~40 runtime dependencies — `azure-identity`,
+`azure-search-documents`, `supabase`, `langchain-aws`, `langchain-google-vertexai`,
+`openai`, `pandas`, `pymupdf`, `ipykernel`, `langgraph-cli[inmem]` — and pins the
+LangChain **0.3** line. `uv add`ing it would (a) contradict IMPLEMENTATION.md §5's
+no-cloud-LLM-APIs rule with a wall of cloud SDKs, and (b) very likely downgrade this
+project's `langchain-core` 1.x / `langgraph` 1.x, breaking `src/agent.py` and
+`src/chat_agent.py`.
 
-- `uv sync` resolves the dep; `uv run python -c "from open_deep_research.deep_researcher import deep_researcher"` imports.
-- Unit: `run_deep_research("<current-events question>")` yields step-dicts ending in `final_answer` with a
-  non-empty report and ≥1 web URL; the event loop closes cleanly after the generator is exhausted. Mock
-  Tavily as in `tests/test_tools.py:12-49`.
-- End-to-end: `uv run streamlit run src/app.py --server.port 8520` → Research page → **Deep** toggle → ask a
-  current-events question → confirm streamed steps, per-URL citation cards, and a saved `comparisons/` report.
-  Confirm **Quick** mode still behaves unchanged.
-- Confirm the run was served locally via `ollama_client.loaded_model()` and that **no OpenAI key** was required.
+The five modules we actually need import very little: `langchain` (`init_chat_model`),
+`aiohttp`, `langchain-mcp-adapters`, `mcp` — the only four additions to `pyproject.toml`.
+Provenance, licence (MIT), the pinned commit and the single mechanical edit are recorded
+in [`src/vendor/README.md`](../src/vendor/README.md).
+
+`mcp` is pinned `<2`: 2.x dropped `mcp.shared.context.RequestContext`, which
+`langchain-mcp-adapters` imports at module load. MCP itself is unused (`mcp_config`
+stays `None`) — the import is simply unavoidable in upstream's `utils.py`.
+
+## Architecture
+
+```
+deep_researcher                                    (src/vendor/open_deep_research/)
+  START
+   → clarify_with_user        (disabled — allow_clarification=False, the page is one-shot)
+   → write_research_brief     (ResearchQuestion schema)
+   → research_supervisor      ── supervisor_subgraph ───────────────────────────┐
+   → final_report_generation                                                    │
+   → END                                                                        │
+                                                                                │
+  supervisor_subgraph:                                                          │
+     supervisor        (tools: ConductResearch, ResearchComplete, think_tool)   │
+     supervisor_tools  → asyncio.gather → N × researcher_subgraph  ◄────────────┘
+                                (researcher → researcher_tools → compress_research)
+```
+
+`src/deep_research_agent.py` is the only thing we wrote: it builds the `Configuration`,
+pumps the graph, and maps its events onto the Research page's step-dict contract.
+
+### Configuration (upstream field → our value)
+
+| Upstream field | Upstream default | Ours |
+|---|---|---|
+| `research_model` / `final_report_model` / `compression_model` / `summarization_model` | `openai:gpt-4.1(-mini)` | `ollama:<DEEP_RESEARCH_MODEL>` |
+| `search_api` | `TAVILY` | `TAVILY` (reuses `TAVILY_API_KEY`) |
+| `allow_clarification` | `True` | **`False`** |
+| `max_concurrent_research_units` | 5 | `DEEP_RESEARCH_CONCURRENCY` (1) |
+| `max_researcher_iterations` | 6 | `DEEP_RESEARCH_MAX_ITERATIONS` (4) |
+| `max_react_tool_calls` | 10 | `DEEP_RESEARCH_MAX_TOOL_CALLS` (6) |
+| `*_model_max_tokens` | 8192–10000 | `DEEP_RESEARCH_MAX_TOKENS` (8192) |
+
+All `DEEP_RESEARCH_*` vars are registered in IMPLEMENTATION.md §6 and `.env.example`.
+
+## Non-obvious facts (each cost a debugging round-trip — do not re-guess)
+
+- **`Configuration.from_runnable_config` reads `os.environ[FIELD.upper()]` *before* the
+  `configurable` dict.** A stray `RESEARCH_MODEL` or `SEARCH_API` in the environment
+  silently overrides our config. This is why every knob is namespaced `DEEP_RESEARCH_*`
+  rather than reusing the upstream field names.
+
+- **Ollama's `base_url` is not configurable, so it is wired through `$OLLAMA_HOST`.**
+  `Configuration` makes only `model` / `max_tokens` / `api_key` configurable.
+  `init_chat_model("ollama:<tag>")` builds a `ChatOllama` with `base_url=None`, and the
+  ollama SDK then falls back to `host or os.getenv("OLLAMA_HOST")`. `run_deep_research`
+  therefore sets `os.environ["OLLAMA_HOST"] = ollama_client._HOST` before streaming.
+
+- **`max_tokens` is a no-op on Ollama.** `ChatOllama` bounds output with `num_predict`;
+  `max_tokens` is accepted and ignored. `DEEP_RESEARCH_MAX_TOKENS` sets the upstream
+  config fields (which feed upstream's token-limit retry logic) but does not bound
+  generation. Don't "fix" this by patching the vendored tree.
+
+- **Web citations arrive via `raw_notes`, not via tool messages.** `supervisor_tools`
+  runs the researcher subgraphs with `researcher_subgraph.ainvoke(...)` — they are not
+  wired as graph nodes — so their `web_search` `ToolMessage`s never reach the parent
+  stream, *even with `subgraphs=True`*. What does come back is `raw_notes`: the
+  concatenated researcher tool output, still carrying upstream's
+  `--- SOURCE n: <title> ---` / `URL: <url>` blocks. That is what
+  `_extract_sources` parses into the per-URL citation cards.
+
+- **Parent nodes replay their subgraph's state.** The `research_supervisor` update
+  re-emits every supervisor message the subgraph already streamed, so the same thought
+  or tool call arrives two or three times. `_step_key` de-duplicates before yielding.
+
+- **`final_report_generation` never raises.** It catches its own exceptions and returns
+  them *as the report string* (`"Error generating final report: …"`), so a failed run
+  looks like a successful one. The fallback check tests that prefix explicitly.
+
+- **Failure falls back to Quick, it does not error.** Small local models are weak at the
+  structured output and tool calling this graph leans on. On any graph exception, an
+  empty report, or the error-prefix above, `run_deep_research` emits a `notice` step and
+  then delegates to `agent.run_research_agent`, so the user still gets an answer. The
+  Research page renders `notice` as `st.warning`.
+
+## Integration seams
+
+- **Step-dict contract.** `run_deep_research(question, wiki_context="") -> Generator[dict]`
+  emits the same shapes as `src/agent.py:3-9`, plus `{"type": "notice"}` for the
+  mode-level fallback, and an extra `sources: [{url, title}]` key on `tool_result` /
+  `final_answer`. `wiki_context` is ignored by Deep mode itself (it is web-only) and
+  passed through only to the Quick fallback, so `app._run_research_stream` can dispatch
+  to either mode with one call signature.
+
+- **Sync/async bridge.** The graph is natively async; Streamlit reruns are synchronous.
+  `_astream_sync` creates a private event loop, pumps `astream(..., stream_mode="updates",
+  subgraphs=True)` one event at a time via `run_until_complete(agen.__anext__())`, and
+  closes the loop in a `finally`. No background thread, no queue. This is the approved
+  async exception (IMPLEMENTATION.md §5).
+
+- **Report persistence.** `_save_report` writes `comparisons/report-<slug>.md` with the
+  same frontmatter shape as the Quick path's `tools._submit_final_impl`, stamped through
+  `okf.apply_to_page`, so the Research page reads it back unchanged.
+
+- **Language pinning.** `lang.response_directive(question)` is appended to the user turn
+  via `prompts.DEEP_RESEARCH_QUESTION`, so it reaches both the research brief and the
+  final report. Prompt strings stay in `src/prompts.py`; the vendored node prompts are
+  not edited.
+
+## Verification
+
+Covered by `tests/test_deep_research_agent.py` (18 tests). `_astream_sync` is the seam —
+tests script `(node, delta)` events, so the graph itself never runs: event mapping,
+`raw_notes` citation extraction, replay de-duplication, report persistence, the
+fallback contract, and event-loop cleanup.
+
+End-to-end, confirmed on `gemma4:e4b` with `OPENAI_API_KEY` unset: a current-events
+question streams brief → `think_tool` → `ConductResearch` ×2 → `web_search` results →
+report, yielding 15 unique web citations and a saved `comparisons/` report, served by
+local Ollama throughout (`ollama_client.loaded_model()`).
+
+## Known limits
+
+- **Concurrency is not speedup.** Ollama serialises requests on a single model; raising
+  `DEEP_RESEARCH_CONCURRENCY` costs VRAM without buying wall-clock.
+- **The supervisor sometimes skips research entirely** on a small model, writing the
+  report from model knowledge with no web sources (observed on `gemma4:e4b`). The run
+  still succeeds, so the fallback does not trigger — the citation panel being empty is
+  the tell. A stronger tool-calling tag is the mitigation.
+- **The vendored tree emits deprecation warnings** under LangChain/LangGraph 1.x
+  (`config_schema`, `input`/`output`, pydantic `Field(metadata=…)`). Functional today;
+  it will break at LangGraph 2.0 and need a re-vendor.
 
 ## Non-goals
 
 - No wiki/raw grounding, no hybrid, no `CHAT_TOOLS` changes — Deep mode is web-only.
 - No replacement of the Quick researcher (`src/agent.py`).
-- This document is design only; it does not build `src/deep_research_agent.py` or add the dependency.

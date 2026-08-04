@@ -180,7 +180,7 @@ wiki_engine.lint()
   → return report string
 ```
 
-### Deep researcher (Research page, `src/agent.py`)
+### Deep researcher (Research page → **Quick** mode, `src/agent.py`)
 
 Ported from `ToHeinAC/deepagents_ollama`. LangGraph `StateGraph` over `MessagesState`, two nodes:
 
@@ -202,8 +202,35 @@ Quality gates and recursion cap are env-tunable (`RESEARCH_MIN_SEARCHES`, `RESEA
 
 The report is pinned to the query's language: `run_research_agent` detects it once via `lang.response_directive(question)` and injects the native-language directive into the system prompt, the budget nudge, and the stall fallback (`src/chat_agent.py` does the same for deep chat). Citations, `§`/`#` markers, and numbers stay verbatim.
 
+### Deep Research, web mode (Research page → **Deep** mode, `src/deep_research_agent.py`)
+
+The Research page's second agent, chosen by a `Quick` / `Deep` segmented control. Instead of one
+ReAct loop it runs a supervisor pipeline — the **vendored, unmodified** `open_deep_research` graph
+(`src/vendor/`, MIT, pinned commit):
+
+```
+START → write_research_brief → research_supervisor → final_report_generation → END
+                                     │
+                                     └─ supervisor ⇄ supervisor_tools
+                                                      └─ asyncio.gather → N × researcher_subgraph
+                                                            (researcher → researcher_tools → compress_research)
+```
+
+`deep_research_agent.py` only configures and adapts it: all four upstream model roles are pinned to
+local Ollama, clarification is disabled (the page is one-shot), budgets come from `DEEP_RESEARCH_*`,
+and graph events are mapped onto the same step-dict contract the Quick path emits.
+
+The two modes differ in kind, not degree: **Quick is local-first** (wiki → raw → web for gaps),
+**Deep is web-only** — it never reads the wiki or `data/raw/`, and its citations are web URLs. On
+any graph failure Deep emits a `notice` step and falls back to Quick rather than erroring.
+
+This is the one place `asyncio` appears (the vendored graph gathers its researcher subgraphs); the
+async surface is confined to `src/vendor/`, and `run_deep_research` re-exposes it as a plain sync
+generator over a private event loop. Full internals, configuration table, and the non-obvious
+upstream behaviours are in [deep_research.md](deep_research.md).
+
 ## Concurrency & state
 
-Synchronous everywhere except the agent I/O layer. `tavily_search`, `fetch_webpage_content`, `wiki_search`, `wiki_read`, `raw_search`, and `raw_read` fan out across a `concurrent.futures.ThreadPoolExecutor` (size = `RESEARCH_PARALLELISM`, default 4 — shared by research and chat tools). LLM calls remain sequential — local single-GPU; parallel LLM calls would just queue. No asyncio at any boundary.
+Synchronous everywhere except the agent I/O layer and the vendored Deep-Research graph (above). `tavily_search`, `fetch_webpage_content`, `wiki_search`, `wiki_read`, `raw_search`, and `raw_read` fan out across a `concurrent.futures.ThreadPoolExecutor` (size = `RESEARCH_PARALLELISM`, default 4 — shared by research and chat tools). LLM calls remain sequential — local single-GPU; parallel LLM calls would just queue. No asyncio at any boundary except Deep Research, where the vendored graph's `asyncio.gather` stays behind `run_deep_research`'s sync generator; the same single-GPU reality applies, so `DEEP_RESEARCH_CONCURRENCY` defaults to 1.
 
 State is files + JSON only — no database, no cache (PRD §4.4).
