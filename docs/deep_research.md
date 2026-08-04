@@ -175,6 +175,23 @@ All `DEEP_RESEARCH_*` vars are registered in IMPLEMENTATION.md §6 and `.env.exa
   same frontmatter shape as the Quick path's `tools._submit_final_impl`, stamped through
   `okf.apply_to_page`, so the Research page reads it back unchanged.
 
+  **Frontmatter must be YAML-serialised, never f-string interpolated.** Both writers use
+  `frontmatter.Post(...)` + `frontmatter.dumps(...)`. Hand-built `title: "{question}"`
+  breaks on any question containing a double quote (`… the thesis "potential 100x
+  baggers"`), and the failure is silent in three stages: `okf.apply_to_page` catches the
+  parse error and **fails open**, writing the invalid YAML through unchanged; the write
+  succeeds so a valid-looking `report_path` comes back; and `wiki_engine.read_page_parsed`
+  then raises when the page is read back. The UI used to swallow that and render nothing.
+  A missing file is *not* the same case — `read_page_parsed` returns a "Page not found"
+  string rather than raising, so it would have been visible.
+
+- **The report text is never lost to a file problem.** The `final_answer` step carries the
+  report in `content`; the file is only a nicer-formatted copy. `app._run_research_stream`
+  falls back to the in-memory text if read-back fails, and a post-run safety net sets
+  `last_research_error` whenever a run finishes with neither an answer nor an error — the
+  result and error blocks are the only places the trace is rendered, so without it a
+  failed run showed a completely blank page.
+
 - **Language pinning.** `lang.response_directive(question)` is appended to the user turn
   via `prompts.DEEP_RESEARCH_QUESTION`, so it reaches both the research brief and the
   final report. Prompt strings stay in `src/prompts.py`; the vendored node prompts are
