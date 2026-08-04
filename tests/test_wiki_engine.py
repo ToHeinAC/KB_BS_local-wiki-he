@@ -98,6 +98,65 @@ def test_ingest_creates_wiki_files(wiki_dir, monkeypatch):
     assert (wiki_dir / "concept-alpha.md").exists()
 
 
+def _mock_ingest_llm(monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    return mock
+
+
+# --- ingest_as_source: research answers registered as real source documents ---
+
+def test_ingest_as_source_registers_a_raw_document(wiki_dir, monkeypatch):
+    """Plain ingest() leaves a `source::` graph node with no file behind it.
+    ingest_as_source writes to data/raw/ + the manifest so the source is real."""
+    import dedup
+    _mock_ingest_llm(monkeypatch)
+    res = wiki_engine.ingest_as_source("some text", "Research: SWOT on Repositrak")
+    assert res["duplicate"] is False
+    assert res["source_name"] == "research-swot-on-repositrak.md"
+    raw = wiki_dir.parent / "raw" / res["source_name"]
+    assert raw.exists() and raw.read_text() == "some text"
+    assert dedup.list_sources() == [res["source_name"]]
+
+
+def test_plain_ingest_leaves_no_raw_document(wiki_dir, monkeypatch):
+    """Contrast case — this is the behaviour the new option opts out of."""
+    import dedup
+    _mock_ingest_llm(monkeypatch)
+    wiki_engine.ingest("some text", "Research: SWOT on Repositrak")
+    assert dedup.list_sources() == []
+    assert not list((wiki_dir.parent / "raw").glob("*.md"))
+
+
+def test_ingest_as_source_is_idempotent_on_identical_text(wiki_dir, monkeypatch):
+    import dedup
+    _mock_ingest_llm(monkeypatch)
+    wiki_engine.ingest_as_source("same body", "Research: X")
+    again = wiki_engine.ingest_as_source("same body", "Research: X")
+    assert again["duplicate"] is True and again["source_name"] is None
+    assert len(dedup.list_sources()) == 1
+
+
+def test_ingest_as_source_uses_the_name_that_landed_on_disk(wiki_dir, monkeypatch):
+    """register_file renames on filename collision; the wiki must be told the
+    real name or its `sources:` would point at the wrong document."""
+    _mock_ingest_llm(monkeypatch)
+    (wiki_dir.parent / "raw").mkdir(parents=True, exist_ok=True)
+    (wiki_dir.parent / "raw" / "research-x.md").write_text("a different file")
+    res = wiki_engine.ingest_as_source("new body", "Research: X")
+    assert res["source_name"] != "research-x.md"
+    assert (wiki_dir.parent / "raw" / res["source_name"]).read_text() == "new body"
+
+
+def test_ingest_as_source_graph_source_node_points_at_a_real_file(wiki_dir, monkeypatch):
+    _mock_ingest_llm(monkeypatch)
+    res = wiki_engine.ingest_as_source("some text", "Research: SWOT on Repositrak")
+    sources = [n for n in wiki_engine.build_typed_graph()["nodes"] if n["type"] == "source"]
+    assert [n["label"] for n in sources] == [res["source_name"]]
+    assert (wiki_dir.parent / "raw" / sources[0]["label"]).exists()
+
+
 def test_ingest_returns_created_list(wiki_dir, monkeypatch):
     mock = MagicMock()
     mock.generate.return_value = {"response": _INGEST_RESPONSE}

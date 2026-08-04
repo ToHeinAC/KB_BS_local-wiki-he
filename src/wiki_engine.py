@@ -874,6 +874,37 @@ def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
     return ingest_end(ctx)
 
 
+def _source_slug(text: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", (text or "source").lower()).strip("-")
+    return (s or "source")[:60]
+
+
+def ingest_as_source(text: str, title: str, user_meta: dict | None = None) -> dict:
+    """Register `text` in `data/raw/` as a first-class source, then ingest it.
+
+    Plain `ingest()` synthesises wiki pages against a source *name* that has no
+    document behind it. Chunks, qa pairs and the BM25 index do get built, but
+    `data/raw/` and the manifest do not — so `raw_read` cannot open it,
+    `delete_source` cannot cascade it, it never appears in the Maintenance
+    source list, and the typed graph's `source::` node points at a file that
+    does not exist. This variant writes the markdown through `dedup` first, so
+    the result is indistinguishable from an uploaded document.
+
+    Returns the usual ingest result plus `source_name` and `duplicate`.
+    """
+    data = text.encode("utf-8")
+    if dedup.is_duplicate(data):
+        return {"created": [], "updated": [], "contradictions": [], "affected": [],
+                "chunks": 0, "source_name": None, "duplicate": True}
+    # register_file renames on filename collision (appends a hash), so the wiki
+    # must be told the name that actually landed on disk.
+    saved = dedup.register_file(data, f"{_source_slug(title)}.md")
+    result = ingest(text, saved.name, user_meta)
+    result["source_name"] = saved.name
+    result["duplicate"] = False
+    return result
+
+
 def rebuild_lex_index() -> dict:
     """Rebuild the BM25 index from all persisted chunks. Returns a summary."""
     return lex_index.build()

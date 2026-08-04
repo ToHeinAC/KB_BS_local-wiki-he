@@ -593,6 +593,7 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
     st.session_state["last_research_steps"] = []
     st.session_state["last_research_metrics"] = None
     st.session_state.pop("research_saved", None)
+    st.session_state.pop("research_saved_note", None)
     _interpreted = question_to_run if question_to_run.strip() != display_q.strip() else None
     st.session_state["last_research_interpreted"] = _interpreted
     st.markdown(f"**Research question:** {display_q}")
@@ -1414,6 +1415,7 @@ elif page == "Research":
             for _k in ("research_history", "last_research_q", "last_research_answer",
                        "last_research_interpreted", "last_report", "research_sources",
                        "last_research_error", "research_followup_input", "research_saved",
+                       "research_saved_note",
                        "last_research_steps", "last_research_metrics"):
                 st.session_state.pop(_k, None)
             st.rerun()
@@ -1478,17 +1480,35 @@ elif page == "Research":
                 use_container_width=True,
             )
             if st.session_state.get("research_saved"):
-                _save_col.success("Saved to wiki.")
+                _save_col.success(st.session_state.get("research_saved_note", "Saved to wiki."))
             elif _save_col.button("Save to wiki", key="save_research_btn",
                                   use_container_width=True,
                                   help="Ingest this result into the wiki as new/updated pages."):
                 with st.spinner("Ingesting result into wiki…"):
                     try:
-                        wiki_engine.ingest(_ans, f"Research: {st.session_state['last_research_q'][:60]}")
+                        _title = st.session_state["last_research_q"][:60]
+                        if st.session_state.get("research_save_as_source"):
+                            _res = wiki_engine.ingest_as_source(_ans, f"Research: {_title}")
+                            st.session_state["research_saved_note"] = (
+                                "Already registered as a source." if _res["duplicate"]
+                                else f"Saved as source `{_res['source_name']}`.")
+                        else:
+                            wiki_engine.ingest(_ans, f"Research: {_title}")
+                            st.session_state["research_saved_note"] = "Saved to wiki."
                         st.session_state["research_saved"] = True
                         st.rerun()
                     except Exception as exc:
                         st.error(f"Save to wiki failed: {exc}")
+            st.checkbox(
+                "Register as a source document",
+                key="research_save_as_source",
+                help="Also writes the report into data/raw/ and the manifest, so it "
+                     "behaves like an uploaded file: raw_read can open it, Deep chat "
+                     "can ground on it, Maintenance → Delete source removes it, and "
+                     "the graph's source node points at a document that exists. "
+                     "Unchecked, only wiki pages are written and the source node is a "
+                     "name with no file behind it.",
+            )
             st.markdown("---")
             _render_research_trace(st.session_state.get("last_research_steps"))
         elif st.session_state.get("last_research_error"):
