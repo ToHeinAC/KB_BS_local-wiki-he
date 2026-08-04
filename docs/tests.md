@@ -11,7 +11,7 @@ author: Tobias Hein
 
 ## Cap (relaxed)
 
-**Originally capped at 100; cap relaxed 2026-05. Current suite 441 tests (438 passing)** (canonical count: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §5). The original cap was relaxed in 2026-05 when the retrieval layer (chunker, lex_index, extractor, qa_gen) added 30 high-signal unit + end-to-end tests; Tier A ingest speedup added 5 more (qa_gen cap, anchored-preference selection, begin/piece/end roundtrip, single-select assertion, back-compat wrapper); the non-Markdown upload converter (`md_convert`) added 10 (plus a `dedup` content-param test); the Stage D cross-encoder (`rerank`) added 14, all mocked so the suite needs no GGUF. The relaxation principle: the cap exists to discourage low-value proliferation; whole new modules with verifiable behaviour are exempt.
+**Originally capped at 100; cap relaxed 2026-05. Current suite 446 tests (443 passing)** (canonical count: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §5). The original cap was relaxed in 2026-05 when the retrieval layer (chunker, lex_index, extractor, qa_gen) added 30 high-signal unit + end-to-end tests; Tier A ingest speedup added 5 more (qa_gen cap, anchored-preference selection, begin/piece/end roundtrip, single-select assertion, back-compat wrapper); the non-Markdown upload converter (`md_convert`) added 10 (plus a `dedup` content-param test); the Stage D cross-encoder (`rerank`) added 14, all mocked so the suite needs no GGUF. The relaxation principle: the cap exists to discourage low-value proliferation; whole new modules with verifiable behaviour are exempt.
 
 ## Allocation
 
