@@ -38,7 +38,7 @@ State-of-implementation reference for **LocalWiki** — a local, Python-based, K
 | `src/auth.py` (users + bcrypt) | **Done** |
 | `src/lang.py` (DE/EN detection + language directives) | **Done** |
 | `src/metadata_extract.py` (regex effective-date detection) | **Done** |
-| Test suite | **Done** (405 tests, 402 passing — see §5 and [`docs/tests.md`](docs/tests.md)) |
+| Test suite | **Done** (436 tests, 433 passing — see §5 and [`docs/tests.md`](docs/tests.md)) |
 | `.streamlit/config.toml` | **Done** |
 | `tunnel.sh` (Cloudflare quick tunnel) | **Done** |
 
@@ -130,7 +130,7 @@ The mockup simplifies a few planned details — tracked here so future iteration
 - **No async** unless UI stack requires it at boundaries (PRD §4.4). **Scoped exception:** Deep Research (web mode). The vendored `open_deep_research` graph is natively async (`asyncio.gather` across researcher subgraphs) and is adopted as-is; the async surface is confined to `src/vendor/`, and `deep_research_agent.run_deep_research` re-exposes it as a plain sync generator over a private event loop, so nothing else in the app sees `await`.
 - **All modules in `src/`**, one file per module, no sub-packages (PRD §4.4). Prompts in `src/prompts.py`. **Scoped exception:** `src/vendor/` holds vendored third-party source (currently `open_deep_research`) as a package; it is not domain code and is never hand-edited — see [`src/vendor/README.md`](src/vendor/README.md).
 - **`uv` only** for env + deps (PRD §5.3).
-- **Test suite: 429 tests, no hard cap** — the source-of-truth count. PRD §4.5's original 100-cap was superseded 2026-05 (new modules with verifiable behaviour are exempt); keep the suite lean and high-signal, no low-value proliferation.
+- **Test suite: 436 tests, no hard cap** — the source-of-truth count. PRD §4.5's original 100-cap was superseded 2026-05 (new modules with verifiable behaviour are exempt); keep the suite lean and high-signal, no low-value proliferation.
 - **NYT editorial UI style** (PRD §2.4).
 - **Apache-2.0 / MIT-compatible licensing** (CLAUDE.md §5.4).
 - **Streamlit port: 8520** (8511 reserved for another app on this host), served

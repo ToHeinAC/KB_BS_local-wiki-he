@@ -108,6 +108,23 @@ All `DEEP_RESEARCH_*` vars are registered in IMPLEMENTATION.md §6 and `.env.exa
   them *as the report string* (`"Error generating final report: …"`), so a failed run
   looks like a successful one. The fallback check tests that prefix explicitly.
 
+- **`ResearchComplete` is a zero-field sentinel, not a broken call.** It is a pydantic model
+  with **no fields** (`state.py`), so its `args` are correctly and always `{}`; and
+  `supervisor_tools` matches on its *name* and jumps straight to `END` without appending a
+  `ToolMessage`, so it is the one tool call that never gets a result. Empty args + no result is
+  the expected shape. The adapter marks it `terminal: True` and attaches an explanatory `note`
+  (`TOOL_NOTES`) so the UI renders "research phase finished" instead of `ResearchComplete — {}`,
+  which reads as a failure. Note it is only *one* of three exit paths — the supervisor may also
+  stop by emitting no tool calls, or by exceeding `max_researcher_iterations`, in which case no
+  `ResearchComplete` appears in the trace at all.
+
+- **Search effort is counted from tool output, not tool calls.** The researcher subgraphs never
+  stream, so `tavily_search` invocations are invisible; `compress_research`'s prose "queries I
+  ran" list is LLM-written and unreliable. `_SEARCH_CALL_RE` counts `Search results:` /
+  `No valid search results found` headers in `raw_notes` — upstream emits exactly one per
+  `tavily_search` call. The number of *queries* inside a batched call is not recoverable: the
+  formatted output drops the per-result `query` field.
+
 - **Failure falls back to Quick, it does not error.** Small local models are weak at the
   structured output and tool calling this graph leans on. On any graph exception, an
   empty report, or the error-prefix above, `run_deep_research` emits a `notice` step and
@@ -118,10 +135,35 @@ All `DEEP_RESEARCH_*` vars are registered in IMPLEMENTATION.md §6 and `.env.exa
 
 - **Step-dict contract.** `run_deep_research(question, wiki_context="") -> Generator[dict]`
   emits the same shapes as `src/agent.py:3-9`, plus `{"type": "notice"}` for the
-  mode-level fallback, and an extra `sources: [{url, title}]` key on `tool_result` /
-  `final_answer`. `wiki_context` is ignored by Deep mode itself (it is web-only) and
-  passed through only to the Quick fallback, so `app._run_research_stream` can dispatch
-  to either mode with one call signature.
+  mode-level fallback. Additive keys the Quick path does not set, all optional so the
+  shared renderer stays backward-compatible:
+
+  | Key | On | Meaning |
+  |---|---|---|
+  | `label` | `thought` | Expander title — `Research brief` / `Sub-topic findings` / `Supervisor reasoning` |
+  | `note` | `tool_call`, `tool_result` | Plain-English gloss of the tool (`TOOL_NOTES`) |
+  | `terminal` | `tool_call` | `True` only for `ResearchComplete` (see above) |
+  | `sources` | `tool_result`, `final_answer` | `[{url, title}]` citation cards |
+  | `searches` | `tool_result` | `tavily_search` calls represented by this result |
+  | `metrics` | `final_answer` | `{tasks, searches, sources_checked, sources_cited}` |
+
+  `wiki_context` is ignored by Deep mode itself (it is web-only) and passed through only
+  to the Quick fallback, so `app._run_research_stream` can dispatch to either mode with
+  one call signature.
+
+- **Trace + metrics in the UI.** `app._render_research_step` is shared between the live
+  stream and the replay from `st.session_state["last_research_steps"]`, so the trace
+  survives the caller's `st.rerun()` instead of vanishing. Intermediate results
+  (thoughts, tool results) render as **collapsed** `st.expander`s; one-line control-flow
+  steps stay inline. `_render_research_metrics` shows the run's key figures as
+  `st.metric` tiles, dropping **Sources checked** when it would merely repeat **Web
+  searches**. Because `st.expander` cannot nest, the trace is a flat sequence of
+  expanders under a heading rather than one outer expander.
+
+- **De-duplication is content-based.** `_step_key` keys text-bearing steps on their body
+  alone: `supervisor_tools` re-wraps each researcher's `compressed_research` in a
+  `ConductResearch` `ToolMessage`, so the identical text would otherwise appear twice —
+  once as the labelled thought, once as a tool result.
 
 - **Sync/async bridge.** The graph is natively async; Streamlit reruns are synchronous.
   `_astream_sync` creates a private event loop, pumps `astream(..., stream_mode="updates",
@@ -140,10 +182,11 @@ All `DEEP_RESEARCH_*` vars are registered in IMPLEMENTATION.md §6 and `.env.exa
 
 ## Verification
 
-Covered by `tests/test_deep_research_agent.py` (18 tests). `_astream_sync` is the seam —
-tests script `(node, delta)` events, so the graph itself never runs: event mapping,
-`raw_notes` citation extraction, replay de-duplication, report persistence, the
-fallback contract, and event-loop cleanup.
+Covered by `tests/test_deep_research_agent.py` (25 tests). `_astream_sync` is the seam —
+tests script `(node, delta)` events, so the graph itself never runs: event mapping, trace
+labels, `raw_notes` citation extraction, replay and content de-duplication, the
+`ResearchComplete` sentinel, metric counting, report persistence, the fallback contract,
+and event-loop cleanup.
 
 End-to-end, confirmed on `gemma4:e4b` with `OPENAI_API_KEY` unset: a current-events
 question streams brief → `think_tool` → `ConductResearch` ×2 → `web_search` results →
@@ -156,8 +199,9 @@ local Ollama throughout (`ollama_client.loaded_model()`).
   `DEEP_RESEARCH_CONCURRENCY` costs VRAM without buying wall-clock.
 - **The supervisor sometimes skips research entirely** on a small model, writing the
   report from model knowledge with no web sources (observed on `gemma4:e4b`). The run
-  still succeeds, so the fallback does not trigger — the citation panel being empty is
-  the tell. A stronger tool-calling tag is the mitigation.
+  still succeeds, so the fallback does not trigger — an all-zero metrics row
+  (0 sub-tasks, 0 searches, 0 sources cited) is the tell. A stronger tool-calling tag is
+  the mitigation.
 - **The vendored tree emits deprecation warnings** under LangChain/LangGraph 1.x
   (`config_schema`, `input`/`output`, pydantic `Field(metadata=…)`). Functional today;
   it will break at LangGraph 2.0 and need a re-vendor.
