@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
+import frontmatter
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 
@@ -563,11 +564,14 @@ def _submit_final_impl(title: str, answer: str) -> str:
     filename = f"report-{_slug(title)}.md"
     all_sources = (sorted(urls) + sorted(f"wiki:{w}" for w in wiki_cites)
                    + sorted(f"src:{r}" for r in raw_cites))
-    body = (
-        f'---\ntitle: "{title}"\ntype: report\ncreated: "{date}"\n'
-        f"sources: {all_sources}\n---\n\n{answer}"
-    )
-    (dest_dir / filename).write_text(okf.apply_to_page(body, db=db_context.get_active_db()))
+    # Serialised by the YAML writer, not f-string interpolated: an LLM-supplied
+    # title containing a quote or colon would otherwise emit invalid YAML, which
+    # okf.apply_to_page passes through unchanged and read_page_parsed then
+    # cannot load — the report is written but unreadable.
+    post = frontmatter.Post(answer, title=title, type="report",
+                            created=date, sources=all_sources)
+    (dest_dir / filename).write_text(
+        okf.apply_to_page(frontmatter.dumps(post), db=db_context.get_active_db()))
     return (
         f"ACCEPTED: comparisons/{filename} ({words} words, "
         f"{len(urls)} urls, {len(wiki_cites)} wiki cites, {len(raw_cites)} source cites)"

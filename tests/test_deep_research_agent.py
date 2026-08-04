@@ -191,6 +191,29 @@ def test_final_answer_carries_report_and_saved_path(monkeypatch, wiki_dir):
     assert "https://example.org/a" in body
 
 
+@pytest.mark.parametrize("question", [
+    'SWOT on Repositrak for the thesis "potential 100x baggers")',  # the reported break
+    "Colons: everywhere: in the question",
+    "Apostrophe's and \"quotes\" together",
+    "Plain question with no special characters",
+])
+def test_saved_report_is_always_readable_back(question, wiki_dir):
+    """Frontmatter must be YAML-serialised, not f-string interpolated.
+
+    A question containing a double quote used to emit `title: "... "x" ..."`,
+    which is invalid YAML. `okf.apply_to_page` fails open and writes it through
+    unchanged, so the report landed on disk but `read_page_parsed` could not
+    load it — and the Research page rendered a blank result.
+    """
+    import wiki_engine
+    path = dra._save_report(question, "# R\n\nBody text.\n",
+                            [{"title": "A", "url": "https://example.org/a"}])
+    assert path is not None
+    parsed = wiki_engine.read_page_parsed("comparisons/" + path.split("comparisons/")[-1])
+    assert "Body text." in parsed["content"]
+    assert parsed["sources"] == ["https://example.org/a"]
+
+
 def test_final_answer_sources_are_deduped_by_url(monkeypatch, wiki_dir):
     tm = ToolMessage(content=TAVILY_RESULT, name="web_search", tool_call_id="1")
     _script(monkeypatch, [

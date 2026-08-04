@@ -34,6 +34,7 @@ import re
 from datetime import datetime, timezone
 from typing import Generator
 
+import frontmatter
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
@@ -142,19 +143,28 @@ def _slug(text: str) -> str:
 
 def _save_report(question: str, report: str, sources: list[dict]) -> str | None:
     """Persist the report to `comparisons/` in the same shape as the Quick path
-    (`tools._submit_final_impl`), so the Research page reads it back unchanged."""
+    (`tools._submit_final_impl`), so the Research page reads it back unchanged.
+
+    The frontmatter is **serialised by the YAML writer, never f-string
+    interpolated**. A question like `... the thesis "potential 100x baggers"`
+    embeds a double quote; hand-built `title: "{question}"` then emits invalid
+    YAML, `okf.apply_to_page` fails open and writes it through unchanged, and
+    the page becomes unreadable — which the Research page used to render as a
+    blank result.
+    """
     try:
         dest_dir = db_context.wiki_dir() / "comparisons"
         dest_dir.mkdir(parents=True, exist_ok=True)
         filename = f"report-{_slug(question)}.md"
-        date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        urls = sorted({s["url"] for s in sources})
-        body = (
-            f'---\ntitle: "{question[:120]}"\ntype: report\ncreated: "{date}"\n'
-            f"sources: {urls}\n---\n\n{report}"
+        post = frontmatter.Post(
+            report,
+            title=question[:120],
+            type="report",
+            created=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            sources=sorted({s["url"] for s in sources}),
         )
         (dest_dir / filename).write_text(
-            okf.apply_to_page(body, db=db_context.get_active_db())
+            okf.apply_to_page(frontmatter.dumps(post), db=db_context.get_active_db())
         )
         return f"comparisons/{filename}"
     except Exception:

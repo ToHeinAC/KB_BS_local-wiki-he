@@ -621,21 +621,30 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                 _record_research_urls(step)
                 st.session_state["last_research_metrics"] = step.get("metrics")
                 st.success("Research complete.")
+                # The agent already handed us the report text; the file is only
+                # a nicer-formatted copy. Never let a read-back problem lose the
+                # answer — fall back to what is in memory and say so.
+                _inline = step.get("content", "")
                 if step.get("report_path"):
                     st.session_state["last_report"] = step["report_path"]
                     try:
                         _rel = "comparisons/" + step["report_path"].split("comparisons/")[-1]
-                        st.session_state["last_research_answer"] = wiki_engine.read_page_parsed(_rel)["content"]
-                    except Exception:
-                        st.session_state["last_research_answer"] = ""
-                else:
-                    st.session_state["last_research_answer"] = step.get("content", "")
-                    if not step.get("content", "").strip():
-                        st.warning("Agent completed but produced no answer text.")
-                        st.session_state["last_research_error"] = (
-                            "The agent finished but produced no answer text. "
-                            "Try rephrasing the question, or click 🆕 New research."
+                        _saved = wiki_engine.read_page_parsed(_rel)["content"]
+                    except Exception as _exc:
+                        _saved = ""
+                        st.warning(
+                            f"Saved report could not be re-read ({type(_exc).__name__}); "
+                            "showing the result as produced."
                         )
+                    st.session_state["last_research_answer"] = _saved or _inline
+                else:
+                    st.session_state["last_research_answer"] = _inline
+                if not st.session_state["last_research_answer"].strip():
+                    st.warning("Agent completed but produced no answer text.")
+                    st.session_state["last_research_error"] = (
+                        "The agent finished but produced no answer text. "
+                        "Try rephrasing the question, or click 🆕 New research."
+                    )
                 st.session_state.setdefault("research_history", []).append({
                     "q": display_q,
                     "a": st.session_state.get("last_research_answer", ""),
@@ -643,6 +652,18 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                     "report": (("comparisons/" + step["report_path"].split("comparisons/")[-1])
                                if step.get("report_path") else None),
                 })
+    # Safety net: the result block renders on `last_research_answer`, and the
+    # error block on `last_research_error`. If a run somehow sets neither
+    # (e.g. the generator ends without a terminal step), the page would come
+    # back completely empty — no answer, no reason, and not even the trace,
+    # since that is rendered inside those two branches. Never leave the user
+    # with a blank page.
+    if not (st.session_state.get("last_research_answer", "").strip()
+            or st.session_state.get("last_research_error", "").strip()):
+        st.session_state["last_research_error"] = (
+            "The run ended without producing a result. The agent trace below "
+            "shows how far it got — try rephrasing, or click 🆕 New research."
+        )
     # Search-ladder audit for the finished run (per-source scores vs τ).
     st.session_state["last_research_audit"] = tools.current_run_audit()
 

@@ -120,6 +120,23 @@ def test_submit_accepts_file_source_citations(tmp_path, monkeypatch):
     assert "src:StrlSchG.md § 78" in written
 
 
+def test_submit_report_survives_a_quoted_title(tmp_path, monkeypatch):
+    """Frontmatter is YAML-serialised, not f-string interpolated. An LLM title
+    containing a quote or colon used to emit invalid YAML that okf passes
+    through unchanged, leaving a report on disk that could not be read back."""
+    import frontmatter as _fm
+    monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
+    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "MIN_URLS", 2)
+    title = 'Thesis: "potential 100x baggers")'
+    out = tools._submit_final_impl(title, "alpha beta gamma http://a.com http://b.com")
+    assert out.startswith("ACCEPTED")
+    path = tmp_path / "comparisons" / out.split("comparisons/")[1].split(" ")[0]
+    post = _fm.load(str(path))           # would raise ParserError before the fix
+    assert post.metadata["title"] == title
+    assert "alpha beta gamma" in post.content
+
+
 def test_submit_does_not_double_count_url_source_citations(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
