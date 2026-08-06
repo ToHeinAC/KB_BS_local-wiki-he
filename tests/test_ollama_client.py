@@ -71,6 +71,36 @@ def test_generate_raises_runtime_error_on_failure(monkeypatch):
         ollama_client.generate("s", "p")
 
 
+def test_generate_retries_with_halved_ctx_on_server_crash(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    monkeypatch.setattr(ollama_client.time, "sleep", lambda _s: None)
+    mock.generate.side_effect = [
+        Exception("llama-server process has terminated: GGML_ASSERT(...) failed"),
+        {"response": "recovered"},
+    ]
+    assert ollama_client.generate("s", "p") == "recovered"
+    assert mock.generate.call_count == 2
+    _, kwargs = mock.generate.call_args
+    assert kwargs["options"]["num_ctx"] == ollama_client._NUM_CTX // 2
+
+
+def test_generate_raises_when_retry_also_crashes(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    monkeypatch.setattr(ollama_client.time, "sleep", lambda _s: None)
+    mock.generate.side_effect = Exception("GGML_ASSERT(n_inputs < ...) failed")
+    with pytest.raises(RuntimeError, match="Ollama generate failed"):
+        ollama_client.generate("s", "p")
+    assert mock.generate.call_count == 2
+
+
+def test_generate_does_not_retry_on_ordinary_error(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.generate.side_effect = Exception("model 'nope:1b' not found")
+    with pytest.raises(RuntimeError, match="Ollama generate failed"):
+        ollama_client.generate("s", "p")
+    assert mock.generate.call_count == 1
+
+
 def test_generate_default_temperature(monkeypatch):
     mock = _make_mock(monkeypatch)
     mock.generate.return_value = {"response": "ok"}
@@ -104,7 +134,7 @@ def test_chat_passes_messages(monkeypatch):
     mock.chat.assert_called_once_with(
         model=ollama_client._MODEL,
         messages=msgs,
-        options={"temperature": 0.7},
+        options={"temperature": 0.7, "num_ctx": ollama_client._NUM_CTX},
     )
 
 

@@ -1,6 +1,7 @@
 """Thin wrapper around the Ollama SDK."""
 
 import os
+import time
 
 from dotenv import load_dotenv
 
@@ -21,7 +22,13 @@ _FAST_MODEL = os.getenv("FAST_MODEL") or _MODEL
 # ggml scheduler assert (GGML_SCHED_MAX_SPLIT_INPUTS) during ingest synthesis.
 # An ingest piece is <= MAX_INGEST_CHARS (~13K tokens) + system + output, so 32K
 # is ample while keeping the graph small enough to stay on one GPU.
+# Note the cap is per request slot: the server allocates num_ctx * OLLAMA_NUM_PARALLEL,
+# so a parallel setting > 1 silently re-inflates the graph this cap exists to shrink.
 _NUM_CTX = int(os.getenv("INGEST_NUM_CTX", "32768"))
+
+# A crashed llama-server (not a bad request) — the ggml scheduler assert above is the
+# usual cause. Ollama restarts the worker, so one retry at half the context can succeed.
+_CRASH_MARKERS = ("GGML_ASSERT", "process has terminated", "status code: 500")
 
 
 def _client():
@@ -52,15 +59,26 @@ def embed(texts: list[str], model_id: str) -> list[list[float]]:
         raise RuntimeError(f"Ollama embed failed ({model_id}): {exc}") from exc
 
 
+def _generate_once(model: str, system: str, prompt: str, temperature: float, num_ctx: int) -> str:
+    resp = _client().generate(
+        model=model,
+        system=system,
+        prompt=prompt,
+        options={"temperature": temperature, "num_ctx": num_ctx},
+    )
+    return resp["response"]
+
+
 def generate(system: str, prompt: str, temperature: float = 0.3, model_id: str | None = None) -> str:
+    model = model_id or _MODEL
     try:
-        resp = _client().generate(
-            model=model_id or _MODEL,
-            system=system,
-            prompt=prompt,
-            options={"temperature": temperature, "num_ctx": _NUM_CTX},
-        )
-        return resp["response"]
+        return _generate_once(model, system, prompt, temperature, _NUM_CTX)
+    except Exception as exc:
+        if not any(m in str(exc) for m in _CRASH_MARKERS):
+            raise RuntimeError(f"Ollama generate failed: {exc}") from exc
+    time.sleep(3)  # let Ollama respawn the worker before the half-context retry
+    try:
+        return _generate_once(model, system, prompt, temperature, _NUM_CTX // 2)
     except Exception as exc:
         raise RuntimeError(f"Ollama generate failed: {exc}") from exc
 
@@ -70,7 +88,7 @@ def chat(messages: list[dict], temperature: float = 0.7) -> str:
         resp = _client().chat(
             model=_MODEL,
             messages=messages,
-            options={"temperature": temperature},
+            options={"temperature": temperature, "num_ctx": _NUM_CTX},
         )
         return resp["message"]["content"]
     except Exception as exc:

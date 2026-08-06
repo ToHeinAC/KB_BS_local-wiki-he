@@ -163,6 +163,7 @@ The mockup simplifies a few planned details — tracked here so future iteration
 | `GRAPH_MAX_NODES` | `4000` | Guardrail for the neural renderer: above this the payload keeps the best-connected nodes and flags `truncated`. The force layout, not the analytics, is what degrades first. |
 | `TAVILY_API_KEY` | — | Required for the Research page (web search). |
 | `MAX_INGEST_CHARS` | `40000` | Chunk size for ingest; documents exceeding this are split into sequential chunks |
+| `INGEST_NUM_CTX` | `32768` | KV context cap on every `generate()`/`chat()` call — bounds the ggml compute graph so wide-graph models (gemma4:e4b) don't hit `GGML_SCHED_MAX_SPLIT_INPUTS`. Allocated *per slot*: run the server with `OLLAMA_NUM_PARALLEL=1` on a single GPU, or the cap is multiplied away. A crashed worker is retried once at half this value. |
 | `DATA_ROOT` | `data` | Root for all databases. Each DB is an isolated subtree `$DATA_ROOT/<db>/{raw,chunks,index,wiki}`; users live in `$DATA_ROOT/users.json`. Replaces the old per-dir `WIKI_DIR`/`RAW_DIR`/`CHUNKS_DIR`/`INDEX_DIR` vars (paths now derive from `db_context` + active DB). |
 | `INGEST_QA` | `1` | Run `qa_gen` during ingest (hypothetical questions). Set `0` to disable. |
 | `STALE_AFTER_DAYS` | `365` | Default freshness window: a page with no `expires_after_days` is flagged stale when `updated` is older than this. |
