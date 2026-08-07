@@ -64,20 +64,6 @@ def _show_md_dialog(title: str, content: str) -> None:
     )
 
 
-@st.dialog("Confirm ingest")
-def _confirm_ingest_dialog(db_name: str, what: str) -> None:
-    st.warning(f"Ingest **{what}** into database **{db_name}**?")
-    st.caption("The document(s) will be written to the currently selected database. "
-               "Make sure this is the right one.")
-    c1, c2 = st.columns(2)
-    if c1.button("Confirm", type="primary", key="confirm_ingest_btn"):
-        st.session_state["batch_confirmed"] = True
-        st.rerun()
-    if c2.button("Cancel", key="cancel_ingest_btn"):
-        st.session_state.pop("pending_batch", None)
-        st.rerun()
-
-
 @st.dialog("Concept", width="large")
 def _show_node_details(node_id: str, graph: dict) -> None:
     nodes_by_id = {n["id"]: n for n in graph["nodes"]}
@@ -885,7 +871,7 @@ if _db_choice != st.session_state["active_db"]:
                "last_research_q", "last_research_answer", "last_report",
                "research_sources", "last_research_steps", "last_research_metrics",
                "explorer_selected_page", "last_contradictions",
-               "pending_batch", "batch_confirmed", "batch_prepared", "batch_key",
+               "pending_batch", "batch_ingesting", "batch_prepared", "batch_key",
                "convert_editor", "chat_scope"):
         st.session_state.pop(_k, None)
     st.rerun()
@@ -1010,7 +996,13 @@ if page == "Upload":
             shared_part = st.text_input("part of", key="batch_part_of")
             shared_desc = st.text_input("description", key="batch_description")
 
-        if st.button(f"Ingest {len(prepared)} file(s) into wiki", type="primary"):
+        # The destination lives in the button label rather than a confirm dialog:
+        # a modal could not be closed reliably before the (slow) ingest ran, so it
+        # sat on screen for the whole run. Naming the DB on the button keeps the
+        # wrong-database guard without a second click.
+        _target_db = st.session_state["active_db"]
+        st.caption(f"Will be written to database **{_target_db}** — make sure this is the right one.")
+        if st.button(f"Ingest {len(prepared)} file(s) into “{_target_db}”", type="primary"):
             files = prepared
             if single_md_edit:
                 files[0]["text"] = st.session_state.get("convert_editor", files[0]["text"])
@@ -1020,10 +1012,11 @@ if page == "Upload":
                 "dates": {r["File"]: str(r.get("effective as of") or "").strip() for r in edited},
                 "shared": {"part of": shared_part.strip(), "description": shared_desc.strip()},
             }
-            _confirm_ingest_dialog(st.session_state["active_db"], f"{len(files)} file(s)")
+            st.session_state["batch_ingesting"] = True
+            st.rerun()
 
         # --- Phase 3: ordered batch ingest (oldest-first so newer supersedes) ---
-        if st.session_state.pop("batch_confirmed", False):
+        if st.session_state.pop("batch_ingesting", False):
             pending = st.session_state.pop("pending_batch", None)
             if pending:
                 files, dates, shared = pending["files"], pending["dates"], pending["shared"]
