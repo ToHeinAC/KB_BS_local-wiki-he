@@ -349,7 +349,7 @@ def run_deep_research(question: str, wiki_context: str = "") -> Generator[dict, 
     # and the ollama SDK then falls back to $OLLAMA_HOST. That env var is the
     # only seam for the host, since Configuration makes only model/max_tokens/
     # api_key configurable.
-    os.environ["OLLAMA_HOST"] = ollama_client._HOST
+    os.environ["OLLAMA_HOST"] = ollama_client.host()
 
     directive = lang.response_directive(question)
     fell_back = False

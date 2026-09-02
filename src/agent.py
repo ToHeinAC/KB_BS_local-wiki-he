@@ -48,7 +48,7 @@ FALLBACK_NOTES_CAP = int(os.getenv("RESEARCH_FALLBACK_NOTES_CAP", "12000"))
 def _build_llm():
     return ChatOllama(
         model=ollama_client._QUERY_MODEL,
-        base_url=ollama_client._HOST,
+        base_url=ollama_client.host(),
         temperature=0.3,
         timeout=LLM_TIMEOUT,
     ).bind_tools(tool_module.TOOLS)

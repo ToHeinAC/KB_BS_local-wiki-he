@@ -5,10 +5,11 @@ import time
 
 from dotenv import load_dotenv
 
+import ollama_server
+
 load_dotenv()
 
 _MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
-_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 
 # Per-role model overrides. Each defaults to _MODEL, so behaviour is unchanged
 # unless the operator sets the env var. QUERY = precision/selection calls,
@@ -31,9 +32,20 @@ _NUM_CTX = int(os.getenv("INGEST_NUM_CTX", "32768"))
 _CRASH_MARKERS = ("GGML_ASSERT", "process has terminated", "status code: 500")
 
 
+def host() -> str:
+    """Base URL of the Ollama daemon this app talks to.
+
+    Resolved on first use: a GPU-pinned daemon of our own when one can be
+    started, else the configured OLLAMA_HOST unchanged. See src/ollama_server.py.
+    Every caller must go through this — never read OLLAMA_HOST directly, or half
+    the app ends up on the split daemon.
+    """
+    return ollama_server.host()
+
+
 def _client():
     import ollama
-    return ollama.Client(host=_HOST)
+    return ollama.Client(host=host())
 
 
 def is_available() -> bool:

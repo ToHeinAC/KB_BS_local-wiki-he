@@ -362,7 +362,7 @@ def test_all_model_roles_point_at_local_ollama():
 
 def test_ollama_host_is_wired_before_the_graph_runs(monkeypatch, wiki_dir):
     monkeypatch.setenv("OLLAMA_HOST", "http://wrong:1")
-    monkeypatch.setattr(dra.ollama_client, "_HOST", "http://gpu-box:11434")
+    monkeypatch.setattr(dra.ollama_client, "host", lambda: "http://gpu-box:11434")
     _script(monkeypatch, [_report_event()])
     list(dra.run_deep_research("q?"))
     import os

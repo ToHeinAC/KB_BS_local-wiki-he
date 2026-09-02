@@ -13,7 +13,7 @@ author: Tobias Hein
 
 - **Python ≥ 3.11**
 - **`uv`** — mandatory for environment + dependency management. No `pip install -r requirements.txt` in the primary workflow (PRD §5.3).
-- **Ollama** — local LLM server, default model `gemma4:e4b`.
+- **Ollama** — local LLM server, default model `gemma4:e4b`. The app talks to a GPU-pinned daemon it starts itself on a spare port, falling back to the shared `:11434` one; see [gpu.md](gpu.md).
 
 ## Libraries
 

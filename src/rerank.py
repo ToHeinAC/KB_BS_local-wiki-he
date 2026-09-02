@@ -20,6 +20,9 @@ Two facts established by the D.0 smoke test (ideas/idea.md §5.4), both non-obvi
    running a reranker through /api/generate returns uniform noise rather than
    erroring. Do not "simplify" this module onto ollama_client.
 
+It is pinned to a single GPU (`_model_params`): llama.cpp would otherwise split
+even this small model across every card. See src/gpu_placement.py.
+
 OPTIONAL AND GRACEFUL, exactly like the semantic arm: no GGUF, no llama-cpp
 installed, or any error mid-scoring — `available()` goes False / `rerank()`
 returns the input order untouched. A down reranker must degrade ranking, never
@@ -34,6 +37,8 @@ import glob
 import os
 import threading
 from pathlib import Path
+
+import gpu_placement
 
 # Cap the document side so a long chunk can't exceed the context window. The doc
 # is truncated for SCORING only — hit text, anchors and citations are untouched.
@@ -60,6 +65,10 @@ def _preload_cuda() -> None:
     than the CPU-only build: ~11 ms/pair vs ~350 ms). No-op and harmless when the wheels
     aren't installed (CPU-only setup) — search stays correct, just slower. Load order is
     dependency order (cudart before cublas)."""
+    # CUDA reads this once, at driver init: its default ordering is fastest-first,
+    # so without it `main_gpu = N` need not select nvidia-smi's GPU N. Must be set
+    # before the runtime loads — see gpu_placement's module docstring.
+    os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
     try:
         import nvidia  # namespace package provided by the nvidia-*-cu12 wheels
     except Exception:
@@ -92,6 +101,28 @@ def available() -> bool:
     return _llama_cpp() is not None and _model_path().exists()
 
 
+def _model_params(L):
+    """Model params with a single-GPU pin when one card can hold the reranker.
+
+    llama.cpp defaults to `split_mode = LAYER`, which spreads even this ~0.6 GiB
+    cross-encoder across every card and pays a cross-device hop per scored pair —
+    a split buys capacity, and capacity is not what this model is short of. The
+    emptiest card wins, so once the pinned Ollama daemon owns one GPU the reranker
+    naturally lands on the other. `RERANK_PIN_GPU=off` restores the split.
+    """
+    params = L.llama_model_default_params()
+    try:
+        size_gib = _model_path().stat().st_size / gpu_placement.GIB
+    except OSError:
+        return params
+    placement = gpu_placement.plan(size_gib + gpu_placement.COMPUTE_OVERHEAD_GIB,
+                                   os.getenv("RERANK_PIN_GPU", "auto"))
+    if placement.is_pinned:
+        params.split_mode = L.LLAMA_SPLIT_MODE_NONE
+        params.main_gpu = placement.index
+    return params
+
+
 def _load() -> dict | None:
     """Lazily build the model + RANK-pooled context. Cached for the process."""
     global _state
@@ -103,8 +134,7 @@ def _load() -> dict | None:
     try:
         L.llama_backend_init()
         L.llama_log_set(ctypes.cast(None, L.llama_log_callback), None)
-        model = L.llama_model_load_from_file(str(_model_path()).encode(),
-                                             L.llama_model_default_params())
+        model = L.llama_model_load_from_file(str(_model_path()).encode(), _model_params(L))
         if not model:
             return None
         p = L.llama_context_default_params()

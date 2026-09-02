@@ -2,7 +2,7 @@
 
 A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in — Markdown, or PDF / DOCX / images that are auto-converted to Markdown (local OCR + rewrite, vendored from [MD-maker](https://github.com/ToHeinAC/MD-maker)) — and a local LLM (Ollama, default `gemma4:e4b`) compiles them into an interlinked Markdown wiki you can navigate, chat with, and challenge with web research.
 
-> **Status:** All pages implemented — three-stage ingest (`ingest_begin` / `ingest_piece` / `ingest_end`) drives a structural chunk store + a lexical FTS5/BM25 index + an optional local-embedding semantic arm fused with it via RRF (hybrid retrieval, degrades gracefully to lexical-only) + 1–5 hypothetical questions per source (folded into BM25 TF) under `data/chunks/` and `data/index/` → wiki (tree-by-type + BM25 full-text search over page bodies + typed-graph viz with `derived-from` source edges) → chat (Fast: one-shot RAG over wiki pages with hybrid BM25→LLM page selection + section-level chunk synthesis; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25; live trace + download) → research (**Quick**: LangGraph deep researcher — plan → wiki-first → triage → web search → quality-gated report; **Deep**: a web-only supervisor pipeline that splits the question into sub-topics, researches each over Tavily and synthesises a URL-cited report, via the vendored [open_deep_research](https://github.com/langchain-ai/open_deep_research) graph run entirely on local Ollama — see [docs/deep_research.md](docs/deep_research.md); inline report + download). Both agent modes include an `evaluate_condition` tool that deterministically evaluates logical / regulatory conditions (thresholds, membership, ranges, AND/OR/NOT trees) over LLM-extracted facts — Python does the comparison, not the model. Affected-page selection during ingest is BM25-driven (no extra LLM call) and merges into existing pages with a rank-weighted budget. Long-source ingest (e.g. 488 KB legal docs): ~7 min. 446-test suite.
+> **Status:** All pages implemented — three-stage ingest (`ingest_begin` / `ingest_piece` / `ingest_end`) drives a structural chunk store + a lexical FTS5/BM25 index + an optional local-embedding semantic arm fused with it via RRF (hybrid retrieval, degrades gracefully to lexical-only) + 1–5 hypothetical questions per source (folded into BM25 TF) under `data/chunks/` and `data/index/` → wiki (tree-by-type + BM25 full-text search over page bodies + typed-graph viz with `derived-from` source edges) → chat (Fast: one-shot RAG over wiki pages with hybrid BM25→LLM page selection + section-level chunk synthesis; **Deep**: LangGraph agent loop over `data/raw/` originals via BM25; live trace + download) → research (**Quick**: LangGraph deep researcher — plan → wiki-first → triage → web search → quality-gated report; **Deep**: a web-only supervisor pipeline that splits the question into sub-topics, researches each over Tavily and synthesises a URL-cited report, via the vendored [open_deep_research](https://github.com/langchain-ai/open_deep_research) graph run entirely on local Ollama — see [docs/deep_research.md](docs/deep_research.md); inline report + download). Both agent modes include an `evaluate_condition` tool that deterministically evaluates logical / regulatory conditions (thresholds, membership, ranges, AND/OR/NOT trees) over LLM-extracted facts — Python does the comparison, not the model. Affected-page selection during ingest is BM25-driven (no extra LLM call) and merges into existing pages with a rank-weighted budget. Long-source ingest (e.g. 488 KB legal docs): ~7 min; both local runtimes (Ollama and the in-process reranker) are pinned to a single GPU each — see [docs/gpu.md](docs/gpu.md). 490-test suite.
 
 The generated `wiki/` folder is a conformant **[Open Knowledge Format (OKF v0.1)](docs/okf.md)** bundle — typed markdown pages, `okf_version`-declaring `index.md`, date-grouped `log.md`, and `## Citations`. Conformance is stamped deterministically in code (`src/okf.py`), never by the LLM, so it holds even on `gemma4:e4b`.
 
@@ -13,7 +13,7 @@ Language is preserved deterministically too: `src/lang.py` detects the source la
 - [`PRD.md`](PRD.md) — product requirements (authoritative spec)
 - [`IMPLEMENTATION.md`](IMPLEMENTATION.md) — current state, module map, deviations from PRD
 - [`CLAUDE.md`](CLAUDE.md) — collaboration rules for AI coding tools
-- [`docs/`](docs/) — deep per-area reference (architecture, domain, tech, ui, wiki, tests)
+- [`docs/`](docs/) — deep per-area reference (architecture, domain, tech, ui, wiki, gpu, tests)
 
 ## Prerequisites
 
@@ -68,7 +68,8 @@ Edit `.env` (copied from `.env.example`). The essentials to get started:
 | Variable | Default | Purpose |
 |---|---|---|
 | `OLLAMA_MODEL` | `gemma4:e4b` | Ollama model to use |
-| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
+| `OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL — the fallback when GPU pinning is off or impossible |
+| `OLLAMA_PIN_GPU` | `auto` | Keeps models on **one** GPU: the app starts its own `ollama serve` pinned to the emptiest card that fits (94 → 170 tok/s here). `off` uses `OLLAMA_HOST` as-is. See [docs/gpu.md](docs/gpu.md) |
 | `TAVILY_API_KEY` | — | Required only for the Research page (web search) |
 | `FRONTEND` | `default` | Visual skin: `default` (editorial) or `newspaper` (broadsheet). Chrome only — same pages and behaviour |
 

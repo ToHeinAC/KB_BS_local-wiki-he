@@ -22,6 +22,7 @@ import lex_index
 import md_convert
 import metadata_extract
 import ollama_client
+import ollama_server
 import theme
 import tools
 import wiki_engine
@@ -725,7 +726,7 @@ def _safe_reset() -> None:
     import requests as _req
     try:
         _req.post(
-            f"{os.getenv('OLLAMA_HOST', 'http://localhost:11434')}/api/generate",
+            f"{ollama_client.host()}/api/generate",
             json={"model": os.getenv("OLLAMA_MODEL", "gemma4:e4b"), "keep_alive": 0},
             timeout=5,
         )
@@ -785,6 +786,15 @@ wiki_engine.init_wiki()
 
 st.sidebar.markdown("## 📖 LocalWiki")
 gpu_widget.render_gpu_sidebar(accent=_t["primary"])
+
+# Resolves (and, first time round, starts) the GPU-pinned Ollama daemon. Cached
+# per process, so the cost is paid once — including when pinning is impossible
+# and the app falls back to the shared, split daemon.
+_pin = ollama_server.status()
+st.sidebar.caption(
+    f"Ollama · pinned to GPU {_pin['gpu']}" if _pin["pinned"] else "Ollama · shared daemon",
+    help=_pin["reason"],
+)
 
 st.sidebar.markdown("---")
 

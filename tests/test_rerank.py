@@ -7,6 +7,7 @@ position-aware blending, and the Fast/Deep split in `retrieval.search`.
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -15,6 +16,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import chunker
 import db_context
 import embed_index
+import gpu_placement
 import lex_index
 import rerank
 import retrieval
@@ -147,3 +149,66 @@ def test_search_fast_path_never_calls_the_reranker(tmp_path, monkeypatch):
     chunker.write_chunks("radon.md", chunker.split("## Radon\nNeutron dose."))
     lex_index.build()
     retrieval.search("radon dose", top_k=5)
+
+
+# --- GPU placement ------------------------------------------------------------
+
+class _FakeLlamaCpp:
+    """Just enough of llama_cpp for `_model_params`; the real one needs CUDA."""
+    LLAMA_SPLIT_MODE_NONE = 0
+    LLAMA_SPLIT_MODE_LAYER = 1
+
+    @staticmethod
+    def llama_model_default_params():
+        return SimpleNamespace(split_mode=1, main_gpu=0, n_gpu_layers=-1)
+
+
+@pytest.fixture()
+def _gguf(monkeypatch, tmp_path):
+    """A stand-in reranker GGUF of a known size."""
+    path = tmp_path / "reranker.gguf"
+    path.write_bytes(b"\0" * 1024)
+    monkeypatch.setattr(rerank, "_model_path", lambda: path)
+    monkeypatch.delenv("RERANK_PIN_GPU", raising=False)
+    return path
+
+
+def _two_cards(monkeypatch, free0: float = 12.0, free1: float = 22.0) -> None:
+    monkeypatch.setattr(gpu_placement, "gpus", lambda: [
+        gpu_placement.Gpu(index=0, name="card0", total_gib=24.0, free_gib=free0),
+        gpu_placement.Gpu(index=1, name="card1", total_gib=24.0, free_gib=free1),
+    ])
+
+
+def test_model_params_pin_to_one_card(_gguf, monkeypatch):
+    """llama.cpp defaults to splitting layers across every GPU; we override that."""
+    _two_cards(monkeypatch)
+    params = rerank._model_params(_FakeLlamaCpp)
+    assert params.split_mode == _FakeLlamaCpp.LLAMA_SPLIT_MODE_NONE
+    assert params.main_gpu == 1  # the emptier card
+
+
+def test_pinning_can_be_turned_off(_gguf, monkeypatch):
+    _two_cards(monkeypatch)
+    monkeypatch.setenv("RERANK_PIN_GPU", "off")
+    params = rerank._model_params(_FakeLlamaCpp)
+    assert params.split_mode == _FakeLlamaCpp.LLAMA_SPLIT_MODE_LAYER
+
+
+def test_pin_gpu_can_name_a_card(_gguf, monkeypatch):
+    _two_cards(monkeypatch)
+    monkeypatch.setenv("RERANK_PIN_GPU", "0")
+    assert rerank._model_params(_FakeLlamaCpp).main_gpu == 0
+
+
+def test_no_gpu_leaves_the_defaults_alone(_gguf, monkeypatch):
+    monkeypatch.setattr(gpu_placement, "gpus", lambda: [])
+    params = rerank._model_params(_FakeLlamaCpp)
+    assert params.split_mode == _FakeLlamaCpp.LLAMA_SPLIT_MODE_LAYER
+
+
+def test_an_unreadable_gguf_leaves_the_defaults_alone(monkeypatch, tmp_path):
+    monkeypatch.setattr(rerank, "_model_path", lambda: tmp_path / "absent.gguf")
+    _two_cards(monkeypatch)
+    params = rerank._model_params(_FakeLlamaCpp)
+    assert params.split_mode == _FakeLlamaCpp.LLAMA_SPLIT_MODE_LAYER
