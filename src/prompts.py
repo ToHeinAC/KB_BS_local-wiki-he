@@ -47,17 +47,42 @@ INGEST_LANGUAGE_DIRECTIVE = {
     "de": (
         "SPRACHE (verbindlich): Schreibe den Fließtext und die Zwischenüberschriften "
         "jeder Wiki-Seite auf Deutsch — der Quelltext bestimmt die FAKTEN, nicht die "
-        "Sprache; fasse fremdsprachige Passagen auf Deutsch zusammen. UNVERÄNDERT "
-        "bleiben: die Überschrift `## Key facts` (genau so, englisch), Zahlen, Daten, "
-        "Einheiten und Zitate wie [quelle.md]."
+        "Sprache. ORIGINALBEGRIFFE bleiben wörtlich und unübersetzt: Fachbegriffe, "
+        "Definitionen, Eigennamen, Titel von Gesetzen und Normen, Abkürzungen und "
+        "wörtliche Zitate. Übersetzt du einen fremdsprachigen Begriff, nenne das "
+        "Original in Klammern, z. B. „Handlungsgrenze (*capability boundary*)“. "
+        "UNVERÄNDERT bleiben außerdem: die Überschrift `## Key facts` (genau so, "
+        "englisch), Zahlen, Daten, Einheiten, Abschnittsmarken (§, Art.) und Zitate "
+        "wie [quelle.md]."
     ),
     "en": (
         "LANGUAGE (strict): Write the prose and section headings of every wiki page in "
-        "English — the source text sets the FACTS, not the language; summarise "
-        "non-English passages in English. KEEP UNCHANGED: the `## Key facts` heading "
-        "(exactly, in English), numbers, dates, units, and citations like [source.md]."
+        "English — the source text sets the FACTS, not the language. ORIGINAL TERMS stay "
+        "verbatim and untranslated: technical terms, definitions, proper names, titles "
+        "of laws and standards, abbreviations, and verbatim quotes. When you translate "
+        "a foreign term, give the original in parentheses, e.g. \"permissible action "
+        "space (*zulässiger Handlungsraum*)\". KEEP UNCHANGED as well: the `## Key facts` "
+        "heading (exactly, in English), numbers, dates, units, section markers (§, Art.), "
+        "and citations like [source.md]."
     ),
 }
+
+# Target-language names for TRANSLATE_CONTRIBUTION_PROMPT (keyed like the directives).
+LANGUAGE_NAMES = {"de": "German", "en": "English"}
+
+# Cross-language merge (src/wiki_engine.py): a page keeps the language it was created
+# in, so lines contributed by a source in another language are translated first. Code
+# picks when to call this, extracts {terms}, and verifies numbers/§/citations after.
+TRANSLATE_CONTRIBUTION_PROMPT = """Translate the following wiki text from {source_language} into {target_language}.
+
+Rules:
+- Translate prose and headings. Keep the markdown structure line by line (headings, bullets, tables); keep `## Key facts` exactly as it is.
+- Keep EXACTLY as written: numbers, dates, units, section references (§, Art.), citations in square brackets, `code`, abbreviations.
+- Original terms — keep each one verbatim. On first use write the translation followed by the original in parentheses, e.g. "permissible action space (*zulässiger Handlungsraum*)": {terms}
+- Do not add, drop, merge, or comment on statements. Output only the translated text.
+
+Text:
+{text}"""
 
 # --- Deep researcher (Research page, agent.py) -----------------------------
 
@@ -153,7 +178,7 @@ AGENT_SYSTEM = RESEARCHER_INSTRUCTIONS
 
 INGEST_PROMPT = """You are ingesting a new source document into the wiki.
 
-Source name: {source_name}
+Source name: {source_name}{part_note}
 
 {meta_block}Current wiki index:
 {index_text}
@@ -164,7 +189,7 @@ Source text (may be truncated):
 Instructions:
 1. Create a detailled source-summary representation page for this document (filename: summary-{summary_slug}.md). Never invent information.
    This is the SAME summary file for EVERY part of this document — extend it, do NOT create one summary per part.
-   Preserve relevant passages from chunk sources in detail. Copy relevant numbers, sizes, and references exactly as they appear in the original, never round or paraphrase. Format every citation as [{source_name}.md] — never append a part/"[Teil n/m]" marker and never double the ".md".
+   Preserve relevant passages from chunk sources in detail. Copy relevant numbers, sizes, and references exactly as they appear in the original, never round or paraphrase. Format every citation as exactly [{source_name}] — this file name as written, never with a part marker or an extra ".md".
 2. Create or update concept/entity pages for key topics found in the source. If a topic matches one of the "Existing pages you may extend" listed above, REUSE that page's EXACT filename so it is updated, not duplicated.
 3. Begin every page body with a `## Key facts` block: 3-5 one-line bullets naming the page's main terms and facts. Then write the prose sections.
 4. Populate `related` frontmatter ONLY with filenames of pages whose topic is directly
@@ -251,7 +276,7 @@ Affected pages:
 
 User guidance (may be empty): {user_guidance}
 
-Rewrite each affected page to resolve the contradiction. Preserve all unrelated content. Use the same `=== filename.md === ... === END ===` block format as ingest. Update `confidence` and `updated` frontmatter accordingly."""
+Rewrite each affected page to resolve the contradiction. Keep each page in its own language (the `lang` after its filename); original terms stay verbatim. Preserve all unrelated content. Use the same `=== filename.md === ... === END ===` block format as ingest. Update `confidence` and `updated` frontmatter accordingly."""
 
 FILE_ANSWER_PROMPT = """Format the following Q&A as a wiki insight page. Output ONLY the page body (no frontmatter — it will be added programmatically). Use markdown headings; preserve any [page title] citations from the answer verbatim.
 

@@ -7,6 +7,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 
 import frontmatter
+import numpy as np
 from dotenv import load_dotenv
 
 import calibrate
@@ -18,6 +19,7 @@ import lang
 import lex_index
 import okf
 import ollama_client
+import page_lang
 import qa_gen
 import retrieval
 import schema_loader
@@ -29,6 +31,7 @@ from prompts import (
     DESCRIPTION_DELETE_PROMPT,
     DESCRIPTION_UPDATE_PROMPT,
     FILE_ANSWER_PROMPT,
+    INGEST_LANGUAGE_DIRECTIVE,
     INGEST_PROMPT,
     LINT_PROMPT,
     RESOLVE_CONTRADICTION_PROMPT,
@@ -168,9 +171,17 @@ def _rebuild_index() -> None:
     _index_path().write_text("".join(lines))
 
 
+def _ascii_fold(text: str) -> str:
+    """Lowercase ASCII form: German digraphs (ü→ue, ß→ss), then accents stripped."""
+    return lex_index._nfkd_fold(lex_index._umlaut_fold(text.lower()))
+
+
+def _slugify(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", _ascii_fold(text)).strip("-")
+
+
 def _title_to_filename(title: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
-    return f"{slug}.md"
+    return f"{_slugify(title)}.md"
 
 
 # --- Deterministic dedup-routing + merge (model-independent) -----------------
@@ -221,7 +232,7 @@ def _term_key(tok: str) -> str:
 
 def _canonical_slug_tokens(name: str) -> frozenset[str]:
     """Topic token-set for a filename or title (prefix/stopwords/plurals folded)."""
-    base = name.lower()
+    base = _ascii_fold(name)
     if base.endswith(".md"):
         base = base[:-3]
     base = _PAGE_PREFIX_RE.sub("", base)
@@ -255,7 +266,7 @@ def _extract_key_terms(content: str) -> list[str]:
         title, body = "", content
     text = title + "\n" + "\n".join(_parse_index_block(body))
     terms, seen = [], set()
-    for tok in re.split(r"[^A-Za-z0-9]+", text):
+    for tok in re.split(r"[^a-z0-9]+", _ascii_fold(text)):
         if len(tok) < 2 or tok.lower() in _STOPWORDS_SLUG:
             continue
         k = _term_key(tok)
@@ -343,8 +354,9 @@ def _route_page(ptype: str, tokens: frozenset, terms: frozenset,
                 registry: dict, self_filename: str) -> str | None:
     """Existing filename this page should merge into, or None to create new.
 
-    Same `type` only. Exact topic-token match wins; otherwise a subset relation
-    (one topic is a specialization of the other) gated by >= 0.7 key-term overlap.
+    Same `type` only. Exact topic-token match (title or an `aliases` entry — the
+    original-language names a cross-language merge recorded) wins; otherwise a subset
+    relation (one topic is a specialization of the other) gated by >= 0.7 key-term overlap.
     """
     if not tokens:
         return None
@@ -355,7 +367,7 @@ def _route_page(ptype: str, tokens: frozenset, terms: frozenset,
         ctoks = info["tokens"]
         if not ctoks:
             continue
-        if tokens == ctoks:
+        if tokens == ctoks or tokens in info.get("aliases", ()):
             exact = exact or fname
         elif (tokens <= ctoks or ctoks <= tokens) and \
                 _overlap_coef(terms, info["terms"]) >= _TERM_OVERLAP_THRESHOLD:
@@ -429,7 +441,17 @@ def _extract_facts(text: str) -> dict[str, set[str]]:
     return facts
 
 
-def _contradiction_check(existing: str, new: str, emeta: dict, nmeta: dict) -> list[str]:
+# Code-written notes land in the page body, so they follow the page's language.
+_CONTRADICTION_NOTES = {
+    "en": ("{term}: now {new} per the newer source; previously {old}",
+           "{term}: sources disagree — {old} vs {new} (unresolved)"),
+    "de": ("{term}: jetzt {new} laut neuerer Quelle; zuvor {old}",
+           "{term}: Quellen widersprechen sich — {old} vs. {new} (ungeklärt)"),
+}
+
+
+def _contradiction_check(existing: str, new: str, emeta: dict, nmeta: dict,
+                         page_lang: str = "en") -> list[str]:
     """Flag same-term/same-unit numeric conflicts. Resolves only on a date signal."""
     ef, nf = _extract_facts(existing), _extract_facts(new)
     newer = _is_newer(nmeta, emeta)
@@ -440,10 +462,8 @@ def _contradiction_check(existing: str, new: str, emeta: dict, nmeta: dict) -> l
             continue
         term = key.split("|")[0]
         old, newv = ", ".join(sorted(evals)), ", ".join(sorted(nvals))
-        if newer:
-            out.append(f"{term}: now {newv} per the newer source; previously {old}")
-        else:
-            out.append(f"{term}: sources disagree — {old} vs {newv} (unresolved)")
+        resolved, unresolved = _CONTRADICTION_NOTES.get(page_lang, _CONTRADICTION_NOTES["en"])
+        out.append((resolved if newer else unresolved).format(term=term, new=newv, old=old))
     return out
 
 
@@ -456,13 +476,16 @@ def _merge_pages(existing: str, new: str, source: str) -> str:
     meta = dict(ep.metadata)
     for key in ("sources", "related", "key_terms"):
         meta[key] = _union_list(ep.metadata.get(key), np_.metadata.get(key))
+    if ep.metadata.get("aliases") or np_.metadata.get("aliases"):
+        meta["aliases"] = _union_list(ep.metadata.get("aliases"), np_.metadata.get("aliases"))
     nc = _parse_date(np_.metadata.get("created"))
     ec = _parse_date(ep.metadata.get("created"))
     if nc and (not ec or nc < ec):
         meta["created"] = np_.metadata.get("created")
     meta["updated"] = _date()
     body = _merge_bodies(ep.content, np_.content)
-    contradictions = _contradiction_check(ep.content, np_.content, ep.metadata, np_.metadata)
+    contradictions = _contradiction_check(ep.content, np_.content, ep.metadata, np_.metadata,
+                                          page_lang.page_lang(existing))
     if contradictions:
         body = body.rstrip() + "\n\n## Contradictions\n" + \
             "\n".join(f"- {c}" for c in contradictions) + "\n"
@@ -473,28 +496,117 @@ def _merge_pages(existing: str, new: str, source: str) -> str:
     return _okf_apply(out)  # keep merged pages OKF-conformant for every caller
 
 
+def _set_meta(content: str, **fields) -> str:
+    post = frontmatter.loads(content)
+    post.metadata.update(fields)
+    return frontmatter.dumps(post) + "\n"
+
+
+def _content_lang(content: str, default: str) -> str:
+    """Language of a page's body text (its frontmatter `lang` is not consulted)."""
+    try:
+        body = frontmatter.loads(content).content
+    except Exception:
+        body = content
+    return page_lang.text_lang(body, default)
+
+
+def _delta_body(existing: str, new: str) -> str:
+    """Lines of ``new`` not already on the page, under their section headings."""
+    seen = {_norm_line(ln) for _, ls in _split_sections(existing) for ln in ls if ln.strip()}
+    out: list[str] = []
+    for heading, lines in _split_sections(new):
+        add = [ln for ln in lines if ln.strip() and _norm_line(ln) not in seen]
+        if add:
+            out += ([heading] if heading else []) + add
+    return "\n".join(out)
+
+
+def _align_language(existing: str, new: str, source_lang: str) -> str:
+    """Rewrite ``new`` into the existing page's language before a merge.
+
+    A page keeps the language it was created in. When the contribution is in the
+    other language, only its NEW lines are translated (original terms kept inline);
+    a translation that fails verification is kept as a labelled `## Original (XX)`
+    quote instead. The contribution's title is recorded in `aliases` — titles only,
+    since aliases drive routing (a stray term like `author` would mis-route pages).
+    """
+    plang = page_lang.page_lang(existing)
+    try:
+        ep, post = frontmatter.loads(existing), frontmatter.loads(new)
+    except Exception:
+        return new
+    nlang = page_lang.text_lang(post.content, source_lang)
+    if nlang == plang:
+        return new
+    delta = _delta_body(ep.content, post.content)
+    title = str(post.metadata.get("title") or "").strip()
+    aliases = [title] if title and title != _page_title(existing) else []
+    translated = page_lang.translate(delta, nlang, plang) if delta.strip() else ""
+    if translated is None:
+        translated = f"## Original ({nlang.upper()})\n" + "\n".join(page_lang.quote(delta))
+    post.content = translated
+    post.metadata["aliases"] = _union_list(post.metadata.get("aliases"), aliases)
+    return frontmatter.dumps(post) + "\n"
+
+
+def _registry_entry(content: str, fname: str) -> dict:
+    try:
+        aliases = frontmatter.loads(content).metadata.get("aliases") or []
+    except Exception:
+        aliases = []
+    title = _page_title(content, fname)
+    return {
+        "type": _page_type(content, fname),
+        "title": title,
+        "lang": page_lang.page_lang(content),
+        "tokens": _canonical_slug_tokens(title),
+        "aliases": frozenset(t for t in (_canonical_slug_tokens(str(a)) for a in aliases) if t),
+        # Recomputed, not read from `key_terms`: stored terms may predate a fold change.
+        "terms": frozenset(_extract_key_terms(content)),
+    }
+
+
 def _build_registry() -> dict:
-    """{filename: {type, tokens, terms}} for every existing page (routing input)."""
-    reg: dict[str, dict] = {}
-    for p in list_pages():
-        fn = p["filename"]
-        terms = p.get("key_terms")
-        if not terms:
-            terms = _extract_key_terms(read_page(fn))
-        reg[fn] = {
-            "type": str(p.get("type") or "concept").strip().lower(),
-            "tokens": _canonical_slug_tokens(str(p.get("title") or fn)),
-            "terms": frozenset(terms or []),
-        }
-    return reg
+    """{filename: {type, title, lang, tokens, aliases, terms}} per page (routing input)."""
+    return {p["filename"]: _registry_entry(read_page(p["filename"]), p["filename"])
+            for p in list_pages()}
 
 
 def _registry_add(registry: dict, target: str, content: str) -> None:
-    registry[target] = {
-        "type": _page_type(content, target),
-        "tokens": _canonical_slug_tokens(_page_title(content, target)),
-        "terms": frozenset(_extract_key_terms(content)),
-    }
+    registry[target] = _registry_entry(content, target)
+
+
+# Cross-language routing (bge-m3 title similarity). Measured on DE/EN title pairs:
+# true pairs 0.62-0.95, false 0.38-0.64 — so only a high score with a clear lead
+# over the runner-up merges; a miss just leaves a separate monolingual page.
+_XLANG_MIN_COS = 0.80
+_XLANG_MARGIN = 0.05
+
+
+def _route_cross_language(title: str, ptype: str, plang: str, ctx: dict) -> str | None:
+    """Existing same-type page in the OTHER language with the same meaning, or None.
+
+    Best-effort: no embed model, no candidates or any error → None (create new).
+    Candidate title vectors are cached on ``ctx`` for the rest of the ingest.
+    """
+    reg = ctx["registry"]
+    cands = [fn for fn, i in reg.items() if i["type"] == ptype and i.get("lang") != plang]
+    if not title or not cands:
+        return None
+    try:
+        cache = ctx.setdefault("title_vecs", {})
+        todo = [fn for fn in cands if fn not in cache]
+        vecs = np.asarray(ollama_client.embed([title] + [reg[fn]["title"] for fn in todo],
+                                              embed_index._model()), dtype=np.float32)
+        vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
+        cache.update(zip(todo, vecs[1:]))
+        scores = sorted(((float(vecs[0] @ cache[fn]), fn) for fn in cands), reverse=True)
+    except Exception:
+        return None
+    best, fname = scores[0]
+    runner_up = scores[1][0] if len(scores) > 1 else 0.0
+    return fname if best >= _XLANG_MIN_COS and best - runner_up >= _XLANG_MARGIN else None
 
 
 def _resolve_target(content: str, llm_filename: str, ctx: dict) -> str:
@@ -502,15 +614,20 @@ def _resolve_target(content: str, llm_filename: str, ctx: dict) -> str:
 
     Source-summaries always collapse to one stable `summary-<doc>.md` (kills the
     per-Teil explosion). Concept/entity pages route into an existing near-duplicate
-    when one exists, else keep the model's filename.
+    when one exists — same-language by title/alias tokens, then other-language by
+    title meaning (`_route_cross_language`) — else keep the model's filename.
     """
     ptype = _page_type(content, llm_filename)
     if ptype == "source-summary":
         return f"summary-{ctx['summary_slug']}.md"
-    tokens = _canonical_slug_tokens(_page_title(content, llm_filename))
+    title = _page_title(content, llm_filename)
+    tokens = _canonical_slug_tokens(title)
     terms = frozenset(_extract_key_terms(content))
     routed = _route_page(ptype, tokens, terms, ctx["registry"], llm_filename)
-    return routed or llm_filename
+    if routed or llm_filename in ctx["registry"]:
+        return routed or llm_filename
+    plang = _content_lang(content, ctx.get("lang", "de"))
+    return _route_cross_language(title, ptype, plang, ctx) or llm_filename
 
 
 def _parse_llm_pages(response: str) -> list[dict]:
@@ -660,8 +777,18 @@ def _ensure_source_in_frontmatter(content: str, source_name: str) -> str:
 
 
 def _okf_apply(content: str) -> str:
-    """Stamp OKF fields + `## Citations` on a page (deterministic, no LLM)."""
+    """Stamp `lang` (when missing) + OKF fields + `## Citations` (deterministic, no LLM)."""
+    try:
+        if not frontmatter.loads(content).metadata.get("lang"):
+            content = _set_meta(content, lang=page_lang.page_lang(content))
+    except Exception:
+        pass
     return okf.apply_to_page(content, db=db_context.get_active_db())
+
+
+def _clean_refs(content: str) -> str:
+    """Drop `[Teil n/m]` part markers and doubled `.md.md` from citations + `sources:`."""
+    return _strip_teil_sources(_clean_teil_text(content))
 
 
 def _ensure_frontmatter(content: str, fname: str) -> str:
@@ -682,6 +809,21 @@ def _ensure_frontmatter(content: str, fname: str) -> str:
         "---\n"
     )
     return fm + content.lstrip()
+
+
+def _summary_slug(source_name: str) -> str:
+    """Stable `summary-<slug>.md` stem for a source (umlauts folded: für→fuer).
+
+    Pages written before the fold used the old slug (für→f-r); an existing old-slug
+    summary is reused so a re-ingest extends it instead of creating a second one.
+    """
+    stem = Path(_TEIL_SUFFIX_RE.sub("", source_name)).stem
+    slug = _slugify(stem)
+    legacy = re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-")
+    if legacy != slug and not (_wiki() / f"summary-{slug}.md").exists() \
+            and (_wiki() / f"summary-{legacy}.md").exists():
+        return legacy
+    return slug
 
 
 def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None) -> dict:
@@ -742,14 +884,46 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
         "existing_filenames": {p["filename"] for p in list_pages()},
         # One stable source-summary slug for the WHOLE document (no per-Teil
         # explosion); plus the routing registry of every existing page.
-        "summary_slug": _title_to_filename(Path(_TEIL_SUFFIX_RE.sub("", source_name)).stem).replace(".md", ""),
+        "summary_slug": _summary_slug(source_name),
+        "lang": lang.detect(full_text),
         "registry": _build_registry(),
     }
 
 
+def _write_piece_page(ctx: dict, page: dict) -> None:
+    """Normalise one LLM-emitted page, route it, merge or create it, write it."""
+    content = _ensure_frontmatter(page["content"], page["filename"])
+    content = _clean_refs(content)
+    # Merge current source into frontmatter `sources:` so the graph viz can
+    # draw `derived-from` edges (source → page) without trusting the LLM
+    # to have written it correctly.
+    content = _ensure_source_in_frontmatter(content, ctx["source_name"])
+    content = _scrub_related(content, ctx["existing_filenames"])
+    content = _ensure_key_terms(content)
+    content = _ensure_index_block(content)
+    target = _resolve_target(content, page["filename"], ctx)
+    dest = _wiki() / target
+    if dest.exists():
+        # Deterministic, no-LLM merge: never drops a prior fact, dedupes lines,
+        # flags numeric contradictions (date-resolved when possible). The page
+        # keeps its language: another-language contribution is translated first.
+        existing = dest.read_text()
+        content = _merge_pages(existing, _align_language(existing, content, ctx["lang"]),
+                               ctx["source_name"])
+        if target not in ctx["updated"] and target not in ctx["created"]:
+            ctx["updated"].append(target)
+    else:
+        content = _set_meta(content, lang=_content_lang(content, ctx["lang"]))
+        if target not in ctx["created"]:
+            ctx["created"].append(target)
+    content = _okf_apply(content)  # OKF frontmatter + citations (deterministic)
+    dest.write_text(content)
+    ctx["existing_filenames"].add(target)
+    _registry_add(ctx["registry"], target, content)
+
+
 def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> None:
     """Run the LLM wiki-synthesis for one 40 KB piece. Mutates `ctx` in place."""
-    piece_source = ctx["source_name"] if total == 1 else f"{ctx['source_name']} [Teil {index + 1}/{total}]"
     # BM25-select the existing pages THIS piece most likely updates, then inject
     # their content (rank-weighted budget) for an accurate merge. Per-piece so a
     # later piece of a long document can surface pages the first piece didn't.
@@ -762,7 +936,8 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
     # only needs a nudge to reuse an existing filename.
     existing_block = _build_candidate_index_block(ranked)
     prompt = INGEST_PROMPT.format(
-        source_name=piece_source,
+        source_name=ctx["source_name"],
+        part_note=f" (part {index + 1} of {total})" if total > 1 else "",
         meta_block=ctx["meta_block"],
         index_text=ctx["index_text"],
         existing_block=existing_block,
@@ -785,28 +960,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
         pages = _parse_llm_pages(response)
 
     for page in pages:
-        content = _ensure_frontmatter(page["content"], page["filename"])
-        # Merge current source into frontmatter `sources:` so the graph viz can
-        # draw `derived-from` edges (source → page) without trusting the LLM
-        # to have written it correctly.
-        content = _ensure_source_in_frontmatter(content, ctx["source_name"])
-        content = _scrub_related(content, ctx["existing_filenames"])
-        content = _ensure_key_terms(content)
-        content = _ensure_index_block(content)
-        target = _resolve_target(content, page["filename"], ctx)
-        dest = _wiki() / target
-        if dest.exists():
-            # Deterministic, no-LLM merge: never drops a prior fact, dedupes lines,
-            # flags numeric contradictions (date-resolved when possible).
-            content = _merge_pages(dest.read_text(), content, ctx["source_name"])
-            if target not in ctx["updated"] and target not in ctx["created"]:
-                ctx["updated"].append(target)
-        elif target not in ctx["created"]:
-            ctx["created"].append(target)
-        content = _okf_apply(content)  # OKF frontmatter + citations (deterministic)
-        dest.write_text(content)
-        ctx["existing_filenames"].add(target)
-        _registry_add(ctx["registry"], target, content)
+        _write_piece_page(ctx, page)
 
     for line in response.splitlines():
         if line.startswith("UPDATE:"):
@@ -1058,19 +1212,24 @@ def _remap_related(rename: dict[str, str]) -> None:
 
 
 def _polish_page(content: str) -> str:
-    """Optional LLM prose-smoothing of a merged page (facts must be preserved)."""
+    """Optional LLM prose-smoothing of a merged page (facts must be preserved).
+
+    Pinned to the page's language; a reply in another language is discarded.
+    """
     try:
         post = frontmatter.loads(content)
     except Exception:
         return content
+    plang = page_lang.page_lang(content)
+    system = schema_loader.get_system_prompt() + "\n\n" + INGEST_LANGUAGE_DIRECTIVE[plang]
     try:
-        resp = ollama_client.generate(schema_loader.get_system_prompt(),
-                                       CONSOLIDATE_POLISH_PROMPT.format(page=post.content),
+        resp = ollama_client.generate(system, CONSOLIDATE_POLISH_PROMPT.format(page=post.content),
                                        temperature=0.2, model_id=ollama_client._INGEST_MODEL)
     except Exception:
         return content
-    if resp and resp.strip():
-        post.content = resp.strip()
+    if not (resp and resp.strip()) or page_lang.clearly_other(resp, plang):
+        return content
+    post.content = resp.strip()
     return frontmatter.dumps(post) + "\n"
 
 
@@ -1969,17 +2128,23 @@ def resolve_contradiction(description: str, page_filenames: list[str], user_guid
     """Reconcile a contradiction across pages via a focused LLM call.
 
     Rewrites the affected pages in place using the standard ingest delimiter
-    format. Returns {updated: [...], description}.
+    format. Each page keeps its language: a rewrite that comes back in another
+    language is not written and is reported in `skipped`.
+    Returns {updated: [...], skipped: [...], description}.
     """
-    system = schema_loader.get_system_prompt()
+    langs: dict[str, str] = {}
     pages_text = ""
     for fname in page_filenames:
         path = _wiki() / fname
         if path.exists():
-            pages_text += f"\n--- {fname} ---\n{path.read_text()}\n"
+            text = path.read_text()
+            langs[fname] = page_lang.page_lang(text)
+            pages_text += f"\n--- {fname} (lang: {langs[fname]}) ---\n{text}\n"
     if not pages_text:
-        return {"updated": [], "description": description}
+        return {"updated": [], "skipped": [], "description": description}
 
+    majority = max(sorted(set(langs.values())), key=list(langs.values()).count)
+    system = schema_loader.get_system_prompt() + "\n\n" + INGEST_LANGUAGE_DIRECTIVE[majority]
     prompt = RESOLVE_CONTRADICTION_PROMPT.format(
         description=description,
         pages_text=pages_text,
@@ -1988,20 +2153,83 @@ def resolve_contradiction(description: str, page_filenames: list[str], user_guid
     response = ollama_client.generate(system, prompt, temperature=0.2)
     pages = _parse_llm_pages(response)
 
-    updated = []
+    updated, skipped = [], []
     for page in pages:
-        dest = _wiki() / page["filename"]
+        fname = page["filename"]
+        dest = _wiki() / fname
         if not dest.exists():
             continue
-        dest.write_text(_okf_apply(_ensure_frontmatter(page["content"], page["filename"])))
-        updated.append(page["filename"])
+        plang = langs.get(fname) or page_lang.page_lang(dest.read_text())
+        content = _ensure_frontmatter(page["content"], fname)
+        if page_lang.clearly_other(frontmatter.loads(content).content, plang):
+            skipped.append(fname)
+            continue
+        dest.write_text(_okf_apply(_set_meta(content, lang=plang)))
+        updated.append(fname)
 
     _append_log(
         "Contradiction resolved",
-        f"Description: {description}\nUpdated: {updated}\nGuidance: {user_guidance[:200]}",
+        f"Description: {description}\nUpdated: {updated}\nSkipped (language changed): {skipped}\n"
+        f"Guidance: {user_guidance[:200]}",
     )
     _rebuild_index()
-    return {"updated": updated, "description": description}
+    return {"updated": updated, "skipped": skipped, "description": description}
+
+
+# --- Page language + reference normalisation (Maintenance) -------------------
+
+def _normalize_page(content: str, dry_run: bool) -> tuple[str, dict]:
+    """Clean references, pin `lang`, translate foreign runs. → (content, what changed)."""
+    try:
+        frontmatter.loads(content)
+    except Exception:
+        return content, {}
+    fixed = _clean_refs(content)
+    post = frontmatter.loads(fixed)
+    plang = page_lang.page_lang(fixed)
+    info: dict = {}
+    if fixed != content:
+        info["references"] = True
+    if post.metadata.get("lang") != plang:
+        info["lang"] = plang
+    foreign = page_lang.foreign_line_count(post.content, plang)
+    if foreign:
+        info["foreign_lines"] = foreign
+    if dry_run or not info:
+        return content, info
+    post.content = page_lang.normalize_body(post.content, plang)
+    post.metadata["lang"] = plang
+    return _okf_apply(frontmatter.dumps(post) + "\n"), info
+
+
+def normalize_pages(dry_run: bool = True) -> dict:
+    """Maintenance pass over existing pages: one language per page, clean references.
+
+    Per page: strips `[Teil n/m]` / `.md.md` from citations and `sources:`, stamps
+    the pinned `lang` (its creator's language), and translates lines in the other
+    language in place (labelled original quote when a translation fails
+    verification). `dry_run=True` only reports. Returns {filename: info}.
+    """
+    report: dict[str, dict] = {}
+    for p in list_pages():
+        fname = p["filename"]
+        path = _wiki() / fname
+        old = path.read_text()
+        new, info = _normalize_page(old, dry_run)
+        if not info:
+            continue
+        report[fname] = info
+        if not dry_run and new != old:
+            path.write_text(new)
+            lex_index.index_replace_wiki_page(fname)
+            try:
+                embed_index.index_replace_wiki_page(fname)
+            except Exception:
+                pass
+    if not dry_run and report:
+        _rebuild_index()
+        _append_log("Normalize pages", f"{len(report)} pages: {', '.join(sorted(report))}")
+    return report
 
 
 def stats() -> dict:

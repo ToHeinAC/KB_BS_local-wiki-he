@@ -28,21 +28,31 @@ _EN_WORDS = frozenset(
 )
 
 
+_WINDOW = 4000
+
+
+def _sample(text: str) -> str:
+    """Start + middle + end windows, so an abstract in another language can't decide."""
+    if len(text) <= 3 * _WINDOW:
+        return text
+    mid = len(text) // 2
+    return " ".join((text[:_WINDOW], text[mid - _WINDOW // 2:mid + _WINDOW // 2], text[-_WINDOW:]))
+
+
 def detect(text: str, default: str = "de") -> str:
     """Return 'de' or 'en' for ``text``.
 
-    Any umlaut/ß decisively marks German. Otherwise the language with more
-    function-word hits wins; a tie or no signal falls back to ``default``
-    (German — the corpus language, and the drift direction users hit most).
+    The language with more function-word hits wins. An umlaut/ß only breaks a
+    tie (terse queries like "Rückstände Grenzwert?") — never outvotes English
+    function words, so a German name in an English sentence can't flip it. No
+    signal at all falls back to ``default`` (German — the corpus language).
     """
-    sample = (text or "")[:4000].lower()
+    sample = _sample(text or "").lower()
     tokens = _TOKEN_RE.findall(sample)
     de = sum(t in _DE_WORDS for t in tokens)
     en = sum(t in _EN_WORDS for t in tokens)
-    if any(c in sample for c in "äöüß"):
-        de += 2
     if de == en:
-        return default
+        return "de" if any(c in sample for c in "äöüß") else default
     return "de" if de > en else "en"
 
 

@@ -57,3 +57,25 @@ def test_directives_exempt_key_facts_heading():
     # tell the model to keep it unchanged in both languages.
     assert "## Key facts" in lang.ingest_directive("Deutscher Text mit ä ö ü.")
     assert "## Key facts" in lang.ingest_directive("English text here.")
+
+
+# --- detect: robustness (umlaut is a tie-breaker, sampling spans the document) ---
+
+def test_umlaut_name_does_not_flip_english_sentence():
+    assert lang.detect("This paper by Jürgen Müller describes the model.") == "en"
+
+
+def test_long_document_sampled_beyond_english_abstract():
+    abstract = "Abstract: We propose a harness for the agents and the tools. " * 60
+    body = "Die Arbeit beschreibt, wie der Agent mit den Werkzeugen arbeitet und was er darf. " * 400
+    assert lang.detect(abstract + body) == "de"
+
+
+# --- ingest directive protects original terms ---
+
+def test_ingest_directives_protect_original_terms():
+    de = lang.ingest_directive("Der Bericht beschreibt die Anlage.")
+    en = lang.ingest_directive("The report describes the plant.")
+    assert "ORIGINALBEGRIFFE" in de and "ORIGINAL TERMS" in en
+    assert "fasse fremdsprachige Passagen" not in de
+    assert "summarise non-English" not in en
