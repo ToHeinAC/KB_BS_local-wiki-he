@@ -184,6 +184,34 @@ def test_ingest_extracts_contradiction_lines(wiki_dir, monkeypatch):
     assert any("Alpha" in c for c in result["contradictions"])
 
 
+@pytest.mark.parametrize("line", [
+    "CONTRADICTION: None found. The source complements existing concepts.",
+    "CONTRADICTION: None. The source introduces a framework.",
+    "CONTRADICTION: none",
+    "CONTRADICTION: No contradictions found.",
+    "CONTRADICTION: N/A",
+    "CONTRADICTION: Keine Widersprüche gefunden.",
+    "CONTRADICTION: Keine.",
+    "CONTRADICTION:",
+])
+def test_ingest_ignores_negative_contradiction_lines(wiki_dir, monkeypatch, line):
+    # Small models echo the prefix even when there is nothing to report.
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE + "\n" + line}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    result = wiki_engine.ingest("text", "src.txt")
+    assert result["contradictions"] == []
+
+
+def test_ingest_keeps_contradiction_that_mentions_none_later(wiki_dir, monkeypatch):
+    line = "CONTRADICTION: Alpha says none are exempt, Beta lists exemptions"
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE + "\n" + line}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    result = wiki_engine.ingest("text", "src.txt")
+    assert len(result["contradictions"]) == 1
+
+
 def test_ingest_raises_runtime_error_when_ollama_down(wiki_dir, monkeypatch):
     mock = MagicMock()
     mock.generate.side_effect = Exception("connection refused")

@@ -51,6 +51,24 @@ _NEWSPAPER = theme.is_newspaper()
 _CHUNK_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*$")
 _CITE_SECTION_SUFFIX_RE = re.compile(r"\s*[§#].*$")
 
+_RESOLVE_HELP = """\
+The last ingest flagged claims that may conflict with existing wiki pages.
+Nothing changes until you press **Reconcile**.
+
+**Your options per item**
+- **Ignore it** — if the item is not a real conflict, do nothing or press **Dismiss**.
+- **Narrow the pages** — remove (×) every page not involved; the LLM rewrites
+  *each* selected page in full, so fewer pages means less risk.
+- **Give guidance** — say which claim wins and why (optional but recommended).
+- **Reconcile** — the LLM rewrites the selected pages; the change is logged.
+  There is no undo except re-ingesting.
+
+**Example**
+*Dose limit: page A says 20 mSv/year, page B says 50 mSv/year.*
+Keep only A and B, write guidance *"20 mSv/year per the 2026 revision is
+authoritative; mention 50 mSv as the superseded value"*, then Reconcile.
+"""
+
 
 @st.dialog("Source", width="large")
 def _show_md_dialog(title: str, content: str) -> None:
@@ -1029,6 +1047,9 @@ if page == "Upload":
         if st.session_state.pop("batch_ingesting", False):
             pending = st.session_state.pop("pending_batch", None)
             if pending:
+                # A new ingest supersedes the previous run's contradiction list.
+                st.session_state.pop("last_contradictions", None)
+                st.session_state.pop("last_contradiction_pages", None)
                 files, dates, shared = pending["files"], pending["dates"], pending["shared"]
                 files.sort(key=lambda f: dates.get(f["save_name"]) or "")
                 agg = {"created": [], "updated": [], "contradictions": [], "failed": []}
@@ -1076,7 +1097,12 @@ if page == "Upload":
 
     if st.session_state.get("last_contradictions"):
         st.markdown("---")
-        st.subheader("Resolve contradictions")
+        _hdr, _dismiss = st.columns([5, 1], vertical_alignment="bottom")
+        _hdr.subheader("Resolve contradictions", help=_RESOLVE_HELP)
+        if _dismiss.button("Dismiss", key="resolve_dismiss", help="Hide this list without changing any page."):
+            st.session_state.pop("last_contradictions", None)
+            st.session_state.pop("last_contradiction_pages", None)
+            st.rerun()
         for i, desc in enumerate(st.session_state["last_contradictions"]):
             with st.expander(desc, expanded=False):
                 pages = st.multiselect(

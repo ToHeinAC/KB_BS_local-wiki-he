@@ -118,7 +118,7 @@ upload[N] → dedup.is_duplicate()               # keyed on original upload byte
              → _select_affected_pages(piece, ctx[src_to_pages])         # BM25 over prior index → ranked pages (no LLM)
              → _build_candidate_index_block(ranked)                     # cheap key-facts index nudge (NOT full bodies)
              → ollama_client.generate(system, INGEST_PROMPT, temperature=0.3, model_id=_INGEST_MODEL)
-             → parse "=== filename.md ===" blocks + UPDATE:/CONTRADICTION: lines
+             → parse "=== filename.md ===" blocks + UPDATE:/CONTRADICTION: lines (negative "None found"/"Keine" CONTRADICTION: lines dropped — _NO_CONTRADICTION_RE)
              → _ensure_key_terms + _ensure_index_block (## Key facts)
              → _resolve_target: source-summary→summary_slug; concept/entity→_route_page(registry) dedup
              → if target exists: _merge_pages (deterministic union + contradiction check); else write

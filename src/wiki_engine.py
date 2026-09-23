@@ -86,6 +86,10 @@ _SHARED_SOURCE_MAX_CLIQUE = 8
 # page's own `expires_after_days` frontmatter if set, else this default.
 _DEFAULT_EXPIRE_DAYS = int(os.getenv("STALE_AFTER_DAYS", "365"))
 _TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*(?:\.md)?\s*$")
+# Small models echo `CONTRADICTION: None found…` when there is nothing to report;
+# a leading negative (EN/DE) or an empty body is not a contradiction.
+_NO_CONTRADICTION_RE = re.compile(
+    r"^\s*(?:$|none\b|no\b|n/?a\b|nothing\b|keine?\b|nichts\b)", re.IGNORECASE)
 
 
 def init_wiki() -> None:
@@ -810,7 +814,9 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
             if fname and fname not in ctx["updated"] and fname not in ctx["created"]:
                 ctx["updated"].append(fname)
         elif line.startswith("CONTRADICTION:"):
-            ctx["contradictions"].append(line.split(":", 1)[1].strip())
+            desc = line.split(":", 1)[1].strip()
+            if not _NO_CONTRADICTION_RE.match(desc):
+                ctx["contradictions"].append(desc)
 
 
 def ingest_end(ctx: dict, finalize: bool = True) -> dict:
