@@ -48,8 +48,10 @@ missing optional fields, or broken links. We use that latitude:
   (this is an encyclopedic wiki, not an asset catalog). OKF permits missing
   sections.
 - **Load-bearing keys kept alongside OKF ones** (`sources`, `related`,
-  `key_terms`, `confidence`, `expires_after_days`) — additive, since OKF allows
-  unknown keys.
+  `key_terms`, `confidence`, `expires_after_days`, `lang`, `aliases`) — additive,
+  since OKF allows unknown keys. `lang` (the page's pinned language) and
+  `aliases` (its other-language titles) are code-stamped like every OKF field —
+  see [architecture.md](architecture.md) §Page language.
 - **Internal `## Key facts` heading retained** (drives merge/index-block logic);
   OKF `## Citations` is added as a separate trailing section.
 

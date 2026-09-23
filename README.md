@@ -6,7 +6,7 @@ A fully local, Karpathy-style self-compiling knowledge wiki. Drop documents in �
 
 The generated `wiki/` folder is a conformant **[Open Knowledge Format (OKF v0.1)](docs/okf.md)** bundle — typed markdown pages, `okf_version`-declaring `index.md`, date-grouped `log.md`, and `## Citations`. Conformance is stamped deterministically in code (`src/okf.py`), never by the LLM, so it holds even on `gemma4:e4b`.
 
-Language is preserved deterministically too: `src/lang.py` detects the source language at ingest and the query language at chat/research time, then pins the wiki page or answer to that language (German ↔ English) — citations and numbers stay verbatim. Detection is code-side, never left to the model, so it holds on `gemma4:e4b`.
+Language is preserved deterministically too: `src/lang.py` detects the source language at ingest and the query language at chat/research time, then pins the wiki page or answer to that language (German ↔ English) — citations, numbers and original terms stay verbatim. **Each wiki page keeps the language it was created in** (`src/page_lang.py`): when a source in the other language adds to it, only the new lines are translated, with original terms kept in parentheses, and code checks that no number, § reference or citation was lost (otherwise the text is kept as a labelled original quote). Maintenance → *Page language* fixes existing pages. Detection is code-side, never left to the model, so it holds on `gemma4:e4b`.
 
 ## Documentation
 
