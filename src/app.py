@@ -61,6 +61,7 @@ Nothing changes until you press **Reconcile**.
   *each* selected page in full, so fewer pages means less risk.
 - **Give guidance** — say which claim wins and why (optional but recommended).
 - **Reconcile** — the LLM rewrites the selected pages; the change is logged.
+  Each page keeps its language (a rewrite in another language is not saved).
   There is no undo except re-ingesting.
 
 **Example**
@@ -900,7 +901,7 @@ if _db_choice != st.session_state["active_db"]:
                "research_sources", "last_research_steps", "last_research_metrics",
                "explorer_selected_page", "last_contradictions",
                "pending_batch", "batch_ingesting", "batch_prepared", "batch_key",
-               "convert_editor", "chat_scope"):
+               "convert_editor", "chat_scope", "normalize_report"):
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -1122,8 +1123,11 @@ if page == "Upload":
                             res = wiki_engine.resolve_contradiction(desc, pages, guidance)
                             if res["updated"]:
                                 st.success("Updated: " + ", ".join(f"`{f}`" for f in res["updated"]))
-                            else:
+                            elif not res["skipped"]:
                                 st.info("No pages were rewritten.")
+                            if res["skipped"]:
+                                st.warning("Not rewritten — the reply switched the page's language: "
+                                           + ", ".join(f"`{f}`" for f in res["skipped"]))
                         except RuntimeError as e:
                             st.error(str(e))
 
@@ -1575,7 +1579,7 @@ elif page == "Maintenance":
     # docs/ui.md §Pages): st.tabs evaluates every branch on every rerun, so the
     # index health read, the orphan scan and the log read all ran on each click.
     _maint_options = ["Search index", "Delete source", "Link graph health", "Lint",
-                      "Activity log"]
+                      "Page language", "Activity log"]
     if auth.is_admin(_user):
         _maint_options.append("Admin")
     # Admin disappears when the user is not one. Written *before* the widget:
@@ -1654,6 +1658,37 @@ elif page == "Maintenance":
                     st.rerun()
         else:
             st.info("Delete actions require maintainer rights for this database.")
+
+    elif _maint_view == "Page language":
+        st.caption(
+            "Each page keeps the language it was created in. This pass stamps that language, "
+            "translates lines written in the other language (original terms kept; a translation "
+            "that fails its number/citation check is kept as a labelled *Original* quote), and "
+            "removes `[Teil n/m]` / `.md.md` from source references."
+        )
+        if st.button("Scan pages", key="normalize_scan_btn"):
+            st.session_state["normalize_report"] = wiki_engine.normalize_pages(dry_run=True)
+        _nr = st.session_state.get("normalize_report")
+        if _nr == {}:
+            st.success("Every page is pinned to one language and its references are clean.")
+        elif _nr:
+            _to_translate = sum(1 for i in _nr.values() if i.get("foreign_lines"))
+            st.markdown(f"**{len(_nr)}** pages to update · **{_to_translate}** need translation "
+                        "(one LLM call per block of foreign lines).")
+            st.dataframe(
+                [{"Page": f, "Stamp language": i.get("lang", ""),
+                  "Foreign lines": i.get("foreign_lines", 0),
+                  "Fix references": "yes" if i.get("references") else ""} for f, i in _nr.items()],
+                hide_index=True, width="stretch",
+            )
+            if _can_maintain:
+                if st.button(f"Normalize {len(_nr)} pages", key="normalize_run_btn", type="primary"):
+                    with st.spinner("Normalizing pages…"):
+                        _done = wiki_engine.normalize_pages(dry_run=False)
+                    st.session_state.pop("normalize_report", None)
+                    st.success(f"Updated {len(_done)} pages.")
+            else:
+                st.info("Only maintainers of this database can normalize pages.")
 
     elif _maint_view == "Activity log":
         st.code(wiki_engine.read_log(), language=None)
