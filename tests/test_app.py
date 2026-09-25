@@ -8,6 +8,7 @@ from pathlib import Path
 
 import frontmatter
 import pytest
+from streamlit import config as st_config
 from streamlit.testing.v1 import AppTest
 
 import agent
@@ -25,6 +26,16 @@ import wiki_engine
 APP = str(Path(__file__).resolve().parents[1] / "src" / "app.py")
 ADMIN = auth.DEFAULT_USER
 DB = db_context.DEFAULT_DB
+
+
+@pytest.fixture(autouse=True)
+def _no_magic():
+    """Skip Streamlit's "magic" AST rewrite, a no-op for app.py (it has no bare expressions)
+    but ~90 % of each script run: every AppTest re-parses the 2,000-line script."""
+    before = st_config.get_option("runner.magicEnabled")
+    st_config.set_option("runner.magicEnabled", False)
+    yield
+    st_config.set_option("runner.magicEnabled", before)
 
 
 @pytest.fixture
