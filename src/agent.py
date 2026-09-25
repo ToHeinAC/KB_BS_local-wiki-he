@@ -1,7 +1,7 @@
 """Deep research agent — LangGraph state machine, ChatOllama backend.
 
-Public surface preserved: `run_research_agent(question, wiki_context) -> Generator[step_dict, None, None]`
-emitting the same step-dict shape the Streamlit Research page expects:
+Public surface preserved: `run_research_agent(question, wiki_context)` is a generator of
+step dicts, emitting the same step-dict shape the Streamlit Research page expects:
   {"type": "thought", "content": ...}
   {"type": "tool_call", "name": ..., "args": ...}
   {"type": "tool_result", "name": ..., "result": ...}
@@ -12,17 +12,30 @@ emitting the same step-dict shape the Streamlit Research page expects:
 from __future__ import annotations
 
 import os
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
+from dataclasses import dataclass, field
 from typing import Any
 
 from dotenv import load_dotenv
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.language_models import LanguageModelInput
+from langchain_core.messages import (
+    AIMessage,
+    AnyMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
+from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_ollama import ChatOllama
 from langgraph.graph import (  # pyright: ignore[reportMissingTypeStubs]
     END,
     START,
     MessagesState,
     StateGraph,
+)
+from langgraph.graph.state import (  # pyright: ignore[reportMissingTypeStubs]
+    CompiledStateGraph,
 )
 from langgraph.prebuilt import ToolNode
 
@@ -50,29 +63,30 @@ LLM_TIMEOUT = int(os.getenv("RESEARCH_LLM_TIMEOUT", "300"))
 FALLBACK_NOTES_CAP = int(os.getenv("RESEARCH_FALLBACK_NOTES_CAP", "12000"))
 
 
-def _build_llm():
+def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
     return ChatOllama(
         model=ollama_client.QUERY_MODEL,
         base_url=ollama_client.host(),
         temperature=0.3,
         client_kwargs={"timeout": LLM_TIMEOUT},  # ChatOllama drops a bare timeout=
-    ).bind_tools(tool_module.TOOLS)
+    ).bind_tools(tool_module.TOOLS)  # pyright: ignore[reportUnknownMemberType]  # bare Callable
 
 
-def _build_graph(llm, directive: str = ""):
+def _build_graph(
+    llm: Runnable[LanguageModelInput, BaseMessage], directive: str = ""
+) -> CompiledStateGraph[MessagesState]:
     nudge = RESEARCH_BUDGET_NUDGE + (f"\n\n{directive}" if directive else "")
 
     def agent_node(state: MessagesState) -> dict[str, Any]:
         msgs = list(state["messages"])
         ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
         if ai_count >= NUDGE_AT:
-            msgs = msgs + [HumanMessage(content=nudge)]
+            msgs = [*msgs, HumanMessage(content=nudge)]
         return {"messages": [llm.invoke(msgs)]}
 
     def should_continue(state: MessagesState) -> str:
         last = state["messages"][-1]
-        tool_calls = getattr(last, "tool_calls", None) or []
-        if not tool_calls:
+        if not (isinstance(last, AIMessage) and last.tool_calls):
             return END
         submit_msgs = [
             m
@@ -81,19 +95,20 @@ def _build_graph(llm, directive: str = ""):
             and m.name == "submit_final_answer"
             and isinstance(m.content, str)
         ]
-        if any(m.content.startswith("ACCEPTED") for m in submit_msgs):
+        if any(str(m.content).startswith("ACCEPTED") for m in submit_msgs):
             return END
         if len(submit_msgs) >= MAX_SUBMIT_ATTEMPTS:
             return END
         return "tools"
 
-    g = StateGraph(MessagesState)
-    g.add_node("agent", agent_node)
-    g.add_node("tools", ToolNode(tool_module.TOOLS))
+    g: StateGraph[MessagesState] = StateGraph(MessagesState)
+    # langgraph leaves CachePolicy/BaseCheckpointSaver generics unsolved in these signatures.
+    g.add_node("agent", agent_node)  # pyright: ignore[reportUnknownMemberType]
+    g.add_node("tools", ToolNode(tool_module.TOOLS))  # pyright: ignore[reportUnknownMemberType]
     g.add_edge(START, "agent")
     g.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
     g.add_edge("tools", "agent")
-    return g.compile()
+    return g.compile()  # pyright: ignore[reportUnknownMemberType]
 
 
 def _load_wiki_index() -> str:
@@ -125,11 +140,11 @@ def _system_prompt(wiki_context: str, directive: str = "") -> str:
     )
 
 
-def _ai_to_thought(msg: AIMessage):
+def _ai_to_thought(msg: AIMessage) -> Iterator[dict[str, Any]]:
     text = msg.content if isinstance(msg.content, str) else str(msg.content or "")
     if text.strip():
         yield {"type": "thought", "content": text}
-    for tc in getattr(msg, "tool_calls", None) or []:
+    for tc in msg.tool_calls:
         yield {
             "type": "tool_call",
             "name": tc.get("name"),
@@ -137,7 +152,7 @@ def _ai_to_thought(msg: AIMessage):
         }
 
 
-def _tool_to_result(msg: ToolMessage):
+def _tool_to_result(msg: ToolMessage) -> Iterator[dict[str, Any]]:
     content = msg.content if isinstance(msg.content, str) else str(msg.content)
     yield {"type": "tool_result", "name": msg.name, "result": content}
 
@@ -175,126 +190,156 @@ def _synthesize_fallback(question: str, all_messages: list[Any], directive: str 
         return ""
 
 
+@dataclass
+class _Run:
+    """What one streamed run has produced so far (read by the final-answer cascade)."""
+
+    messages: list[AnyMessage] = field(default_factory=list[AnyMessage])
+    final_msg: AIMessage | ToolMessage | None = None
+    report_path: str | None = None
+    last_submit_args: dict[str, Any] | None = None
+    recursion_hit: bool = False
+
+
+def _observe(msg: AnyMessage, run: _Run) -> Iterator[dict[str, Any]]:
+    """Live steps for one new message; records submissions and the filed report."""
+    if isinstance(msg, AIMessage):
+        for tc in msg.tool_calls:
+            if tc.get("name") == "submit_final_answer":
+                run.last_submit_args = tc.get("args") or {}
+        yield from _ai_to_thought(msg)
+        run.final_msg = msg
+    elif isinstance(msg, ToolMessage):
+        yield from _tool_to_result(msg)
+        run.final_msg = msg
+        if (
+            msg.name == "submit_final_answer"
+            and isinstance(msg.content, str)
+            and msg.content.startswith("ACCEPTED")
+        ):
+            # parse "ACCEPTED: comparisons/<file> (...)"
+            body = msg.content.split(":", 1)[1].strip()
+            run.report_path = body.split(" ", 1)[0]
+
+
+def _stream(graph: Any, init: MessagesState, run: _Run) -> Generator[dict[str, Any], None, bool]:
+    """Run the graph, yielding live steps. Returns False when it died on a real error
+    (already reported); an iteration-limit stop is recorded and returns True."""
+    config: RunnableConfig = {"recursion_limit": MAX_ITER}
+    seen = 0
+    try:
+        for chunk in graph.stream(init, config=config, stream_mode="values"):
+            run.messages = chunk.get("messages", [])
+            for msg in run.messages[seen:]:
+                yield from _observe(msg, run)
+            seen = len(run.messages)
+    except Exception as exc:
+        err = str(exc)
+        if "recursion" not in err.lower() and "GRAPH_RECURSION_LIMIT" not in err:
+            yield {"type": "error", "content": err}
+            return False
+        run.recursion_hit = True
+        yield {
+            "type": "error",
+            "content": f"Iteration limit ({MAX_ITER}) reached for this run — "
+            "returning best-effort answer.",
+        }
+    return True
+
+
+def _direct_answer(final_msg: AIMessage | ToolMessage | None) -> str | None:
+    """The closing assistant prose, when the run ended cleanly without a tool call."""
+    if not isinstance(final_msg, AIMessage):
+        return None
+    text = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
+    return text if not final_msg.tool_calls and text.strip() else None
+
+
+def _best_effort_draft(run: _Run) -> tuple[str, str | None] | None:
+    """(text, note) of the last rejected submission, else of the last assistant prose."""
+    if run.last_submit_args and run.last_submit_args.get("answer"):
+        note = "Submission did not meet quality bar; returning best-effort draft."
+        return str(run.last_submit_args["answer"]), note
+    for m in reversed(run.messages):
+        if isinstance(m, AIMessage):
+            t = m.content if isinstance(m.content, str) else str(m.content or "")
+            if t.strip():
+                return t, None
+    return None
+
+
+def _last_resort(question: str, directive: str, run: _Run) -> dict[str, Any]:
+    # The agent gathered search results but never wrote prose or filed a report
+    # (common with small local models). Synthesise an answer from the notes
+    # instead of discarding everything.
+    synth = _synthesize_fallback(question, run.messages, directive)
+    if synth:
+        return {
+            "type": "final_answer",
+            "content": "(assembled from gathered notes — the agent did not file a report)"
+            f"\n\n{synth}",
+            "report_path": None,
+            "note": "Fallback synthesis from gathered tool results.",
+        }
+    if run.recursion_hit:
+        return {
+            "type": "final_answer",
+            "content": "(no answer — iteration limit reached before any draft was produced)",
+            "report_path": None,
+        }
+    return {
+        "type": "error",
+        "content": "The agent ended without producing an answer — try rephrasing or click "
+        "🆕 New research.",
+    }
+
+
+def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
+    """The one closing step: filed report, clean answer, best-effort draft, or fallback."""
+    if run.report_path:
+        return {
+            "type": "final_answer",
+            "content": "Report submitted.",
+            "report_path": run.report_path,
+        }
+    direct = _direct_answer(run.final_msg)
+    if direct:
+        return {"type": "final_answer", "content": direct, "report_path": None}
+    draft = _best_effort_draft(run)
+    if draft is None:
+        return _last_resort(question, directive, run)
+    prefix = (
+        "(partial — iteration limit hit)"
+        if run.recursion_hit
+        else "(best-effort — quality gate not met)"
+    )
+    step: dict[str, Any] = {
+        "type": "final_answer",
+        "content": f"{prefix}\n\n{draft[0]}",
+        "report_path": None,
+    }
+    if draft[1]:
+        step["note"] = draft[1]
+    return step
+
+
 def run_research_agent(
     question: str, wiki_context: str = ""
 ) -> Generator[dict[str, Any], None, None]:
     run_memory.begin_run()
     directive = lang.response_directive(question)
     try:
-        llm = _build_llm()
-        graph = _build_graph(llm, directive)
+        graph = _build_graph(_build_llm(), directive)
     except Exception as exc:
         yield {"type": "error", "content": f"Agent init failed: {exc}"}
         return
 
-    init = {
+    init: MessagesState = {
         "messages": [
             SystemMessage(content=_system_prompt(wiki_context, directive)),
             HumanMessage(content=question),
         ]
     }
-    config = {"recursion_limit": MAX_ITER}
-
-    seen = 0
-    final_msg: ToolMessage | AIMessage | None = None
-    report_path: str | None = None
-    last_submit_args: dict[str, Any] | None = None
-    all_messages: list[Any] = []
-    recursion_hit = False
-
-    try:
-        for chunk in graph.stream(init, config=config, stream_mode="values"):
-            messages = chunk.get("messages", [])
-            all_messages = messages
-            for msg in messages[seen:]:
-                if isinstance(msg, AIMessage):
-                    for tc in getattr(msg, "tool_calls", None) or []:
-                        if tc.get("name") == "submit_final_answer":
-                            last_submit_args = tc.get("args") or {}
-                    yield from _ai_to_thought(msg)
-                    final_msg = msg
-                elif isinstance(msg, ToolMessage):
-                    yield from _tool_to_result(msg)
-                    final_msg = msg
-                    if (
-                        msg.name == "submit_final_answer"
-                        and isinstance(msg.content, str)
-                        and msg.content.startswith("ACCEPTED")
-                    ):
-                        # parse "ACCEPTED: comparisons/<file> (...)"
-                        body = msg.content.split(":", 1)[1].strip()
-                        report_path = body.split(" ", 1)[0]
-            seen = len(messages)
-    except Exception as exc:
-        msg = str(exc)
-        if "recursion" in msg.lower() or "GRAPH_RECURSION_LIMIT" in msg:
-            recursion_hit = True
-            yield {
-                "type": "error",
-                "content": f"Iteration limit ({MAX_ITER}) reached for this run — returning best-effort answer.",
-            }
-        else:
-            yield {"type": "error", "content": msg}
-            return
-
-    if report_path:
-        yield {"type": "final_answer", "content": "Report submitted.", "report_path": report_path}
-        return
-
-    if isinstance(final_msg, AIMessage):
-        text = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
-        if not getattr(final_msg, "tool_calls", None) and text.strip():
-            yield {"type": "final_answer", "content": text, "report_path": None}
-            return
-
-    _prefix = (
-        "(partial — iteration limit hit)"
-        if recursion_hit
-        else "(best-effort — quality gate not met)"
-    )
-
-    if last_submit_args and last_submit_args.get("answer"):
-        yield {
-            "type": "final_answer",
-            "content": f"{_prefix}\n\n{last_submit_args['answer']}",
-            "report_path": None,
-            "note": "Submission did not meet quality bar; returning best-effort draft.",
-        }
-        return
-
-    for m in reversed(all_messages):
-        if isinstance(m, AIMessage):
-            t = m.content if isinstance(m.content, str) else str(m.content or "")
-            if t.strip():
-                yield {
-                    "type": "final_answer",
-                    "content": f"{_prefix}\n\n{t}",
-                    "report_path": None,
-                }
-                return
-
-    # The agent gathered search results but never wrote prose or filed a report
-    # (common with small local models). Synthesise an answer from the notes
-    # instead of discarding everything.
-    synth = _synthesize_fallback(question, all_messages, directive)
-    if synth:
-        yield {
-            "type": "final_answer",
-            "content": f"(assembled from gathered notes — the agent did not file a report)\n\n{synth}",
-            "report_path": None,
-            "note": "Fallback synthesis from gathered tool results.",
-        }
-        return
-
-    if recursion_hit:
-        yield {
-            "type": "final_answer",
-            "content": "(no answer — iteration limit reached before any draft was produced)",
-            "report_path": None,
-        }
-        return
-
-    yield {
-        "type": "error",
-        "content": "The agent ended without producing an answer — try rephrasing or click 🆕 New research.",
-    }
+    run = _Run()
+    if (yield from _stream(graph, init, run)):
+        yield _final_step(question, directive, run)
