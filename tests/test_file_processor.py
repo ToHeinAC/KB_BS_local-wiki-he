@@ -59,21 +59,13 @@ def test_unsupported_suffix_raises_value_error(tmp_path):
         file_processor.extract_text(f)
 
 
-# --- Truncation ---
+# --- No truncation (MAX_CHARS sizes ingest chunks, see chunk_text) ---
 
-def test_truncation_respects_max_chars(tmp_path, monkeypatch):
-    monkeypatch.setattr(file_processor, "MAX_CHARS", 10)
-    f = tmp_path / "big.txt"
-    f.write_text("a" * 100)
-    result = file_processor.extract_text(f)
-    assert len(result) <= 10
-
-
-def test_result_len_at_most_max_chars(tmp_path, monkeypatch):
+def test_extract_text_returns_full_text_beyond_max_chars(tmp_path, monkeypatch):
     monkeypatch.setattr(file_processor, "MAX_CHARS", 5)
     f = tmp_path / "long.md"
-    f.write_text("x" * 50)
-    assert len(file_processor.extract_text(f)) == 5
+    f.write_text("AAAAA" + "BBBBB")
+    assert file_processor.extract_text(f) == "AAAAABBBBB"
 
 
 # --- Edge cases ---
@@ -154,13 +146,3 @@ def test_extract_text_always_returns_str(tmp_path):
     f = tmp_path / "t.txt"
     f.write_text("data")
     assert isinstance(file_processor.extract_text(f), str)
-
-
-# --- Large file truncation detail ---
-
-def test_large_file_content_after_max_absent(tmp_path, monkeypatch):
-    monkeypatch.setattr(file_processor, "MAX_CHARS", 5)
-    f = tmp_path / "large.txt"
-    f.write_text("AAAAA" + "BBBBB")
-    result = file_processor.extract_text(f)
-    assert "B" not in result
