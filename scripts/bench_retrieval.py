@@ -100,7 +100,7 @@ def _report(results: list[tuple[dict, dict]]) -> None:
     )
 
 
-def main() -> int:
+def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="LocalWiki retrieval benchmark")
     ap.add_argument("--db", required=True, help="database name (e.g. KI)")
     ap.add_argument("--fixture", help="path to fixture JSON (default: bench/fixture_<db>.json)")
@@ -117,31 +117,38 @@ def main() -> int:
         help="retrieval arm: lexical (default), semantic, hybrid (RRF), "
         "or rerank (hybrid + Stage D cross-encoder)",
     )
-    args = ap.parse_args()
+    return ap.parse_args()
 
+
+def _mode_unavailable(mode: str, db: str) -> str | None:
+    """Why ``mode`` cannot run on ``db`` (an error message), or None when it can."""
+    if mode in ("semantic", "hybrid", "rerank") and not embed_index.available():
+        return (
+            f"ERROR: mode={mode} needs a semantic index for '{db}'.\n"
+            f"Pull an embed model and run: uv run python scripts/backfill_embeddings.py {db}"
+        )
+    # The reranker fails open by design, so a missing GGUF would silently score as
+    # plain hybrid and look like "no gain". Fail loudly instead.
+    if mode == "rerank" and not rerank.available():
+        return (
+            "ERROR: mode=rerank needs llama-cpp-python + a reranker GGUF at "
+            f"{rerank._model_path()} (RERANK_MODEL). Without it the run would "
+            "silently measure plain hybrid."
+        )
+    return None
+
+
+def main() -> int:
+    args = _parse_args()
     db_context.set_active_db(args.db)
     fixture_path = Path(args.fixture or f"bench/fixture_{args.db}.json")
     if not fixture_path.exists():
         print(f"fixture not found: {fixture_path}", file=sys.stderr)
         return 2
     cases = json.loads(fixture_path.read_text())["queries"]
-
-    if args.mode in ("semantic", "hybrid", "rerank") and not embed_index.available():
-        print(
-            f"ERROR: mode={args.mode} needs a semantic index for '{args.db}'.\n"
-            f"Pull an embed model and run: uv run python scripts/backfill_embeddings.py {args.db}",
-            file=sys.stderr,
-        )
-        return 2
-    # The reranker fails open by design, so a missing GGUF would silently score as
-    # plain hybrid and look like "no gain". Fail loudly instead.
-    if args.mode == "rerank" and not rerank.available():
-        print(
-            "ERROR: mode=rerank needs llama-cpp-python + a reranker GGUF at "
-            f"{rerank._model_path()} (RERANK_MODEL). Without it the run would "
-            "silently measure plain hybrid.",
-            file=sys.stderr,
-        )
+    problem = _mode_unavailable(args.mode, args.db)
+    if problem:
+        print(problem, file=sys.stderr)
         return 2
 
     search_fn = _SEARCHERS[args.mode]

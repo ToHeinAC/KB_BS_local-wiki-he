@@ -35,6 +35,7 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
@@ -161,7 +162,49 @@ def _report_per_hit(rel: list[float], irr: list[float], found_q: int, n_q: int) 
     return auc
 
 
-def _report_query_level(answer: list[float], abstain: list[float], min_recall: float) -> dict:
+def _abstain_rates(answer: list[float], abstain: list[float], t: float) -> tuple[float, float]:
+    """(should-answer wrongly abstained, should-abstain correctly abstained) at τ=t."""
+    return (
+        sum(1 for s in answer if s < t) / len(answer),
+        sum(1 for s in abstain if s < t) / len(abstain),
+    )
+
+
+def _print_query_level(
+    answer: list[float],
+    abstain: list[float],
+    q: dict[str, Any],
+) -> None:
+    ans_p, abs_p = q["ans_p"], q["abs_p"]
+    print("── QUERY-LEVEL (top-hit; abstention decision) ──")
+    print(
+        f"should-ANSWER  top-score: n={len(answer):>3}  "
+        f"p10={ans_p[0.10]:+.3f}  p25={ans_p[0.25]:+.3f}  p50={ans_p[0.50]:+.3f}"
+    )
+    print(
+        f"should-ABSTAIN top-score: n={len(abstain):>3}  "
+        f"p50={abs_p[0.50]:+.3f}  p75={abs_p[0.75]:+.3f}  p90={abs_p[0.90]:+.3f}"
+    )
+    print(f"query-level ROC-AUC:           {q['auc']:.3f}")
+    print(
+        f"gap answer-p10 − abstain-p90:  {ans_p[0.10] - abs_p[0.90]:+.3f}   "
+        f"(>0 = a τ separates them)"
+    )
+    fj, tj = _abstain_rates(answer, abstain, q["tau_j"])
+    fr, tr = _abstain_rates(answer, abstain, q["tau"])
+    print(
+        f"τ (Youden):                    {q['tau_j']:+.3f}  "
+        f"→ false-abstain {fj:.0%}, correct-abstain {tj:.0%}"
+    )
+    print(
+        f"τ ({'max-margin midpoint' if q['clean'] else 'conservative'}):        "
+        f"{q['tau']:+.3f}  → false-abstain {fr:.0%}, correct-abstain {tr:.0%}   <- recommended\n"
+    )
+
+
+def _report_query_level(
+    answer: list[float], abstain: list[float], min_recall: float
+) -> dict[str, Any]:
     """Query-level (top-hit) separation — what abstention actually thresholds on."""
     ans_p = {p: _percentile(answer, p) for p in (0.10, 0.25, 0.50)}
     abs_p = {p: _percentile(abstain, p) for p in (0.50, 0.75, 0.90)}
@@ -174,39 +217,9 @@ def _report_query_level(answer: list[float], abstain: list[float], min_recall: f
     tau = (
         (ans_p[0.10] + abs_p[0.90]) / 2 if clean else _conservative_tau(answer, abstain, min_recall)
     )
-
-    def _abstain_rate(t: float) -> tuple[float, float]:
-        # (should-answer wrongly abstained, should-abstain correctly abstained)
-        return (
-            sum(1 for s in answer if s < t) / len(answer),
-            sum(1 for s in abstain if s < t) / len(abstain),
-        )
-
-    print("── QUERY-LEVEL (top-hit; abstention decision) ──")
-    print(
-        f"should-ANSWER  top-score: n={len(answer):>3}  "
-        f"p10={ans_p[0.10]:+.3f}  p25={ans_p[0.25]:+.3f}  p50={ans_p[0.50]:+.3f}"
-    )
-    print(
-        f"should-ABSTAIN top-score: n={len(abstain):>3}  "
-        f"p50={abs_p[0.50]:+.3f}  p75={abs_p[0.75]:+.3f}  p90={abs_p[0.90]:+.3f}"
-    )
-    print(f"query-level ROC-AUC:           {auc_q:.3f}")
-    print(
-        f"gap answer-p10 − abstain-p90:  {ans_p[0.10] - abs_p[0.90]:+.3f}   "
-        f"(>0 = a τ separates them)"
-    )
-    fj, tj = _abstain_rate(tau_j)
-    fr, tr = _abstain_rate(tau)
-    print(
-        f"τ (Youden):                    {tau_j:+.3f}  "
-        f"→ false-abstain {fj:.0%}, correct-abstain {tj:.0%}"
-    )
-    print(
-        f"τ ({'max-margin midpoint' if clean else 'conservative'}):        "
-        f"{tau:+.3f}  → false-abstain {fr:.0%}, correct-abstain {tr:.0%}   <- recommended\n"
-    )
-
+    q = {"ans_p": ans_p, "abs_p": abs_p, "tau_j": tau_j, "auc": auc_q, "clean": clean, "tau": tau}
+    _print_query_level(answer, abstain, q)
+    fr, tr = _abstain_rates(answer, abstain, tau)
     verdict = (
         "SHIP: answer/abstain top-scores separate — abstention is viable."
         if auc_q >= 0.90 and clean
@@ -228,7 +241,7 @@ def _report_query_level(answer: list[float], abstain: list[float], min_recall: f
     }
 
 
-def main() -> int:
+def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Stage E abstention calibration")
     ap.add_argument("--db", required=True, help="database name (e.g. KI)")
     ap.add_argument(
@@ -247,43 +260,33 @@ def main() -> int:
     ap.add_argument(
         "--write", action="store_true", help="persist derived τ to data/<db>/index/calibration.json"
     )
-    args = ap.parse_args()
+    return ap.parse_args()
 
-    db_context.set_active_db(args.db)
-    fixture_path = Path(args.fixture or f"bench/fixture_{args.db}_chunk.json")
+
+def _preflight(db: str, fixture_path: Path) -> str | None:
+    """Why calibration cannot run (an error message), or None when it can."""
     if not fixture_path.exists():
-        print(f"fixture not found: {fixture_path}", file=sys.stderr)
-        return 2
+        return f"fixture not found: {fixture_path}"
     if not embed_index.available():
-        print(
-            f"ERROR: no semantic index for '{args.db}'. Run "
-            f"scripts/backfill_embeddings.py {args.db}",
-            file=sys.stderr,
-        )
-        return 2
+        return f"ERROR: no semantic index for '{db}'. Run scripts/backfill_embeddings.py {db}"
     if not rerank.available():
-        print(
+        return (
             "ERROR: calibration needs the reranker (llama-cpp-python + GGUF at "
-            f"{rerank._model_path()}). Without it there is no score to calibrate.",
-            file=sys.stderr,
+            f"{rerank._model_path()}). Without it there is no score to calibrate."
         )
-        return 2
+    return None
 
-    cases = json.loads(fixture_path.read_text())["queries"]
-    neg_path = Path(args.negatives or f"bench/fixture_{args.db}_negatives.json")
-    print(
-        f"DB={args.db}  answer-fixture={fixture_path}  cases={len(cases)}  "
-        f"model={rerank._model_path().name}"
-    )
-    print(f"abstain-fixture={neg_path if neg_path.exists() else '(none — per-hit only)'}\n")
 
-    rel, irr, found_q, n_q = _collect(cases, args.scope)
-    if not rel or not irr:
-        print("ERROR: could not collect both relevant and irrelevant scored hits.", file=sys.stderr)
-        return 1
-    auc_hit = _report_per_hit(rel, irr, found_q, n_q)
-
-    summary: dict = {"auc_hit": round(auc_hit, 4)}
+def _summarise(
+    args: argparse.Namespace,
+    cases: list[dict[str, Any]],
+    neg_path: Path,
+    auc_hit: float,
+    rel: list[float],
+    irr: list[float],
+) -> dict[str, Any]:
+    """τ from the should-abstain fixture when there is one, else from per-hit recall."""
+    summary: dict[str, Any] = {"auc_hit": round(auc_hit, 4)}
     if neg_path.exists():
         answer_tops = _top_scores(cases, args.scope)
         abstain_tops = _top_scores(json.loads(neg_path.read_text())["queries"], args.scope)
@@ -299,22 +302,51 @@ def main() -> int:
             "(no negatives fixture — τ from per-hit recall only; add one for a "
             "meaningful threshold)"
         )
+    return summary
 
-    if args.write:
-        out = db_context.index_dir() / "calibration.json"
-        out.write_text(
-            json.dumps(
-                {
-                    "model": rerank._model_path().name,
-                    "computed_at": datetime.now(UTC).isoformat(timespec="seconds"),
-                    "answer_fixture": fixture_path.name,
-                    "abstain_fixture": neg_path.name if neg_path.exists() else None,
-                    **summary,
-                },
-                indent=2,
-            )
+
+def _write_calibration(fixture_path: Path, neg_path: Path, summary: dict[str, Any]) -> None:
+    out = db_context.index_dir() / "calibration.json"
+    out.write_text(
+        json.dumps(
+            {
+                "model": rerank._model_path().name,
+                "computed_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                "answer_fixture": fixture_path.name,
+                "abstain_fixture": neg_path.name if neg_path.exists() else None,
+                **summary,
+            },
+            indent=2,
         )
-        print(f"\nwrote {out}")
+    )
+    print(f"\nwrote {out}")
+
+
+def main() -> int:
+    args = _parse_args()
+    db_context.set_active_db(args.db)
+    fixture_path = Path(args.fixture or f"bench/fixture_{args.db}_chunk.json")
+    problem = _preflight(args.db, fixture_path)
+    if problem:
+        print(problem, file=sys.stderr)
+        return 2
+
+    cases = json.loads(fixture_path.read_text())["queries"]
+    neg_path = Path(args.negatives or f"bench/fixture_{args.db}_negatives.json")
+    print(
+        f"DB={args.db}  answer-fixture={fixture_path}  cases={len(cases)}  "
+        f"model={rerank._model_path().name}"
+    )
+    print(f"abstain-fixture={neg_path if neg_path.exists() else '(none — per-hit only)'}\n")
+
+    rel, irr, found_q, n_q = _collect(cases, args.scope)
+    if not rel or not irr:
+        print("ERROR: could not collect both relevant and irrelevant scored hits.", file=sys.stderr)
+        return 1
+    auc_hit = _report_per_hit(rel, irr, found_q, n_q)
+    summary = _summarise(args, cases, neg_path, auc_hit, rel, irr)
+    if args.write:
+        _write_calibration(fixture_path, neg_path, summary)
     return 0
 
 
