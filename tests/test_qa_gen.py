@@ -10,21 +10,26 @@ import lex_index
 import qa_gen
 
 
-@pytest.fixture()
+@pytest.fixture
 def isolated(tmp_path, monkeypatch):
     import db_context
+
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
     return tmp_path
 
 
 def test_generate_parses_json_array(isolated):
-    chunks = [{"chunk_id": "c1", "anchor": "§ 1", "text": "abc"},
-              {"chunk_id": "c2", "anchor": "§ 2", "text": "def"}]
-    response = json.dumps([
-        {"chunk_id": "c1", "questions": ["Q1a?", "Q1b?"]},
-        {"chunk_id": "c2", "questions": ["Q2?"]},
-    ])
+    chunks = [
+        {"chunk_id": "c1", "anchor": "§ 1", "text": "abc"},
+        {"chunk_id": "c2", "anchor": "§ 2", "text": "def"},
+    ]
+    response = json.dumps(
+        [
+            {"chunk_id": "c1", "questions": ["Q1a?", "Q1b?"]},
+            {"chunk_id": "c2", "questions": ["Q2?"]},
+        ]
+    )
     with patch.object(qa_gen.ollama_client, "generate", return_value=response):
         out = qa_gen.generate(chunks)
     assert out == [("c1", "Q1a?"), ("c1", "Q1b?"), ("c2", "Q2?")]
@@ -50,8 +55,10 @@ def test_generate_drops_unknown_chunk_ids(isolated):
 
 def test_generate_falls_back_on_ollama_failure(isolated):
     chunks = [{"chunk_id": "c1", "anchor": "x", "text": "x"}]
+
     def boom(*a, **kw):
         raise RuntimeError("ollama down")
+
     with patch.object(qa_gen.ollama_client, "generate", side_effect=boom):
         out = qa_gen.generate(chunks, source="src.md")
     # Guarantee: 1 entry per source even when the LLM is completely unreachable.
@@ -68,6 +75,7 @@ def test_batching_chunks_runs_multiple_calls(isolated, monkeypatch):
     monkeypatch.setattr(qa_gen, "BATCH_SIZE", 2)
     chunks = [{"chunk_id": f"c{i}", "anchor": "", "text": "x"} for i in range(5)]
     call_count = {"n": 0}
+
     def stub(system, prompt, temperature=0.2):
         call_count["n"] += 1
         # Echo back each chunk id seen in the prompt with one question
@@ -76,6 +84,7 @@ def test_batching_chunks_runs_multiple_calls(isolated, monkeypatch):
             if line.startswith("--- chunk_id: "):
                 ids.append(line.split("--- chunk_id: ")[1].split(" ")[0])
         return json.dumps([{"chunk_id": cid, "questions": [f"Q for {cid}?"]} for cid in ids])
+
     with patch.object(qa_gen.ollama_client, "generate", side_effect=stub):
         out = qa_gen.generate(chunks)
     assert call_count["n"] == 3  # ceil(5/2)
@@ -87,17 +96,27 @@ def test_generate_caps_pairs_per_source(isolated, monkeypatch):
     monkeypatch.setattr(qa_gen, "MAX_PAIRS_PER_SOURCE", 3)
     monkeypatch.setattr(qa_gen, "BATCH_SIZE", 12)
     chunks = [
-        {"chunk_id": f"c{i}", "anchor": f"§ {i}", "heading_path": [f"§ {i}"],
-         "text": f"Some German technical paragraph number {i} with various tokens.",
-         "char_start": i * 100}
+        {
+            "chunk_id": f"c{i}",
+            "anchor": f"§ {i}",
+            "heading_path": [f"§ {i}"],
+            "text": f"Some German technical paragraph number {i} with various tokens.",
+            "char_start": i * 100,
+        }
         for i in range(10)
     ]
+
     # LLM returns 2 questions per chunk seen → would be 20 if uncapped.
     def stub(system, prompt, temperature=0.2):
-        ids = [ln.split("--- chunk_id: ")[1].split(" ")[0]
-               for ln in prompt.splitlines() if ln.startswith("--- chunk_id: ")]
-        return json.dumps([{"chunk_id": cid, "questions": [f"Q1 {cid}?", f"Q2 {cid}?"]}
-                           for cid in ids])
+        ids = [
+            ln.split("--- chunk_id: ")[1].split(" ")[0]
+            for ln in prompt.splitlines()
+            if ln.startswith("--- chunk_id: ")
+        ]
+        return json.dumps(
+            [{"chunk_id": cid, "questions": [f"Q1 {cid}?", f"Q2 {cid}?"]} for cid in ids]
+        )
+
     with patch.object(qa_gen.ollama_client, "generate", side_effect=stub):
         out = qa_gen.generate(chunks)
     assert len(out) == 3
@@ -109,12 +128,18 @@ def test_generate_caps_pairs_per_source(isolated, monkeypatch):
 def test_select_target_chunks_prefers_anchored(isolated):
     """Anchored chunks must outrank a denser-but-unanchored chunk."""
     dense_unanchored = {
-        "chunk_id": "dense", "anchor": "", "heading_path": [],
-        "text": " ".join(f"word{i}" for i in range(200)), "char_start": 0,
+        "chunk_id": "dense",
+        "anchor": "",
+        "heading_path": [],
+        "text": " ".join(f"word{i}" for i in range(200)),
+        "char_start": 0,
     }
     anchored = {
-        "chunk_id": "anc", "anchor": "§ 5", "heading_path": ["§ 5"],
-        "text": "kurz", "char_start": 10,
+        "chunk_id": "anc",
+        "anchor": "§ 5",
+        "heading_path": ["§ 5"],
+        "text": "kurz",
+        "char_start": 10,
     }
     out = qa_gen._select_target_chunks([dense_unanchored, anchored], k=1)
     assert out[0]["chunk_id"] == "anc"
@@ -140,10 +165,13 @@ ihre Aktivität bestimmte Werte unterschreitet.
 
     # Persist hypothetical English questions for § 62 (Teil 2 or main)
     target = next(c for c in chunks if c["anchor"].startswith("§ 62"))
-    qa_gen.persist([
-        (target["chunk_id"], "What is the clearance threshold for radioactive residues?"),
-        (target["chunk_id"], "When may residues be released from supervision?"),
-    ], "StrlSchG.md")
+    qa_gen.persist(
+        [
+            (target["chunk_id"], "What is the clearance threshold for radioactive residues?"),
+            (target["chunk_id"], "When may residues be released from supervision?"),
+        ],
+        "StrlSchG.md",
+    )
 
     lex_index.build()
     after = lex_index.query("clearance threshold for radioactive residues")

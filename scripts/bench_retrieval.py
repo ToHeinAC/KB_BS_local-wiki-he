@@ -24,19 +24,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import db_context  # noqa: E402
-import embed_index  # noqa: E402
-import lex_index  # noqa: E402
-import rerank  # noqa: E402
-import retrieval  # noqa: E402
+import db_context
+import embed_index
+import lex_index
+import rerank
+import retrieval
 
 PRECISION_K = 5
 RECALL_K = 10
 
 _SEARCHERS = {
-    "lexical": lex_index.query,   # arm A only (FTS5 BM25)
+    "lexical": lex_index.query,  # arm A only (FTS5 BM25)
     "semantic": embed_index.query,  # arm B only (cosine)
-    "hybrid": retrieval.search,   # RRF fusion of A + B
+    "hybrid": retrieval.search,  # RRF fusion of A + B
     # Stage D: fusion + cross-encoder rerank. Scored against `hybrid` on the same
     # fixture — idea.md's kill-criterion is "no precision@5 gain ⇒ drop the model".
     "rerank": functools.partial(retrieval.search, use_rerank=True),
@@ -54,8 +54,7 @@ def _matches(hit: dict, token: str) -> bool:
     if "#" in token:
         src, frag = token.split("#", 1)
         if src == hit.get("source"):
-            hay = (hit.get("anchor", "") + " "
-                   + " ".join(hit.get("heading_path", []))).lower()
+            hay = (hit.get("anchor", "") + " " + " ".join(hit.get("heading_path", []))).lower()
             return frag.strip().lower() in hay
     return False
 
@@ -63,8 +62,7 @@ def _matches(hit: dict, token: str) -> bool:
 def _score_query(case: dict, scope: str | None, search_fn) -> dict:
     """Run one fixture case and return its per-query metrics."""
     q_scope = case.get("scope", scope)
-    hits = search_fn(case["query"], top_k=RECALL_K,
-                     scope=(q_scope if q_scope != "both" else None))
+    hits = search_fn(case["query"], top_k=RECALL_K, scope=(q_scope if q_scope != "both" else None))
     expected = case["expected"]
     ranks = [i for i, h in enumerate(hits) if any(_matches(h, t) for t in expected)]
     found = {t for t in expected for h in hits[:RECALL_K] if _matches(h, t)}
@@ -90,23 +88,35 @@ def _report(results: list[tuple[dict, dict]]) -> None:
     print("-" * len(hdr))
     for t in sorted(by_type):
         rows = by_type[t]
-        print(f"{t:<14}{len(rows):>4}{_mean(rows,'precision@5'):>8.3f}"
-              f"{_mean(rows,'recall@10'):>8.3f}{_mean(rows,'mrr'):>8.3f}")
+        print(
+            f"{t:<14}{len(rows):>4}{_mean(rows, 'precision@5'):>8.3f}"
+            f"{_mean(rows, 'recall@10'):>8.3f}{_mean(rows, 'mrr'):>8.3f}"
+        )
     allm = [m for _, m in results]
     print("-" * len(hdr))
-    print(f"{'ALL':<14}{len(allm):>4}{_mean(allm,'precision@5'):>8.3f}"
-          f"{_mean(allm,'recall@10'):>8.3f}{_mean(allm,'mrr'):>8.3f}")
+    print(
+        f"{'ALL':<14}{len(allm):>4}{_mean(allm, 'precision@5'):>8.3f}"
+        f"{_mean(allm, 'recall@10'):>8.3f}{_mean(allm, 'mrr'):>8.3f}"
+    )
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="LocalWiki retrieval benchmark")
     ap.add_argument("--db", required=True, help="database name (e.g. KI)")
     ap.add_argument("--fixture", help="path to fixture JSON (default: bench/fixture_<db>.json)")
-    ap.add_argument("--scope", default="both", choices=["raw", "wiki", "both"],
-                    help="default retrieval scope; a case may override with its own 'scope'")
-    ap.add_argument("--mode", default="lexical", choices=list(_SEARCHERS),
-                    help="retrieval arm: lexical (default), semantic, hybrid (RRF), "
-                         "or rerank (hybrid + Stage D cross-encoder)")
+    ap.add_argument(
+        "--scope",
+        default="both",
+        choices=["raw", "wiki", "both"],
+        help="default retrieval scope; a case may override with its own 'scope'",
+    )
+    ap.add_argument(
+        "--mode",
+        default="lexical",
+        choices=list(_SEARCHERS),
+        help="retrieval arm: lexical (default), semantic, hybrid (RRF), "
+        "or rerank (hybrid + Stage D cross-encoder)",
+    )
     args = ap.parse_args()
 
     db_context.set_active_db(args.db)
@@ -117,29 +127,38 @@ def main() -> int:
     cases = json.loads(fixture_path.read_text())["queries"]
 
     if args.mode in ("semantic", "hybrid", "rerank") and not embed_index.available():
-        print(f"ERROR: mode={args.mode} needs a semantic index for '{args.db}'.\n"
-              f"Pull an embed model and run: uv run python scripts/backfill_embeddings.py {args.db}",
-              file=sys.stderr)
+        print(
+            f"ERROR: mode={args.mode} needs a semantic index for '{args.db}'.\n"
+            f"Pull an embed model and run: uv run python scripts/backfill_embeddings.py {args.db}",
+            file=sys.stderr,
+        )
         return 2
     # The reranker fails open by design, so a missing GGUF would silently score as
     # plain hybrid and look like "no gain". Fail loudly instead.
     if args.mode == "rerank" and not rerank.available():
-        print("ERROR: mode=rerank needs llama-cpp-python + a reranker GGUF at "
-              f"{rerank._model_path()} (RERANK_MODEL). Without it the run would "
-              "silently measure plain hybrid.", file=sys.stderr)
+        print(
+            "ERROR: mode=rerank needs llama-cpp-python + a reranker GGUF at "
+            f"{rerank._model_path()} (RERANK_MODEL). Without it the run would "
+            "silently measure plain hybrid.",
+            file=sys.stderr,
+        )
         return 2
 
     search_fn = _SEARCHERS[args.mode]
     results = [(c, _score_query(c, args.scope, search_fn)) for c in cases]
     # Fail loud on an unindexed corpus rather than reporting silent zeros.
     if sum(m["hits"] for _, m in results) == 0:
-        print(f"ERROR: 0 hits for every query — is the '{args.db}' index built?\n"
-              f"Rebuild it (ingest, or a rebuild run) before benchmarking.",
-              file=sys.stderr)
+        print(
+            f"ERROR: 0 hits for every query — is the '{args.db}' index built?\n"
+            f"Rebuild it (ingest, or a rebuild run) before benchmarking.",
+            file=sys.stderr,
+        )
         return 1
 
-    print(f"DB={args.db}  fixture={fixture_path}  cases={len(cases)}  "
-          f"scope={args.scope}  mode={args.mode}\n")
+    print(
+        f"DB={args.db}  fixture={fixture_path}  cases={len(cases)}  "
+        f"scope={args.scope}  mode={args.mode}\n"
+    )
     _report(results)
     return 0
 

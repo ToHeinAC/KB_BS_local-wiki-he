@@ -58,16 +58,18 @@ def ensure_seeded() -> None:
     p = _path()
     if p.exists():
         return
-    _save({
-        "users": {
-            DEFAULT_USER: {
-                "pw_hash": _hash(DEFAULT_PASSWORD),
-                "dbs": [db_context.DEFAULT_DB],
-                "is_admin": True,
-                "maintains": [db_context.DEFAULT_DB],
+    _save(
+        {
+            "users": {
+                DEFAULT_USER: {
+                    "pw_hash": _hash(DEFAULT_PASSWORD),
+                    "dbs": [db_context.DEFAULT_DB],
+                    "is_admin": True,
+                    "maintains": [db_context.DEFAULT_DB],
+                }
             }
         }
-    })
+    )
 
 
 def backfill_maintainers() -> None:

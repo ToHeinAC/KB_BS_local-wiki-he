@@ -25,7 +25,10 @@ def test_cue_priority_prefers_in_kraft_over_stand():
 
 
 def test_bare_date_fallback():
-    assert me.extract_effective_date("Ein Dokument vom 31.12.2021 ohne Signalwort davor.") == "2021-12-31"
+    assert (
+        me.extract_effective_date("Ein Dokument vom 31.12.2021 ohne Signalwort davor.")
+        == "2021-12-31"
+    )
 
 
 def test_no_date_returns_none():

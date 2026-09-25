@@ -16,8 +16,7 @@ from __future__ import annotations
 
 import os
 import re
-from pathlib import Path
-from typing import Generator
+from collections.abc import Generator
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -87,8 +86,12 @@ def _build_graph(llm, directive: str = ""):
         if not tool_calls:
             return END
         for m in reversed(state["messages"]):
-            if isinstance(m, ToolMessage) and m.name == "submit_chat_answer" \
-                    and isinstance(m.content, str) and m.content.startswith("ACCEPTED"):
+            if (
+                isinstance(m, ToolMessage)
+                and m.name == "submit_chat_answer"
+                and isinstance(m.content, str)
+                and m.content.startswith("ACCEPTED")
+            ):
                 return END
         return "tools"
 
@@ -148,10 +151,7 @@ def _build_raw_index() -> str:
 
 def _system_prompt(directive: str = "") -> str:
     index_text = _build_raw_index()
-    raw_block = (
-        f"Original files available in data/raw/:\n{index_text}\n\n"
-        if index_text else ""
-    )
+    raw_block = f"Original files available in data/raw/:\n{index_text}\n\n" if index_text else ""
     return CHAT_AGENT_SYSTEM.format(
         raw_block=raw_block,
         language_directive=directive,
@@ -209,8 +209,10 @@ def _synthesize_fallback(question: str, all_messages, directive: str = "") -> st
         prompt += f"\n\n{directive}"
     try:
         return ollama_client.generate(
-            CHAT_FALLBACK_SYSTEM, prompt,
-            temperature=0.3, model_id=ollama_client._QUERY_MODEL,
+            CHAT_FALLBACK_SYSTEM,
+            prompt,
+            temperature=0.3,
+            model_id=ollama_client._QUERY_MODEL,
         ).strip()
     except Exception:
         return ""
@@ -224,8 +226,12 @@ def _extract_submitted_answer(messages) -> tuple[str, list[str]] | None:
     accepted_tool_idx = None
     for i in range(len(messages) - 1, -1, -1):
         m = messages[i]
-        if isinstance(m, ToolMessage) and m.name == "submit_chat_answer" \
-                and isinstance(m.content, str) and m.content.startswith("ACCEPTED"):
+        if (
+            isinstance(m, ToolMessage)
+            and m.name == "submit_chat_answer"
+            and isinstance(m.content, str)
+            and m.content.startswith("ACCEPTED")
+        ):
             accepted_tool_idx = i
             break
     if accepted_tool_idx is None:
@@ -281,8 +287,10 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
         msg = str(exc)
         if "recursion" in msg.lower() or "GRAPH_RECURSION_LIMIT" in msg:
             recursion_hit = True
-            yield {"type": "error",
-                   "content": f"Recursion limit ({MAX_ITER}) reached. Returning best-effort partial answer."}
+            yield {
+                "type": "error",
+                "content": f"Recursion limit ({MAX_ITER}) reached. Returning best-effort partial answer.",
+            }
         else:
             yield {"type": "error", "content": msg}
             return
@@ -290,19 +298,29 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
     submitted = _extract_submitted_answer(all_messages)
     if submitted is not None:
         answer, sources = submitted
-        yield {"type": "final_answer",
-               "content": _with_iter_hint(answer, recursion_hit), **_cites(answer, sources)}
+        yield {
+            "type": "final_answer",
+            "content": _with_iter_hint(answer, recursion_hit),
+            **_cites(answer, sources),
+        }
         return
 
     # Clean exit: the final assistant message carries non-empty answer text.
     if isinstance(final_msg, AIMessage) and not getattr(final_msg, "tool_calls", None):
         text = final_msg.content if isinstance(final_msg.content, str) else str(final_msg.content)
         if text.strip():
-            yield {"type": "final_answer",
-                   "content": _with_iter_hint(text, recursion_hit), **_cites(text)}
+            yield {
+                "type": "final_answer",
+                "content": _with_iter_hint(text, recursion_hit),
+                **_cites(text),
+            }
             return
 
-    _prefix = "(partial — recursion limit hit)" if recursion_hit else "(best-effort — quality gate not met)"
+    _prefix = (
+        "(partial — recursion limit hit)"
+        if recursion_hit
+        else "(best-effort — quality gate not met)"
+    )
 
     # Best-effort: a submit_chat_answer draft that did not clear the quality gate.
     for m in reversed(all_messages):
@@ -311,9 +329,11 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
                 if tc.get("name") == "submit_chat_answer":
                     draft = ((tc.get("args") or {}).get("answer") or "").strip()
                     if draft:
-                        yield {"type": "final_answer",
-                               "content": _with_iter_hint(f"{_prefix}\n\n{draft}", recursion_hit),
-                               **_cites(draft, (tc.get("args") or {}).get("sources") or [])}
+                        yield {
+                            "type": "final_answer",
+                            "content": _with_iter_hint(f"{_prefix}\n\n{draft}", recursion_hit),
+                            **_cites(draft, (tc.get("args") or {}).get("sources") or []),
+                        }
                         return
 
     # Best-effort: the last non-empty assistant message (usually a reflection).
@@ -321,9 +341,11 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
         if isinstance(m, AIMessage):
             text = m.content if isinstance(m.content, str) else str(m.content or "")
             if text.strip():
-                yield {"type": "final_answer",
-                       "content": _with_iter_hint(f"{_prefix}\n\n{text}", recursion_hit),
-                       **_cites(text)}
+                yield {
+                    "type": "final_answer",
+                    "content": _with_iter_hint(f"{_prefix}\n\n{text}", recursion_hit),
+                    **_cites(text),
+                }
                 return
 
     # The agent gathered search results but never submitted or wrote prose
@@ -343,10 +365,15 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
         return
 
     if recursion_hit:
-        yield {"type": "final_answer",
-               "content": "(no answer — recursion limit hit before any reflection was emitted)",
-               "sources": [], "wiki_sources": []}
+        yield {
+            "type": "final_answer",
+            "content": "(no answer — recursion limit hit before any reflection was emitted)",
+            "sources": [],
+            "wiki_sources": [],
+        }
         return
 
-    yield {"type": "error",
-           "content": f"Reached max iterations ({MAX_ITER}) without a submitted answer."}
+    yield {
+        "type": "error",
+        "content": f"Reached max iterations ({MAX_ITER}) without a submitted answer.",
+    }

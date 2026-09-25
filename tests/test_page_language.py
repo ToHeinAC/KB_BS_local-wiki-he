@@ -31,6 +31,7 @@ def _fake_llm(monkeypatch, ingest_response="", translation=""):
 def _no_embed(monkeypatch):
     def boom(texts, model_id):
         raise RuntimeError("no embed in tests")
+
     monkeypatch.setattr(ollama_client, "embed", boom)
 
 
@@ -40,9 +41,12 @@ def _meta(path):
 
 # --- step 1: umlaut-safe slugs ------------------------------------------------
 
+
 def test_title_to_filename_folds_umlauts():
-    assert w._title_to_filename("Überwachung der Äquivalentdosis") == \
-        "ueberwachung-der-aequivalentdosis.md"
+    assert (
+        w._title_to_filename("Überwachung der Äquivalentdosis")
+        == "ueberwachung-der-aequivalentdosis.md"
+    )
 
 
 def test_slug_tokens_fold_umlauts():
@@ -90,10 +94,12 @@ def test_ingest_cleans_teil_and_double_md_refs(wiki_dir, monkeypatch):
 
 # --- step 4: `lang` stamped at creation ---------------------------------------
 
+
 def _page(fname, title, body, lang=None):
     lang_line = f"lang: {lang}\n" if lang else ""
-    return (f"=== {fname} ===\n---\ntitle: {title}\ntype: concept\n{lang_line}---\n"
-            f"{body}\n=== END ===")
+    return (
+        f"=== {fname} ===\n---\ntitle: {title}\ntype: concept\n{lang_line}---\n{body}\n=== END ==="
+    )
 
 
 def test_new_page_stamped_with_its_language(wiki_dir, monkeypatch):
@@ -108,12 +114,13 @@ def test_new_page_stamped_with_its_language(wiki_dir, monkeypatch):
 # --- step 5: cross-language merge ---------------------------------------------
 
 _EN_ONTOLOGY = (
-    "---\ntitle: Ontology\ntype: concept\nlang: en\nsources: [\"a.md\"]\n---\n"
+    '---\ntitle: Ontology\ntype: concept\nlang: en\nsources: ["a.md"]\n---\n'
     "## Key facts\n- An ontology is a formal specification of the domain.\n\n"
     "The ontology gives the agent a structure and it is used for the inference.\n"
 )
 _DE_CONTRIBUTION = _page(
-    "concept-ontology.md", "Ontologie",
+    "concept-ontology.md",
+    "Ontologie",
     "## Key facts\n- Eine Ontologie ist eine formale Spezifikation und sie ist die Grundlage.\n\n"
     "Sie liefert die **Begrenzungen** für den Agenten mit 20 mSv [doc.md].",
 )
@@ -152,8 +159,11 @@ def test_cross_language_merge_falls_back_to_labelled_quote(wiki_dir, monkeypatch
 
 def test_same_language_merge_makes_no_translation_call(wiki_dir, monkeypatch):
     (wiki_dir / "concept-ontology.md").write_text(_EN_ONTOLOGY)
-    en = _page("concept-ontology.md", "Ontology",
-               "The ontology is also used for the checks of the constraints.")
+    en = _page(
+        "concept-ontology.md",
+        "Ontology",
+        "The ontology is also used for the checks of the constraints.",
+    )
     calls = _fake_llm(monkeypatch, en)
     w.ingest("An English source about the ontology and the agent.", "b.md")
     assert not [p for _, p in calls if p.startswith("Translate")]
@@ -167,14 +177,19 @@ def test_contradiction_note_follows_page_language():
 
 # --- step 6: Reconcile / polish never switch a page's language ----------------
 
-_DE_PAGE = ("---\ntitle: Grenzwert\ntype: concept\nlang: de\n---\n"
-            "Der Grenzwert liegt bei 20 mSv pro Jahr und gilt für die Arbeitskräfte.\n")
+_DE_PAGE = (
+    "---\ntitle: Grenzwert\ntype: concept\nlang: de\n---\n"
+    "Der Grenzwert liegt bei 20 mSv pro Jahr und gilt für die Arbeitskräfte.\n"
+)
 
 
 def test_resolve_skips_rewrite_in_wrong_language(wiki_dir, monkeypatch):
     (wiki_dir / "a.md").write_text(_DE_PAGE)
-    calls = _fake_llm(monkeypatch, "=== a.md ===\n---\ntitle: Limit\n---\n"
-                      "The limit is 20 mSv per year and it applies to the workers.\n=== END ===")
+    calls = _fake_llm(
+        monkeypatch,
+        "=== a.md ===\n---\ntitle: Limit\n---\n"
+        "The limit is 20 mSv per year and it applies to the workers.\n=== END ===",
+    )
     res = w.resolve_contradiction("20 vs 50 mSv", ["a.md"])
     assert res["updated"] == [] and res["skipped"] == ["a.md"]
     assert "Der Grenzwert" in (wiki_dir / "a.md").read_text()
@@ -183,8 +198,11 @@ def test_resolve_skips_rewrite_in_wrong_language(wiki_dir, monkeypatch):
 
 def test_resolve_accepts_rewrite_in_page_language(wiki_dir, monkeypatch):
     (wiki_dir / "a.md").write_text(_DE_PAGE)
-    _fake_llm(monkeypatch, "=== a.md ===\n---\ntitle: Grenzwert\n---\n"
-              "Der Grenzwert liegt bei 20 mSv pro Jahr, das ist der gültige Wert.\n=== END ===")
+    _fake_llm(
+        monkeypatch,
+        "=== a.md ===\n---\ntitle: Grenzwert\n---\n"
+        "Der Grenzwert liegt bei 20 mSv pro Jahr, das ist der gültige Wert.\n=== END ===",
+    )
     res = w.resolve_contradiction("20 vs 50 mSv", ["a.md"])
     assert res["updated"] == ["a.md"]
     assert _meta(wiki_dir / "a.md")["lang"] == "de"
@@ -240,7 +258,9 @@ def test_normalize_translates_foreign_runs_in_place(wiki_dir, monkeypatch):
 
 def test_translation_keeps_bullet_markers(wiki_dir, monkeypatch):
     (wiki_dir / "concept-ontology.md").write_text(_MIXED)
-    no_bullets = _MIXED_TRANSLATION.replace("- An ontology", "An ontology").replace("- It provides", "It provides")
+    no_bullets = _MIXED_TRANSLATION.replace("- An ontology", "An ontology").replace(
+        "- It provides", "It provides"
+    )
     _fake_llm(monkeypatch, translation=no_bullets)
     w.normalize_pages(dry_run=False)
     page = (wiki_dir / "concept-ontology.md").read_text()
@@ -259,10 +279,12 @@ def test_normalize_quotes_run_when_translation_fails(wiki_dir, monkeypatch):
 
 # --- step 8: cross-language routing -------------------------------------------
 
+
 def _existing(wiki_dir, fname, title, body, lang, aliases=None):
     alias_line = f"aliases: {aliases}\n" if aliases else ""
     (wiki_dir / fname).write_text(
-        f"---\ntitle: {title}\ntype: concept\nlang: {lang}\n{alias_line}---\n{body}\n")
+        f"---\ntitle: {title}\ntype: concept\nlang: {lang}\n{alias_line}---\n{body}\n"
+    )
 
 
 def _content(title, body):
@@ -273,8 +295,14 @@ _DE_BODY = "Die Ausführung wird dauerhaft gespeichert und sie ist für den Agen
 
 
 def test_routes_by_alias(wiki_dir):
-    _existing(wiki_dir, "concept-ontology.md", "Ontology",
-              "The ontology is the model of the domain.", "en", '["Ontologie"]')
+    _existing(
+        wiki_dir,
+        "concept-ontology.md",
+        "Ontology",
+        "The ontology is the model of the domain.",
+        "en",
+        '["Ontologie"]',
+    )
     ctx = {"registry": w._build_registry(), "lang": "de"}
     target = w._resolve_target(_content("Ontologie", _DE_BODY), "concept-ontologie.md", ctx)
     assert target == "concept-ontology.md"
@@ -285,30 +313,49 @@ def _fake_embed(monkeypatch, vecs):
 
 
 def test_routes_cross_language_by_title_similarity(wiki_dir, monkeypatch):
-    _existing(wiki_dir, "concept-durable-execution.md", "Durable Execution",
-              "Durable execution persists the state of the workflow.", "en")
+    _existing(
+        wiki_dir,
+        "concept-durable-execution.md",
+        "Durable Execution",
+        "Durable execution persists the state of the workflow.",
+        "en",
+    )
     _existing(wiki_dir, "concept-gpu.md", "GPU", "The GPU is the processor for the models.", "en")
-    _fake_embed(monkeypatch, {"Dauerhafte Ausführung": [1.0, 0.0],
-                              "Durable Execution": [0.95, 0.31], "GPU": [0.0, 1.0]})
+    _fake_embed(
+        monkeypatch,
+        {"Dauerhafte Ausführung": [1.0, 0.0], "Durable Execution": [0.95, 0.31], "GPU": [0.0, 1.0]},
+    )
     ctx = {"registry": w._build_registry(), "lang": "de"}
-    target = w._resolve_target(_content("Dauerhafte Ausführung", _DE_BODY),
-                               "concept-dauerhafte-ausfuehrung.md", ctx)
+    target = w._resolve_target(
+        _content("Dauerhafte Ausführung", _DE_BODY), "concept-dauerhafte-ausfuehrung.md", ctx
+    )
     assert target == "concept-durable-execution.md"
 
 
 def test_no_cross_language_route_without_clear_winner(wiki_dir, monkeypatch):
     _existing(wiki_dir, "concept-a.md", "Durable Execution", "The state is persisted.", "en")
     _existing(wiki_dir, "concept-b.md", "Durable Storage", "The data is persisted.", "en")
-    _fake_embed(monkeypatch, {"Dauerhafte Ausführung": [1.0, 0.0],
-                              "Durable Execution": [0.95, 0.31], "Durable Storage": [0.93, 0.37]})
+    _fake_embed(
+        monkeypatch,
+        {
+            "Dauerhafte Ausführung": [1.0, 0.0],
+            "Durable Execution": [0.95, 0.31],
+            "Durable Storage": [0.93, 0.37],
+        },
+    )
     ctx = {"registry": w._build_registry(), "lang": "de"}
     target = w._resolve_target(_content("Dauerhafte Ausführung", _DE_BODY), "concept-x.md", ctx)
     assert target == "concept-x.md"
 
 
 def test_no_cross_language_route_when_embed_unavailable(wiki_dir):
-    _existing(wiki_dir, "concept-durable-execution.md", "Durable Execution",
-              "Durable execution persists the state of the workflow.", "en")
+    _existing(
+        wiki_dir,
+        "concept-durable-execution.md",
+        "Durable Execution",
+        "Durable execution persists the state of the workflow.",
+        "en",
+    )
     ctx = {"registry": w._build_registry(), "lang": "de"}
     target = w._resolve_target(_content("Dauerhafte Ausführung", _DE_BODY), "concept-x.md", ctx)
     assert target == "concept-x.md"

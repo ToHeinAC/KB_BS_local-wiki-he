@@ -4,12 +4,10 @@ import sys
 from pathlib import Path
 
 import frontmatter
-import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import okf
-
 
 CONCEPT = """---
 title: Copper
@@ -38,6 +36,7 @@ def _meta(content: str) -> dict:
 
 # --- enrich_frontmatter ------------------------------------------------------
 
+
 def test_enrich_adds_okf_fields():
     post = frontmatter.loads(CONCEPT)
     m = okf.enrich_frontmatter(post.metadata, post.content, db="Investing")
@@ -61,7 +60,7 @@ def test_enrich_resource_for_source_summary():
 
 
 def test_enrich_keeps_existing_description():
-    c = CONCEPT.replace('confidence: high', 'confidence: high\ndescription: "Hand written."')
+    c = CONCEPT.replace("confidence: high", 'confidence: high\ndescription: "Hand written."')
     post = frontmatter.loads(c)
     m = okf.enrich_frontmatter(post.metadata, post.content, db="Investing")
     assert m["description"] == "Hand written."
@@ -75,6 +74,7 @@ def test_enrich_is_idempotent():
 
 
 # --- citations ---------------------------------------------------------------
+
 
 def test_render_citations_numbered():
     out = okf.render_citations(["a.md", "b.md"])
@@ -105,6 +105,7 @@ def test_apply_to_page_refreshes_citations_on_source_change():
 
 # --- log ---------------------------------------------------------------------
 
+
 def test_add_log_entry_groups_by_date_newest_first():
     text = "---\ntitle: Activity Log\n---\n\n# Log\n"
     text = okf.add_log_entry(text, "Ingest: a", "created x", day="2026-07-01", time="09:00")
@@ -117,9 +118,11 @@ def test_add_log_entry_groups_by_date_newest_first():
 
 
 def test_reformat_legacy_log():
-    legacy = ("# Wiki Log\n\n"
-              "## 2026-06-01 09:00 — Ingest: a\nAffected: []\n\n"
-              "## 2026-06-02 11:00 — Consolidate\nmerged\n")
+    legacy = (
+        "# Wiki Log\n\n"
+        "## 2026-06-01 09:00 — Ingest: a\nAffected: []\n\n"
+        "## 2026-06-02 11:00 — Consolidate\nmerged\n"
+    )
     out = okf.reformat_log(legacy)
     body = frontmatter.loads(out).content
     assert body.count("## 2026-06-02") == 1
@@ -128,6 +131,7 @@ def test_reformat_legacy_log():
 
 
 # --- validate ----------------------------------------------------------------
+
 
 def test_validate_clean_bundle(tmp_path):
     (tmp_path / "index.md").write_text('---\nokf_version: "0.1"\n---\n\n# Pages\n')
@@ -146,22 +150,23 @@ def test_validate_flags_missing_version_and_type(tmp_path):
 
 # --- collapse_duplicate_sections ---------------------------------------------
 
+
 def test_collapse_keeps_content_bearing_duplicate():
     body = (
-        "## Key facts\n- A\n- B\n\n"                     # short outline
+        "## Key facts\n- A\n- B\n\n"  # short outline
         "## Key facts\n- Real fact one is much longer.\n- Real fact two.\n\n"
         "## Details\nsome text\n"
     )
     out, removed = okf.collapse_duplicate_sections(body)
     assert removed == 1
     assert out.count("## Key facts") == 1
-    assert "Real fact one is much longer." in out   # kept the longer section
-    assert "- A\n- B" not in out                     # dropped the outline
-    assert "## Details" in out                       # untouched
+    assert "Real fact one is much longer." in out  # kept the longer section
+    assert "- A\n- B" not in out  # dropped the outline
+    assert "## Details" in out  # untouched
 
 
 def test_collapse_noop_without_consecutive_duplicates():
-    body = "## A\nx\n\n## B\ny\n\n## A\nz\n"          # repeat, but not adjacent
+    body = "## A\nx\n\n## B\ny\n\n## A\nz\n"  # repeat, but not adjacent
     out, removed = okf.collapse_duplicate_sections(body)
     assert removed == 0
     assert out == body

@@ -10,8 +10,7 @@ import operator as _op
 import os
 import re
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 import frontmatter
 from dotenv import load_dotenv
@@ -20,8 +19,8 @@ from langchain_core.tools import tool
 import calibrate
 import chunker
 import db_context
-import retrieval
 import okf
+import retrieval
 import run_memory
 import wiki_engine
 from prompts import (
@@ -58,6 +57,7 @@ WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended 
 # wide scope starves every DB into uselessness.
 MIN_HITS_PER_DB = 3
 
+
 def _with_active_db(fn):
     """Wrap `fn` so a ThreadPoolExecutor worker re-applies the caller's DB context.
 
@@ -86,9 +86,7 @@ _URL_RE = re.compile(r"https?://[^\s\)\]]+")
 _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([^\]\n]+?\.md)\s*\]")
 # Accept an optional trailing " §..." or " #..." section marker so the same file
 # can be cited as multiple distinct sources, e.g. [Source: StrlSchG.md §62].
-_RAW_CITE_RE = re.compile(
-    r"\[Source:\s*([^\]\n]+?\.(?:md|txt|html)(?:\s*[§#][^\]\n]+?)?)\s*\]"
-)
+_RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]\n]+?\.(?:md|txt|html)(?:\s*[§#][^\]\n]+?)?)\s*\]")
 
 
 def _slug(text: str) -> str:
@@ -98,11 +96,7 @@ def _slug(text: str) -> str:
 def _format_tavily_result(idx: int, r: dict) -> str:
     content = (r.get("content") or "")[:CONTENT_TRUNCATE]
     url = r.get("url", "")
-    return (
-        f"Result {idx}: {r.get('title', '')}\n"
-        f"Cite as: [Source: {url}]\n"
-        f"Content: {content}\n---"
-    )
+    return f"Result {idx}: {r.get('title', '')}\nCite as: [Source: {url}]\nContent: {content}\n---"
 
 
 def _tavily_one(query: str, max_results: int) -> str:
@@ -170,8 +164,11 @@ def _format_wiki_hit(idx: int, hit: dict) -> str:
 
 def _format_wiki_link(idx: int, hit: dict) -> str:
     via = hit.get("via", "")
-    why = (f"shares a source with {via}" if hit.get("kind") == "shared-source"
-           else f"related via {via}")
+    why = (
+        f"shares a source with {via}"
+        if hit.get("kind") == "shared-source"
+        else f"related via {via}"
+    )
     return (
         f"[Wiki linked {idx} — {why}]\n"
         f"file: {db_context.qualify(hit.get('filename', ''))}\n"
@@ -193,8 +190,11 @@ def _wiki_search_db(query: str, max_results: int) -> list[str]:
     if WIKI_LINK_EXPANSION:
         seeds = [h["filename"] for h in top[:WIKI_LINK_SEEDS]]
         shown = {h["filename"] for h in top}
-        linked = [l for l in wiki_engine.linked_pages(seeds, limit=WIKI_LINK_MAX)
-                  if l["filename"] not in shown]
+        linked = [
+            l
+            for l in wiki_engine.linked_pages(seeds, limit=WIKI_LINK_MAX)
+            if l["filename"] not in shown
+        ]
         parts.extend(_format_wiki_link(i, l) for i, l in enumerate(linked, 1))
     return parts
 
@@ -318,7 +318,7 @@ def _split_filename(filename: str) -> tuple[str, str]:
     f = filename.strip()
     m = re.search(r"\s*[§#]", f)
     if m:  # explicit section marker
-        return f[: m.start()].strip(), f[m.start():].strip()
+        return f[: m.start()].strip(), f[m.start() :].strip()
     if wiki_engine.read_raw_source(f) is not None:  # bare file (may contain spaces)
         return f, ""
     m = re.match(r"^(\S+\.\w{1,5})\s+(.+)$", f)  # peel a trailing heading title
@@ -403,7 +403,7 @@ def _read_key(base: str, canon: str, offset: int) -> str:
 def _read_canons(mem, base: str) -> set[str]:
     """Normalized section anchors of `base` already read this run."""
     prefix = f"raw:{base}|sec="
-    return {k[len(prefix):].rsplit(":", 1)[0] for k in mem.reads if k.startswith(prefix)}
+    return {k[len(prefix) :].rsplit(":", 1)[0] for k in mem.reads if k.startswith(prefix)}
 
 
 def _read_offsets(mem, base: str) -> set[int]:
@@ -413,7 +413,7 @@ def _read_offsets(mem, base: str) -> set[int]:
     for k in mem.reads:
         if k.startswith(prefix):
             try:
-                out.add(int(k[len(prefix):]))
+                out.add(int(k[len(prefix) :]))
             except ValueError:
                 pass
     return out
@@ -490,8 +490,13 @@ def _low_confidence_nudge() -> str | None:
     """
     mem = run_memory.current()
     tau = calibrate.threshold()
-    if (mem is not None and tau is not None and mem.best_relevance is not None
-            and mem.best_relevance < tau and not mem.low_conf_nudged):
+    if (
+        mem is not None
+        and tau is not None
+        and mem.best_relevance is not None
+        and mem.best_relevance < tau
+        and not mem.low_conf_nudged
+    ):
         mem.low_conf_nudged = True
         return LOW_CONFIDENCE_NUDGE
     return None
@@ -560,18 +565,21 @@ def _submit_final_impl(title: str, answer: str) -> str:
         return nudge
     dest_dir = db_context.wiki_dir() / "comparisons"
     dest_dir.mkdir(parents=True, exist_ok=True)
-    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date = datetime.now(UTC).strftime("%Y-%m-%d")
     filename = f"report-{_slug(title)}.md"
-    all_sources = (sorted(urls) + sorted(f"wiki:{w}" for w in wiki_cites)
-                   + sorted(f"src:{r}" for r in raw_cites))
+    all_sources = (
+        sorted(urls)
+        + sorted(f"wiki:{w}" for w in wiki_cites)
+        + sorted(f"src:{r}" for r in raw_cites)
+    )
     # Serialised by the YAML writer, not f-string interpolated: an LLM-supplied
     # title containing a quote or colon would otherwise emit invalid YAML, which
     # okf.apply_to_page passes through unchanged and read_page_parsed then
     # cannot load — the report is written but unreadable.
-    post = frontmatter.Post(answer, title=title, type="report",
-                            created=date, sources=all_sources)
+    post = frontmatter.Post(answer, title=title, type="report", created=date, sources=all_sources)
     (dest_dir / filename).write_text(
-        okf.apply_to_page(frontmatter.dumps(post), db=db_context.get_active_db()))
+        okf.apply_to_page(frontmatter.dumps(post), db=db_context.get_active_db())
+    )
     return (
         f"ACCEPTED: comparisons/{filename} ({words} words, "
         f"{len(urls)} urls, {len(wiki_cites)} wiki cites, {len(raw_cites)} source cites)"
@@ -579,6 +587,7 @@ def _submit_final_impl(title: str, answer: str) -> str:
 
 
 # --- LangChain tool wrappers (used by ChatOllama.bind_tools) --------------
+
 
 @tool(description=TAVILY_SEARCH_DESCRIPTION)
 def tavily_search(query: str = "", queries: list[str] | None = None, max_results: int = 5) -> str:
@@ -704,8 +713,7 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
         elif canon:
             with db_context.using_db(db):
                 anchors = _section_anchors(base)
-            unread = [a for a in anchors
-                      if _norm_anchor(a) not in _read_canons(mem, qbase)]
+            unread = [a for a in anchors if _norm_anchor(a) not in _read_canons(mem, qbase)]
             menu = ", ".join(unread[:6]) if unread else "none left — pick a different file"
             out.append(
                 f"## Raw file: {qbase} {section}\n"
@@ -761,8 +769,12 @@ def submit_chat_answer(answer: str, sources: list[str] | None = None) -> str:
 # hallucinations on threshold comparisons.
 
 _CMP_OPS = {
-    ">": _op.gt, ">=": _op.ge, "<": _op.lt, "<=": _op.le,
-    "==": _op.eq, "!=": _op.ne,
+    ">": _op.gt,
+    ">=": _op.ge,
+    "<": _op.lt,
+    "<=": _op.le,
+    "==": _op.eq,
+    "!=": _op.ne,
 }
 
 
@@ -804,7 +816,9 @@ def _eval_node(node, facts: dict, trace: list) -> bool:
             v = facts[name]
             low, high = node["low"], node["high"]
             r = low <= v <= high
-            trace.append((r, f"{name} between {_fmt_val(low)} and {_fmt_val(high)}  (= {_fmt_val(v)})"))
+            trace.append(
+                (r, f"{name} between {_fmt_val(low)} and {_fmt_val(high)}  (= {_fmt_val(v)})")
+            )
             return r
         if o == "not":
             inner = _eval_node(node["arg"], facts, trace)

@@ -65,8 +65,9 @@ def _rrf_fuse(lex_hits: list[dict], sem_hits: list[dict], top_k: int) -> list[di
     return out
 
 
-def search(q: str, top_k: int = 10, scope: str | None = None,
-           use_rerank: bool = False) -> list[dict]:
+def search(
+    q: str, top_k: int = 10, scope: str | None = None, use_rerank: bool = False
+) -> list[dict]:
     """Hybrid lexical+semantic retrieval. Falls back to pure lexical when the
     semantic arm is unavailable (identical to `lex_index.query`).
 

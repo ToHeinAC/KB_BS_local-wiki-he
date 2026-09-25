@@ -15,13 +15,13 @@ import wiki_engine
 # Deterministic source-summary + concept page the ingest synthesis call emits.
 _SOURCE_A_PAGES = (
     "=== summary-strlschg.md ===\n"
-    "---\ntitle: StrlSchG\ntype: source-summary\nsources: [\"strlschg.md\"]\n"
+    '---\ntitle: StrlSchG\ntype: source-summary\nsources: ["strlschg.md"]\n'
     "related: []\nconfidence: high\n---\n"
     "The Strahlenschutzgesetz sets the annual effective dose limit for occupationally "
     "exposed persons at 20 millisievert.\n"
     "=== END ===\n"
     "=== dose-limit.md ===\n"
-    "---\ntitle: Dose Limit\ntype: concept\nsources: [\"strlschg.md\"]\n"
+    '---\ntitle: Dose Limit\ntype: concept\nsources: ["strlschg.md"]\n'
     "related: []\nconfidence: high\n---\n"
     "The annual effective dose limit for occupationally exposed persons is 20 mSv "
     "per year under the Strahlenschutzgesetz.\n"
@@ -100,8 +100,7 @@ def test_second_source_merges_into_existing_page_no_duplicate(wiki_dir, monkeypa
 
     # The shared CONCEPT page is merged in place (not duplicated). A fresh
     # source-summary for the new document is expected and correct.
-    concept_pages = [p["filename"] for p in wiki_engine.list_pages()
-                     if p.get("type") == "concept"]
+    concept_pages = [p["filename"] for p in wiki_engine.list_pages() if p.get("type") == "concept"]
     assert concept_pages == ["dose-limit.md"]
     post = frontmatter.load(str(wiki_dir / "dose-limit.md"))
     assert "strlschv.md" in post.metadata["sources"]

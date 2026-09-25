@@ -42,7 +42,8 @@ def test_stalled_agent_synthesizes_from_notes(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        chat_agent.ollama_client, "generate",
+        chat_agent.ollama_client,
+        "generate",
         lambda system, prompt, **kw: "SYNTHESIZED [Source: foo.md]",
     )
     steps = list(chat_agent.run_chat_agent("q?"))
@@ -61,7 +62,8 @@ def test_iteration_limit_appends_end_hint(monkeypatch):
     monkeypatch.setattr(chat_agent, "_build_llm", lambda: LoopingLLM())
     monkeypatch.setattr(chat_agent, "MAX_ITER", 4)
     monkeypatch.setattr(
-        chat_agent.ollama_client, "generate",
+        chat_agent.ollama_client,
+        "generate",
         lambda system, prompt, **kw: "PARTIAL [Source: foo.md]",
     )
     steps = list(chat_agent.run_chat_agent("q?"))

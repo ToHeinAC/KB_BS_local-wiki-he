@@ -20,7 +20,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import ollama_client
-from prompts import OCR_DEEPSEEK_PROMPT, OCR_SYSTEM_PROMPT, OCR_USER_PROMPT, MD_REWRITE_PROMPT
+from prompts import MD_REWRITE_PROMPT, OCR_DEEPSEEK_PROMPT, OCR_SYSTEM_PROMPT, OCR_USER_PROMPT
 
 load_dotenv()
 
@@ -34,8 +34,14 @@ PDF_DPI = int(os.getenv("PDF_DPI", "150"))
 TEXT_THRESHOLD = 40  # chars; below this a PDF page is treated as image-only
 
 CONVERTIBLE_EXTS = {
-    ".pdf", ".docx",
-    ".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp",
+    ".pdf",
+    ".docx",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tiff",
+    ".tif",
+    ".bmp",
 }
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"}
 
@@ -49,6 +55,7 @@ def is_convertible(filename: str) -> bool:
 
 
 # --- image / PDF helpers (from MD-maker pdf_utils.py) ----------------------
+
 
 def _image_to_base64(pil_image) -> str:
     buf = io.BytesIO()
@@ -80,6 +87,7 @@ def _pdf_page_count(pdf_bytes: bytes) -> int:
 
 # --- LLM calls (from MD-maker models.py) -----------------------------------
 
+
 def rewrite_text(text: str, model_id: str = REWRITE_MODEL) -> str:
     """Reformat already-extracted PDF text into Markdown without altering wording."""
     return ollama_client.rewrite(model_id, MD_REWRITE_PROMPT + text)
@@ -96,6 +104,7 @@ def convert_image(pil_image, model_id: str = OCR_MODEL) -> str:
 
 
 # --- DOCX helpers (from MD-maker docx_utils.py) ----------------------------
+
 
 def _paragraph_md(para) -> str | None:
     text = para.text.strip()
@@ -151,6 +160,7 @@ def extract_docx_text(docx_bytes: bytes) -> str:
 
 
 # --- unified entry point ---------------------------------------------------
+
 
 def _convert_pdf(pdf_bytes: bytes, on_progress: ProgressCb | None) -> str:
     total = _pdf_page_count(pdf_bytes)

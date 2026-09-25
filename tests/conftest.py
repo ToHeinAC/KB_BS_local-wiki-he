@@ -34,14 +34,14 @@ def _patch_data_root(monkeypatch, tmp_path: Path, db_name: str = "test") -> Path
     return root
 
 
-@pytest.fixture()
+@pytest.fixture
 def raw_dir(tmp_path, monkeypatch):
     """Isolated raw directory."""
     root = _patch_data_root(monkeypatch, tmp_path)
     return root / "raw"
 
 
-@pytest.fixture()
+@pytest.fixture
 def wiki_dir(tmp_path, monkeypatch):
     """Isolated wiki + raw + chunks + index dirs; inits wiki state."""
     root = _patch_data_root(monkeypatch, tmp_path)
@@ -51,7 +51,7 @@ def wiki_dir(tmp_path, monkeypatch):
     return root / "wiki"
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_ollama(monkeypatch):
     """Patches ollama_client._client; returns the mock instance."""
     mock_instance = MagicMock()

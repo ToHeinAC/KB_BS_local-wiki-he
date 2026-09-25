@@ -2,12 +2,10 @@
 
 import json
 
-import pytest
-
 import dedup
 
-
 # --- sha256 ---
+
 
 def test_sha256_is_64_char_hex():
     result = dedup.sha256(b"hello")
@@ -25,6 +23,7 @@ def test_sha256_differs_for_different_inputs():
 
 # --- is_duplicate ---
 
+
 def test_is_duplicate_false_for_new_file(raw_dir):
     assert dedup.is_duplicate(b"brand new content") is False
 
@@ -41,9 +40,11 @@ def test_is_duplicate_empty_bytes(raw_dir):
 
 # --- register_file ---
 
+
 def test_register_file_returns_path(raw_dir):
     result = dedup.register_file(b"content", "file.txt")
     from pathlib import Path
+
     assert isinstance(result, Path)
 
 
@@ -88,6 +89,7 @@ def test_register_file_name_collision_appends_hash(raw_dir):
 
 def test_register_file_creates_raw_dir_if_absent(tmp_path, monkeypatch):
     import db_context
+
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
     dedup.register_file(b"x", "x.txt")

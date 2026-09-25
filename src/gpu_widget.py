@@ -48,6 +48,7 @@ def reset_research_timer() -> None:
 # GPU stats
 # ---------------------------------------------------------------------------
 
+
 def _get_gpu_stats() -> list[dict]:
     """Query nvidia-smi. Returns [] on failure."""
     try:
@@ -67,12 +68,14 @@ def _get_gpu_stats() -> list[dict]:
         for line in result.stdout.strip().splitlines():
             parts = [p.strip() for p in line.split(",")]
             if len(parts) == 4:
-                gpus.append({
-                    "name": parts[0],
-                    "fan": parts[1],
-                    "temp": parts[2],
-                    "util": parts[3],
-                })
+                gpus.append(
+                    {
+                        "name": parts[0],
+                        "fan": parts[1],
+                        "temp": parts[2],
+                        "util": parts[3],
+                    }
+                )
         return gpus
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return []
@@ -81,6 +84,7 @@ def _get_gpu_stats() -> list[dict]:
 def _build_payload() -> str:
     """Build JSON payload for the GPU stats endpoint."""
     import ollama_client
+
     gpus = _get_gpu_stats()
     elapsed = None
     is_running = False
@@ -89,17 +93,20 @@ def _build_payload() -> str:
         end = _timer["end"] if _timer["end"] is not None else time.monotonic()
         elapsed = int(end - start)
         is_running = _timer["end"] is None
-    return json.dumps({
-        "gpus": gpus,
-        "elapsed": elapsed,
-        "is_running": is_running,
-        "model": ollama_client.loaded_model(),
-    })
+    return json.dumps(
+        {
+            "gpus": gpus,
+            "elapsed": elapsed,
+            "is_running": is_running,
+            "model": ollama_client.loaded_model(),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Starlette route injection (Streamlit >= 1.57)
 # ---------------------------------------------------------------------------
+
 
 def _base_path() -> str:
     """Streamlit's base path as a URL prefix: ``""`` or ``"/wiwi"``.
@@ -172,6 +179,7 @@ def _ensure_gpu_route() -> bool:
 # HTML/JS template (fetches _api/gpu relative to the page)
 # ---------------------------------------------------------------------------
 
+
 def _gpu_html(accent: str = "#234637") -> str:
     return f"""\
 <div id="gpu-stats" style="font-family:monospace; font-size:13px; color:#aaa; white-space:nowrap;">
@@ -221,6 +229,7 @@ setInterval(fetchGPU, 1000);
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def render_gpu_sidebar(accent: str = "#234637") -> None:
     """Render live GPU widget in sidebar via Starlette route injection."""

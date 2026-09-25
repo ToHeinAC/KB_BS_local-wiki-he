@@ -25,7 +25,7 @@ graph_widget.render_graph(overlays={overlays!r}, size_by={size_by!r}, layout={la
 """
 
 
-@pytest.fixture()
+@pytest.fixture
 def app(wiki_dir, tmp_path):
     (wiki_dir / "alpha.md").write_text(
         '---\ntitle: "Alpha"\ntype: concept\nrelated: ["beta.md"]\n'
@@ -66,11 +66,33 @@ def test_component_mounts_with_payload(app):
 def test_payload_carries_every_key_the_renderer_reads(app):
     """index.html reads these by name; a rename here is a silently blank canvas."""
     _, args = _component_args(app())
-    assert {"graph", "overlays", "sizeBy", "layout", "backdrop", "strings",
-            "accent", "height"} <= set(args)
+    assert {
+        "graph",
+        "overlays",
+        "sizeBy",
+        "layout",
+        "backdrop",
+        "strings",
+        "accent",
+        "height",
+    } <= set(args)
     node = args["graph"]["nodes"][0]
-    assert {"id", "label", "cat", "kind", "comm", "deg", "pr", "bridge",
-            "confidence", "stale", "orphan", "hub", "bridgeHub", "tags"} <= set(node)
+    assert {
+        "id",
+        "label",
+        "cat",
+        "kind",
+        "comm",
+        "deg",
+        "pr",
+        "bridge",
+        "confidence",
+        "stale",
+        "orphan",
+        "hub",
+        "bridgeHub",
+        "tags",
+    } <= set(node)
     edge = args["graph"]["edges"][0]
     assert {"s", "t", "type"} <= set(edge)
 

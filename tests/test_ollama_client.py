@@ -15,6 +15,7 @@ def _make_mock(monkeypatch):
 
 # --- is_available ---
 
+
 def test_is_available_true_when_list_succeeds(monkeypatch):
     mock = _make_mock(monkeypatch)
     mock.list.return_value = {}
@@ -28,6 +29,7 @@ def test_is_available_false_when_list_raises(monkeypatch):
 
 
 # --- generate ---
+
 
 def test_generate_returns_response_string(monkeypatch):
     mock = _make_mock(monkeypatch)
@@ -118,6 +120,7 @@ def test_generate_custom_temperature(monkeypatch):
 
 
 # --- chat ---
+
 
 def test_chat_returns_content_string(monkeypatch):
     mock = _make_mock(monkeypatch)

@@ -68,8 +68,9 @@ def _best(hits: list[dict]) -> tuple[float | None, dict | None]:
     return max(scored, key=lambda t: t[0]) if scored else (None, None)
 
 
-def justify(scored: list[tuple[str, float | None]], tau: float | None,
-            cap: int | None = None) -> dict:
+def justify(
+    scored: list[tuple[str, float | None]], tau: float | None, cap: int | None = None
+) -> dict:
     """Split (name, best_score) pairs into an audit record for the search ladder.
 
     Rung 4 of the ladder (idea.md §6.9.1): open the *justified set* — every candidate

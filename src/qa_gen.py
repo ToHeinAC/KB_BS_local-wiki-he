@@ -34,6 +34,7 @@ def _index_dir() -> Path:
 def _qa_path() -> Path:
     return _index_dir() / "qa.jsonl"
 
+
 # Larger batches → fewer Ollama round-trips. 12 chunks × ~500 chars ≈ 6 KB
 # context, comfortable for any local model.
 BATCH_SIZE = int(os.getenv("QA_BATCH_SIZE", "12"))
@@ -131,11 +132,11 @@ def _select_target_chunks(chunks: list[dict], k: int) -> list[dict]:
 
     scored = [
         (
-            -is_anchored(ch),       # anchored first
-            -density(ch),           # then densest
+            -is_anchored(ch),  # anchored first
+            -density(ch),  # then densest
             -len(ch.get("text") or ""),  # then longest
-            ch.get("char_start", 0),     # stable
-            i,                            # break remaining ties by input order
+            ch.get("char_start", 0),  # stable
+            i,  # break remaining ties by input order
         )
         for i, ch in enumerate(chunks)
     ]
@@ -182,8 +183,10 @@ def persist(items: list[tuple[str, str]], source: str) -> None:
     _index_dir().mkdir(parents=True, exist_ok=True)
     with _qa_path().open("a") as f:
         for cid, q in items:
-            f.write(json.dumps({"chunk_id": cid, "question": q, "source": source},
-                               ensure_ascii=False) + "\n")
+            f.write(
+                json.dumps({"chunk_id": cid, "question": q, "source": source}, ensure_ascii=False)
+                + "\n"
+            )
 
 
 def delete_source_entries(source_name: str) -> int:

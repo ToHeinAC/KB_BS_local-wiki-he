@@ -24,11 +24,19 @@ import retrieval
 
 def _hits(n: int) -> list[dict]:
     """n fused hits, already in descending fused-score order."""
-    return [{"chunk_id": f"c{i}", "source": "s.md", "text": f"body {i}",
-             "score": round(1.0 - i * 0.01, 4)} for i in range(n)]
+    return [
+        {
+            "chunk_id": f"c{i}",
+            "source": "s.md",
+            "text": f"body {i}",
+            "score": round(1.0 - i * 0.01, 4),
+        }
+        for i in range(n)
+    ]
 
 
 # --- availability -------------------------------------------------------------
+
 
 def test_unavailable_when_disabled(monkeypatch):
     monkeypatch.setenv("RERANK_ENABLED", "0")
@@ -42,6 +50,7 @@ def test_unavailable_without_model_file(monkeypatch, tmp_path):
 
 
 # --- fail open ----------------------------------------------------------------
+
 
 def test_rerank_fails_open_when_scoring_returns_nothing(monkeypatch):
     """A down reranker must degrade ranking, never break search."""
@@ -57,13 +66,13 @@ def test_rerank_fails_open_on_partial_scores(monkeypatch):
 
 
 def test_rerank_noop_on_trivial_list(monkeypatch):
-    monkeypatch.setattr(rerank, "score_pairs",
-                        lambda q, docs: pytest.fail("should not score"))
+    monkeypatch.setattr(rerank, "score_pairs", lambda q, docs: pytest.fail("should not score"))
     hits = _hits(1)
     assert rerank.rerank("q", hits, top_k=5) == hits
 
 
 # --- blending -----------------------------------------------------------------
+
 
 def test_blend_weight_tiers_are_position_aware():
     assert rerank._blend_weight(0) == rerank._blend_weight(2) == 0.25
@@ -125,13 +134,15 @@ def test_rerank_preserves_hit_shape(monkeypatch):
 
 # --- integration with retrieval.search ---------------------------------------
 
+
 def test_search_is_unchanged_when_reranker_unavailable(tmp_path, monkeypatch):
     """Enabling the flag on a machine without the model can never change results."""
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
     monkeypatch.setenv("RERANK_ENABLED", "0")
-    chunker.write_chunks("radon.md", chunker.split(
-        "## Radon\nRadon raises the neutron dose in the reactor."))
+    chunker.write_chunks(
+        "radon.md", chunker.split("## Radon\nRadon raises the neutron dose in the reactor.")
+    )
     lex_index.build()
     assert not embed_index.available()
     plain = retrieval.search("radon dose", top_k=5)
@@ -144,8 +155,7 @@ def test_search_fast_path_never_calls_the_reranker(tmp_path, monkeypatch):
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
     monkeypatch.setattr(rerank, "available", lambda: True)
-    monkeypatch.setattr(rerank, "rerank",
-                        lambda *a, **k: pytest.fail("Fast path must not rerank"))
+    monkeypatch.setattr(rerank, "rerank", lambda *a, **k: pytest.fail("Fast path must not rerank"))
     chunker.write_chunks("radon.md", chunker.split("## Radon\nNeutron dose."))
     lex_index.build()
     retrieval.search("radon dose", top_k=5)
@@ -153,8 +163,10 @@ def test_search_fast_path_never_calls_the_reranker(tmp_path, monkeypatch):
 
 # --- GPU placement ------------------------------------------------------------
 
+
 class _FakeLlamaCpp:
     """Just enough of llama_cpp for `_model_params`; the real one needs CUDA."""
+
     LLAMA_SPLIT_MODE_NONE = 0
     LLAMA_SPLIT_MODE_LAYER = 1
 
@@ -163,7 +175,7 @@ class _FakeLlamaCpp:
         return SimpleNamespace(split_mode=1, main_gpu=0, n_gpu_layers=-1)
 
 
-@pytest.fixture()
+@pytest.fixture
 def _gguf(monkeypatch, tmp_path):
     """A stand-in reranker GGUF of a known size."""
     path = tmp_path / "reranker.gguf"
@@ -174,10 +186,14 @@ def _gguf(monkeypatch, tmp_path):
 
 
 def _two_cards(monkeypatch, free0: float = 12.0, free1: float = 22.0) -> None:
-    monkeypatch.setattr(gpu_placement, "gpus", lambda: [
-        gpu_placement.Gpu(index=0, name="card0", total_gib=24.0, free_gib=free0),
-        gpu_placement.Gpu(index=1, name="card1", total_gib=24.0, free_gib=free1),
-    ])
+    monkeypatch.setattr(
+        gpu_placement,
+        "gpus",
+        lambda: [
+            gpu_placement.Gpu(index=0, name="card0", total_gib=24.0, free_gib=free0),
+            gpu_placement.Gpu(index=1, name="card1", total_gib=24.0, free_gib=free1),
+        ],
+    )
 
 
 def test_model_params_pin_to_one_card(_gguf, monkeypatch):

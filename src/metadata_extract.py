@@ -13,9 +13,19 @@ from datetime import date
 _HEAD_CHARS = 4000  # vintage signals live in the document head
 
 _MONTHS = {
-    "januar": 1, "februar": 2, "märz": 3, "maerz": 3, "april": 4, "mai": 5,
-    "juni": 6, "juli": 7, "august": 8, "september": 9, "oktober": 10,
-    "november": 11, "dezember": 12,
+    "januar": 1,
+    "februar": 2,
+    "märz": 3,
+    "maerz": 3,
+    "april": 4,
+    "mai": 5,
+    "juni": 6,
+    "juli": 7,
+    "august": 8,
+    "september": 9,
+    "oktober": 10,
+    "november": 11,
+    "dezember": 12,
 }
 
 # High → low priority. A cue must be followed (within ~40 chars) by a date.
@@ -30,9 +40,9 @@ _CUES = [
     r"\bvom\b",
 ]
 
-_DMY = re.compile(r"(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})")           # 01.01.2024
+_DMY = re.compile(r"(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})")  # 01.01.2024
 _DMONTHY = re.compile(r"(\d{1,2})\.\s*([A-Za-zÄÖÜäöü]+)\s+(\d{4})")  # 1. Januar 2024
-_ISO = re.compile(r"(\d{4})-(\d{2})-(\d{2})")                        # 2024-01-01
+_ISO = re.compile(r"(\d{4})-(\d{2})-(\d{2})")  # 2024-01-01
 
 
 def _norm(day: int, month: int, year: int) -> str | None:
@@ -66,7 +76,7 @@ def extract_effective_date(text: str) -> str | None:
     low = head.lower()
     for cue in _CUES:
         for m in re.finditer(cue, low):
-            found = _match_date(head[m.end():m.end() + 40])
+            found = _match_date(head[m.end() : m.end() + 40])
             if found:
                 return found
     return _match_date(head)  # bare-date fallback anywhere in the head

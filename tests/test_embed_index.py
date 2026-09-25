@@ -20,9 +20,18 @@ import embed_index
 import lex_index
 import retrieval
 
-
-_VOCAB = ["radon", "dose", "revenue", "cloud", "attention", "reactor",
-          "photosynthesis", "neutron", "growth", "risk"]
+_VOCAB = [
+    "radon",
+    "dose",
+    "revenue",
+    "cloud",
+    "attention",
+    "reactor",
+    "photosynthesis",
+    "neutron",
+    "growth",
+    "risk",
+]
 
 
 def _toy_vec(text: str) -> list[float]:
@@ -33,18 +42,23 @@ def _toy_vec(text: str) -> list[float]:
     return v.tolist()
 
 
-@pytest.fixture()
+@pytest.fixture
 def semantic_db(tmp_path, monkeypatch):
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
     monkeypatch.setenv("EMBED_MODEL", "toy")
-    monkeypatch.setattr(embed_index.ollama_client, "embed",
-                        lambda texts, model_id: [_toy_vec(t) for t in texts])
+    monkeypatch.setattr(
+        embed_index.ollama_client, "embed", lambda texts, model_id: [_toy_vec(t) for t in texts]
+    )
 
-    chunker.write_chunks("radon.md", chunker.split(
-        "## Radon\nRadon in the reactor building raises the neutron dose."))
-    chunker.write_chunks("sap.md", chunker.split(
-        "## Revenue\nCloud revenue growth was strong; the main risk is regulatory."))
+    chunker.write_chunks(
+        "radon.md",
+        chunker.split("## Radon\nRadon in the reactor building raises the neutron dose."),
+    )
+    chunker.write_chunks(
+        "sap.md",
+        chunker.split("## Revenue\nCloud revenue growth was strong; the main risk is regulatory."),
+    )
     lex_index.build()
     embed_index.build()
     return tmp_path
@@ -52,6 +66,7 @@ def semantic_db(tmp_path, monkeypatch):
 
 def test_build_writes_aligned_vectors_and_meta(semantic_db):
     import json
+
     matrix = np.load(embed_index._vectors_path())
     meta = json.loads(embed_index._meta_path().read_text())
     assert matrix.shape[0] == len(meta["rows"]) > 0
@@ -64,7 +79,7 @@ def test_build_writes_aligned_vectors_and_meta(semantic_db):
 
 def test_available_reflects_model_match(semantic_db, monkeypatch):
     assert embed_index.available()
-    monkeypatch.setenv("EMBED_MODEL", "other")   # vectors were built with 'toy'
+    monkeypatch.setenv("EMBED_MODEL", "other")  # vectors were built with 'toy'
     assert not embed_index.available()
 
 
@@ -83,6 +98,7 @@ def test_query_scope_filter(semantic_db):
 def test_embed_texts_resilient_to_oversized_input(monkeypatch):
     """A single context-overflowing input is isolated and truncated, not fatal —
     the rest of the batch still embeds (guards whole-DB backfill against one bad chunk)."""
+
     def fake_embed(texts, model_id):
         out = []
         for t in texts:
@@ -98,14 +114,18 @@ def test_embed_texts_resilient_to_oversized_input(monkeypatch):
 
 def test_embed_texts_reraises_non_length_errors(monkeypatch):
     """Connectivity/other errors must propagate, not trigger the truncation retry."""
-    monkeypatch.setattr(embed_index.ollama_client, "embed",
-                        lambda texts, model_id: (_ for _ in ()).throw(RuntimeError("connection refused")))
+    monkeypatch.setattr(
+        embed_index.ollama_client,
+        "embed",
+        lambda texts, model_id: (_ for _ in ()).throw(RuntimeError("connection refused")),
+    )
     with pytest.raises(RuntimeError):
         embed_index.embed_texts(["anything"])
 
 
 def test_index_delete_removes_only_that_source(semantic_db):
     import json
+
     before = len(json.loads(embed_index._meta_path().read_text())["rows"])
     assert embed_index.query("revenue")  # sap present
     embed_index.index_delete("sap.md")
@@ -117,6 +137,7 @@ def test_index_delete_removes_only_that_source(semantic_db):
 
 def test_index_replace_source_adds_then_replaces(semantic_db):
     import json
+
     chunker.write_chunks("new.md", chunker.split("## New\nphotosynthesis in green plants"))
     embed_index.index_replace_source("new.md", chunker.load_chunks("new.md"))
     rows = json.loads(embed_index._meta_path().read_text())["rows"]
@@ -135,8 +156,9 @@ def test_incremental_noop_without_existing_index(tmp_path, monkeypatch):
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("fresh")
     monkeypatch.setenv("EMBED_MODEL", "toy")
-    monkeypatch.setattr(embed_index.ollama_client, "embed",
-                        lambda texts, model_id: [_toy_vec(t) for t in texts])
+    monkeypatch.setattr(
+        embed_index.ollama_client, "embed", lambda texts, model_id: [_toy_vec(t) for t in texts]
+    )
     chunker.write_chunks("x.md", chunker.split("## X\nradon dose"))
     # no vectors built yet -> incremental is a no-op (no partial index created)
     embed_index.index_replace_source("x.md", chunker.load_chunks("x.md"))
@@ -166,7 +188,8 @@ def test_okf_prefix_applied_to_wiki_only_not_leaked(tmp_path, monkeypatch):
     wiki = tmp_path / "d" / "wiki"
     wiki.mkdir(parents=True)
     (wiki / "concept-x.md").write_text(
-        "---\ntitle: Photosynthesis\ntype: concept\n---\n## Key facts\n- Plants make sugar.\n")
+        "---\ntitle: Photosynthesis\ntype: concept\n---\n## Key facts\n- Plants make sugar.\n"
+    )
     embed_index.build()
     # the wiki chunk was embedded WITH the OKF identity prefix ...
     assert any(t.startswith("type: concept | title: Photosynthesis") for t in captured["texts"])
@@ -177,12 +200,14 @@ def test_okf_prefix_applied_to_wiki_only_not_leaked(tmp_path, monkeypatch):
 
 # --- RRF fusion / graceful degradation ---------------------------------------
 
+
 def test_search_falls_back_to_lexical_without_vectors(tmp_path, monkeypatch):
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
     monkeypatch.setenv("EMBED_MODEL", "toy")
-    chunker.write_chunks("radon.md", chunker.split(
-        "## Radon\nRadon raises the neutron dose in the reactor."))
+    chunker.write_chunks(
+        "radon.md", chunker.split("## Radon\nRadon raises the neutron dose in the reactor.")
+    )
     lex_index.build()  # lexical only; no embed_index.build()
     assert not embed_index.available()
     fused = retrieval.search("radon dose", top_k=5)

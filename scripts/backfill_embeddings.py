@@ -24,9 +24,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import db_context  # noqa: E402
-import embed_index  # noqa: E402
-import ollama_client  # noqa: E402
+import db_context
+import embed_index
+import ollama_client
 
 
 def _backfill(db: str) -> dict:
@@ -37,8 +37,10 @@ def _backfill(db: str) -> dict:
         print(f"\r  {db}: embedded {done}/{total} chunks", end="", flush=True)
 
     summary = embed_index.build(progress=_progress)
-    print(f"\r  {db}: {summary['chunks']} chunks, model={summary['model']}, "
-          f"dim={summary.get('dim', 0)}  ({time.time() - start:.1f}s)")
+    print(
+        f"\r  {db}: {summary['chunks']} chunks, model={summary['model']}, "
+        f"dim={summary.get('dim', 0)}  ({time.time() - start:.1f}s)"
+    )
     return summary
 
 
@@ -49,8 +51,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if not ollama_client.is_available():
-        print("ERROR: Ollama not reachable. Start it and `ollama pull bge-m3`.",
-              file=sys.stderr)
+        print("ERROR: Ollama not reachable. Start it and `ollama pull bge-m3`.", file=sys.stderr)
         return 2
 
     dbs = db_context.list_dbs() if args.all else ([args.db] if args.db else [])

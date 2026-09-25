@@ -12,7 +12,6 @@ prompt strings (project rule 5.3).
 from __future__ import annotations
 
 import re
-from collections import OrderedDict
 from pathlib import Path
 
 import frontmatter
@@ -26,7 +25,7 @@ _CITATIONS_HEADING = "## Citations"
 _KEY_FACTS_HEADING = "## Key facts"
 _DESC_MAX = 160
 
-_INLINE_CITE_RE = re.compile(r"\[[^\]]*\]")          # strip [source.md] inline cites
+_INLINE_CITE_RE = re.compile(r"\[[^\]]*\]")  # strip [source.md] inline cites
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
 _URL_RE = re.compile(r"^https?://", re.IGNORECASE)
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -47,6 +46,7 @@ def _as_list(value) -> list[str]:
 
 
 # --- Description -------------------------------------------------------------
+
 
 def _key_facts_bullets(body: str) -> list[str]:
     out, capturing = [], False
@@ -83,6 +83,7 @@ def _derive_description(body: str) -> str:
 
 
 # --- Frontmatter enrichment --------------------------------------------------
+
 
 def _derive_tags(meta: dict, db: str, ptype: str) -> list[str]:
     """Coarse, deterministic categories (no LLM): db + page type + `part of`."""
@@ -146,6 +147,7 @@ def enrich_frontmatter(meta: dict, body: str, *, db: str) -> dict:
 
 # --- Citations ---------------------------------------------------------------
 
+
 def render_citations(sources) -> str:
     """Numbered `## Citations` block from a sources list; '' when empty."""
     items = _as_list(sources)
@@ -206,8 +208,8 @@ def collapse_duplicate_sections(body: str) -> tuple[str, int]:
     sections: list[tuple[str, str, int]] = []  # (name, full_text, body_len)
     for i, m in enumerate(heads):
         end = heads[i + 1].start() if i + 1 < len(heads) else len(body)
-        text = body[m.start():end]
-        body_len = len(text[m.end() - m.start():].strip())
+        text = body[m.start() : end]
+        body_len = len(text[m.end() - m.start() :].strip())
         sections.append((m.group(1).strip().lower(), text, body_len))
 
     kept: list[str] = []
@@ -217,7 +219,7 @@ def collapse_duplicate_sections(body: str) -> tuple[str, int]:
         j = i
         while j + 1 < len(sections) and sections[j + 1][0] == sections[i][0]:
             j += 1
-        run = sections[i:j + 1]
+        run = sections[i : j + 1]
         best = max(range(len(run)), key=lambda k: run[k][2])
         kept.append(run[best][1])
         removed += len(run) - 1
@@ -227,10 +229,14 @@ def collapse_duplicate_sections(body: str) -> tuple[str, int]:
 
 # --- Reserved files: log -----------------------------------------------------
 
+
 def add_log_entry(text: str, action: str, detail: str, *, day: str, time: str) -> str:
     """Insert a log entry newest-first under a `## YYYY-MM-DD` date section."""
-    post = frontmatter.loads(text) if text.lstrip().startswith("---") \
+    post = (
+        frontmatter.loads(text)
+        if text.lstrip().startswith("---")
         else frontmatter.Post(text or "# Log\n")
+    )
     post.metadata.setdefault("title", "Activity Log")
 
     bullet = f"- {time} — {action}"
@@ -242,8 +248,7 @@ def add_log_entry(text: str, action: str, detail: str, *, day: str, time: str) -
     if heading in lines:
         lines.insert(lines.index(heading) + 1, bullet)
     else:
-        insert_at = next((i for i, ln in enumerate(lines) if ln.startswith("## ")),
-                         len(lines))
+        insert_at = next((i for i, ln in enumerate(lines) if ln.startswith("## ")), len(lines))
         block = [heading, bullet, ""]
         if insert_at and lines[insert_at - 1].strip():
             block = [""] + block
@@ -271,8 +276,7 @@ def _parse_legacy_log(body: str) -> list[tuple[str, str, str, str]]:
 
 def reformat_log(text: str) -> str:
     """Best-effort convert a legacy flat log into OKF date-grouped form."""
-    post = frontmatter.loads(text) if text.lstrip().startswith("---") \
-        else frontmatter.Post(text)
+    post = frontmatter.loads(text) if text.lstrip().startswith("---") else frontmatter.Post(text)
     events = _parse_legacy_log(post.content)
     if not events:
         post.metadata.setdefault("title", "Activity Log")
@@ -286,6 +290,7 @@ def reformat_log(text: str) -> str:
 
 
 # --- Validation --------------------------------------------------------------
+
 
 def okf_validate(wiki_dir) -> list[str]:
     """Return OKF conformance issues for a bundle directory; empty == conformant."""

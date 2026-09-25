@@ -16,7 +16,6 @@ import run_memory
 import tools
 import wiki_engine
 
-
 ALPHA_RAW = """\
 ## Reactor shielding
 Alpha lead shielding attenuates gamma radiation by a factor of ten.
@@ -63,7 +62,7 @@ def _seed_db(name: str, raw_name: str, raw_text: str, page_text: str) -> None:
         lex_index.build()
 
 
-@pytest.fixture()
+@pytest.fixture
 def two_dbs(tmp_path, monkeypatch):
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("Alpha")
@@ -76,6 +75,7 @@ def two_dbs(tmp_path, monkeypatch):
 
 
 # --- raw_search fan-out ---------------------------------------------------
+
 
 def test_raw_search_single_db_scope_is_unqualified(two_dbs):
     """Default (one DB) behaviour must be byte-identical to the pre-scope path."""
@@ -123,6 +123,7 @@ def test_per_db_budget_has_a_floor(two_dbs):
 
 # --- wiki_search fan-out --------------------------------------------------
 
+
 def test_wiki_search_spans_scope_and_qualifies(two_dbs):
     db_context.set_search_scope(["Alpha", "Beta"])
     out = tools._wiki_search_one("shielding", 8)
@@ -137,6 +138,7 @@ def test_wiki_search_single_scope_unqualified(two_dbs):
 
 
 # --- read routing ---------------------------------------------------------
+
 
 def test_wiki_read_routes_qualified_ref_to_its_db(two_dbs):
     db_context.set_search_scope(["Alpha", "Beta"])
@@ -182,6 +184,7 @@ def test_raw_read_missing_qualified_ref_reports_not_found(two_dbs):
 
 # --- read guard keying ----------------------------------------------------
 
+
 def test_read_guard_keys_are_db_distinct(two_dbs):
     """Same filename in two DBs must not collapse into one visited entry."""
     run_memory.begin_run()
@@ -201,6 +204,7 @@ def test_read_guard_still_catches_true_duplicates(two_dbs):
 
 
 # --- thread-pool context propagation --------------------------------------
+
 
 def test_with_active_db_restores_scope_in_worker(two_dbs):
     """Workers don't inherit ContextVars — a lost scope silently narrows search."""
@@ -222,6 +226,7 @@ def test_parallel_raw_search_keeps_scope(two_dbs):
 
 # --- chat_agent raw index -------------------------------------------------
 
+
 def test_raw_index_single_db_is_ungrouped(two_dbs):
     text = chat_agent._build_raw_index()
     assert "- alpha.md" in text
@@ -236,6 +241,7 @@ def test_raw_index_groups_and_qualifies_across_scope(two_dbs):
 
 
 # --- citation parsing -----------------------------------------------------
+
 
 def test_wiki_cite_regex_accepts_qualified_page():
     assert chat_agent._WIKI_CITE_RE.findall("see [Wiki: Beta::shielding.md] ok") == [
@@ -254,6 +260,7 @@ def test_submit_gate_counts_qualified_sources_from_distinct_dbs():
 
 
 # --- Fast-mode fan-out ----------------------------------------------------
+
 
 def test_query_with_sources_fans_out_one_synthesis_call(two_dbs, monkeypatch):
     calls = []
@@ -278,8 +285,9 @@ def test_query_with_sources_fans_out_one_synthesis_call(two_dbs, monkeypatch):
 
 def test_query_with_sources_single_db_unqualified(two_dbs, monkeypatch):
     calls = []
-    monkeypatch.setattr(wiki_engine.ollama_client, "generate",
-                        lambda s, p, **kw: calls.append(p) or "answer")
+    monkeypatch.setattr(
+        wiki_engine.ollama_client, "generate", lambda s, p, **kw: calls.append(p) or "answer"
+    )
     monkeypatch.setattr(wiki_engine.schema_loader, "get_system_prompt", lambda mode: "sys")
     monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i: ["shielding.md"])
 
@@ -295,10 +303,14 @@ def test_query_with_sources_splits_synthesis_budget(two_dbs, monkeypatch):
     monkeypatch.setattr(wiki_engine, "_QUERY_SYNTH_MAX_CHARS", 6000)
     monkeypatch.setattr(wiki_engine, "_QUERY_MIN_DB_SYNTH_CHARS", 100)
     budgets = []
-    monkeypatch.setattr(wiki_engine, "_gather_pages",
-                        lambda q, s, b: budgets.append(b) or (
-                            "", [], set(), [],
-                            {"tau": None, "kept": [], "below_tau": [], "over_cap": []}))
+    monkeypatch.setattr(
+        wiki_engine,
+        "_gather_pages",
+        lambda q, s, b: (
+            budgets.append(b)
+            or ("", [], set(), [], {"tau": None, "kept": [], "below_tau": [], "over_cap": []})
+        ),
+    )
     monkeypatch.setattr(wiki_engine.ollama_client, "generate", lambda s, p, **kw: "a")
     monkeypatch.setattr(wiki_engine.schema_loader, "get_system_prompt", lambda mode: "sys")
     db_context.set_search_scope(["Alpha", "Beta"])

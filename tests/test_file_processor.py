@@ -1,14 +1,13 @@
 """Tests for file_processor.py — text extraction from various formats."""
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 import file_processor
 
-
 # --- TXT / MD ---
+
 
 def test_txt_extracts_plain_text(tmp_path):
     f = tmp_path / "doc.txt"
@@ -25,6 +24,7 @@ def test_md_extracts_as_is(tmp_path):
 
 
 # --- HTML ---
+
 
 def test_htm_treated_as_html(tmp_path):
     f = tmp_path / "page.htm"
@@ -52,6 +52,7 @@ def test_html_extracts_only_text(tmp_path):
 
 # --- Error handling ---
 
+
 def test_unsupported_suffix_raises_value_error(tmp_path):
     f = tmp_path / "file.xyz"
     f.write_bytes(b"data")
@@ -61,6 +62,7 @@ def test_unsupported_suffix_raises_value_error(tmp_path):
 
 # --- No truncation (MAX_CHARS sizes ingest chunks, see chunk_text) ---
 
+
 def test_extract_text_returns_full_text_beyond_max_chars(tmp_path, monkeypatch):
     monkeypatch.setattr(file_processor, "MAX_CHARS", 5)
     f = tmp_path / "long.md"
@@ -69,6 +71,7 @@ def test_extract_text_returns_full_text_beyond_max_chars(tmp_path, monkeypatch):
 
 
 # --- Edge cases ---
+
 
 def test_empty_txt_returns_empty_string(tmp_path):
     f = tmp_path / "empty.txt"
@@ -85,6 +88,7 @@ def test_non_utf8_handled_with_replace(tmp_path):
 
 
 # --- PDF (mocked) ---
+
 
 def test_pdf_extracts_text(tmp_path):
     f = tmp_path / "doc.pdf"
@@ -114,6 +118,7 @@ def test_pdf_multi_page_joins(tmp_path):
 
 # --- DOCX (mocked) ---
 
+
 def test_docx_extracts_paragraphs(tmp_path):
     f = tmp_path / "doc.docx"
     f.write_bytes(b"PK fake")
@@ -141,6 +146,7 @@ def test_docx_multi_para_joins(tmp_path):
 
 
 # --- Return type ---
+
 
 def test_extract_text_always_returns_str(tmp_path):
     f = tmp_path / "t.txt"

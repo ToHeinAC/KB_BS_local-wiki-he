@@ -2,8 +2,7 @@
 
 import hashlib
 import json
-import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -63,7 +62,7 @@ def register_file(file_bytes: bytes, filename: str, content: bytes | None = None
     manifest = _load_manifest()
     manifest[digest] = {
         "filename": dest.name,
-        "added_at": datetime.now(timezone.utc).isoformat(),
+        "added_at": datetime.now(UTC).isoformat(),
     }
     _save_manifest(manifest)
     return dest

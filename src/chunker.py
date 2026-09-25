@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import unicodedata
 from pathlib import Path
@@ -33,6 +32,7 @@ load_dotenv()
 
 def _chunks_dir() -> Path:
     return db_context.chunks_dir()
+
 
 MAX_CHUNK_CHARS = 4000
 MIN_CHUNK_CHARS = 80
@@ -58,7 +58,9 @@ def chunk_id(text: str) -> str:
 
 def _detect_lang(text: str) -> str:
     sample = text[:4000].lower()
-    de_markers = sum(sample.count(m) for m in (" der ", " die ", " und ", " ist ", "ä", "ö", "ü", "ß"))
+    de_markers = sum(
+        sample.count(m) for m in (" der ", " die ", " und ", " ist ", "ä", "ö", "ü", "ß")
+    )
     en_markers = sum(sample.count(m) for m in (" the ", " and ", " of ", " to ", " is "))
     return "de" if de_markers > en_markers else "en"
 
@@ -67,8 +69,9 @@ def _is_legal(text: str) -> bool:
     return len(_LEGAL_HEAD_RE.findall(text)) >= 3
 
 
-def _split_long(text: str, anchor: str, heading_path: list[str], base_offset: int,
-                lang: str) -> list[dict]:
+def _split_long(
+    text: str, anchor: str, heading_path: list[str], base_offset: int, lang: str
+) -> list[dict]:
     """Window an oversize section into overlapping paragraph-bounded chunks."""
     if len(text) <= MAX_CHUNK_CHARS:
         return [_mk(text, anchor, heading_path, base_offset, lang)]
@@ -106,8 +109,7 @@ def _split_long(text: str, anchor: str, heading_path: list[str], base_offset: in
     return out
 
 
-def _mk(text: str, anchor: str, heading_path: list[str], char_start: int,
-        lang: str) -> dict:
+def _mk(text: str, anchor: str, heading_path: list[str], char_start: int, lang: str) -> dict:
     text = text.strip()
     return {
         "chunk_id": chunk_id(text),

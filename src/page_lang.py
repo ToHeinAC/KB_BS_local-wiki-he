@@ -19,7 +19,7 @@ import ollama_client
 import schema_loader
 from prompts import INGEST_LANGUAGE_DIRECTIVE, LANGUAGE_NAMES, TRANSLATE_CONTRIBUTION_PROMPT
 
-_CITE_RE = re.compile(r"\[[^\]\n]+\](?!\()")          # [source.md], not [link](url)
+_CITE_RE = re.compile(r"\[[^\]\n]+\](?!\()")  # [source.md], not [link](url)
 _CODE_RE = re.compile(r"`([^`\n]{2,60})`")
 _NUMBER_RE = re.compile(r"\d+(?:[.,]\d+)*")
 _SECTION_REF_RE = re.compile(r"(?:§|Art\.)\s*\d+[a-z]?")
@@ -35,9 +35,9 @@ _TERM_RES = (
     re.compile(r"[„“\"]([^\"“”„\n]{2,60})[“”\"]"),
 )
 _MAX_TERMS = 30
-_MIN_WORDS = 4      # shorter lines carry too little signal to classify
-_JUDGE_WORDS = 8    # a whole reply shorter than this is not judged at all
-_LEAD_LINES = 3     # the creator's lines — merges append below them
+_MIN_WORDS = 4  # shorter lines carry too little signal to classify
+_JUDGE_WORDS = 8  # a whole reply shorter than this is not judged at all
+_LEAD_LINES = 3  # the creator's lines — merges append below them
 # Sections whose text is code-generated or deliberately original: never translated.
 _EXEMPT_HEADINGS = ("## citations", "## contradictions", "## original (")
 
@@ -73,9 +73,12 @@ def page_lang(content: str, default: str = "de") -> str:
     code = str(post.metadata.get("lang") or "").strip().lower()
     if code in LANGUAGE_NAMES:
         return code
-    lead = [ln for ln in post.content.splitlines()
-            if len(_WORD_RE.findall(_CITE_RE.sub(" ", ln))) >= _MIN_WORDS
-            and not ln.lstrip().startswith(("#", ">", "|"))][:_LEAD_LINES]
+    lead = [
+        ln
+        for ln in post.content.splitlines()
+        if len(_WORD_RE.findall(_CITE_RE.sub(" ", ln))) >= _MIN_WORDS
+        and not ln.lstrip().startswith(("#", ">", "|"))
+    ][:_LEAD_LINES]
     return text_lang("\n".join(lead), default)
 
 
@@ -94,15 +97,18 @@ def original_terms(text: str) -> list[str]:
 
 def missing_protected(source: str, translated: str) -> list[str]:
     """Numbers, § references and citations of ``source`` absent from ``translated``."""
+
     def numbers(t):
         return {re.sub(r"[.,]", "", n) for n in _NUMBER_RE.findall(t)}
 
     def refs(t):
         return {re.sub(r"\s+", "", r) for r in _SECTION_REF_RE.findall(t)}
 
-    return (sorted(numbers(source) - numbers(translated))
-            + sorted(refs(source) - refs(translated))
-            + sorted(set(_CITE_RE.findall(source)) - set(_CITE_RE.findall(translated))))
+    return (
+        sorted(numbers(source) - numbers(translated))
+        + sorted(refs(source) - refs(translated))
+        + sorted(set(_CITE_RE.findall(source)) - set(_CITE_RE.findall(translated)))
+    )
 
 
 def _strip_fence(text: str) -> str:
@@ -135,12 +141,19 @@ def translate(text: str, src: str, tgt: str) -> str | None:
     drops a number, § reference or citation, or is clearly not in ``tgt``.
     """
     prompt = TRANSLATE_CONTRIBUTION_PROMPT.format(
-        source_language=LANGUAGE_NAMES[src], target_language=LANGUAGE_NAMES[tgt],
-        terms="; ".join(original_terms(text)) or "(none)", text=text)
+        source_language=LANGUAGE_NAMES[src],
+        target_language=LANGUAGE_NAMES[tgt],
+        terms="; ".join(original_terms(text)) or "(none)",
+        text=text,
+    )
     system = schema_loader.get_system_prompt() + "\n\n" + INGEST_LANGUAGE_DIRECTIVE[tgt]
     try:
-        out = _strip_fence(ollama_client.generate(
-            system, prompt, temperature=0.1, model_id=ollama_client._INGEST_MODEL) or "")
+        out = _strip_fence(
+            ollama_client.generate(
+                system, prompt, temperature=0.1, model_id=ollama_client._INGEST_MODEL
+            )
+            or ""
+        )
     except Exception:
         return None
     if not out or out == text.strip() or missing_protected(text, out) or clearly_other(out, tgt):
@@ -218,5 +231,7 @@ def normalize_body(body: str, plang: str) -> str:
     for s, e in reversed(foreign_runs(body, plang)):
         text = "\n".join(lines[s:e])
         done = translate(text, src, plang)
-        lines[s:e] = done.splitlines() if done else [f"> **Original ({src.upper()}):**", *quote(text)]
+        lines[s:e] = (
+            done.splitlines() if done else [f"> **Original ({src.upper()}):**", *quote(text)]
+        )
     return "\n".join(lines).rstrip() + "\n"

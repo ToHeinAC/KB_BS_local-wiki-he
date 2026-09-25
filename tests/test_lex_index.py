@@ -5,7 +5,6 @@ import pytest
 import chunker
 import lex_index
 
-
 SAMPLE_LEGAL = """\
 ## § 62 Entlassung von Rückständen aus der Überwachung
 Rückstände dürfen nur dann aus der Überwachung entlassen werden,
@@ -24,9 +23,10 @@ The primary risk is regulatory uncertainty in cloud markets.
 """
 
 
-@pytest.fixture()
+@pytest.fixture
 def fresh_index(tmp_path, monkeypatch):
     import db_context
+
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
 
@@ -42,6 +42,7 @@ def fresh_index(tmp_path, monkeypatch):
 def test_scope_separates_raw_and_wiki(tmp_path, monkeypatch):
     """R-1: wiki page bodies are indexed under scope='wiki'; raw queries exclude them."""
     import db_context
+
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
     wiki = tmp_path / "d" / "wiki"
@@ -49,10 +50,20 @@ def test_scope_separates_raw_and_wiki(tmp_path, monkeypatch):
     (wiki / "alpha.md").write_text(
         "---\ntitle: Alpha\ntype: concept\n---\nThe attention mechanism scales context windows."
     )
-    chunker.write_chunks("src.md", [{
-        "chunk_id": "r1", "text": "plutonium isotope criticality safety data",
-        "anchor": "", "heading_path": [], "char_start": 0, "char_end": 41, "lang": "en",
-    }])
+    chunker.write_chunks(
+        "src.md",
+        [
+            {
+                "chunk_id": "r1",
+                "text": "plutonium isotope criticality safety data",
+                "anchor": "",
+                "heading_path": [],
+                "char_start": 0,
+                "char_end": 41,
+                "lang": "en",
+            }
+        ],
+    )
     lex_index.build()
 
     wiki_hits = lex_index.query("attention", scope="wiki")
@@ -114,6 +125,7 @@ def test_index_health_reports_missing_index(tmp_path, monkeypatch):
     """A DB built before the FTS5 cutover has no store — query() is silently empty,
     so index_health() is what lets the UI say "no index" instead of "no match"."""
     import db_context
+
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("legacy")
     assert lex_index.index_health() == {"raw": 0, "wiki": 0}
@@ -127,8 +139,10 @@ def test_index_health_counts_built_rows(fresh_index):
 
 # --- incremental updates -----------------------------------------------------
 
+
 def test_query_returns_empty_without_index(tmp_path, monkeypatch):
     import db_context
+
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("empty")
     assert lex_index.query("anything") == []
@@ -136,10 +150,10 @@ def test_query_returns_empty_without_index(tmp_path, monkeypatch):
 
 
 def test_index_delete_removes_only_that_source(fresh_index):
-    assert lex_index.query("revenue growth")                # SAP present first
+    assert lex_index.query("revenue growth")  # SAP present first
     lex_index.index_delete("SAP.md")
-    assert lex_index.query("revenue growth") == []          # SAP gone
-    assert lex_index.query("Rückstand")                     # StrlSchG untouched
+    assert lex_index.query("revenue growth") == []  # SAP gone
+    assert lex_index.query("Rückstand")  # StrlSchG untouched
 
 
 def test_index_replace_source_adds_then_replaces(fresh_index):
@@ -153,7 +167,7 @@ def test_index_replace_source_adds_then_replaces(fresh_index):
     repl = chunker.split("## Neu\nEs geht jetzt um Photosynthese.")
     chunker.write_chunks("Neu.md", repl)
     lex_index.index_replace_source("Neu.md", chunker.load_chunks("Neu.md"))
-    assert lex_index.query("Kernspaltung") == []            # old term gone
+    assert lex_index.query("Kernspaltung") == []  # old term gone
     assert any(h["source"] == "Neu.md" for h in lex_index.query("Photosynthese"))
     # a replace of one source leaves the others intact
     assert lex_index.query("revenue growth")

@@ -12,8 +12,7 @@ emitting the same step-dict shape the Streamlit Research page expects:
 from __future__ import annotations
 
 import os
-from pathlib import Path
-from typing import Generator
+from collections.abc import Generator
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -27,10 +26,10 @@ import ollama_client
 import run_memory
 import tools as tool_module
 from prompts import (
-    RESEARCHER_INSTRUCTIONS,
     RESEARCH_BUDGET_NUDGE,
     RESEARCH_FALLBACK_PROMPT,
     RESEARCH_FALLBACK_SYSTEM,
+    RESEARCHER_INSTRUCTIONS,
 )
 
 load_dotenv()
@@ -70,8 +69,10 @@ def _build_graph(llm, directive: str = ""):
         if not tool_calls:
             return END
         submit_msgs = [
-            m for m in state["messages"]
-            if isinstance(m, ToolMessage) and m.name == "submit_final_answer"
+            m
+            for m in state["messages"]
+            if isinstance(m, ToolMessage)
+            and m.name == "submit_final_answer"
             and isinstance(m.content, str)
         ]
         if any(m.content.startswith("ACCEPTED") for m in submit_msgs):
@@ -104,8 +105,7 @@ def _system_prompt(wiki_context: str, directive: str = "") -> str:
     index_text = _load_wiki_index()
     if index_text.strip():
         parts.append(
-            "Wiki index (page filenames available to wiki_search / wiki_read):\n"
-            f"{index_text}"
+            f"Wiki index (page filenames available to wiki_search / wiki_read):\n{index_text}"
         )
     if wiki_context:
         parts.append(f"Extra wiki context (user paste):\n{wiki_context}")
@@ -160,8 +160,10 @@ def _synthesize_fallback(question: str, all_messages: list, directive: str = "")
         prompt += f"\n\n{directive}"
     try:
         return ollama_client.generate(
-            RESEARCH_FALLBACK_SYSTEM, prompt,
-            temperature=0.3, model_id=ollama_client._QUERY_MODEL,
+            RESEARCH_FALLBACK_SYSTEM,
+            prompt,
+            temperature=0.3,
+            model_id=ollama_client._QUERY_MODEL,
         ).strip()
     except Exception:
         return ""
@@ -206,8 +208,11 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
                 elif isinstance(msg, ToolMessage):
                     yield from _tool_to_result(msg)
                     final_msg = msg
-                    if msg.name == "submit_final_answer" and isinstance(msg.content, str) \
-                            and msg.content.startswith("ACCEPTED"):
+                    if (
+                        msg.name == "submit_final_answer"
+                        and isinstance(msg.content, str)
+                        and msg.content.startswith("ACCEPTED")
+                    ):
                         # parse "ACCEPTED: comparisons/<file> (...)"
                         body = msg.content.split(":", 1)[1].strip()
                         report_path = body.split(" ", 1)[0]
@@ -216,8 +221,10 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
         msg = str(exc)
         if "recursion" in msg.lower() or "GRAPH_RECURSION_LIMIT" in msg:
             recursion_hit = True
-            yield {"type": "error",
-                   "content": f"Iteration limit ({MAX_ITER}) reached for this run — returning best-effort answer."}
+            yield {
+                "type": "error",
+                "content": f"Iteration limit ({MAX_ITER}) reached for this run — returning best-effort answer.",
+            }
         else:
             yield {"type": "error", "content": msg}
             return
@@ -232,7 +239,11 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
             yield {"type": "final_answer", "content": text, "report_path": None}
             return
 
-    _prefix = "(partial — iteration limit hit)" if recursion_hit else "(best-effort — quality gate not met)"
+    _prefix = (
+        "(partial — iteration limit hit)"
+        if recursion_hit
+        else "(best-effort — quality gate not met)"
+    )
 
     if last_submit_args and last_submit_args.get("answer"):
         yield {
@@ -268,10 +279,14 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
         return
 
     if recursion_hit:
-        yield {"type": "final_answer",
-               "content": "(no answer — iteration limit reached before any draft was produced)",
-               "report_path": None}
+        yield {
+            "type": "final_answer",
+            "content": "(no answer — iteration limit reached before any draft was produced)",
+            "report_path": None,
+        }
         return
 
-    yield {"type": "error",
-           "content": "The agent ended without producing an answer — try rephrasing or click 🆕 New research."}
+    yield {
+        "type": "error",
+        "content": "The agent ended without producing an answer — try rephrasing or click 🆕 New research.",
+    }

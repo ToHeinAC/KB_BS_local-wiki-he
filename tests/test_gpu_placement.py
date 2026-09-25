@@ -17,15 +17,13 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import gpu_placement
 from gpu_placement import Gpu
 
-SMI_TWO_CARDS = (
-    "0, NVIDIA GeForce RTX 4090, 24564, 1075\n"
-    "1, NVIDIA GeForce RTX 4090, 24564, 918\n"
-)
+SMI_TWO_CARDS = "0, NVIDIA GeForce RTX 4090, 24564, 1075\n1, NVIDIA GeForce RTX 4090, 24564, 918\n"
 
 
 def _cards(*free_gib: float) -> list[Gpu]:
-    return [Gpu(index=i, name=f"card{i}", total_gib=24.0, free_gib=f)
-            for i, f in enumerate(free_gib)]
+    return [
+        Gpu(index=i, name=f"card{i}", total_gib=24.0, free_gib=f) for i, f in enumerate(free_gib)
+    ]
 
 
 def _fake_gpus(monkeypatch, cards: list[Gpu]) -> None:
@@ -34,9 +32,11 @@ def _fake_gpus(monkeypatch, cards: list[Gpu]) -> None:
 
 # --- device discovery ---------------------------------------------------------
 
+
 def test_gpus_parses_nvidia_smi(monkeypatch):
-    monkeypatch.setattr(subprocess, "run",
-                        lambda *a, **k: subprocess.CompletedProcess(a, 0, SMI_TWO_CARDS, ""))
+    monkeypatch.setattr(
+        subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, SMI_TWO_CARDS, "")
+    )
     cards = gpu_placement.gpus()
     assert [c.index for c in cards] == [0, 1]
     assert cards[0].name == "NVIDIA GeForce RTX 4090"
@@ -48,24 +48,28 @@ def test_gpus_parses_nvidia_smi(monkeypatch):
 def test_gpus_survives_a_missing_nvidia_smi(monkeypatch):
     def _boom(*a, **k):
         raise FileNotFoundError("nvidia-smi")
+
     monkeypatch.setattr(subprocess, "run", _boom)
     assert gpu_placement.gpus() == []
 
 
 def test_gpus_ignores_unparseable_rows(monkeypatch):
     noisy = SMI_TWO_CARDS + "[N/A], broken row\n2, card, N/A, N/A\n"
-    monkeypatch.setattr(subprocess, "run",
-                        lambda *a, **k: subprocess.CompletedProcess(a, 0, noisy, ""))
+    monkeypatch.setattr(
+        subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, noisy, "")
+    )
     assert [c.index for c in gpu_placement.gpus()] == [0, 1]
 
 
 def test_gpus_empty_on_nonzero_exit(monkeypatch):
-    monkeypatch.setattr(subprocess, "run",
-                        lambda *a, **k: subprocess.CompletedProcess(a, 9, "", "no driver"))
+    monkeypatch.setattr(
+        subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 9, "", "no driver")
+    )
     assert gpu_placement.gpus() == []
 
 
 # --- policy -------------------------------------------------------------------
+
 
 def test_pins_to_the_emptiest_card_that_fits(monkeypatch):
     _fake_gpus(monkeypatch, _cards(12.0, 22.0))
@@ -134,6 +138,7 @@ def test_no_gpu_at_all_is_left_alone(monkeypatch):
 
 
 # --- child-process env --------------------------------------------------------
+
 
 def test_cuda_env_always_pins_the_ordering_too():
     """CUDA_VISIBLE_DEVICES without PCI_BUS_ID can select a different card."""

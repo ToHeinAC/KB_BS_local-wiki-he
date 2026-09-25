@@ -45,6 +45,7 @@ def host() -> str:
 
 def _client():
     import ollama
+
     return ollama.Client(host=host())
 
 
@@ -63,7 +64,7 @@ def embed(texts: list[str], model_id: str) -> list[list[float]]:
     """
     try:
         resp = _client().embed(model=model_id, input=list(texts))
-        vecs = resp["embeddings"] if isinstance(resp, dict) else getattr(resp, "embeddings")
+        vecs = resp["embeddings"] if isinstance(resp, dict) else resp.embeddings
         if not vecs:
             raise RuntimeError("empty embeddings response")
         return vecs
@@ -81,7 +82,9 @@ def _generate_once(model: str, system: str, prompt: str, temperature: float, num
     return resp["response"]
 
 
-def generate(system: str, prompt: str, temperature: float = 0.3, model_id: str | None = None) -> str:
+def generate(
+    system: str, prompt: str, temperature: float = 0.3, model_id: str | None = None
+) -> str:
     model = model_id or _MODEL
     try:
         return _generate_once(model, system, prompt, temperature, _NUM_CTX)
@@ -120,10 +123,18 @@ def loaded_model() -> str:
     """Model currently loaded in Ollama VRAM; falls back to configured _MODEL when idle."""
     try:
         resp = _client().ps()
-        models = getattr(resp, "models", None) or (resp.get("models") if isinstance(resp, dict) else None) or []
+        models = (
+            getattr(resp, "models", None)
+            or (resp.get("models") if isinstance(resp, dict) else None)
+            or []
+        )
         if models:
             m = models[0]
-            return getattr(m, "model", None) or (m.get("model") if isinstance(m, dict) else None) or _MODEL
+            return (
+                getattr(m, "model", None)
+                or (m.get("model") if isinstance(m, dict) else None)
+                or _MODEL
+            )
     except Exception:
         pass
     return _MODEL

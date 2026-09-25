@@ -17,8 +17,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import db_context  # noqa: E402
-import wiki_engine  # noqa: E402
+import db_context
+import wiki_engine
 
 
 def _report(db: str, res: dict) -> None:
@@ -36,10 +36,12 @@ def main() -> None:
     ap = argparse.ArgumentParser(description="Consolidate duplicate wiki pages.")
     ap.add_argument("db", nargs="?", help="DB name (omit when using --all)")
     ap.add_argument("--all", action="store_true", help="run on every DB")
-    ap.add_argument("--apply", action="store_true",
-                    help="write changes (default: dry-run)")
-    ap.add_argument("--llm-polish", action="store_true",
-                    help="smooth merged prose with the local model (slower)")
+    ap.add_argument("--apply", action="store_true", help="write changes (default: dry-run)")
+    ap.add_argument(
+        "--llm-polish",
+        action="store_true",
+        help="smooth merged prose with the local model (slower)",
+    )
     args = ap.parse_args()
 
     if not args.all and not args.db:
@@ -47,8 +49,7 @@ def main() -> None:
     dbs = db_context.list_dbs() if args.all else [args.db]
 
     for db in dbs:
-        res = wiki_engine.consolidate(db, dry_run=not args.apply,
-                                      llm_polish=args.llm_polish)
+        res = wiki_engine.consolidate(db, dry_run=not args.apply, llm_polish=args.llm_polish)
         _report(db, res)
 
     if not args.apply:

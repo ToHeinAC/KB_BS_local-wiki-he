@@ -29,7 +29,6 @@ and the runtime places the model exactly as it does today.
 
 from __future__ import annotations
 
-import os
 import subprocess
 from dataclasses import dataclass
 
@@ -57,7 +56,7 @@ class Gpu:
 
 @dataclass(frozen=True)
 class Placement:
-    index: int | None   # None = leave placement to the runtime (i.e. split)
+    index: int | None  # None = leave placement to the runtime (i.e. split)
     reason: str
 
     @property
@@ -72,10 +71,14 @@ def gpus() -> list[Gpu]:
     fail a run."""
     try:
         proc = subprocess.run(
-            ["nvidia-smi",
-             "--query-gpu=index,name,memory.total,memory.used",
-             "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            [
+                "nvidia-smi",
+                "--query-gpu=index,name,memory.total,memory.used",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
     except (OSError, subprocess.SubprocessError):
         return []
@@ -90,14 +93,18 @@ def gpus() -> list[Gpu]:
             index, total_mib, used_mib = int(parts[0]), float(parts[2]), float(parts[3])
         except ValueError:
             continue
-        found.append(Gpu(index=index, name=parts[1],
-                         total_gib=total_mib / 1024,
-                         free_gib=(total_mib - used_mib) / 1024))
+        found.append(
+            Gpu(
+                index=index,
+                name=parts[1],
+                total_gib=total_mib / 1024,
+                free_gib=(total_mib - used_mib) / 1024,
+            )
+        )
     return found
 
 
-def plan(required_gib: float, mode: str = "auto",
-         headroom_gib: float = HEADROOM_GIB) -> Placement:
+def plan(required_gib: float, mode: str = "auto", headroom_gib: float = HEADROOM_GIB) -> Placement:
     """Pick the card for a model needing `required_gib`.
 
     `mode` is the raw value of a `*_PIN_GPU` env var: "auto" pins to the emptiest
@@ -113,9 +120,13 @@ def plan(required_gib: float, mode: str = "auto",
         try:
             forced = int(mode)
         except ValueError:
-            return Placement(None, f"unusable pin setting {mode!r} — expected auto, off or a GPU index")
+            return Placement(
+                None, f"unusable pin setting {mode!r} — expected auto, off or a GPU index"
+            )
         if devices and not any(g.index == forced for g in devices):
-            return Placement(None, f"GPU {forced} is not present — leaving placement to the runtime")
+            return Placement(
+                None, f"GPU {forced} is not present — leaving placement to the runtime"
+            )
         return Placement(forced, f"pinned to GPU {forced} (requested)")
 
     if not devices:
@@ -125,12 +136,16 @@ def plan(required_gib: float, mode: str = "auto",
 
     best = max(devices, key=lambda g: g.free_gib)
     if best.free_gib >= required_gib + headroom_gib:
-        return Placement(best.index,
-                         f"fits on GPU {best.index} alone (needs ~{required_gib:.1f} GiB, "
-                         f"{best.free_gib:.1f} GiB free) — no cross-GPU hop per token")
-    return Placement(None,
-                     f"needs ~{required_gib:.1f} GiB but the emptiest card (GPU {best.index}) has "
-                     f"only {best.free_gib:.1f} GiB free — left split across all GPUs")
+        return Placement(
+            best.index,
+            f"fits on GPU {best.index} alone (needs ~{required_gib:.1f} GiB, "
+            f"{best.free_gib:.1f} GiB free) — no cross-GPU hop per token",
+        )
+    return Placement(
+        None,
+        f"needs ~{required_gib:.1f} GiB but the emptiest card (GPU {best.index}) has "
+        f"only {best.free_gib:.1f} GiB free — left split across all GPUs",
+    )
 
 
 def cuda_env(index: int) -> dict[str, str]:

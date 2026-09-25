@@ -8,7 +8,7 @@ import auth
 import db_context
 
 
-@pytest.fixture()
+@pytest.fixture
 def users_root(tmp_path, monkeypatch):
     """Point the user store at an isolated data root."""
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
@@ -20,6 +20,7 @@ def _read(users_root):
 
 
 # --- maintainer rights ---
+
 
 def test_seeded_admin_maintains_default_db(users_root):
     auth.ensure_seeded()
@@ -57,6 +58,7 @@ def test_set_user_maintains_unknown_user_raises(users_root):
 
 # --- grant_maintainer ---
 
+
 def test_grant_maintainer_adds_to_both_lists(users_root):
     auth.add_user("u", "pw", [])
     auth.grant_maintainer("u", "DB1")
@@ -78,12 +80,19 @@ def test_grant_maintainer_unknown_user_raises(users_root):
 
 # --- backfill_maintainers ---
 
+
 def test_backfill_grants_admins_their_dbs(users_root):
     # Simulate a pre-maintainer install: no `maintains` key.
-    (users_root / "users.json").write_text(json.dumps({"users": {
-        "adm": {"pw_hash": "x", "dbs": ["DB1", "DB2"], "is_admin": True},
-        "reader": {"pw_hash": "x", "dbs": ["DB1"], "is_admin": False},
-    }}))
+    (users_root / "users.json").write_text(
+        json.dumps(
+            {
+                "users": {
+                    "adm": {"pw_hash": "x", "dbs": ["DB1", "DB2"], "is_admin": True},
+                    "reader": {"pw_hash": "x", "dbs": ["DB1"], "is_admin": False},
+                }
+            }
+        )
+    )
     auth.backfill_maintainers()
     data = _read(users_root)
     assert data["users"]["adm"]["maintains"] == ["DB1", "DB2"]

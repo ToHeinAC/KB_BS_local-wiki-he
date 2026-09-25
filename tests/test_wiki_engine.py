@@ -8,11 +8,12 @@ import pytest
 import ollama_client
 import wiki_engine
 
-
 # --- init_wiki ---
+
 
 def _patch_root(monkeypatch, tmp_path):
     import db_context
+
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("t")
     return tmp_path / "t"
@@ -47,6 +48,7 @@ def test_init_wiki_does_not_overwrite_existing_index(wiki_dir):
 
 # --- _parse_llm_pages ---
 
+
 def test_parse_llm_pages_single_block():
     response = "=== concept.md ===\n---\ntitle: X\n---\nBody\n=== END ==="
     pages = wiki_engine._parse_llm_pages(response)
@@ -56,10 +58,7 @@ def test_parse_llm_pages_single_block():
 
 
 def test_parse_llm_pages_multiple_blocks():
-    response = (
-        "=== a.md ===\ncontent A\n=== END ===\n"
-        "=== b.md ===\ncontent B\n=== END ==="
-    )
+    response = "=== a.md ===\ncontent A\n=== END ===\n=== b.md ===\ncontent B\n=== END ==="
     pages = wiki_engine._parse_llm_pages(response)
     assert len(pages) == 2
     filenames = [p["filename"] for p in pages]
@@ -107,10 +106,12 @@ def _mock_ingest_llm(monkeypatch):
 
 # --- ingest_as_source: research answers registered as real source documents ---
 
+
 def test_ingest_as_source_registers_a_raw_document(wiki_dir, monkeypatch):
     """Plain ingest() leaves a `source::` graph node with no file behind it.
     ingest_as_source writes to data/raw/ + the manifest so the source is real."""
     import dedup
+
     _mock_ingest_llm(monkeypatch)
     res = wiki_engine.ingest_as_source("some text", "Research: SWOT on Repositrak")
     assert res["duplicate"] is False
@@ -123,6 +124,7 @@ def test_ingest_as_source_registers_a_raw_document(wiki_dir, monkeypatch):
 def test_plain_ingest_leaves_no_raw_document(wiki_dir, monkeypatch):
     """Contrast case — this is the behaviour the new option opts out of."""
     import dedup
+
     _mock_ingest_llm(monkeypatch)
     wiki_engine.ingest("some text", "Research: SWOT on Repositrak")
     assert dedup.list_sources() == []
@@ -131,6 +133,7 @@ def test_plain_ingest_leaves_no_raw_document(wiki_dir, monkeypatch):
 
 def test_ingest_as_source_is_idempotent_on_identical_text(wiki_dir, monkeypatch):
     import dedup
+
     _mock_ingest_llm(monkeypatch)
     wiki_engine.ingest_as_source("same body", "Research: X")
     again = wiki_engine.ingest_as_source("same body", "Research: X")
@@ -184,16 +187,19 @@ def test_ingest_extracts_contradiction_lines(wiki_dir, monkeypatch):
     assert any("Alpha" in c for c in result["contradictions"])
 
 
-@pytest.mark.parametrize("line", [
-    "CONTRADICTION: None found. The source complements existing concepts.",
-    "CONTRADICTION: None. The source introduces a framework.",
-    "CONTRADICTION: none",
-    "CONTRADICTION: No contradictions found.",
-    "CONTRADICTION: N/A",
-    "CONTRADICTION: Keine Widersprüche gefunden.",
-    "CONTRADICTION: Keine.",
-    "CONTRADICTION:",
-])
+@pytest.mark.parametrize(
+    "line",
+    [
+        "CONTRADICTION: None found. The source complements existing concepts.",
+        "CONTRADICTION: None. The source introduces a framework.",
+        "CONTRADICTION: none",
+        "CONTRADICTION: No contradictions found.",
+        "CONTRADICTION: N/A",
+        "CONTRADICTION: Keine Widersprüche gefunden.",
+        "CONTRADICTION: Keine.",
+        "CONTRADICTION:",
+    ],
+)
 def test_ingest_ignores_negative_contradiction_lines(wiki_dir, monkeypatch, line):
     # Small models echo the prefix even when there is nothing to report.
     mock = MagicMock()
@@ -252,11 +258,12 @@ def test_ingest_pins_source_language_in_system_prompt(wiki_dir, monkeypatch):
     mock = MagicMock()
     mock.generate.return_value = {"response": _INGEST_RESPONSE}
     monkeypatch.setattr(ollama_client, "_client", lambda: mock)
-    wiki_engine.ingest("Der Bericht beschreibt die kerntechnische Anlage und ihre Grenzwerte.",
-                       "de-doc.txt")
+    wiki_engine.ingest(
+        "Der Bericht beschreibt die kerntechnische Anlage und ihre Grenzwerte.", "de-doc.txt"
+    )
     sent_system = mock.generate.call_args.kwargs["system"]
     assert "SPRACHE (verbindlich)" in sent_system  # German source → German directive
-    assert "## Key facts" in sent_system           # structural heading kept exempt
+    assert "## Key facts" in sent_system  # structural heading kept exempt
 
 
 def test_ingest_works_without_user_metadata(wiki_dir, monkeypatch):
@@ -273,6 +280,7 @@ def test_ingest_works_without_user_metadata(wiki_dir, monkeypatch):
 
 
 # --- ingest_end indexing (incremental per source, no full rebuild) ---
+
 
 def test_ingest_end_indexes_incrementally_no_full_rebuild(wiki_dir, monkeypatch):
     mock = MagicMock()
@@ -314,12 +322,15 @@ def test_ingest_end_finalize_gates_description_only(wiki_dir, monkeypatch):
 
 # --- contradiction resolution guards on effective-as-of (the batch data-quality stake) ---
 
+
 def test_contradiction_resolves_with_newer_effective_date():
     existing = "Der Grenzwert liegt bei 20 mSv pro Jahr."
     new = "Der Grenzwert liegt bei 100 mSv pro Jahr."
     out = wiki_engine._contradiction_check(
-        existing, new,
-        {"effective as of": "2018-01-01"}, {"effective as of": "2024-01-01"},
+        existing,
+        new,
+        {"effective as of": "2018-01-01"},
+        {"effective as of": "2024-01-01"},
     )
     assert any("now" in c for c in out)
 
@@ -332,6 +343,7 @@ def test_contradiction_unresolved_without_effective_date():
 
 
 # --- query ---
+
 
 def test_query_returns_string(wiki_dir, monkeypatch):
     mock = MagicMock()
@@ -360,6 +372,7 @@ def test_query_raises_runtime_error_when_ollama_down(wiki_dir, monkeypatch):
 
 # --- lint ---
 
+
 def test_lint_empty_wiki_returns_message(wiki_dir):
     result = wiki_engine.lint()
     assert "empty" in result.lower()
@@ -376,6 +389,7 @@ def test_lint_returns_report_string(wiki_dir, monkeypatch):
 
 
 # --- list_pages ---
+
 
 def test_list_pages_empty_wiki(wiki_dir):
     assert wiki_engine.list_pages() == []
@@ -404,6 +418,7 @@ def test_list_pages_handles_no_frontmatter(wiki_dir):
 
 # --- read_page / read_log / stats ---
 
+
 def test_read_page_returns_content(wiki_dir):
     (wiki_dir / "p.md").write_text("page body")
     assert wiki_engine.read_page("p.md") == "page body"
@@ -423,6 +438,7 @@ def test_stats_correct_page_count(wiki_dir):
 
 def test_search_wiki_matches_title(wiki_dir):
     import lex_index
+
     (wiki_dir / "transformer.md").write_text(
         "---\ntitle: Transformer Architecture\ntype: concept\n---\nbody"
     )
@@ -433,6 +449,7 @@ def test_search_wiki_matches_title(wiki_dir):
 
 def test_search_wiki_matches_body(wiki_dir):
     import lex_index
+
     (wiki_dir / "x.md").write_text(
         "---\ntitle: X\n---\nThe attention mechanism scales context windows."
     )
@@ -450,9 +467,11 @@ def test_search_wiki_empty_query_returns_empty(wiki_dir):
 
 # --- Q-1: hybrid page selection ---
 
+
 def test_candidate_pages_finds_body_match_absent_from_blurb(wiki_dir):
     """A term that lives in the page BODY (not its index blurb) still surfaces."""
     import lex_index
+
     (wiki_dir / "dose.md").write_text(
         '---\ntitle: Overview\ntype: concept\nsources: ["s.md"]\n---\n'
         "The annual effective limit is 20 millisievert for occupationally exposed workers."
@@ -466,13 +485,24 @@ def test_candidate_pages_maps_raw_hit_to_page(wiki_dir):
     """A raw-chunk match maps back to its derived wiki page via `sources:`."""
     import chunker
     import lex_index
+
     (wiki_dir / "page.md").write_text(
         '---\ntitle: P\ntype: concept\nsources: ["src.md"]\n---\ngeneric overview body'
     )
-    chunker.write_chunks("src.md", [{
-        "chunk_id": "r1", "text": "plutonium isotope criticality safety threshold",
-        "anchor": "", "heading_path": [], "char_start": 0, "char_end": 46, "lang": "en",
-    }])
+    chunker.write_chunks(
+        "src.md",
+        [
+            {
+                "chunk_id": "r1",
+                "text": "plutonium isotope criticality safety threshold",
+                "anchor": "",
+                "heading_path": [],
+                "char_start": 0,
+                "char_end": 46,
+                "lang": "en",
+            }
+        ],
+    )
     lex_index.build()
     cands = wiki_engine._candidate_pages_for_query("plutonium criticality")
     assert "page.md" in cands
@@ -480,11 +510,14 @@ def test_candidate_pages_maps_raw_hit_to_page(wiki_dir):
 
 # --- Q-3: section-level synthesis ---
 
+
 def test_query_synthesis_injects_chunks_not_full_page(wiki_dir, monkeypatch):
     import lex_index
+
     body = (
         "## Dose limits\nThe annual effective dose limit is 20 millisievert per year.\n\n"
-        "## Banana farming\nUnrelated ZZZFILLER orchard gardening notes about bananas. " * 1
+        "## Banana farming\nUnrelated ZZZFILLER orchard gardening notes about bananas. "
+        * 1
         + "## Weather\nZZZFILLER cloudy skies and rainfall patterns over the region described. "
         + "## Cooking\nZZZFILLER recipes for soup and bread baking at home in detail here. "
     )
@@ -510,8 +543,8 @@ def test_query_synthesis_injects_chunks_not_full_page(wiki_dir, monkeypatch):
     out = wiki_engine.query_with_sources("dose limit millisievert per year")
     assert out["sources"] == ["dose.md"]
     ap = captured["answer_prompt"]
-    assert "20 millisievert" in ap          # the matching section is present
-    assert "ZZZFILLER" not in ap            # unrelated sections are NOT injected (chunk-level, not full page)
+    assert "20 millisievert" in ap  # the matching section is present
+    assert "ZZZFILLER" not in ap  # unrelated sections are NOT injected (chunk-level, not full page)
 
 
 def test_query_abstains_below_threshold_and_skips_synthesis(wiki_dir, monkeypatch):
@@ -519,29 +552,40 @@ def test_query_abstains_below_threshold_and_skips_synthesis(wiki_dir, monkeypatc
     never call the LLM synthesis (idea.md §3.5 — no answer from weak context)."""
     hits = [{"source": "dose.md", "rerank_score": -6.0}]
     monkeypatch.setattr(
-        wiki_engine, "_gather_pages",
-        lambda q, s, b: ("--- dose.md ---\nweak context", ["dose.md"], set(), hits,
-                         {"tau": None, "kept": [], "below_tau": [], "over_cap": []}),
+        wiki_engine,
+        "_gather_pages",
+        lambda q, s, b: (
+            "--- dose.md ---\nweak context",
+            ["dose.md"],
+            set(),
+            hits,
+            {"tau": None, "kept": [], "below_tau": [], "over_cap": []},
+        ),
     )
-    monkeypatch.setattr(wiki_engine.calibrate, "assess",
-                        lambda h, db=None: (False, 0.26, {"source": "dose.md"}))
+    monkeypatch.setattr(
+        wiki_engine.calibrate, "assess", lambda h, db=None: (False, 0.26, {"source": "dose.md"})
+    )
     gen = MagicMock()
     monkeypatch.setattr(ollama_client, "_client", lambda: gen)
 
     out = wiki_engine.query_with_sources("some clearly off-topic question")
     assert out.get("abstained") is True
-    assert "dose.md" in out["answer"]        # names the closest page
-    gen.generate.assert_not_called()         # synthesis LLM call skipped
+    assert "dose.md" in out["answer"]  # names the closest page
+    gen.generate.assert_not_called()  # synthesis LLM call skipped
 
 
 # --- search-ladder rung 4: τ-gated justified set (idea.md §6.9.1) ---
 
+
 def _two_page_gather(wiki_dir, monkeypatch):
     (wiki_dir / "hot.md").write_text('---\ntitle: Hot\ntype: concept\nsources: ["s.md"]\n---\nbody')
-    (wiki_dir / "cold.md").write_text('---\ntitle: Cold\ntype: concept\nsources: ["s.md"]\n---\nbody')
+    (wiki_dir / "cold.md").write_text(
+        '---\ntitle: Cold\ntype: concept\nsources: ["s.md"]\n---\nbody'
+    )
     monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i: ["hot.md", "cold.md"])
     monkeypatch.setattr(
-        wiki_engine.retrieval, "search",
+        wiki_engine.retrieval,
+        "search",
         lambda q, top_k, scope, use_rerank=False: [
             {"source": "hot.md", "text": "hot ctx", "rerank_score": -1.0},
             {"source": "cold.md", "text": "cold ctx", "rerank_score": -8.0},
@@ -553,7 +597,7 @@ def test_gather_pages_tau_gates_below_threshold(wiki_dir, monkeypatch):
     _two_page_gather(wiki_dir, monkeypatch)
     monkeypatch.setattr(wiki_engine.calibrate, "threshold", lambda db=None: -4.0)
     text, used, _raws, _hits, audit = wiki_engine._gather_pages("q", "sys", 10000)
-    assert used == ["hot.md"]                       # cold dropped by τ, keeps picker order
+    assert used == ["hot.md"]  # cold dropped by τ, keeps picker order
     assert "cold ctx" not in text
     assert audit["kept"] == [("hot.md", -1.0)]
     assert audit["below_tau"] == [("cold.md", -8.0)]
@@ -570,9 +614,10 @@ def test_gather_pages_failopen_keeps_all_when_uncalibrated(wiki_dir, monkeypatch
 
 # --- E-1: staleness ---
 
+
 def test_is_page_stale_default_ttl():
     today = date(2026, 6, 11)
-    old = {"updated": "2024-01-01"}          # >365 days before today
+    old = {"updated": "2024-01-01"}  # >365 days before today
     fresh = {"updated": "2026-06-01"}
     assert wiki_engine.is_page_stale(old, today) is True
     assert wiki_engine.is_page_stale(fresh, today) is False
@@ -588,10 +633,14 @@ def test_is_page_stale_respects_expires_after_days_override():
 
 def test_is_page_stale_handles_missing_or_disabled():
     today = date(2026, 6, 11)
-    assert wiki_engine.is_page_stale({}, today) is False                       # no updated
+    assert wiki_engine.is_page_stale({}, today) is False  # no updated
     assert wiki_engine.is_page_stale({"updated": "nonsense"}, today) is False  # unparseable
-    assert wiki_engine.is_page_stale(                                          # TTL<=0 = never
-        {"updated": "2000-01-01", "expires_after_days": 0}, today) is False
+    assert (
+        wiki_engine.is_page_stale(  # TTL<=0 = never
+            {"updated": "2000-01-01", "expires_after_days": 0}, today
+        )
+        is False
+    )
 
 
 def test_stale_pages_lists_overdue_page(wiki_dir):
@@ -620,14 +669,16 @@ def test_lint_prepends_stale_pages(wiki_dir, monkeypatch):
 
 # --- E-2: insights in wiki health ---
 
+
 def test_list_pages_includes_insights_when_requested(wiki_dir):
     wiki_engine.file_answer("What is the dose limit?", "20 mSv per year.", ["dose.md"])
     without = {p["filename"] for p in wiki_engine.list_pages()}
     with_ins = {p["filename"] for p in wiki_engine.list_pages(include_insights=True)}
-    assert not any(f.startswith("insights/") for f in without)   # default unchanged
+    assert not any(f.startswith("insights/") for f in without)  # default unchanged
     insight = next(f for f in with_ins if f.startswith("insights/"))
-    page = next(p for p in wiki_engine.list_pages(include_insights=True)
-                if p["filename"] == insight)
+    page = next(
+        p for p in wiki_engine.list_pages(include_insights=True) if p["filename"] == insight
+    )
     assert page["type"] == "insight"
 
 
@@ -643,14 +694,17 @@ def test_rebuild_index_has_insights_section(wiki_dir):
 
 def test_file_answer_is_okf_enriched(wiki_dir):
     import frontmatter
+
     import okf
-    rel = wiki_engine.file_answer("What is copper used for?",
-                                  "Copper conducts electricity in wiring.", [])
+
+    rel = wiki_engine.file_answer(
+        "What is copper used for?", "Copper conducts electricity in wiring.", []
+    )
     post = frontmatter.loads((wiki_dir / rel).read_text())
-    assert post.metadata["tags"]              # OKF field code-stamped
+    assert post.metadata["tags"]  # OKF field code-stamped
     assert post.metadata["description"]
-    assert "## Citations" in post.content     # regenerated from sources
-    assert okf.okf_validate(wiki_dir) == []   # whole bundle stays conformant
+    assert "## Citations" in post.content  # regenerated from sources
+    assert okf.okf_validate(wiki_dir) == []  # whole bundle stays conformant
 
 
 def test_get_wiki_tree_groups_insights_and_flags_stale(wiki_dir):
@@ -659,7 +713,7 @@ def test_get_wiki_tree_groups_insights_and_flags_stale(wiki_dir):
     )
     wiki_engine.file_answer("Q?", "A.", [])
     tree = wiki_engine.get_wiki_tree()
-    assert "insight" in tree and tree["insight"]
+    assert tree.get("insight")
     old = next(p for p in tree["concept"] if p["filename"] == "old.md")
     assert old["stale"] is True
 
@@ -677,6 +731,7 @@ def test_get_wiki_tree_groups_by_type(wiki_dir):
 
 # --- file_answer ---
 
+
 def test_file_answer_creates_insight_page(wiki_dir):
     rel = wiki_engine.file_answer("What is X?", "X is the answer.", related=["a.md"])
     path = wiki_dir / rel
@@ -689,6 +744,7 @@ def test_file_answer_creates_insight_page(wiki_dir):
 
 # --- build_link_graph / find_orphans ---
 
+
 def test_find_orphans_returns_pages_with_no_inedges(wiki_dir):
     (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["b.md"]\n---\nA')
     (wiki_dir / "b.md").write_text("---\ntitle: B\nrelated: []\n---\nB")
@@ -700,6 +756,7 @@ def test_find_orphans_returns_pages_with_no_inedges(wiki_dir):
 
 
 # --- linked_pages (link-aware retrieval expansion) ---
+
 
 def test_linked_pages_returns_one_hop_neighbours(wiki_dir):
     (wiki_dir / "a.md").write_text('---\ntitle: A\nrelated: ["b.md", "c.md"]\n---\nBody A')
@@ -739,6 +796,7 @@ def test_linked_pages_includes_insight_neighbours(wiki_dir):
 
 # --- linked_pages: undirected traversal + shared-source edges ---
 
+
 def test_linked_pages_follows_backlinks(wiki_dir):
     """`related:` is written at ingest, so edges are ~88% one-way. Seeding the
     TARGET of a one-way edge must still surface the page pointing at it."""
@@ -770,8 +828,9 @@ def test_linked_pages_includes_shared_source_neighbours(wiki_dir):
 
 def test_linked_pages_ranks_explicit_links_above_shared_source(wiki_dir):
     (wiki_dir / "a.md").write_text(
-        '---\ntitle: A\nrelated: ["linked.md"]\nsources: ["doc.md"]\n---\nA')
-    (wiki_dir / "linked.md").write_text('---\ntitle: Linked\nrelated: []\nsources: []\n---\nL')
+        '---\ntitle: A\nrelated: ["linked.md"]\nsources: ["doc.md"]\n---\nA'
+    )
+    (wiki_dir / "linked.md").write_text("---\ntitle: Linked\nrelated: []\nsources: []\n---\nL")
     (wiki_dir / "sib.md").write_text('---\ntitle: Sib\nrelated: []\nsources: ["doc.md"]\n---\nS')
     out = wiki_engine.linked_pages(["a.md"], limit=1)
     assert [p["filename"] for p in out] == ["linked.md"]
@@ -783,33 +842,37 @@ def test_linked_pages_skips_oversized_shared_source_cliques(wiki_dir, monkeypatc
     monkeypatch.setattr(wiki_engine, "_SHARED_SOURCE_MAX_CLIQUE", 3)
     for n in ("a", "b", "c", "d"):
         (wiki_dir / f"{n}.md").write_text(
-            f'---\ntitle: {n}\nrelated: []\nsources: ["big.md"]\n---\n{n}')
+            f'---\ntitle: {n}\nrelated: []\nsources: ["big.md"]\n---\n{n}'
+        )
     assert wiki_engine.linked_pages(["a.md"]) == []
 
 
 # --- Q-1: link-aware candidate expansion (Fast chat) ---
 
+
 def test_candidate_pages_expands_over_links(wiki_dir):
     """A page with no lexical match is reachable via a link from a BM25 hit."""
     import lex_index
+
     (wiki_dir / "dose.md").write_text(
         '---\ntitle: Dose\ntype: concept\nrelated: ["shield.md"]\nsources: []\n---\n'
         "The annual effective limit is 20 millisievert for exposed workers."
     )
     (wiki_dir / "shield.md").write_text(
-        '---\ntitle: Shield\ntype: concept\nrelated: []\nsources: []\n---\n'
+        "---\ntitle: Shield\ntype: concept\nrelated: []\nsources: []\n---\n"
         "Unrelated wording about lead aprons."
     )
     lex_index.build()
     cands = wiki_engine._candidate_pages_for_query("millisievert limit workers")
-    assert cands[0] == "dose.md"          # BM25 hit keeps priority
-    assert "shield.md" in cands           # link-expanded neighbour is reachable
+    assert cands[0] == "dose.md"  # BM25 hit keeps priority
+    assert "shield.md" in cands  # link-expanded neighbour is reachable
 
 
 def test_candidate_pages_expansion_follows_backlinks(wiki_dir):
     import lex_index
+
     (wiki_dir / "dose.md").write_text(
-        '---\ntitle: Dose\ntype: concept\nrelated: []\nsources: []\n---\n'
+        "---\ntitle: Dose\ntype: concept\nrelated: []\nsources: []\n---\n"
         "The annual effective limit is 20 millisievert for exposed workers."
     )
     (wiki_dir / "shield.md").write_text(
@@ -823,21 +886,32 @@ def test_candidate_pages_expansion_follows_backlinks(wiki_dir):
 
 # --- ingest with existing content + retry ---
 
+
 def test_ingest_loads_existing_content_for_affected_pages(wiki_dir, monkeypatch):
     """BM25 selection: a page derived from a prior source whose chunks match the
     new text is surfaced, and its body is injected for merge."""
     import chunker
     import lex_index
+
     # Existing page derived from a prior source, present in the BM25 index.
     (wiki_dir / "alpha.md").write_text(
         '---\ntitle: Alpha\ntype: concept\nsources: ["prior.md"]\n---\n'
-        '## Key facts\n- alpha radiation dose limit\n\nEXISTING_ALPHA_BODY'
+        "## Key facts\n- alpha radiation dose limit\n\nEXISTING_ALPHA_BODY"
     )
-    chunker.write_chunks("prior.md", [{
-        "chunk_id": "c-prior-1",
-        "text": "Alpha radiation protection dose limits and shielding fundamentals.",
-        "anchor": "", "heading_path": [], "char_start": 0, "char_end": 60, "lang": "en",
-    }])
+    chunker.write_chunks(
+        "prior.md",
+        [
+            {
+                "chunk_id": "c-prior-1",
+                "text": "Alpha radiation protection dose limits and shielding fundamentals.",
+                "anchor": "",
+                "heading_path": [],
+                "char_start": 0,
+                "char_end": 60,
+                "lang": "en",
+            }
+        ],
+    )
     lex_index.build()
     mock = MagicMock()
     mock.generate.return_value = {"response": _INGEST_RESPONSE}
@@ -857,7 +931,7 @@ def test_ingest_retries_when_no_pages_parsed(wiki_dir, monkeypatch):
     mock = MagicMock()
     mock.generate.side_effect = [
         {"response": "garbage no delimiters"},  # first INGEST attempt
-        {"response": _INGEST_RESPONSE},         # retry attempt
+        {"response": _INGEST_RESPONSE},  # retry attempt
     ]
     monkeypatch.setattr(ollama_client, "_client", lambda: mock)
     result = wiki_engine.ingest("text", "src.txt")
@@ -867,6 +941,7 @@ def test_ingest_retries_when_no_pages_parsed(wiki_dir, monkeypatch):
 
 
 # --- resolve_contradiction ---
+
 
 def test_resolve_contradiction_rewrites_pages(wiki_dir, monkeypatch):
     (wiki_dir / "a.md").write_text("OLD_A")
@@ -880,6 +955,7 @@ def test_resolve_contradiction_rewrites_pages(wiki_dir, monkeypatch):
 
 
 # --- Tier A: begin / piece / end split ---
+
 
 def test_ingest_begin_piece_end_creates_pages(wiki_dir, monkeypatch):
     mock = MagicMock()
@@ -937,6 +1013,7 @@ def test_ingest_back_compat_wrapper_still_works(wiki_dir, monkeypatch):
 
 def test_stats_excludes_manifest_from_raw_count(wiki_dir):
     import db_context
+
     raw = db_context.raw_dir()
     raw.mkdir(parents=True, exist_ok=True)
     (raw / "manifest.json").write_text("{}")

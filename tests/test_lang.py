@@ -2,8 +2,8 @@
 
 import lang
 
-
 # --- detect: long text ---
+
 
 def test_detect_german_prose():
     assert lang.detect("Der Grenzwert für die effektive Dosis beträgt 20 mSv im Jahr.") == "de"
@@ -14,6 +14,7 @@ def test_detect_english_prose():
 
 
 # --- detect: short queries (the weak spot Layer 1 hardens) ---
+
 
 def test_detect_short_german_question():
     assert lang.detect("Was ist ein Kernbrennstoff?") == "de"
@@ -30,6 +31,7 @@ def test_umlaut_forces_german_even_when_terse():
 
 # --- detect: fallbacks ---
 
+
 def test_no_signal_falls_back_to_default():
     assert lang.detect("Radon 222") == "de"
     assert lang.detect("Radon 222", default="en") == "en"
@@ -41,6 +43,7 @@ def test_empty_text_uses_default():
 
 
 # --- directive selection maps to the right prompt constant ---
+
 
 def test_response_directive_language_matches():
     assert "ANTWORTSPRACHE" in lang.response_directive("Was gilt für Radon?")
@@ -61,17 +64,21 @@ def test_directives_exempt_key_facts_heading():
 
 # --- detect: robustness (umlaut is a tie-breaker, sampling spans the document) ---
 
+
 def test_umlaut_name_does_not_flip_english_sentence():
     assert lang.detect("This paper by Jürgen Müller describes the model.") == "en"
 
 
 def test_long_document_sampled_beyond_english_abstract():
     abstract = "Abstract: We propose a harness for the agents and the tools. " * 60
-    body = "Die Arbeit beschreibt, wie der Agent mit den Werkzeugen arbeitet und was er darf. " * 400
+    body = (
+        "Die Arbeit beschreibt, wie der Agent mit den Werkzeugen arbeitet und was er darf. " * 400
+    )
     assert lang.detect(abstract + body) == "de"
 
 
 # --- ingest directive protects original terms ---
+
 
 def test_ingest_directives_protect_original_terms():
     de = lang.ingest_directive("Der Bericht beschreibt die Anlage.")

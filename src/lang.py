@@ -18,13 +18,10 @@ _TOKEN_RE = re.compile(r"[a-zäöüß]+")
 # High-signal function words per language, word-boundary matched (so they work
 # on short queries where raw substring counting is unreliable).
 _DE_WORDS = frozenset(
-    "der die das und oder ist sind ein eine einen einem einer für mit von nicht "
-    "auch wie was welche welcher welches wann warum wird werden muss darf kann bei "
-    "zum zur dem den des auf im nach über unter gibt sich".split()
+    ["der", "die", "das", "und", "oder", "ist", "sind", "ein", "eine", "einen", "einem", "einer", "für", "mit", "von", "nicht", "auch", "wie", "was", "welche", "welcher", "welches", "wann", "warum", "wird", "werden", "muss", "darf", "kann", "bei", "zum", "zur", "dem", "den", "des", "auf", "im", "nach", "über", "unter", "gibt", "sich"]
 )
 _EN_WORDS = frozenset(
-    "the and or is are a an of to for with from not also how what which when why "
-    "will would be must may can at in on after over under this that does has have".split()
+    ["the", "and", "or", "is", "are", "a", "an", "of", "to", "for", "with", "from", "not", "also", "how", "what", "which", "when", "why", "will", "would", "be", "must", "may", "can", "at", "in", "on", "after", "over", "under", "this", "that", "does", "has", "have"]
 )
 
 
@@ -36,7 +33,9 @@ def _sample(text: str) -> str:
     if len(text) <= 3 * _WINDOW:
         return text
     mid = len(text) // 2
-    return " ".join((text[:_WINDOW], text[mid - _WINDOW // 2:mid + _WINDOW // 2], text[-_WINDOW:]))
+    return " ".join(
+        (text[:_WINDOW], text[mid - _WINDOW // 2 : mid + _WINDOW // 2], text[-_WINDOW:])
+    )
 
 
 def detect(text: str, default: str = "de") -> str:
@@ -66,7 +65,6 @@ def ingest_directive(text: str, default: str = "de") -> str:
     return INGEST_LANGUAGE_DIRECTIVE[detect(text, default)]
 
 
-def abstain_message(query: str, db: str, page: str, score: float,
-                    default: str = "de") -> str:
+def abstain_message(query: str, db: str, page: str, score: float, default: str = "de") -> str:
     """Stage E abstention text in the query's language (see prompts.ABSTAIN_MESSAGE)."""
     return ABSTAIN_MESSAGE[detect(query, default)].format(db=db, page=page, score=score)

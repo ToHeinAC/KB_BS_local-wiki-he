@@ -6,8 +6,8 @@ import pytest
 
 import md_convert
 
-
 # --- is_convertible --------------------------------------------------------
+
 
 @pytest.mark.parametrize("name", ["a.pdf", "A.PDF", "b.docx", "c.png", "d.JPG", "e.tiff"])
 def test_is_convertible_true(name):
@@ -20,6 +20,7 @@ def test_is_convertible_false(name):
 
 
 # --- DOCX (deterministic, no LLM) ------------------------------------------
+
 
 def _make_docx() -> bytes:
     from docx import Document
@@ -59,6 +60,7 @@ def test_convert_to_markdown_docx_routes_to_extractor():
 
 # --- PDF routing (monkeypatched, no real model / no pypdfium2) --------------
 
+
 def test_pdf_routing_text_and_image(monkeypatch):
     pages = [("text", "raw text page"), ("image", object())]
     monkeypatch.setattr(md_convert, "_pdf_page_count", lambda b: len(pages))
@@ -82,6 +84,7 @@ def test_pdf_progress_callback(monkeypatch):
 
 # --- image OCR routing ------------------------------------------------------
 
+
 def test_image_routes_to_convert_image(monkeypatch):
     from PIL import Image
 
@@ -94,11 +97,13 @@ def test_image_routes_to_convert_image(monkeypatch):
 
 # --- LLM wrappers select the right prompt ----------------------------------
 
+
 def test_convert_image_uses_deepseek_prompt(monkeypatch):
     seen = {}
     monkeypatch.setattr(md_convert, "_image_to_base64", lambda img: "b64")
     monkeypatch.setattr(
-        md_convert.ollama_client, "ocr",
+        md_convert.ollama_client,
+        "ocr",
         lambda model, prompt, img_b64: seen.update(model=model, prompt=prompt) or "ok",
     )
     md_convert.convert_image(object(), model_id="deepseek-ocr:3b")
@@ -109,7 +114,8 @@ def test_convert_image_uses_system_prompt_for_non_deepseek(monkeypatch):
     seen = {}
     monkeypatch.setattr(md_convert, "_image_to_base64", lambda img: "b64")
     monkeypatch.setattr(
-        md_convert.ollama_client, "ocr",
+        md_convert.ollama_client,
+        "ocr",
         lambda model, prompt, img_b64: seen.update(prompt=prompt) or "ok",
     )
     md_convert.convert_image(object(), model_id="some-vision:1b")

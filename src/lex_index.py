@@ -49,30 +49,167 @@ MIN_TOKEN_LEN = 2
 
 _STOPWORDS = {
     # German function words
-    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einen", "einem", "einer", "eines",
-    "und", "oder", "aber", "doch", "ist", "war", "sind", "waren", "sein", "wird", "werden", "wurde",
-    "von", "vom", "zu", "zum", "zur", "in", "im", "an", "am", "auf", "für", "mit", "ohne",
-    "nicht", "kein", "keine", "auch", "nur", "noch", "schon", "wenn", "dass", "als", "wie",
-    "bei", "nach", "vor", "über", "unter", "aus", "durch", "gegen", "um",
+    "der",
+    "die",
+    "das",
+    "den",
+    "dem",
+    "des",
+    "ein",
+    "eine",
+    "einen",
+    "einem",
+    "einer",
+    "eines",
+    "und",
+    "oder",
+    "aber",
+    "doch",
+    "ist",
+    "war",
+    "sind",
+    "waren",
+    "sein",
+    "wird",
+    "werden",
+    "wurde",
+    "von",
+    "vom",
+    "zu",
+    "zum",
+    "zur",
+    "in",
+    "im",
+    "an",
+    "am",
+    "auf",
+    "für",
+    "mit",
+    "ohne",
+    "nicht",
+    "kein",
+    "keine",
+    "auch",
+    "nur",
+    "noch",
+    "schon",
+    "wenn",
+    "dass",
+    "als",
+    "wie",
+    "bei",
+    "nach",
+    "vor",
+    "über",
+    "unter",
+    "aus",
+    "durch",
+    "gegen",
+    "um",
     # English function words
-    "the", "a", "an", "and", "or", "but", "is", "are", "was", "were", "be", "been", "being",
-    "to", "of", "in", "on", "at", "by", "for", "with", "from", "as", "that", "this", "these",
-    "those", "it", "its", "not", "no", "if", "then", "than", "so", "do", "does", "did",
+    "the",
+    "a",
+    "and",
+    "or",
+    "but",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "to",
+    "of",
+    "on",
+    "at",
+    "by",
+    "for",
+    "with",
+    "from",
+    "as",
+    "that",
+    "this",
+    "these",
+    "those",
+    "it",
+    "its",
+    "not",
+    "no",
+    "if",
+    "then",
+    "than",
+    "so",
+    "do",
+    "does",
+    "did",
 }
 
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
-_UMLAUT_MAP = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss",
-                             "Ä": "ae", "Ö": "oe", "Ü": "ue"})
+_UMLAUT_MAP = str.maketrans(
+    {"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss", "Ä": "ae", "Ö": "oe", "Ü": "ue"}
+)
 
-_GERMAN_SUFFIXES = ("erungen", "ierung", "ungen", "ierens", "ieren", "iert",
-                    "lich", "isch", "ung", "keit", "heit", "schaft", "ern",
-                    "end", "ten", "ein", "ene", "enem", "enen", "ener", "enes",
-                    "em", "en", "er", "es", "et", "te", "st", "n", "e", "s")
-_ENGLISH_SUFFIXES = ("ization", "isation", "ational", "tional", "ization",
-                     "ingly", "ation", "ments", "ement", "ness", "ously", "ously",
-                     "ize", "ise", "ing", "ies", "ied", "est", "ers", "ed",
-                     "ly", "es", "er", "s")
+_GERMAN_SUFFIXES = (
+    "erungen",
+    "ierung",
+    "ungen",
+    "ierens",
+    "ieren",
+    "iert",
+    "lich",
+    "isch",
+    "ung",
+    "keit",
+    "heit",
+    "schaft",
+    "ern",
+    "end",
+    "ten",
+    "ein",
+    "ene",
+    "enem",
+    "enen",
+    "ener",
+    "enes",
+    "em",
+    "en",
+    "er",
+    "es",
+    "et",
+    "te",
+    "st",
+    "n",
+    "e",
+    "s",
+)
+_ENGLISH_SUFFIXES = (
+    "ization",
+    "isation",
+    "ational",
+    "tional",
+    "ization",
+    "ingly",
+    "ation",
+    "ments",
+    "ement",
+    "ness",
+    "ously",
+    "ously",
+    "ize",
+    "ise",
+    "ing",
+    "ies",
+    "ied",
+    "est",
+    "ers",
+    "ed",
+    "ly",
+    "es",
+    "er",
+    "s",
+)
 
 
 def _nfkd_fold(token: str) -> str:
@@ -195,10 +332,14 @@ def _row_for_chunk(ch: dict, qa_by_chunk: dict) -> tuple:
     so a chunk is retrievable by the questions it answers.
     """
     cid = ch["chunk_id"]
-    body_tokens = [t for t in tokenize(ch.get("text", ""))
-                   if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN]
-    qa_tokens = [t for t in tokenize(" ".join(qa_by_chunk.get(cid, [])))
-                 if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN]
+    body_tokens = [
+        t for t in tokenize(ch.get("text", "")) if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN
+    ]
+    qa_tokens = [
+        t
+        for t in tokenize(" ".join(qa_by_chunk.get(cid, [])))
+        if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN
+    ]
     terms: list[str] = []
     for tok in body_tokens + qa_tokens:
         terms.extend(variants(tok))
@@ -207,9 +348,16 @@ def _row_for_chunk(ch: dict, qa_by_chunk: dict) -> tuple:
     # hit dict can supply it without a JSONL lookup.
     inline = ch.get("text", "") if scope != "raw" else ""
     return (
-        " ".join(terms), cid, ch.get("source", ""), scope, ch.get("anchor", ""),
+        " ".join(terms),
+        cid,
+        ch.get("source", ""),
+        scope,
+        ch.get("anchor", ""),
         json.dumps(ch.get("heading_path", []), ensure_ascii=False),
-        ch.get("char_start", 0), ch.get("char_end", 0), ch.get("lang", ""), inline,
+        ch.get("char_start", 0),
+        ch.get("char_end", 0),
+        ch.get("lang", ""),
+        inline,
     )
 
 
@@ -252,6 +400,7 @@ def build(chunks: list[dict] | None = None) -> dict:
 
 
 # --- Incremental updates (per source, keyed on the `source` column) ----------
+
 
 def index_replace_source(source: str, chunks: list[dict], qa: dict | None = None) -> None:
     """Replace all rows for `source` with rows for `chunks` (delete + insert).
@@ -302,6 +451,7 @@ def index_delete(source: str) -> None:
 
 
 # --- Query -------------------------------------------------------------------
+
 
 def index_health() -> dict:
     """Row counts per scope for the active DB's FTS5 store: `{raw, wiki}`.
@@ -357,9 +507,11 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]
         return []
 
     match = " OR ".join(f'"{v}"' for v in expanded)
-    sql = ("SELECT chunk_id, source, scope, anchor, heading_path, char_start, "
-           "char_end, lang, text, terms, bm25(chunks_fts) AS score "
-           "FROM chunks_fts WHERE chunks_fts MATCH ?")
+    sql = (
+        "SELECT chunk_id, source, scope, anchor, heading_path, char_start, "
+        "char_end, lang, text, terms, bm25(chunks_fts) AS score "
+        "FROM chunks_fts WHERE chunks_fts MATCH ?"
+    )
     params: list = [match]
     if scope is not None:
         sql += " AND scope = ?"
@@ -382,13 +534,12 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]
         if inline:
             return inline
         if source not in text_cache:
-            text_cache[source] = {c["chunk_id"]: c["text"]
-                                  for c in chunker.load_chunks(source)}
+            text_cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
         return text_cache[source].get(cid, "")
 
     out: list[dict] = []
     seen: set[str] = set()
-    for (cid, source, sc, anchor, hp_json, cs, ce, lang, inline, terms, score) in rows:
+    for cid, source, sc, anchor, hp_json, cs, ce, lang, inline, terms, score in rows:
         if cid in seen:
             continue
         seen.add(cid)
@@ -396,20 +547,22 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]
         preview = text.replace("\n", " ").strip()
         if len(preview) > 320:
             preview = preview[:320] + "…"
-        out.append({
-            "chunk_id": cid,
-            "score": round(-score, 3),
-            "source": source,
-            "scope": sc,
-            "anchor": anchor,
-            "heading_path": json.loads(hp_json) if hp_json else [],
-            "char_start": cs,
-            "char_end": ce,
-            "lang": lang,
-            "text": text,
-            "preview": preview,
-            "matched_terms": sorted(exp_set.intersection(terms.split())),
-        })
+        out.append(
+            {
+                "chunk_id": cid,
+                "score": round(-score, 3),
+                "source": source,
+                "scope": sc,
+                "anchor": anchor,
+                "heading_path": json.loads(hp_json) if hp_json else [],
+                "char_start": cs,
+                "char_end": ce,
+                "lang": lang,
+                "text": text,
+                "preview": preview,
+                "matched_terms": sorted(exp_set.intersection(terms.split())),
+            }
+        )
         if len(out) >= top_k:
             break
     return out

@@ -3,7 +3,6 @@
 import gc
 import os
 import re
-import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -12,9 +11,12 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import agent as research_agent
 import auth
+import chat_agent
 import db_context
 import dedup
+import deep_research_agent
 import file_processor
 import gpu_widget
 import graph_widget
@@ -26,9 +28,6 @@ import ollama_server
 import theme
 import tools
 import wiki_engine
-import agent as research_agent
-import deep_research_agent
-import chat_agent
 
 st.set_page_config(
     page_title="LocalWiki",
@@ -125,6 +124,7 @@ def _render_legacy_graph() -> None:
     """
     try:
         import json as _json
+
         graph = wiki_engine.build_typed_graph()
         tcol1, tcol2 = st.columns(2)
         show_names = tcol1.toggle("Node names", value=True)
@@ -141,23 +141,29 @@ def _render_legacy_graph() -> None:
                 continue
             keep_ids.add(node["id"])
             label = node["label"]
-            nodes_data.append({
-                "id": node["id"],
-                "group": node["type"],
-                "label": (_abbrev(label) if node["type"] == "page" else label) if show_names else "",
-                "title": label,
-            })
+            nodes_data.append(
+                {
+                    "id": node["id"],
+                    "group": node["type"],
+                    "label": (_abbrev(label) if node["type"] == "page" else label)
+                    if show_names
+                    else "",
+                    "title": label,
+                }
+            )
         for edge in graph["edges"]:
             if edge["from"] not in keep_ids or edge["to"] not in keep_ids:
                 continue
-            edges_data.append({
-                "from": edge["from"],
-                "to": edge["to"],
-                "group": edge["type"],
-                "dashes": edge["type"] == "derived-from",
-                "color": "#d97a3a" if edge["type"] == "derived-from" else "#aaa",
-                "arrows": "to" if edge["type"] == "derived-from" else "",
-            })
+            edges_data.append(
+                {
+                    "from": edge["from"],
+                    "to": edge["to"],
+                    "group": edge["type"],
+                    "dashes": edge["type"] == "derived-from",
+                    "color": "#d97a3a" if edge["type"] == "derived-from" else "#aaa",
+                    "arrows": "to" if edge["type"] == "derived-from" else "",
+                }
+            )
 
         html = f"""<!DOCTYPE html><html><head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"
@@ -188,7 +194,10 @@ var net=new vis.Network(document.getElementById('g'),
         )
         orphans = wiki_engine.find_orphans()
         if orphans:
-            st.caption(f"**{len(orphans)} orphan(s)** (no in-links): " + ", ".join(f"`{o}`" for o in orphans[:20]))
+            st.caption(
+                f"**{len(orphans)} orphan(s)** (no in-links): "
+                + ", ".join(f"`{o}`" for o in orphans[:20])
+            )
 
         st.markdown("### Inspect a node")
         node_options = {n["label"]: n["id"] for n in graph["nodes"]}
@@ -229,8 +238,11 @@ def _render_neural_graph(layout: str) -> None:
     twice.
     """
     overlay_labels = {
-        "Hubs": "hubs", "Bridges": "bridges", "Orphans": "orphans",
-        "Stale": "stale", "Low confidence": "confidence",
+        "Hubs": "hubs",
+        "Bridges": "bridges",
+        "Orphans": "orphans",
+        "Stale": "stale",
+        "Low confidence": "confidence",
     }
     # The metric and the overlays refine what is already drawn, so they live
     # behind a collapsed disclosure rather than competing with the layout switch.
@@ -239,12 +251,16 @@ def _render_neural_graph(layout: str) -> None:
     with st.expander("Advanced", expanded=False, key="graph_advanced"):
         acol1, acol2 = st.columns([1, 2])
     by_degree = acol1.toggle(
-        "Connections", key="graph_by_degree",
+        "Connections",
+        key="graph_by_degree",
         help="Off: dots and the ranked chart show PageRank. On: number of connections.",
     )
     picked = acol2.multiselect(
-        "Style Options", list(overlay_labels), default=["Hubs"],
-        key="graph_overlays", placeholder="Style Options",
+        "Style Options",
+        list(overlay_labels),
+        default=["Hubs"],
+        key="graph_overlays",
+        placeholder="Style Options",
         help=(
             "Highlights only — no node is added or hidden.\n\n"
             "- **Hubs** — pages in the top 10% by PageRank (most central): "
@@ -298,8 +314,10 @@ def _render_neural_graph(layout: str) -> None:
         else:
             # A toast, not a panel message: the collapsed rail is too narrow to
             # read one, and this needs no space of its own.
-            st.toast(f"{clicked['node'].removeprefix('source::')} is an original "
-                     "document, not a wiki page.")
+            st.toast(
+                f"{clicked['node'].removeprefix('source::')} is an original "
+                "document, not a wiki page."
+            )
 
     with panel_col:
         if not panel_open:
@@ -332,8 +350,11 @@ def _render_explorer_panel() -> None:
     with st.container(height=560, border=False):
         st.markdown(parsed["content"])
     st.download_button(
-        "Download page", data=parsed["content"], file_name=selected,
-        mime="text/markdown", key=f"dl_graph_page_{selected}",
+        "Download page",
+        data=parsed["content"],
+        file_name=selected,
+        mime="text/markdown",
+        key=f"dl_graph_page_{selected}",
     )
     if parsed["sources"] or parsed["related"]:
         with st.expander("Sources", expanded=False):
@@ -382,7 +403,6 @@ def _render_graph_health() -> None:
                 st.caption(f"…and {len(ids) - 25} more.")
 
 
-
 def _raw_source_button(filename: str, key: str) -> None:
     db, ref = db_context.split_ref(filename)  # cross-DB chat cites as "DB::file.md"
     base = _CHUNK_SUFFIX_RE.sub("", ref)
@@ -419,8 +439,10 @@ def _warn_if_no_lex_index() -> bool:
 def _render_wiki_nav(key_prefix: str) -> str | None:
     """Render wiki navigation tree in a narrow column. Returns clicked filename or None."""
     search = st.text_input(
-        "Search pages", placeholder="Search…",
-        key=f"{key_prefix}_nav_search", label_visibility="collapsed",
+        "Search pages",
+        placeholder="Search…",
+        key=f"{key_prefix}_nav_search",
+        label_visibility="collapsed",
     ).strip()
     selected: str | None = None
     if search:
@@ -430,7 +452,9 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
         st.caption(f"{len(results)} result(s)")
         max_score = max((r.get("score", 0.0) for r in results), default=0.0)
         for _i, r in enumerate(results):
-            if st.button(r["title"], key=f"{key_prefix}_hit_{r['filename']}", use_container_width=True):
+            if st.button(
+                r["title"], key=f"{key_prefix}_hit_{r['filename']}", use_container_width=True
+            ):
                 st.session_state[f"{key_prefix}_selected_page"] = r["filename"]
                 selected = r["filename"]
             if max_score > 0:
@@ -450,9 +474,12 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
     else:
         tree = wiki_engine.get_wiki_tree()
         group_labels = {
-            "concept": "Concepts", "entity": "Entities",
-            "source-summary": "Source Summaries", "comparison": "Comparisons",
-            "insight": "Insights", "other": "Other",
+            "concept": "Concepts",
+            "entity": "Entities",
+            "source-summary": "Source Summaries",
+            "comparison": "Comparisons",
+            "insight": "Insights",
+            "other": "Other",
         }
         for grp in ["concept", "entity", "source-summary", "comparison", "insight", "other"]:
             group = tree.get(grp)
@@ -461,7 +488,9 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
             with st.expander(f"{group_labels[grp]} ({len(group)})", expanded=(grp == "concept")):
                 for p in group:
                     title = ("⚠️ " if p.get("stale") else "") + p.get("title", p["filename"])
-                    if st.button(title, key=f"{key_prefix}_nav_{p['filename']}", use_container_width=True):
+                    if st.button(
+                        title, key=f"{key_prefix}_nav_{p['filename']}", use_container_width=True
+                    ):
                         st.session_state[f"{key_prefix}_selected_page"] = p["filename"]
                         selected = p["filename"]
     return selected
@@ -568,8 +597,7 @@ def _render_research_metrics(metrics: dict | None) -> None:
     would just repeat the search count (per the spec: only show it if it differs)."""
     if not metrics:
         return
-    tiles = [("Sub-tasks", metrics.get("tasks", 0)),
-             ("Web searches", metrics.get("searches", 0))]
+    tiles = [("Sub-tasks", metrics.get("tasks", 0)), ("Web searches", metrics.get("searches", 0))]
     checked = metrics.get("sources_checked", 0)
     if checked != metrics.get("searches", 0):
         tiles.append(("Sources checked", checked))
@@ -589,8 +617,9 @@ def _render_research_trace(steps: list[dict] | None) -> None:
         _render_research_step(step)
 
 
-def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str,
-                         deep: bool = False) -> None:
+def _run_research_stream(
+    question_to_run: str, display_q: str, wiki_context: str, deep: bool = False
+) -> None:
     st.session_state["research_sources"] = []
     st.session_state["last_research_answer"] = ""
     st.session_state["last_research_error"] = ""
@@ -604,8 +633,7 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
     st.session_state["last_research_interpreted"] = _interpreted
     st.markdown(f"**Research question:** {display_q}")
     steps_container = st.container()
-    _runner = (deep_research_agent.run_deep_research if deep
-               else research_agent.run_research_agent)
+    _runner = deep_research_agent.run_deep_research if deep else research_agent.run_research_agent
     _trace = st.session_state["last_research_steps"]
     with steps_container:
         for step in _runner(question_to_run, wiki_context):
@@ -652,21 +680,28 @@ def _run_research_stream(question_to_run: str, display_q: str, wiki_context: str
                         "The agent finished but produced no answer text. "
                         "Try rephrasing the question, or click 🆕 New research."
                     )
-                st.session_state.setdefault("research_history", []).append({
-                    "q": display_q,
-                    "a": st.session_state.get("last_research_answer", ""),
-                    "interpreted": _interpreted,
-                    "report": (("comparisons/" + step["report_path"].split("comparisons/")[-1])
-                               if step.get("report_path") else None),
-                })
+                st.session_state.setdefault("research_history", []).append(
+                    {
+                        "q": display_q,
+                        "a": st.session_state.get("last_research_answer", ""),
+                        "interpreted": _interpreted,
+                        "report": (
+                            ("comparisons/" + step["report_path"].split("comparisons/")[-1])
+                            if step.get("report_path")
+                            else None
+                        ),
+                    }
+                )
     # Safety net: the result block renders on `last_research_answer`, and the
     # error block on `last_research_error`. If a run somehow sets neither
     # (e.g. the generator ends without a terminal step), the page would come
     # back completely empty — no answer, no reason, and not even the trace,
     # since that is rendered inside those two branches. Never leave the user
     # with a blank page.
-    if not (st.session_state.get("last_research_answer", "").strip()
-            or st.session_state.get("last_research_error", "").strip()):
+    if not (
+        st.session_state.get("last_research_answer", "").strip()
+        or st.session_state.get("last_research_error", "").strip()
+    ):
         st.session_state["last_research_error"] = (
             "The run ended without producing a result. The agent trace below "
             "shows how far it got — try rephrasing, or click 🆕 New research."
@@ -741,8 +776,10 @@ def _render_why_sources(audit: dict | None) -> None:
 
 # --- sidebar ---
 
+
 def _safe_reset() -> None:
     import requests as _req
+
     try:
         _req.post(
             f"{ollama_client.host()}/api/generate",
@@ -831,8 +868,8 @@ if _maint_active:
     st.markdown(
         f"""<style>
         [data-testid="stSidebar"] .st-key-maint_nav_btn button {{
-            background-color: {_t['primary']} !important;
-            border-color: {_t['primary']} !important;
+            background-color: {_t["primary"]} !important;
+            border-color: {_t["primary"]} !important;
         }}
         [data-testid="stSidebar"] .st-key-maint_nav_btn button * {{
             color: #ffffff !important;
@@ -847,13 +884,25 @@ if st.sidebar.button("🛠 Maintenance", key="maint_nav_btn", use_container_widt
 st.sidebar.markdown("---")
 st.sidebar.caption(f"Signed in as **{_user}**")
 _rst_col, _logout_col = st.sidebar.columns(2)
-if _rst_col.button("Reset", key="reset_btn", help="Unload model from VRAM and reset session. Server stays running."):
+if _rst_col.button(
+    "Reset", key="reset_btn", help="Unload model from VRAM and reset session. Server stays running."
+):
     _safe_reset()
 if _logout_col.button("Logout", key="logout_btn"):
-    for _k in ("user", "active_db", "messages", "chat_followup", "chat_scope",
-               "research_history", "last_research_q", "last_research_answer",
-               "last_report", "research_sources", "last_research_steps",
-               "last_research_metrics"):
+    for _k in (
+        "user",
+        "active_db",
+        "messages",
+        "chat_followup",
+        "chat_scope",
+        "research_history",
+        "last_research_q",
+        "last_research_answer",
+        "last_report",
+        "research_sources",
+        "last_research_steps",
+        "last_research_metrics",
+    ):
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -890,18 +939,34 @@ with _bar_db:
     )
     # The masthead dateline already carries the counts in newspaper mode.
     if not _NEWSPAPER:
-        st.caption(f"**{_s['pages']}** pages &nbsp;·&nbsp; **{_s['raw_files']}** sources",
-                   unsafe_allow_html=True)
+        st.caption(
+            f"**{_s['pages']}** pages &nbsp;·&nbsp; **{_s['raw_files']}** sources",
+            unsafe_allow_html=True,
+        )
 if _db_choice != st.session_state["active_db"]:
     st.session_state["active_db"] = _db_choice
     db_context.set_active_db(_db_choice)
     # Clear per-DB session state to avoid cross-DB leakage.
-    for _k in ("messages", "chat_followup", "research_history",
-               "last_research_q", "last_research_answer", "last_report",
-               "research_sources", "last_research_steps", "last_research_metrics",
-               "explorer_selected_page", "last_contradictions",
-               "pending_batch", "batch_ingesting", "batch_prepared", "batch_key",
-               "convert_editor", "chat_scope", "normalize_report"):
+    for _k in (
+        "messages",
+        "chat_followup",
+        "research_history",
+        "last_research_q",
+        "last_research_answer",
+        "last_report",
+        "research_sources",
+        "last_research_steps",
+        "last_research_metrics",
+        "explorer_selected_page",
+        "last_contradictions",
+        "pending_batch",
+        "batch_ingesting",
+        "batch_prepared",
+        "batch_key",
+        "convert_editor",
+        "chat_scope",
+        "normalize_report",
+    ):
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -924,8 +989,12 @@ with _bar_nav:
         # segmented_control, not st.tabs: tabs execute every branch on every rerun
         # and the Upload branch's st.stop() would blank the other tabs.
         page = st.segmented_control(
-            "OPTIONS", _nav_options, required=True, key="wiki_view",
-            label_visibility="collapsed", width="stretch",
+            "OPTIONS",
+            _nav_options,
+            required=True,
+            key="wiki_view",
+            label_visibility="collapsed",
+            width="stretch",
         )
 
 
@@ -934,7 +1003,9 @@ with _bar_nav:
 if page == "Upload":
     # No title: the active nav pill already names the page. Only the part the
     # pill cannot say stays.
-    st.caption("Markdown, PDF, DOCX, and images — non-Markdown files are auto-converted before ingest.")
+    st.caption(
+        "Markdown, PDF, DOCX, and images — non-Markdown files are auto-converted before ingest."
+    )
     if not _can_maintain:
         st.error("You are not a maintainer of this database. Ask an admin for maintainer rights.")
         st.stop()
@@ -973,9 +1044,11 @@ if page == "Upload":
                 b = raws[name]
                 convertible = md_convert.is_convertible(name)
                 if convertible:
+
                     def _cb(done, total, label, _n=name, _i=i, _t=len(todo)):
                         frac = (_i + (done / total if total else 1.0)) / _t
                         prog.progress(min(frac, 1.0), text=f"{_n}: {label}")
+
                     try:
                         text = md_convert.convert_to_markdown(b, name, _cb)
                     except (RuntimeError, ValueError) as e:
@@ -988,14 +1061,16 @@ if page == "Upload":
                     text = b.decode(errors="replace")
                     save_name = name
                     content_bytes = None  # write the original bytes as-is
-                prepared.append({
-                    "save_name": save_name,
-                    "raw": b,
-                    "text": text,
-                    "content_bytes": content_bytes,
-                    "convertible": convertible,
-                    "detected_date": metadata_extract.extract_effective_date(text) or "",
-                })
+                prepared.append(
+                    {
+                        "save_name": save_name,
+                        "raw": b,
+                        "text": text,
+                        "content_bytes": content_bytes,
+                        "convertible": convertible,
+                        "detected_date": metadata_extract.extract_effective_date(text) or "",
+                    }
+                )
             prog.empty()
             if not prepared:
                 st.stop()
@@ -1008,13 +1083,18 @@ if page == "Upload":
             st.markdown("**Converted Markdown** — review and edit before ingest.")
             if "convert_editor" not in st.session_state:
                 st.session_state["convert_editor"] = prepared[0]["text"]
-            st.text_area("Converted Markdown", height=300,
-                         label_visibility="collapsed", key="convert_editor")
+            st.text_area(
+                "Converted Markdown", height=300, label_visibility="collapsed", key="convert_editor"
+            )
 
-        st.markdown("**Effective date** — auto-detected from each document; correct any before ingest.")
+        st.markdown(
+            "**Effective date** — auto-detected from each document; correct any before ingest."
+        )
         edited = st.data_editor(
             [{"File": f["save_name"], "effective as of": f["detected_date"]} for f in prepared],
-            key="date_editor", hide_index=True, use_container_width=True,
+            key="date_editor",
+            hide_index=True,
+            use_container_width=True,
             disabled=["File"],
             column_config={
                 "File": st.column_config.TextColumn("File"),
@@ -1030,7 +1110,9 @@ if page == "Upload":
         # sat on screen for the whole run. Naming the DB on the button keeps the
         # wrong-database guard without a second click.
         _target_db = st.session_state["active_db"]
-        st.caption(f"Will be written to database **{_target_db}** — make sure this is the right one.")
+        st.caption(
+            f"Will be written to database **{_target_db}** — make sure this is the right one."
+        )
         if st.button(f"Ingest {len(prepared)} file(s) into “{_target_db}”", type="primary"):
             files = prepared
             if single_md_edit:
@@ -1060,13 +1142,19 @@ if page == "Upload":
                     is_last = i == len(files) - 1
                     with st.spinner(f"Ingesting {f['save_name']} ({i + 1}/{len(files)})…"):
                         try:
-                            saved = dedup.register_file(f["raw"], f["save_name"], content=f["content_bytes"])
+                            saved = dedup.register_file(
+                                f["raw"], f["save_name"], content=f["content_bytes"]
+                            )
                             chunks = file_processor.chunk_text(f["text"])
-                            per_meta = {k: v for k, v in {
-                                "effective as of": dates.get(f["save_name"], ""),
-                                "part of": shared["part of"],
-                                "description": shared["description"],
-                            }.items() if v}
+                            per_meta = {
+                                k: v
+                                for k, v in {
+                                    "effective as of": dates.get(f["save_name"], ""),
+                                    "part of": shared["part of"],
+                                    "description": shared["description"],
+                                }.items()
+                                if v
+                            }
                             ctx = wiki_engine.ingest_begin(f["text"], saved.name, per_meta or None)
                             for j, chunk in enumerate(chunks):
                                 wiki_engine.ingest_piece(ctx, chunk, j, len(chunks))
@@ -1088,19 +1176,29 @@ if page == "Upload":
                 c2.metric("Updated", len(dict.fromkeys(agg["updated"])))
                 c3.metric("Contradictions", len(agg["contradictions"]))
                 if agg["created"]:
-                    st.markdown("**New pages:** " + ", ".join(f"`{f}`" for f in dict.fromkeys(agg["created"])))
+                    st.markdown(
+                        "**New pages:** "
+                        + ", ".join(f"`{f}`" for f in dict.fromkeys(agg["created"]))
+                    )
                 if agg["failed"]:
                     st.error("Failed:\n" + "\n".join(f"- {x}" for x in agg["failed"]))
                 if agg["contradictions"]:
-                    st.warning("Contradictions found:\n" + "\n".join(f"- {c}" for c in agg["contradictions"]))
+                    st.warning(
+                        "Contradictions found:\n"
+                        + "\n".join(f"- {c}" for c in agg["contradictions"])
+                    )
                     st.session_state["last_contradictions"] = agg["contradictions"]
-                    st.session_state["last_contradiction_pages"] = list({*agg["created"], *agg["updated"]})
+                    st.session_state["last_contradiction_pages"] = list(
+                        {*agg["created"], *agg["updated"]}
+                    )
 
     if st.session_state.get("last_contradictions"):
         st.markdown("---")
         _hdr, _dismiss = st.columns([5, 1], vertical_alignment="bottom")
         _hdr.subheader("Resolve contradictions", help=_RESOLVE_HELP)
-        if _dismiss.button("Dismiss", key="resolve_dismiss", help="Hide this list without changing any page."):
+        if _dismiss.button(
+            "Dismiss", key="resolve_dismiss", help="Hide this list without changing any page."
+        ):
             st.session_state.pop("last_contradictions", None)
             st.session_state.pop("last_contradiction_pages", None)
             st.rerun()
@@ -1122,12 +1220,16 @@ if page == "Upload":
                         try:
                             res = wiki_engine.resolve_contradiction(desc, pages, guidance)
                             if res["updated"]:
-                                st.success("Updated: " + ", ".join(f"`{f}`" for f in res["updated"]))
+                                st.success(
+                                    "Updated: " + ", ".join(f"`{f}`" for f in res["updated"])
+                                )
                             elif not res["skipped"]:
                                 st.info("No pages were rewritten.")
                             if res["skipped"]:
-                                st.warning("Not rewritten — the reply switched the page's language: "
-                                           + ", ".join(f"`{f}`" for f in res["skipped"]))
+                                st.warning(
+                                    "Not rewritten — the reply switched the page's language: "
+                                    + ", ".join(f"`{f}`" for f in res["skipped"])
+                                )
                         except RuntimeError as e:
                             st.error(str(e))
 
@@ -1146,8 +1248,13 @@ elif page == "Wiki Explorer":
         _vcol, _sepcol, _lcol = st.columns([5, 0.25, 5])
         with _vcol:
             view_mode = st.segmented_control(
-                "View", ["Graph", "Tree"], required=True, default="Graph",
-                key="explorer_view", label_visibility="collapsed", width="stretch",
+                "View",
+                ["Graph", "Tree"],
+                required=True,
+                default="Graph",
+                key="explorer_view",
+                label_visibility="collapsed",
+                width="stretch",
             )
         _neural = graph_widget.RENDERER == "neural"
         graph_layout = "galaxy"
@@ -1159,10 +1266,14 @@ elif page == "Wiki Explorer":
             )
             with _lcol:
                 _picked_layout = st.segmented_control(
-                    "Layout", list(_GRAPH_LAYOUTS), default="Galaxy",
-                    key="graph_layout", label_visibility="collapsed", width="stretch",
+                    "Layout",
+                    list(_GRAPH_LAYOUTS),
+                    default="Galaxy",
+                    key="graph_layout",
+                    label_visibility="collapsed",
+                    width="stretch",
                     help="Galaxy: force layout. Ranked: the metric's head as a stable "
-                         "column. Clusters: pages on a ring by cluster, links bundled.",
+                    "column. Clusters: pages on a ring by cluster, links bundled.",
                 )
             # Clearing the control returns None; the map still has to be drawn
             # in *some* geometry.
@@ -1249,17 +1360,23 @@ elif page == "Wiki Chat":
         # as a two-option toggle; the caption above the page already explains
         # what Fast and Deep do.
         mode = st.segmented_control(
-            "Mode", ["Fast", "Deep"], required=True, default="Fast",
-            key="chat_mode", label_visibility="collapsed",
+            "Mode",
+            ["Fast", "Deep"],
+            required=True,
+            default="Fast",
+            key="chat_mode",
+            label_visibility="collapsed",
         )
 
         # Scope and reset are per-session decisions, not per-turn ones.
         with st.expander("Advanced", expanded=False, key="chat_advanced"):
             st.multiselect(
-                "Search in", options=_allowed_dbs, key="chat_scope",
+                "Search in",
+                options=_allowed_dbs,
+                key="chat_scope",
                 help="Databases this chat searches. Answers cite cross-database results "
-                     "as `Database::file.md`. Uploads and 'Save answer to wiki' still go "
-                     "to the active database in the sidebar.",
+                "as `Database::file.md`. Uploads and 'Save answer to wiki' still go "
+                "to the active database in the sidebar.",
             )
             if st.button("🆕 New chat", key="new_chat"):
                 st.session_state.pop("messages", None)
@@ -1279,7 +1396,9 @@ elif page == "Wiki Chat":
         _msgs = st.session_state["messages"]
         _current_start = len(_msgs) - 2 if len(_msgs) > 2 else 0
         if _current_start > 0:
-            with st.expander(f"📜 Conversation history ({_current_start // 2} earlier turn(s))", expanded=False):
+            with st.expander(
+                f"📜 Conversation history ({_current_start // 2} earlier turn(s))", expanded=False
+            ):
                 for _m in _msgs[:_current_start]:
                     _role = "You" if _m["role"] == "user" else "Assistant"
                     if _m["role"] == "assistant" and _m.get("interpreted"):
@@ -1296,9 +1415,18 @@ elif page == "Wiki Chat":
                 st.markdown(msg["content"])
                 if msg["role"] == "assistant":
                     _render_why_sources(msg.get("audit"))
-                if msg["role"] == "assistant" and msg.get("question") and not msg["content"].startswith("Error:"):
-                    if st.button("↪ Follow up", key=f"followup_{i}", help="Continue from this answer"):
-                        st.session_state["chat_followup"] = {"q": msg["question"], "a": msg["content"]}
+                if (
+                    msg["role"] == "assistant"
+                    and msg.get("question")
+                    and not msg["content"].startswith("Error:")
+                ):
+                    if st.button(
+                        "↪ Follow up", key=f"followup_{i}", help="Continue from this answer"
+                    ):
+                        st.session_state["chat_followup"] = {
+                            "q": msg["question"],
+                            "a": msg["content"],
+                        }
                         st.rerun()
                 if msg["role"] == "assistant" and msg.get("steps"):
                     st.download_button(
@@ -1321,10 +1449,18 @@ elif page == "Wiki Chat":
                                 st.error(step["content"])
 
         last = st.session_state["messages"][-1] if st.session_state["messages"] else None
-        if last and last["role"] == "assistant" and last.get("question") and not last["content"].startswith("Error:"):
+        if (
+            last
+            and last["role"] == "assistant"
+            and last.get("question")
+            and not last["content"].startswith("Error:")
+        ):
             _active = st.session_state["active_db"]
-            if st.button("Save answer to wiki", key="save_answer",
-                         help=f"Files the answer into the active database ({_active})."):
+            if st.button(
+                "Save answer to wiki",
+                key="save_answer",
+                help=f"Files the answer into the active database ({_active}).",
+            ):
                 # `related:` links are intra-DB, so a cross-DB answer only carries
                 # over the pages that actually live in the DB being written to.
                 _refs = [db_context.split_ref(s) for s in last.get("sources", [])]
@@ -1372,9 +1508,15 @@ elif page == "Wiki Chat":
                 except RuntimeError as e:
                     answer, sources, raw_sources, audit = f"Error: {e}", [], [], None
             st.session_state["messages"].append(
-                {"role": "assistant", "content": answer, "question": prompt,
-                 "sources": sources, "raw_sources": raw_sources, "interpreted": interpreted,
-                 "audit": audit}
+                {
+                    "role": "assistant",
+                    "content": answer,
+                    "question": prompt,
+                    "sources": sources,
+                    "raw_sources": raw_sources,
+                    "interpreted": interpreted,
+                    "audit": audit,
+                }
             )
         else:
             steps: list[dict] = []
@@ -1408,9 +1550,16 @@ elif page == "Wiki Chat":
             # scores the run accumulated in run memory (idea.md §6.9.1 guardrail).
             _audit = tools.current_run_audit()
             st.session_state["messages"].append(
-                {"role": "assistant", "content": answer or "(no answer)", "question": prompt,
-                 "sources": wiki_pages, "raw_sources": raw_sources, "steps": steps,
-                 "interpreted": interpreted, "audit": _audit}
+                {
+                    "role": "assistant",
+                    "content": answer or "(no answer)",
+                    "question": prompt,
+                    "sources": wiki_pages,
+                    "raw_sources": raw_sources,
+                    "steps": steps,
+                    "interpreted": interpreted,
+                    "audit": _audit,
+                }
             )
         st.rerun()
 
@@ -1439,24 +1588,42 @@ elif page == "Research":
         # Mirrors the Chat page's Fast/Deep toggle — the mode is the one control
         # every run depends on, so it stands alone above the question.
         research_mode = st.segmented_control(
-            "Research mode", ["Quick", "Deep"], required=True, default="Quick",
-            key="research_mode", label_visibility="collapsed",
+            "Research mode",
+            ["Quick", "Deep"],
+            required=True,
+            default="Quick",
+            key="research_mode",
+            label_visibility="collapsed",
         )
         _deep = research_mode == "Deep"
 
         if st.button("🆕 New research", key="new_research"):
-            for _k in ("research_history", "last_research_q", "last_research_answer",
-                       "last_research_interpreted", "last_report", "research_sources",
-                       "last_research_error", "research_followup_input", "research_saved",
-                       "research_saved_note",
-                       "last_research_steps", "last_research_metrics"):
+            for _k in (
+                "research_history",
+                "last_research_q",
+                "last_research_answer",
+                "last_research_interpreted",
+                "last_report",
+                "research_sources",
+                "last_research_error",
+                "research_followup_input",
+                "research_saved",
+                "research_saved_note",
+                "last_research_steps",
+                "last_research_metrics",
+            ):
                 st.session_state.pop(_k, None)
             st.rerun()
 
-        question = st.text_input("Research question", placeholder="e.g. What are the latest advances in RAG?")
+        question = st.text_input(
+            "Research question", placeholder="e.g. What are the latest advances in RAG?"
+        )
 
-        _paste_label = ("Extra wiki paste (unused in Deep mode — it is web-only)" if _deep
-                        else "Extra wiki paste (optional — the agent browses the wiki on its own)")
+        _paste_label = (
+            "Extra wiki paste (unused in Deep mode — it is web-only)"
+            if _deep
+            else "Extra wiki paste (optional — the agent browses the wiki on its own)"
+        )
         with st.expander(_paste_label):
             wiki_context = st.text_area(
                 "Optional extra context. Leave blank — the agent will run wiki_search first automatically.",
@@ -1471,8 +1638,12 @@ elif page == "Research":
         # perfectly clickable (the click blurs the input, which commits the text
         # and reruns). Validate on click instead; an empty box is rare and a
         # message beats a lying cursor.
-        if st.button("Start research", key="start_research_btn",
-                     use_container_width=True, disabled=not tavily_key):
+        if st.button(
+            "Start research",
+            key="start_research_btn",
+            use_container_width=True,
+            disabled=not tavily_key,
+        ):
             if not question.strip():
                 st.warning("Enter a research question first.")
             else:
@@ -1481,7 +1652,9 @@ elif page == "Research":
 
         _rhist = st.session_state.get("research_history", [])
         if len(_rhist) > 1:
-            with st.expander(f"📜 Conversation history ({len(_rhist) - 1} earlier turn(s))", expanded=False):
+            with st.expander(
+                f"📜 Conversation history ({len(_rhist) - 1} earlier turn(s))", expanded=False
+            ):
                 for _h in _rhist[:-1]:
                     st.markdown(f"**Q:** {_h['q']}")
                     if _h.get("interpreted"):
@@ -1506,25 +1679,33 @@ elif page == "Research":
             _dl_col.download_button(
                 "Download report",
                 data=_ans,
-                file_name=(st.session_state["last_report"].split("comparisons/")[-1]
-                           if st.session_state.get("last_report") else "research-answer.md"),
+                file_name=(
+                    st.session_state["last_report"].split("comparisons/")[-1]
+                    if st.session_state.get("last_report")
+                    else "research-answer.md"
+                ),
                 mime="text/markdown",
                 key="dl_report",
                 use_container_width=True,
             )
             if st.session_state.get("research_saved"):
                 _save_col.success(st.session_state.get("research_saved_note", "Saved to wiki."))
-            elif _save_col.button("Save to wiki", key="save_research_btn",
-                                  use_container_width=True,
-                                  help="Ingest this result into the wiki as new/updated pages."):
+            elif _save_col.button(
+                "Save to wiki",
+                key="save_research_btn",
+                use_container_width=True,
+                help="Ingest this result into the wiki as new/updated pages.",
+            ):
                 with st.spinner("Ingesting result into wiki…"):
                     try:
                         _title = st.session_state["last_research_q"][:60]
                         if st.session_state.get("research_save_as_source"):
                             _res = wiki_engine.ingest_as_source(_ans, f"Research: {_title}")
                             st.session_state["research_saved_note"] = (
-                                "Already registered as a source." if _res["duplicate"]
-                                else f"Saved as source `{_res['source_name']}`.")
+                                "Already registered as a source."
+                                if _res["duplicate"]
+                                else f"Saved as source `{_res['source_name']}`."
+                            )
                         else:
                             wiki_engine.ingest(_ans, f"Research: {_title}")
                             st.session_state["research_saved_note"] = "Saved to wiki."
@@ -1536,11 +1717,11 @@ elif page == "Research":
                 "Register as a source document",
                 key="research_save_as_source",
                 help="Also writes the report into data/raw/ and the manifest, so it "
-                     "behaves like an uploaded file: raw_read can open it, Deep chat "
-                     "can ground on it, Maintenance → Delete source removes it, and "
-                     "the graph's source node points at a document that exists. "
-                     "Unchecked, only wiki pages are written and the source node is a "
-                     "name with no file behind it.",
+                "behaves like an uploaded file: raw_read can open it, Deep chat "
+                "can ground on it, Maintenance → Delete source removes it, and "
+                "the graph's source node points at a document that exists. "
+                "Unchecked, only wiki pages are written and the source node is a "
+                "name with no file behind it.",
             )
             st.markdown("---")
             _render_research_trace(st.session_state.get("last_research_steps"))
@@ -1552,17 +1733,20 @@ elif page == "Research":
         if st.session_state.get("last_research_q"):
             st.markdown("---")
             st.markdown("**↪ Follow-up research**")
-            fq = st.text_input("Ask a follow-up about the last research answer", key="research_followup_input")
+            fq = st.text_input(
+                "Ask a follow-up about the last research answer", key="research_followup_input"
+            )
             # Same stale-widget-value reasoning as "Start research" above.
-            if st.button("Ask follow-up", key="research_followup_go",
-                         disabled=not tavily_key):
+            if st.button("Ask follow-up", key="research_followup_go", disabled=not tavily_key):
                 if not fq.strip():
                     st.warning("Enter a follow-up question first.")
                 else:
                     with st.spinner("Rephrasing follow-up…"):
                         standalone = wiki_engine.condense_followup(
                             st.session_state["last_research_q"],
-                            st.session_state.get("last_research_answer", ""), fq)
+                            st.session_state.get("last_research_answer", ""),
+                            fq,
+                        )
                     _run_research_stream(standalone, fq, "", deep=_deep)
                     st.rerun()
 
@@ -1578,8 +1762,14 @@ elif page == "Maintenance":
     # Same segmented control as the primary nav, for the same reason (see
     # docs/ui.md §Pages): st.tabs evaluates every branch on every rerun, so the
     # index health read, the orphan scan and the log read all ran on each click.
-    _maint_options = ["Search index", "Delete source", "Link graph health", "Lint",
-                      "Page language", "Activity log"]
+    _maint_options = [
+        "Search index",
+        "Delete source",
+        "Link graph health",
+        "Lint",
+        "Page language",
+        "Activity log",
+    ]
     if auth.is_admin(_user):
         _maint_options.append("Admin")
     # Admin disappears when the user is not one. Written *before* the widget:
@@ -1587,8 +1777,12 @@ elif page == "Maintenance":
     if st.session_state.get("maint_view") not in _maint_options:
         st.session_state["maint_view"] = _maint_options[0]
     _maint_view = st.segmented_control(
-        "Maintenance section", _maint_options, required=True, key="maint_view",
-        label_visibility="collapsed", width="stretch",
+        "Maintenance section",
+        _maint_options,
+        required=True,
+        key="maint_view",
+        label_visibility="collapsed",
+        width="stretch",
     )
 
     if _maint_view == "Search index":
@@ -1625,7 +1819,9 @@ elif page == "Maintenance":
             st.success("No orphans — every page is linked from at least one other page.")
 
     elif _maint_view == "Lint":
-        st.caption("Ask the LLM to review wiki quality: contradictions, orphans, gaps, suggestions.")
+        st.caption(
+            "Ask the LLM to review wiki quality: contradictions, orphans, gaps, suggestions."
+        )
         if st.button("Run lint", key="run_lint_btn"):
             with st.spinner("Running lint (may take a minute)…"):
                 try:
@@ -1673,16 +1869,27 @@ elif page == "Maintenance":
             st.success("Every page is pinned to one language and its references are clean.")
         elif _nr:
             _to_translate = sum(1 for i in _nr.values() if i.get("foreign_lines"))
-            st.markdown(f"**{len(_nr)}** pages to update · **{_to_translate}** need translation "
-                        "(one LLM call per block of foreign lines).")
+            st.markdown(
+                f"**{len(_nr)}** pages to update · **{_to_translate}** need translation "
+                "(one LLM call per block of foreign lines)."
+            )
             st.dataframe(
-                [{"Page": f, "Stamp language": i.get("lang", ""),
-                  "Foreign lines": i.get("foreign_lines", 0),
-                  "Fix references": "yes" if i.get("references") else ""} for f, i in _nr.items()],
-                hide_index=True, width="stretch",
+                [
+                    {
+                        "Page": f,
+                        "Stamp language": i.get("lang", ""),
+                        "Foreign lines": i.get("foreign_lines", 0),
+                        "Fix references": "yes" if i.get("references") else "",
+                    }
+                    for f, i in _nr.items()
+                ],
+                hide_index=True,
+                width="stretch",
             )
             if _can_maintain:
-                if st.button(f"Normalize {len(_nr)} pages", key="normalize_run_btn", type="primary"):
+                if st.button(
+                    f"Normalize {len(_nr)} pages", key="normalize_run_btn", type="primary"
+                ):
                     with st.spinner("Normalizing pages…"):
                         _done = wiki_engine.normalize_pages(dry_run=False)
                     st.session_state.pop("normalize_report", None)
@@ -1725,7 +1932,9 @@ elif page == "Maintenance":
             st.subheader("Users (admin)")
             _users = auth.list_users()
             for _ud in _users:
-                with st.expander(f"{_ud['username']}  ·  dbs: {_ud['dbs']}  ·  admin: {_ud['is_admin']}"):
+                with st.expander(
+                    f"{_ud['username']}  ·  dbs: {_ud['dbs']}  ·  admin: {_ud['is_admin']}"
+                ):
                     _all_dbs = db_context.list_dbs()
                     _new_dbs = st.multiselect(
                         "Allowed databases",
@@ -1754,8 +1963,9 @@ elif page == "Maintenance":
                             auth.change_password(_ud["username"], _new_pw)
                         st.success("Updated.")
                         st.rerun()
-                    if c2.button("Delete", key=f"udel_{_ud['username']}",
-                                 disabled=_ud["username"] == _user):
+                    if c2.button(
+                        "Delete", key=f"udel_{_ud['username']}", disabled=_ud["username"] == _user
+                    ):
                         auth.delete_user(_ud["username"])
                         st.success(f"Deleted {_ud['username']}.")
                         st.rerun()

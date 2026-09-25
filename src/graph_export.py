@@ -21,7 +21,7 @@ disagree.
 from __future__ import annotations
 
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 import networkx as nx
 from networkx.algorithms.community import louvain_communities
@@ -107,9 +107,7 @@ def export(today=None) -> dict:
     else:
         pagerank = {n: 0.0 for n in G}
         communities = [set(G)] if G else []
-    betweenness = (
-        nx.betweenness_centrality(G) if G.number_of_nodes() > 2 else {n: 0.0 for n in G}
-    )
+    betweenness = nx.betweenness_centrality(G) if G.number_of_nodes() > 2 else {n: 0.0 for n in G}
     # Sort communities by their smallest member so ids are stable across runs
     # even if Louvain returns them in a different order.
     community_of = {
@@ -129,26 +127,28 @@ def export(today=None) -> dict:
         pr = pagerank.get(nid, 0.0)
         bridge = betweenness.get(nid, 0.0)
         degree = G.degree(nid) if nid in G else 0
-        nodes.append({
-            "id": nid,
-            "label": node["label"],
-            # `cat` drives colour: the page's own frontmatter type for pages,
-            # a synthetic "source" category for raw documents.
-            "cat": "source" if is_source else str(fm.get("type", "concept")).lower(),
-            "kind": node["type"],
-            "comm": community_of.get(nid, 0),
-            "deg": degree,
-            "pr": round(pr, 5),
-            "bridge": round(bridge, 5),
-            "confidence": str(fm.get("confidence", "")).lower() or None,
-            "created": _iso_or_none(fm.get("created")),
-            "updated": _iso_or_none(fm.get("updated")),
-            "tags": [str(t) for t in (fm.get("tags") or [])],
-            "stale": bool(fm) and wiki_engine.is_page_stale(fm, today),
-            "orphan": degree == 0,
-            "hub": bool(pr) and pr >= hub_cut,
-            "bridgeHub": bool(bridge) and bridge >= bridge_cut,
-        })
+        nodes.append(
+            {
+                "id": nid,
+                "label": node["label"],
+                # `cat` drives colour: the page's own frontmatter type for pages,
+                # a synthetic "source" category for raw documents.
+                "cat": "source" if is_source else str(fm.get("type", "concept")).lower(),
+                "kind": node["type"],
+                "comm": community_of.get(nid, 0),
+                "deg": degree,
+                "pr": round(pr, 5),
+                "bridge": round(bridge, 5),
+                "confidence": str(fm.get("confidence", "")).lower() or None,
+                "created": _iso_or_none(fm.get("created")),
+                "updated": _iso_or_none(fm.get("updated")),
+                "tags": [str(t) for t in (fm.get("tags") or [])],
+                "stale": bool(fm) and wiki_engine.is_page_stale(fm, today),
+                "orphan": degree == 0,
+                "hub": bool(pr) and pr >= hub_cut,
+                "bridgeHub": bool(bridge) and bridge >= bridge_cut,
+            }
+        )
 
     # `related-to` is undirected, and which end the typed graph emits first
     # depends on `Path.glob` order — i.e. on the filesystem. Orient those pairs
@@ -172,7 +172,7 @@ def export(today=None) -> dict:
         # Widget chrome follows the bundle's own language, detected in code from
         # the page titles — the same DE/EN heuristic the rest of the app pins on.
         "lang": lang.detect(" ".join(n["label"] for n in nodes)),
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
 
 
@@ -185,7 +185,7 @@ def health(payload: dict, today=None) -> dict:
     Counts cover *pages* only: a raw source document has no health of its own.
     """
     pages = [n for n in payload["nodes"] if n["kind"] == "page"]
-    cutoff = (today or datetime.now(timezone.utc).date())
+    cutoff = today or datetime.now(UTC).date()
     cutoff = cutoff - timedelta(days=HEALTH_WINDOW_DAYS)
 
     clusters: dict[int, dict] = {}

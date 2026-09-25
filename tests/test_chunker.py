@@ -1,9 +1,7 @@
 """Unit tests for the structural chunker."""
 
-import pytest
 
 import chunker
-
 
 LEGAL_SAMPLE = """\
 # Strahlenschutzgesetz
@@ -85,6 +83,7 @@ def test_empty_input_returns_empty():
 
 def test_persistence_roundtrip(tmp_path, monkeypatch):
     import db_context
+
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
     db_context.set_active_db("d")
     chunks = chunker.split(LEGAL_SAMPLE)

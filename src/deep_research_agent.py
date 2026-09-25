@@ -31,8 +31,8 @@ from __future__ import annotations
 import asyncio
 import os
 import re
-from datetime import datetime, timezone
-from typing import Generator
+from collections.abc import Generator
+from datetime import UTC, datetime
 
 import frontmatter
 from dotenv import load_dotenv
@@ -160,7 +160,7 @@ def _save_report(question: str, report: str, sources: list[dict]) -> str | None:
             report,
             title=question[:120],
             type="report",
-            created=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            created=datetime.now(UTC).strftime("%Y-%m-%d"),
             sources=sorted({s["url"] for s in sources}),
         )
         (dest_dir / filename).write_text(
@@ -217,9 +217,14 @@ def _update_steps(update: dict) -> Generator[dict, None, None]:
     for notes in update.get("raw_notes") or []:
         sources = _extract_sources(notes)
         if sources:
-            yield {"type": "tool_result", "name": "web_search", "result": notes,
-                   "note": TOOL_NOTES["web_search"], "sources": sources,
-                   "searches": len(_SEARCH_CALL_RE.findall(notes))}
+            yield {
+                "type": "tool_result",
+                "name": "web_search",
+                "result": notes,
+                "note": TOOL_NOTES["web_search"],
+                "sources": sources,
+                "searches": len(_SEARCH_CALL_RE.findall(notes)),
+            }
     for key in _MESSAGE_KEYS:
         for msg in update.get(key) or []:
             yield from _message_steps(msg)

@@ -56,13 +56,13 @@ _STARTUP_TIMEOUT_S = 40.0
 # so this module stays free of an import cycle (ollama_client calls host()) — keep
 # the defaults in step with those two modules; a drift only skews the size estimate.
 _MODEL_ENV = {
-    "OLLAMA_MODEL": "gemma4:e4b",   # ollama_client._MODEL
-    "QUERY_MODEL": "",              # the three role overrides fall back to OLLAMA_MODEL
+    "OLLAMA_MODEL": "gemma4:e4b",  # ollama_client._MODEL
+    "QUERY_MODEL": "",  # the three role overrides fall back to OLLAMA_MODEL
     "INGEST_MODEL": "",
     "FAST_MODEL": "",
-    "EMBED_MODEL": "bge-m3",        # embed_index
+    "EMBED_MODEL": "bge-m3",  # embed_index
     "REWRITE_MODEL": "LiquidAI/lfm2.5-1.2b-instruct:latest",  # md_convert
-    "OCR_MODEL": "deepseek-ocr:3b",                           # md_convert
+    "OCR_MODEL": "deepseek-ocr:3b",  # md_convert
 }
 
 _lock = threading.Lock()
@@ -97,8 +97,12 @@ def _pinned_port() -> int:
 
 def _store_candidates() -> tuple[str | None, ...]:
     """Where an Ollama model store can live, most-specific first."""
-    return (os.getenv("OLLAMA_MODELS"), os.path.expanduser("~/.ollama/models"),
-            "/usr/share/ollama/.ollama/models", "/var/lib/ollama/.ollama/models")
+    return (
+        os.getenv("OLLAMA_MODELS"),
+        os.path.expanduser("~/.ollama/models"),
+        "/usr/share/ollama/.ollama/models",
+        "/var/lib/ollama/.ollama/models",
+    )
 
 
 def find_models_dir() -> str | None:
@@ -172,21 +176,29 @@ def _spawn(port: int, gpu_index: int) -> subprocess.Popen | None:
     binary = shutil.which("ollama")
     if not binary:
         return None
-    env = {**os.environ, **gpu_placement.cuda_env(gpu_index),
-           "OLLAMA_HOST": f"127.0.0.1:{port}",
-           # Without this the card hidden from CUDA reappears as a Vulkan device
-           # and the model loads there anyway. See gpu_placement's module docstring.
-           "OLLAMA_VULKAN": "0",
-           # Each slot allocates INGEST_NUM_CTX; >1 re-inflates the compute graph.
-           "OLLAMA_NUM_PARALLEL": "1"}
+    env = {
+        **os.environ,
+        **gpu_placement.cuda_env(gpu_index),
+        "OLLAMA_HOST": f"127.0.0.1:{port}",
+        # Without this the card hidden from CUDA reappears as a Vulkan device
+        # and the model loads there anyway. See gpu_placement's module docstring.
+        "OLLAMA_VULKAN": "0",
+        # Each slot allocates INGEST_NUM_CTX; >1 re-inflates the compute graph.
+        "OLLAMA_NUM_PARALLEL": "1",
+    }
     models_dir = find_models_dir()
     if models_dir:
         env["OLLAMA_MODELS"] = models_dir
     try:
         # start_new_session: the daemon's lifetime is decided by stop() alone, so
         # a Ctrl-C aimed at the app's process group cannot kill it mid-request.
-        return subprocess.Popen([binary, "serve"], env=env, stdout=subprocess.DEVNULL,
-                                stderr=subprocess.DEVNULL, start_new_session=True)
+        return subprocess.Popen(
+            [binary, "serve"],
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
     except OSError:
         return None
 
@@ -228,8 +240,7 @@ def _resolve() -> dict:
     mode = os.getenv("OLLAMA_PIN_GPU", "auto")
 
     def unpinned(reason: str) -> dict:
-        return {"host": fallback, "pinned": False, "gpu": None,
-                "managed": False, "reason": reason}
+        return {"host": fallback, "pinned": False, "gpu": None, "managed": False, "reason": reason}
 
     if not _is_local(fallback):
         return unpinned(f"OLLAMA_HOST is remote ({fallback}) — left untouched")
@@ -241,8 +252,13 @@ def _resolve() -> dict:
     port = _pinned_port()
     base = f"http://127.0.0.1:{port}"
     if _serving(base):
-        return {"host": base, "pinned": True, "gpu": placement.index, "managed": False,
-                "reason": f"reusing the pinned daemon already on port {port}"}
+        return {
+            "host": base,
+            "pinned": True,
+            "gpu": placement.index,
+            "managed": False,
+            "reason": f"reusing the pinned daemon already on port {port}",
+        }
 
     proc = _spawn(port, placement.index)
     if proc is None:
@@ -251,8 +267,13 @@ def _resolve() -> dict:
         proc.kill()
         return unpinned(f"pinned daemon did not come up on port {port}")
     _proc = proc
-    return {"host": base, "pinned": True, "gpu": placement.index, "managed": True,
-            "reason": placement.reason}
+    return {
+        "host": base,
+        "pinned": True,
+        "gpu": placement.index,
+        "managed": True,
+        "reason": placement.reason,
+    }
 
 
 def host() -> str:

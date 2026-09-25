@@ -115,8 +115,9 @@ def _model_params(L):
         size_gib = _model_path().stat().st_size / gpu_placement.GIB
     except OSError:
         return params
-    placement = gpu_placement.plan(size_gib + gpu_placement.COMPUTE_OVERHEAD_GIB,
-                                   os.getenv("RERANK_PIN_GPU", "auto"))
+    placement = gpu_placement.plan(
+        size_gib + gpu_placement.COMPUTE_OVERHEAD_GIB, os.getenv("RERANK_PIN_GPU", "auto")
+    )
     if placement.is_pinned:
         params.split_mode = L.LLAMA_SPLIT_MODE_NONE
         params.main_gpu = placement.index
@@ -146,8 +147,7 @@ def _load() -> dict | None:
         ctx = L.llama_init_from_model(model, p)
         if not ctx:
             return None
-        _state = {"L": L, "model": model, "ctx": ctx,
-                  "vocab": L.llama_model_get_vocab(model)}
+        _state = {"L": L, "model": model, "ctx": ctx, "vocab": L.llama_model_get_vocab(model)}
         return _state
     except Exception:
         return None
@@ -163,9 +163,13 @@ def _tokenize(st: dict, text: str) -> list[int]:
 def _score_one(st: dict, q_toks: list[int], doc: str) -> float:
     """One cross-encoder forward pass over [BOS] q [EOS] [SEP] doc [EOS]."""
     L, vocab = st["L"], st["vocab"]
-    toks = ([L.llama_vocab_bos(vocab)] + q_toks
-            + [L.llama_vocab_eos(vocab), L.llama_vocab_sep(vocab)]
-            + _tokenize(st, doc[:_MAX_DOC_CHARS]) + [L.llama_vocab_eos(vocab)])
+    toks = (
+        [L.llama_vocab_bos(vocab)]
+        + q_toks
+        + [L.llama_vocab_eos(vocab), L.llama_vocab_sep(vocab)]
+        + _tokenize(st, doc[:_MAX_DOC_CHARS])
+        + [L.llama_vocab_eos(vocab)]
+    )
     toks = toks[:_N_CTX]
     batch = L.llama_batch_init(len(toks), 0, 1)
     try:
@@ -235,7 +239,7 @@ def rerank(query: str, hits: list[dict], top_k: int) -> list[dict]:
     replacing one with the other. Each returned hit carries `rerank_score` (the raw
     logit) so Stage E can calibrate an abstention threshold on it.
     """
-    window = hits[:candidates()]
+    window = hits[: candidates()]
     if len(window) < 2:
         return hits[:top_k]
     logits = score_pairs(query, [h.get("text", "") for h in window])
@@ -252,4 +256,4 @@ def rerank(query: str, hits: list[dict], top_k: int) -> list[dict]:
         scored.append((out["score"], rank, out))
     scored.sort(key=lambda t: (-t[0], t[1]))
     reordered = [h for _, _, h in scored]
-    return (reordered + hits[candidates():])[:top_k]
+    return (reordered + hits[candidates() :])[:top_k]

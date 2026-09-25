@@ -31,6 +31,7 @@ def _hits(*scores: float) -> list[dict]:
 
 # --- relevance display map ----------------------------------------------------
 
+
 def test_relevance_monotonic_and_bounded():
     xs = [-10.0, -4.0, 0.0, 3.0, 8.0]
     ys = [calibrate.relevance(x) for x in xs]
@@ -40,6 +41,7 @@ def test_relevance_monotonic_and_bounded():
 
 
 # --- threshold resolution -----------------------------------------------------
+
 
 def test_threshold_reads_calibration_file(monkeypatch, tmp_path):
     _calibrated_db(monkeypatch, tmp_path, tau=-4.14)
@@ -61,6 +63,7 @@ def test_threshold_none_when_uncalibrated(monkeypatch, tmp_path):
 
 
 # --- assess: the abstention decision ------------------------------------------
+
 
 def test_abstains_below_threshold(monkeypatch, tmp_path):
     _calibrated_db(monkeypatch, tmp_path, tau=-4.14)
@@ -101,9 +104,10 @@ def test_master_switch_off(monkeypatch, tmp_path):
 
 # --- justify: the search-ladder rung-4 audit record --------------------------
 
+
 def test_justify_splits_by_tau_highest_first():
     rec = calibrate.justify([("a", -2.0), ("b", -5.0), ("c", 1.0)], tau=-4.0)
-    assert rec["kept"] == [("c", 1.0), ("a", -2.0)]   # sorted high→low, both clear τ
+    assert rec["kept"] == [("c", 1.0), ("a", -2.0)]  # sorted high→low, both clear τ
     assert rec["below_tau"] == [("b", -5.0)]
     assert rec["over_cap"] == []
     assert rec["tau"] == -4.0

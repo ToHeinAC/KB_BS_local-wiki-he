@@ -36,8 +36,8 @@ import numpy as np
 import chunker
 import db_context
 import lex_index
-import ollama_client
 import okf
+import ollama_client
 
 _EMBED_BATCH = 64
 # Cap each embed input so a pathologically long chunk/page can't exceed the embed
@@ -60,6 +60,7 @@ def _meta_path() -> Path:
 
 
 # --- embedding ---------------------------------------------------------------
+
 
 def _embed_raw(texts: list[str]) -> np.ndarray:
     """One Ollama embed call + L2-normalize each row (float32). Raises on failure."""
@@ -181,7 +182,7 @@ def _embed_chunks(chunks: list[dict], *, progress=None) -> tuple[np.ndarray, lis
     inputs = [_embed_text(ch, prefix_map) for ch in uniq]
     mats: list[np.ndarray] = []
     for i in range(0, len(inputs), _EMBED_BATCH):
-        mats.append(embed_texts(inputs[i:i + _EMBED_BATCH]))
+        mats.append(embed_texts(inputs[i : i + _EMBED_BATCH]))
         if progress:
             progress(min(i + _EMBED_BATCH, len(inputs)), len(inputs))
     return np.vstack(mats).astype(np.float16), rows
@@ -197,8 +198,11 @@ def build(chunks: list[dict] | None = None, *, progress=None) -> dict:
         chunks = chunker.all_chunks() + lex_index._wiki_chunks()
     matrix, rows = _embed_chunks(chunks, progress=progress)
     _write(matrix, rows)
-    return {"chunks": len(rows), "model": _model(),
-            "dim": int(matrix.shape[1]) if matrix.size else 0}
+    return {
+        "chunks": len(rows),
+        "model": _model(),
+        "dim": int(matrix.shape[1]) if matrix.size else 0,
+    }
 
 
 def _write(matrix: np.ndarray, rows: list[dict], *, model: str | None = None) -> None:
@@ -206,14 +210,20 @@ def _write(matrix: np.ndarray, rows: list[dict], *, model: str | None = None) ->
     build); incremental ops pass the existing index's model to avoid restamping."""
     db_context.index_dir().mkdir(parents=True, exist_ok=True)
     np.save(_vectors_path(), matrix)
-    _meta_path().write_text(json.dumps(
-        {"model": model or _model(),
-         "dim": int(matrix.shape[1]) if matrix.size else 0, "rows": rows},
-        ensure_ascii=False,
-    ))
+    _meta_path().write_text(
+        json.dumps(
+            {
+                "model": model or _model(),
+                "dim": int(matrix.shape[1]) if matrix.size else 0,
+                "rows": rows,
+            },
+            ensure_ascii=False,
+        )
+    )
 
 
 # --- Incremental updates (per source; mirror lex_index) ----------------------
+
 
 def index_delete(source: str) -> None:
     """Drop every row for `source` from the vector index. No-op if no index."""
@@ -271,6 +281,7 @@ def index_replace_wiki_page(name: str) -> None:
 
 # --- query -------------------------------------------------------------------
 
+
 def available() -> bool:
     """True when this DB has vectors built with the currently-configured model."""
     if not _vectors_path().exists() or not _meta_path().exists():
@@ -310,8 +321,7 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
             return row["text"]
         source = row.get("source", "")
         if source not in text_cache:
-            text_cache[source] = {c["chunk_id"]: c["text"]
-                                  for c in chunker.load_chunks(source)}
+            text_cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
         return text_cache[source].get(row["chunk_id"], "")
 
     out: list[dict] = []
@@ -323,20 +333,22 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
         preview = text.replace("\n", " ").strip()
         if len(preview) > 320:
             preview = preview[:320] + "…"
-        out.append({
-            "chunk_id": row["chunk_id"],
-            "score": round(float(sims[int(i)]), 4),
-            "source": row.get("source", ""),
-            "scope": row.get("scope", "raw"),
-            "anchor": row.get("anchor", ""),
-            "heading_path": row.get("heading_path", []),
-            "char_start": row.get("char_start", 0),
-            "char_end": row.get("char_end", 0),
-            "lang": row.get("lang", ""),
-            "text": text,
-            "preview": preview,
-            "matched_terms": [],  # dense arm has no lexical term overlap
-        })
+        out.append(
+            {
+                "chunk_id": row["chunk_id"],
+                "score": round(float(sims[int(i)]), 4),
+                "source": row.get("source", ""),
+                "scope": row.get("scope", "raw"),
+                "anchor": row.get("anchor", ""),
+                "heading_path": row.get("heading_path", []),
+                "char_start": row.get("char_start", 0),
+                "char_end": row.get("char_end", 0),
+                "lang": row.get("lang", ""),
+                "text": text,
+                "preview": preview,
+                "matched_terms": [],  # dense arm has no lexical term overlap
+            }
+        )
         if len(out) >= top_k:
             break
     return out

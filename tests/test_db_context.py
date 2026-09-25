@@ -16,6 +16,7 @@ def _reset_scope():
 
 # --- using_db -------------------------------------------------------------
 
+
 def test_using_db_binds_and_restores():
     with db_context.using_db("Beta"):
         assert db_context.get_active_db() == "Beta"
@@ -23,9 +24,8 @@ def test_using_db_binds_and_restores():
 
 
 def test_using_db_restores_on_exception():
-    with pytest.raises(ValueError):
-        with db_context.using_db("Beta"):
-            raise ValueError("boom")
+    with pytest.raises(ValueError), db_context.using_db("Beta"):
+        raise ValueError("boom")
     assert db_context.get_active_db() == "Alpha"
 
 
@@ -44,6 +44,7 @@ def test_using_db_switches_paths(tmp_path, monkeypatch):
 
 
 # --- search_scope ---------------------------------------------------------
+
 
 def test_scope_defaults_to_active_db():
     assert db_context.search_scope() == ("Alpha",)
@@ -74,6 +75,7 @@ def test_empty_scope_resets_to_active():
 
 # --- qualify --------------------------------------------------------------
 
+
 def test_qualify_noop_for_single_db_scope():
     assert db_context.qualify("index.md") == "index.md"
 
@@ -95,6 +97,7 @@ def test_qualify_passes_empty_through():
 
 
 # --- split_ref ------------------------------------------------------------
+
 
 def test_split_ref_unqualified_resolves_to_active():
     assert db_context.split_ref("index.md") == ("Alpha", "index.md")

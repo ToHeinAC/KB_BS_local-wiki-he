@@ -33,17 +33,17 @@ from __future__ import annotations
 import argparse
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import db_context  # noqa: E402
-import embed_index  # noqa: E402
-import rerank  # noqa: E402
-import retrieval  # noqa: E402
+from bench_retrieval import _matches  # reuse, never duplicate the predicate
 
-from bench_retrieval import _matches  # noqa: E402  # reuse, never duplicate the predicate
+import db_context
+import embed_index
+import rerank
+import retrieval
 
 # Full reranked window per query: ~1 relevant + many irrelevant hits, all carrying a
 # `rerank_score` (rerank() scores the top `candidates()`), so one query yields the most
@@ -101,8 +101,9 @@ def _conservative_tau(rel: list[float], irr: list[float], min_recall: float) -> 
 
 def _search(query: str, scope: str) -> list[dict]:
     q_scope = scope
-    return retrieval.search(query, top_k=_DEPTH, use_rerank=True,
-                            scope=(q_scope if q_scope != "both" else None))
+    return retrieval.search(
+        query, top_k=_DEPTH, use_rerank=True, scope=(q_scope if q_scope != "both" else None)
+    )
 
 
 def _rerank_scores(hits: list[dict]) -> list[float]:
@@ -147,10 +148,14 @@ def _report_per_hit(rel: list[float], irr: list[float], found_q: int, n_q: int) 
     rel_p = {p: _percentile(rel, p) for p in (0.10, 0.25, 0.50)}
     irr_p = {p: _percentile(irr, p) for p in (0.50, 0.75, 0.90)}
     print("── PER-HIT (passage-level separability) ──")
-    print(f"relevant hits:   n={len(rel):>4}  "
-          f"p10={rel_p[0.10]:+.3f}  p25={rel_p[0.25]:+.3f}  p50={rel_p[0.50]:+.3f}")
-    print(f"irrelevant hits: n={len(irr):>4}  "
-          f"p50={irr_p[0.50]:+.3f}  p75={irr_p[0.75]:+.3f}  p90={irr_p[0.90]:+.3f}")
+    print(
+        f"relevant hits:   n={len(rel):>4}  "
+        f"p10={rel_p[0.10]:+.3f}  p25={rel_p[0.25]:+.3f}  p50={rel_p[0.50]:+.3f}"
+    )
+    print(
+        f"irrelevant hits: n={len(irr):>4}  "
+        f"p50={irr_p[0.50]:+.3f}  p75={irr_p[0.75]:+.3f}  p90={irr_p[0.90]:+.3f}"
+    )
     print(f"queries with a relevant hit in top-{_DEPTH}: {found_q}/{n_q}")
     print(f"ROC-AUC:                       {auc:.3f}   (0.5 = none, 1.0 = perfect)\n")
     return auc
@@ -166,53 +171,82 @@ def _report_query_level(answer: list[float], abstain: list[float], min_recall: f
     # of the gap — the choice most robust to unseen queries. Fall back to the recall-
     # constrained conservative τ when they overlap.
     clean = ans_p[0.10] > abs_p[0.90]
-    tau = (ans_p[0.10] + abs_p[0.90]) / 2 if clean else _conservative_tau(
-        answer, abstain, min_recall)
+    tau = (
+        (ans_p[0.10] + abs_p[0.90]) / 2 if clean else _conservative_tau(answer, abstain, min_recall)
+    )
 
     def _abstain_rate(t: float) -> tuple[float, float]:
         # (should-answer wrongly abstained, should-abstain correctly abstained)
-        return (sum(1 for s in answer if s < t) / len(answer),
-                sum(1 for s in abstain if s < t) / len(abstain))
+        return (
+            sum(1 for s in answer if s < t) / len(answer),
+            sum(1 for s in abstain if s < t) / len(abstain),
+        )
 
     print("── QUERY-LEVEL (top-hit; abstention decision) ──")
-    print(f"should-ANSWER  top-score: n={len(answer):>3}  "
-          f"p10={ans_p[0.10]:+.3f}  p25={ans_p[0.25]:+.3f}  p50={ans_p[0.50]:+.3f}")
-    print(f"should-ABSTAIN top-score: n={len(abstain):>3}  "
-          f"p50={abs_p[0.50]:+.3f}  p75={abs_p[0.75]:+.3f}  p90={abs_p[0.90]:+.3f}")
+    print(
+        f"should-ANSWER  top-score: n={len(answer):>3}  "
+        f"p10={ans_p[0.10]:+.3f}  p25={ans_p[0.25]:+.3f}  p50={ans_p[0.50]:+.3f}"
+    )
+    print(
+        f"should-ABSTAIN top-score: n={len(abstain):>3}  "
+        f"p50={abs_p[0.50]:+.3f}  p75={abs_p[0.75]:+.3f}  p90={abs_p[0.90]:+.3f}"
+    )
     print(f"query-level ROC-AUC:           {auc_q:.3f}")
-    print(f"gap answer-p10 − abstain-p90:  {ans_p[0.10] - abs_p[0.90]:+.3f}   "
-          f"(>0 = a τ separates them)")
+    print(
+        f"gap answer-p10 − abstain-p90:  {ans_p[0.10] - abs_p[0.90]:+.3f}   "
+        f"(>0 = a τ separates them)"
+    )
     fj, tj = _abstain_rate(tau_j)
     fr, tr = _abstain_rate(tau)
-    print(f"τ (Youden):                    {tau_j:+.3f}  "
-          f"→ false-abstain {fj:.0%}, correct-abstain {tj:.0%}")
-    print(f"τ ({'max-margin midpoint' if clean else 'conservative'}):        "
-          f"{tau:+.3f}  → false-abstain {fr:.0%}, correct-abstain {tr:.0%}   <- recommended\n")
+    print(
+        f"τ (Youden):                    {tau_j:+.3f}  "
+        f"→ false-abstain {fj:.0%}, correct-abstain {tj:.0%}"
+    )
+    print(
+        f"τ ({'max-margin midpoint' if clean else 'conservative'}):        "
+        f"{tau:+.3f}  → false-abstain {fr:.0%}, correct-abstain {tr:.0%}   <- recommended\n"
+    )
 
-    verdict = ("SHIP: answer/abstain top-scores separate — abstention is viable."
-               if auc_q >= 0.90 and clean
-               else "SHIP (conservative): usable τ with few false abstains; tune per-DB."
-               if auc_q >= 0.80 and tr >= 0.5
-               else "CAUTION: weak query-level separation — inspect before shipping.")
+    verdict = (
+        "SHIP: answer/abstain top-scores separate — abstention is viable."
+        if auc_q >= 0.90 and clean
+        else "SHIP (conservative): usable τ with few false abstains; tune per-DB."
+        if auc_q >= 0.80 and tr >= 0.5
+        else "CAUTION: weak query-level separation — inspect before shipping."
+    )
     print(f"VERDICT: {verdict}")
-    return {"auc_query": round(auc_q, 4),
-            "tau_youden": round(tau_j, 4), "tau": round(tau, 4),
-            "answer_p10": round(ans_p[0.10], 4), "abstain_p90": round(abs_p[0.90], 4),
-            "false_abstain": round(fr, 4), "correct_abstain": round(tr, 4),
-            "n_answer": len(answer), "n_abstain": len(abstain)}
+    return {
+        "auc_query": round(auc_q, 4),
+        "tau_youden": round(tau_j, 4),
+        "tau": round(tau, 4),
+        "answer_p10": round(ans_p[0.10], 4),
+        "abstain_p90": round(abs_p[0.90], 4),
+        "false_abstain": round(fr, 4),
+        "correct_abstain": round(tr, 4),
+        "n_answer": len(answer),
+        "n_abstain": len(abstain),
+    }
 
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Stage E abstention calibration")
     ap.add_argument("--db", required=True, help="database name (e.g. KI)")
-    ap.add_argument("--fixture", help="should-answer fixture (default: bench/fixture_<db>_chunk.json)")
-    ap.add_argument("--negatives",
-                    help="should-abstain fixture (default: bench/fixture_<db>_negatives.json)")
+    ap.add_argument(
+        "--fixture", help="should-answer fixture (default: bench/fixture_<db>_chunk.json)"
+    )
+    ap.add_argument(
+        "--negatives", help="should-abstain fixture (default: bench/fixture_<db>_negatives.json)"
+    )
     ap.add_argument("--scope", default="both", choices=["raw", "wiki", "both"])
-    ap.add_argument("--min-recall", type=float, default=0.90,
-                    help="conservative-τ target: fraction of should-answer queries to keep")
-    ap.add_argument("--write", action="store_true",
-                    help="persist derived τ to data/<db>/index/calibration.json")
+    ap.add_argument(
+        "--min-recall",
+        type=float,
+        default=0.90,
+        help="conservative-τ target: fraction of should-answer queries to keep",
+    )
+    ap.add_argument(
+        "--write", action="store_true", help="persist derived τ to data/<db>/index/calibration.json"
+    )
     args = ap.parse_args()
 
     db_context.set_active_db(args.db)
@@ -221,25 +255,31 @@ def main() -> int:
         print(f"fixture not found: {fixture_path}", file=sys.stderr)
         return 2
     if not embed_index.available():
-        print(f"ERROR: no semantic index for '{args.db}'. Run "
-              f"scripts/backfill_embeddings.py {args.db}", file=sys.stderr)
+        print(
+            f"ERROR: no semantic index for '{args.db}'. Run "
+            f"scripts/backfill_embeddings.py {args.db}",
+            file=sys.stderr,
+        )
         return 2
     if not rerank.available():
-        print("ERROR: calibration needs the reranker (llama-cpp-python + GGUF at "
-              f"{rerank._model_path()}). Without it there is no score to calibrate.",
-              file=sys.stderr)
+        print(
+            "ERROR: calibration needs the reranker (llama-cpp-python + GGUF at "
+            f"{rerank._model_path()}). Without it there is no score to calibrate.",
+            file=sys.stderr,
+        )
         return 2
 
     cases = json.loads(fixture_path.read_text())["queries"]
     neg_path = Path(args.negatives or f"bench/fixture_{args.db}_negatives.json")
-    print(f"DB={args.db}  answer-fixture={fixture_path}  cases={len(cases)}  "
-          f"model={rerank._model_path().name}")
+    print(
+        f"DB={args.db}  answer-fixture={fixture_path}  cases={len(cases)}  "
+        f"model={rerank._model_path().name}"
+    )
     print(f"abstain-fixture={neg_path if neg_path.exists() else '(none — per-hit only)'}\n")
 
     rel, irr, found_q, n_q = _collect(cases, args.scope)
     if not rel or not irr:
-        print("ERROR: could not collect both relevant and irrelevant scored hits.",
-              file=sys.stderr)
+        print("ERROR: could not collect both relevant and irrelevant scored hits.", file=sys.stderr)
         return 1
     auc_hit = _report_per_hit(rel, irr, found_q, n_q)
 
@@ -248,23 +288,32 @@ def main() -> int:
         answer_tops = _top_scores(cases, args.scope)
         abstain_tops = _top_scores(json.loads(neg_path.read_text())["queries"], args.scope)
         if answer_tops and abstain_tops:
-            summary = {**_report_query_level(answer_tops, abstain_tops, args.min_recall),
-                       "auc_hit": round(auc_hit, 4)}
+            summary = {
+                **_report_query_level(answer_tops, abstain_tops, args.min_recall),
+                "auc_hit": round(auc_hit, 4),
+            }
     else:
         # No negatives: fall back to a per-hit conservative τ (weaker, toothless bias).
         summary["tau"] = round(_conservative_tau(rel, irr, args.min_recall), 4)
-        print("(no negatives fixture — τ from per-hit recall only; add one for a "
-              "meaningful threshold)")
+        print(
+            "(no negatives fixture — τ from per-hit recall only; add one for a "
+            "meaningful threshold)"
+        )
 
     if args.write:
         out = db_context.index_dir() / "calibration.json"
-        out.write_text(json.dumps({
-            "model": rerank._model_path().name,
-            "computed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-            "answer_fixture": fixture_path.name,
-            "abstain_fixture": neg_path.name if neg_path.exists() else None,
-            **summary,
-        }, indent=2))
+        out.write_text(
+            json.dumps(
+                {
+                    "model": rerank._model_path().name,
+                    "computed_at": datetime.now(UTC).isoformat(timespec="seconds"),
+                    "answer_fixture": fixture_path.name,
+                    "abstain_fixture": neg_path.name if neg_path.exists() else None,
+                    **summary,
+                },
+                indent=2,
+            )
+        )
         print(f"\nwrote {out}")
     return 0
 

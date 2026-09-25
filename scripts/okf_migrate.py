@@ -18,15 +18,15 @@ Usage:
 import argparse
 import shutil
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-import db_context  # noqa: E402
-import lex_index  # noqa: E402
-import okf  # noqa: E402
-import wiki_engine  # noqa: E402
+import db_context
+import lex_index
+import okf
+import wiki_engine
 
 _RESERVED = ("index.md", "log.md", "DESCRIPTION.md")
 
@@ -41,7 +41,7 @@ def migrate_db(db: str, *, apply: bool) -> dict:
     if not wiki.exists():
         return {"db": db, "pages": 0, "issues": ["no wiki/ dir"], "backup": None}
 
-    backup = wiki.parent / f"wiki.bak_{datetime.now(timezone.utc):%Y%m%d}"
+    backup = wiki.parent / f"wiki.bak_{datetime.now(UTC):%Y%m%d}"
     pages = _pages(wiki)
 
     if apply:
@@ -52,12 +52,16 @@ def migrate_db(db: str, *, apply: bool) -> dict:
         log = wiki / "log.md"
         if log.exists():
             log.write_text(okf.reformat_log(log.read_text()))
-        wiki_engine._rebuild_index()       # OKF index.md + okf_version
-        lex_index.build()                   # resync postings/stats to new bodies
+        wiki_engine._rebuild_index()  # OKF index.md + okf_version
+        lex_index.build()  # resync postings/stats to new bodies
 
     issues = okf.okf_validate(wiki) if apply else []
-    return {"db": db, "pages": len(pages),
-            "issues": issues, "backup": str(backup) if apply else None}
+    return {
+        "db": db,
+        "pages": len(pages),
+        "issues": issues,
+        "backup": str(backup) if apply else None,
+    }
 
 
 def main() -> None:

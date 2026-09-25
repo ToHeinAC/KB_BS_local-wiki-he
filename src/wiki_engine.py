@@ -3,7 +3,7 @@
 import os
 import re
 import shutil
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import frontmatter
@@ -30,7 +30,6 @@ from prompts import (
     DESCRIPTION_BUILD_PROMPT,
     DESCRIPTION_DELETE_PROMPT,
     DESCRIPTION_UPDATE_PROMPT,
-    FILE_ANSWER_PROMPT,
     INGEST_LANGUAGE_DIRECTIVE,
     INGEST_PROMPT,
     LINT_PROMPT,
@@ -71,17 +70,17 @@ _AFFECTED_QUERY_TOPK = 20  # BM25 chunk hits considered when mapping to wiki pag
 # for the LLM to recognise and link them. Index = rank (0 = top hit).
 _EXISTING_BUDGET_BY_RANK = (4000, 2000, 2000, 800, 800)
 # Query-path tuning (Q-1 hybrid selection + Q-3 section-level synthesis).
-_QUERY_CANDIDATE_TOPK = 15       # BM25 hits scanned to build the candidate page set
-_QUERY_MAX_CANDIDATES = 10       # candidate pages handed to the LLM re-ranker
-_QUERY_CHUNKS_PER_PAGE = 2       # wiki chunks injected per selected page
-_QUERY_SYNTH_MAX_CHARS = 8000    # hard cap on total synthesis context
+_QUERY_CANDIDATE_TOPK = 15  # BM25 hits scanned to build the candidate page set
+_QUERY_MAX_CANDIDATES = 10  # candidate pages handed to the LLM re-ranker
+_QUERY_CHUNKS_PER_PAGE = 2  # wiki chunks injected per selected page
+_QUERY_SYNTH_MAX_CHARS = 8000  # hard cap on total synthesis context
 # Multi-DB chat splits the synthesis cap across the searched DBs so N databases
 # cost the same context as one. The floor keeps each DB's slice usable when the
 # scope is wide (the total may exceed the cap above rather than starve a DB).
 _QUERY_MIN_DB_SYNTH_CHARS = 2500
 _QUERY_PAGE_FALLBACK_CHARS = 1500  # body slice when a page had no BM25 chunk hit
-_QUERY_LINK_SEEDS = 3            # top BM25 pages whose links are followed
-_QUERY_LINK_NEIGHBOURS = 3       # max link-expanded pages appended to the candidate set
+_QUERY_LINK_SEEDS = 3  # top BM25 pages whose links are followed
+_QUERY_LINK_NEIGHBOURS = 3  # max link-expanded pages appended to the candidate set
 # A raw source feeding more pages than this yields no topical signal (StrlSchG.md
 # alone backs 25 pages), so its shared-source edges are dropped as noise.
 _SHARED_SOURCE_MAX_CLIQUE = 8
@@ -92,7 +91,8 @@ _TEIL_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*(?:\.md)?\s*$")
 # Small models echo `CONTRADICTION: None found…` when there is nothing to report;
 # a leading negative (EN/DE) or an empty body is not a contradiction.
 _NO_CONTRADICTION_RE = re.compile(
-    r"^\s*(?:$|none\b|no\b|n/?a\b|nothing\b|keine?\b|nichts\b)", re.IGNORECASE)
+    r"^\s*(?:$|none\b|no\b|n/?a\b|nothing\b|keine?\b|nichts\b)", re.IGNORECASE
+)
 
 
 def init_wiki() -> None:
@@ -109,7 +109,7 @@ def init_wiki() -> None:
 
 
 def _date() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
 def _parse_date(value) -> date | None:
@@ -135,7 +135,7 @@ def is_page_stale(meta: dict, today: date | None = None) -> bool:
         ttl = _DEFAULT_EXPIRE_DAYS
     if ttl <= 0:
         return False
-    today = today or datetime.now(timezone.utc).date()
+    today = today or datetime.now(UTC).date()
     return (today - updated).days > ttl
 
 
@@ -148,7 +148,7 @@ def _append_log(action: str, detail: str) -> None:
     """OKF-format log write: newest-first under a `## YYYY-MM-DD` date section."""
     path = _log_path()
     text = path.read_text() if path.exists() else ""
-    time = datetime.now(timezone.utc).strftime("%H:%M")
+    time = datetime.now(UTC).strftime("%H:%M")
     path.write_text(okf.add_log_entry(text, action, detail, day=_date(), time=time))
 
 
@@ -158,11 +158,15 @@ def _rebuild_index() -> None:
     insights = [p for p in pages if p.get("type") == "insight"]
 
     def _line(p: dict) -> str:
-        return f"* [{p.get('title', p['filename'])}]({p['filename']}) - {p.get('description', '')}\n"
+        return (
+            f"* [{p.get('title', p['filename'])}]({p['filename']}) - {p.get('description', '')}\n"
+        )
 
-    head = ("---\ntitle: Index\n"
-            f'okf_version: "{okf.OKF_VERSION}"\n'
-            f'updated: "{_date()}"\n---\n\n# Pages\n')
+    head = (
+        "---\ntitle: Index\n"
+        f'okf_version: "{okf.OKF_VERSION}"\n'
+        f'updated: "{_date()}"\n---\n\n# Pages\n'
+    )
     lines = [head]
     lines += [_line(p) for p in main]
     if insights:
@@ -189,8 +193,25 @@ def _title_to_filename(title: str) -> str:
 # whether a freshly-synthesised page is the same topic as an existing one and,
 # if so, merges them. All matching is deterministic so model quality is moot.
 
-_STOPWORDS_SLUG = {"of", "the", "and", "a", "an", "to", "in", "for", "on",
-                   "with", "md", "der", "die", "das", "und", "von", "im"}
+_STOPWORDS_SLUG = {
+    "of",
+    "the",
+    "and",
+    "a",
+    "an",
+    "to",
+    "in",
+    "for",
+    "on",
+    "with",
+    "md",
+    "der",
+    "die",
+    "das",
+    "und",
+    "von",
+    "im",
+}
 _PAGE_PREFIX_RE = re.compile(r"^(concept|entity|summary|report|insight)-")
 _FILE_TEIL_RE = re.compile(r"-teil-\d+-\d+(?=\.md$|$)")
 _KEY_FACTS_HEADING = "## Key facts"
@@ -236,8 +257,7 @@ def _canonical_slug_tokens(name: str) -> frozenset[str]:
     if base.endswith(".md"):
         base = base[:-3]
     base = _PAGE_PREFIX_RE.sub("", base)
-    keys = {_term_key(t) for t in re.split(r"[^a-z0-9]+", base)
-            if t and t not in _STOPWORDS_SLUG}
+    keys = {_term_key(t) for t in re.split(r"[^a-z0-9]+", base) if t and t not in _STOPWORDS_SLUG}
     return frozenset(k for k in keys if k)
 
 
@@ -350,8 +370,9 @@ def _overlap_coef(a: frozenset, b: frozenset) -> float:
     return len(a & b) / min(len(a), len(b))
 
 
-def _route_page(ptype: str, tokens: frozenset, terms: frozenset,
-                registry: dict, self_filename: str) -> str | None:
+def _route_page(
+    ptype: str, tokens: frozenset, terms: frozenset, registry: dict, self_filename: str
+) -> str | None:
     """Existing filename this page should merge into, or None to create new.
 
     Same `type` only. Exact topic-token match (title or an `aliases` entry — the
@@ -369,8 +390,9 @@ def _route_page(ptype: str, tokens: frozenset, terms: frozenset,
             continue
         if tokens == ctoks or tokens in info.get("aliases", ()):
             exact = exact or fname
-        elif (tokens <= ctoks or ctoks <= tokens) and \
-                _overlap_coef(terms, info["terms"]) >= _TERM_OVERLAP_THRESHOLD:
+        elif (tokens <= ctoks or ctoks <= tokens) and _overlap_coef(
+            terms, info["terms"]
+        ) >= _TERM_OVERLAP_THRESHOLD:
             subset = subset or fname
     return exact or subset
 
@@ -417,7 +439,7 @@ def _merge_bodies(existing: str, new: str) -> str:
 
 def _union_list(a, b) -> list:
     merged = [str(x).strip() for x in (a or []) if str(x).strip()]
-    for v in (b or []):
+    for v in b or []:
         v = str(v).strip()
         if v and v not in merged:
             merged.append(v)
@@ -435,7 +457,7 @@ def _extract_facts(text: str) -> dict[str, set[str]]:
     facts: dict[str, set[str]] = {}
     for m in _NUM_UNIT_RE.finditer(text):
         num, unit = m.group(1).replace(",", "."), m.group(2).lower()
-        words = re.findall(r"[A-Za-zÄÖÜäöüß][\w-]+", text[max(0, m.start() - 40):m.start()])
+        words = re.findall(r"[A-Za-zÄÖÜäöüß][\w-]+", text[max(0, m.start() - 40) : m.start()])
         term = _term_key(words[-1]) if words else ""
         facts.setdefault(f"{term}|{unit}", set()).add(f"{num} {unit}")
     return facts
@@ -443,15 +465,20 @@ def _extract_facts(text: str) -> dict[str, set[str]]:
 
 # Code-written notes land in the page body, so they follow the page's language.
 _CONTRADICTION_NOTES = {
-    "en": ("{term}: now {new} per the newer source; previously {old}",
-           "{term}: sources disagree — {old} vs {new} (unresolved)"),
-    "de": ("{term}: jetzt {new} laut neuerer Quelle; zuvor {old}",
-           "{term}: Quellen widersprechen sich — {old} vs. {new} (ungeklärt)"),
+    "en": (
+        "{term}: now {new} per the newer source; previously {old}",
+        "{term}: sources disagree — {old} vs {new} (unresolved)",
+    ),
+    "de": (
+        "{term}: jetzt {new} laut neuerer Quelle; zuvor {old}",
+        "{term}: Quellen widersprechen sich — {old} vs. {new} (ungeklärt)",
+    ),
 }
 
 
-def _contradiction_check(existing: str, new: str, emeta: dict, nmeta: dict,
-                         page_lang: str = "en") -> list[str]:
+def _contradiction_check(
+    existing: str, new: str, emeta: dict, nmeta: dict, page_lang: str = "en"
+) -> list[str]:
     """Flag same-term/same-unit numeric conflicts. Resolves only on a date signal."""
     ef, nf = _extract_facts(existing), _extract_facts(new)
     newer = _is_newer(nmeta, emeta)
@@ -484,11 +511,16 @@ def _merge_pages(existing: str, new: str, source: str) -> str:
         meta["created"] = np_.metadata.get("created")
     meta["updated"] = _date()
     body = _merge_bodies(ep.content, np_.content)
-    contradictions = _contradiction_check(ep.content, np_.content, ep.metadata, np_.metadata,
-                                          page_lang.page_lang(existing))
+    contradictions = _contradiction_check(
+        ep.content, np_.content, ep.metadata, np_.metadata, page_lang.page_lang(existing)
+    )
     if contradictions:
-        body = body.rstrip() + "\n\n## Contradictions\n" + \
-            "\n".join(f"- {c}" for c in contradictions) + "\n"
+        body = (
+            body.rstrip()
+            + "\n\n## Contradictions\n"
+            + "\n".join(f"- {c}" for c in contradictions)
+            + "\n"
+        )
         meta["confidence"] = "low"
     out = frontmatter.dumps(frontmatter.Post(body, **meta)) + "\n"
     out = _ensure_key_terms(out)
@@ -569,8 +601,10 @@ def _registry_entry(content: str, fname: str) -> dict:
 
 def _build_registry() -> dict:
     """{filename: {type, title, lang, tokens, aliases, terms}} per page (routing input)."""
-    return {p["filename"]: _registry_entry(read_page(p["filename"]), p["filename"])
-            for p in list_pages()}
+    return {
+        p["filename"]: _registry_entry(read_page(p["filename"]), p["filename"])
+        for p in list_pages()
+    }
 
 
 def _registry_add(registry: dict, target: str, content: str) -> None:
@@ -597,8 +631,10 @@ def _route_cross_language(title: str, ptype: str, plang: str, ctx: dict) -> str 
     try:
         cache = ctx.setdefault("title_vecs", {})
         todo = [fn for fn in cands if fn not in cache]
-        vecs = np.asarray(ollama_client.embed([title] + [reg[fn]["title"] for fn in todo],
-                                              embed_index._model()), dtype=np.float32)
+        vecs = np.asarray(
+            ollama_client.embed([title] + [reg[fn]["title"] for fn in todo], embed_index._model()),
+            dtype=np.float32,
+        )
         vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
         cache.update(zip(todo, vecs[1:]))
         scores = sorted(((float(vecs[0] @ cache[fn]), fn) for fn in cands), reverse=True)
@@ -656,15 +692,16 @@ def _source_to_pages() -> dict[str, list[str]]:
     """
     mapping: dict[str, list[str]] = {}
     for page in list_pages():
-        for src in (page.get("sources") or []):
+        for src in page.get("sources") or []:
             key = str(src).strip()
             if key:
                 mapping.setdefault(key, []).append(page["filename"])
     return mapping
 
 
-def _select_affected_pages(query_text: str, src_to_pages: dict[str, list[str]],
-                           exclude_source: str = "") -> list[str]:
+def _select_affected_pages(
+    query_text: str, src_to_pages: dict[str, list[str]], exclude_source: str = ""
+) -> list[str]:
     """Rank existing wiki pages a new source likely updates, via BM25.
 
     Queries the pre-existing lexical index with the new source text, maps each
@@ -705,9 +742,11 @@ def _build_existing_block(filenames: list[str]) -> str:
         path = _wiki() / fname
         if not path.exists():
             continue
-        budget = (_EXISTING_BUDGET_BY_RANK[rank]
-                  if rank < len(_EXISTING_BUDGET_BY_RANK)
-                  else _EXISTING_BUDGET_BY_RANK[-1])
+        budget = (
+            _EXISTING_BUDGET_BY_RANK[rank]
+            if rank < len(_EXISTING_BUDGET_BY_RANK)
+            else _EXISTING_BUDGET_BY_RANK[-1]
+        )
         body = path.read_text()
         if len(body) > budget:
             body = body[:budget] + "\n…[truncated]"
@@ -723,8 +762,9 @@ def _build_candidate_index_block(filenames: list[str]) -> str:
     """
     if not filenames:
         return ""
-    parts = ["\nExisting pages you may extend "
-             "(REUSE the exact filename if your topic matches one):\n"]
+    parts = [
+        "\nExisting pages you may extend (REUSE the exact filename if your topic matches one):\n"
+    ]
     for fname in filenames:
         path = _wiki() / fname
         if not path.exists():
@@ -820,8 +860,11 @@ def _summary_slug(source_name: str) -> str:
     stem = Path(_TEIL_SUFFIX_RE.sub("", source_name)).stem
     slug = _slugify(stem)
     legacy = re.sub(r"[^a-z0-9]+", "-", stem.lower()).strip("-")
-    if legacy != slug and not (_wiki() / f"summary-{slug}.md").exists() \
-            and (_wiki() / f"summary-{legacy}.md").exists():
+    if (
+        legacy != slug
+        and not (_wiki() / f"summary-{slug}.md").exists()
+        and (_wiki() / f"summary-{legacy}.md").exists()
+    ):
         return legacy
     return slug
 
@@ -908,8 +951,9 @@ def _write_piece_page(ctx: dict, page: dict) -> None:
         # flags numeric contradictions (date-resolved when possible). The page
         # keeps its language: another-language contribution is translated first.
         existing = dest.read_text()
-        content = _merge_pages(existing, _align_language(existing, content, ctx["lang"]),
-                               ctx["source_name"])
+        content = _merge_pages(
+            existing, _align_language(existing, content, ctx["lang"]), ctx["source_name"]
+        )
         if target not in ctx["updated"] and target not in ctx["created"]:
             ctx["updated"].append(target)
     else:
@@ -927,7 +971,9 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
     # BM25-select the existing pages THIS piece most likely updates, then inject
     # their content (rank-weighted budget) for an accurate merge. Per-piece so a
     # later piece of a long document can surface pages the first piece didn't.
-    ranked = _select_affected_pages(piece_text, ctx["src_to_pages"], exclude_source=ctx["source_name"])
+    ranked = _select_affected_pages(
+        piece_text, ctx["src_to_pages"], exclude_source=ctx["source_name"]
+    )
     for fname in ranked:
         if fname not in ctx["affected"]:
             ctx["affected"].append(fname)
@@ -947,7 +993,9 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
         date=_date(),
     )
 
-    response = ollama_client.generate(ctx["system"], prompt, temperature=0.3, model_id=ollama_client._INGEST_MODEL)
+    response = ollama_client.generate(
+        ctx["system"], prompt, temperature=0.3, model_id=ollama_client._INGEST_MODEL
+    )
     pages = _parse_llm_pages(response)
 
     if not pages:
@@ -956,7 +1004,9 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
             "Reformat your output now using EXACTLY that delimiter. Same content, correct format.\n\n"
             f"Original task was:\n{prompt}"
         )
-        response = ollama_client.generate(ctx["system"], retry_prompt, temperature=0.2, model_id=ollama_client._INGEST_MODEL)
+        response = ollama_client.generate(
+            ctx["system"], retry_prompt, temperature=0.2, model_id=ollama_client._INGEST_MODEL
+        )
         pages = _parse_llm_pages(response)
 
     for page in pages:
@@ -1054,8 +1104,15 @@ def ingest_as_source(text: str, title: str, user_meta: dict | None = None) -> di
     """
     data = text.encode("utf-8")
     if dedup.is_duplicate(data):
-        return {"created": [], "updated": [], "contradictions": [], "affected": [],
-                "chunks": 0, "source_name": None, "duplicate": True}
+        return {
+            "created": [],
+            "updated": [],
+            "contradictions": [],
+            "affected": [],
+            "chunks": 0,
+            "source_name": None,
+            "duplicate": True,
+        }
     # register_file renames on filename collision (appends a hash), so the wiki
     # must be told the name that actually landed on disk.
     saved = dedup.register_file(data, f"{_source_slug(title)}.md")
@@ -1072,6 +1129,7 @@ def rebuild_lex_index() -> dict:
 
 # --- One-off consolidation (clean up legacy chunk-derived duplicates) --------
 
+
 def _clean_teil_text(text: str) -> str:
     """Strip `[Teil n/m]` markers and collapse any repeated `.md.md…` runs."""
     text = re.sub(r"\s*\[Teil\s+\d+/\d+\]", "", text)
@@ -1085,7 +1143,7 @@ def _strip_teil_sources(content: str) -> str:
     except Exception:
         return content
     cleaned: list[str] = []
-    for s in (post.metadata.get("sources") or []):
+    for s in post.metadata.get("sources") or []:
         s2 = _TEIL_SUFFIX_RE.sub("", str(s)).strip()
         if s2 and s2 not in cleaned:
             cleaned.append(s2)
@@ -1097,7 +1155,7 @@ def _summary_base(filename: str) -> str:
     base = filename[:-3] if filename.endswith(".md") else filename
     base = _FILE_TEIL_RE.sub("", base)
     if base.startswith("summary-"):
-        base = base[len("summary-"):]
+        base = base[len("summary-") :]
     # drop stray `source-summary-`/`concept-`/`entity-` infixes left by old ingests
     base = re.sub(r"^(source-summary-|concept-|entity-)+", "", base)
     if base.endswith("-md"):
@@ -1123,9 +1181,14 @@ def _group_concept_pages(pages: list[dict]) -> list[list[str]]:
             continue
         fn = p["filename"]
         terms = p.get("key_terms") or _extract_key_terms(read_page(fn))
-        items.append((fn, str(p.get("type")).lower(),
-                      _canonical_slug_tokens(str(p.get("title") or fn)),
-                      frozenset(terms or [])))
+        items.append(
+            (
+                fn,
+                str(p.get("type")).lower(),
+                _canonical_slug_tokens(str(p.get("title") or fn)),
+                frozenset(terms or []),
+            )
+        )
     parent = {it[0]: it[0] for it in items}
 
     def find(x):
@@ -1139,8 +1202,10 @@ def _group_concept_pages(pages: list[dict]) -> list[list[str]]:
             a, b = items[i], items[j]
             if a[1] != b[1] or not a[2] or not b[2]:
                 continue
-            if a[2] == b[2] or ((a[2] <= b[2] or b[2] <= a[2])
-                                and _overlap_coef(a[3], b[3]) >= _TERM_OVERLAP_THRESHOLD):
+            if a[2] == b[2] or (
+                (a[2] <= b[2] or b[2] <= a[2])
+                and _overlap_coef(a[3], b[3]) >= _TERM_OVERLAP_THRESHOLD
+            ):
                 parent[find(a[0])] = find(b[0])
     groups: dict[str, list[str]] = {}
     for fn in parent:
@@ -1150,8 +1215,7 @@ def _group_concept_pages(pages: list[dict]) -> list[list[str]]:
 
 def _canonical_concept(members: list[str], title_by: dict[str, str]) -> str:
     """Most-general member: fewest topic tokens, then shortest filename."""
-    return min(members, key=lambda m: (len(_canonical_slug_tokens(title_by.get(m, m))),
-                                       len(m), m))
+    return min(members, key=lambda m: (len(_canonical_slug_tokens(title_by.get(m, m))), len(m), m))
 
 
 def _plan_groups(pages: list[dict]) -> list[dict]:
@@ -1159,12 +1223,15 @@ def _plan_groups(pages: list[dict]) -> list[dict]:
     plans: list[dict] = []
     summaries: dict[str, list[str]] = {}
     for p in pages:
-        if str(p.get("type") or "").lower() == "source-summary" or p["filename"].startswith("summary-"):
+        if str(p.get("type") or "").lower() == "source-summary" or p["filename"].startswith(
+            "summary-"
+        ):
             summaries.setdefault(_summary_base(p["filename"]), []).append(p["filename"])
     for base, members in summaries.items():
         canonical = f"summary-{base}.md"
-        base_member = max(members, key=lambda m: (_wiki() / m).stat().st_size
-                          if (_wiki() / m).exists() else 0)
+        base_member = max(
+            members, key=lambda m: (_wiki() / m).stat().st_size if (_wiki() / m).exists() else 0
+        )
         if len(members) == 1 and members[0] == canonical and not _needs_cleanup(canonical):
             continue
         plans.append({"canonical": canonical, "members": members, "base": base_member})
@@ -1223,8 +1290,12 @@ def _polish_page(content: str) -> str:
     plang = page_lang.page_lang(content)
     system = schema_loader.get_system_prompt() + "\n\n" + INGEST_LANGUAGE_DIRECTIVE[plang]
     try:
-        resp = ollama_client.generate(system, CONSOLIDATE_POLISH_PROMPT.format(page=post.content),
-                                       temperature=0.2, model_id=ollama_client._INGEST_MODEL)
+        resp = ollama_client.generate(
+            system,
+            CONSOLIDATE_POLISH_PROMPT.format(page=post.content),
+            temperature=0.2,
+            model_id=ollama_client._INGEST_MODEL,
+        )
     except Exception:
         return content
     if not (resp and resp.strip()) or page_lang.clearly_other(resp, plang):
@@ -1257,11 +1328,15 @@ def _consolidate_active(dry_run: bool, llm_polish: bool) -> dict:
     plans = _plan_groups(pages)
     rename = {m: pl["canonical"] for pl in plans for m in pl["members"] if m != pl["canonical"]}
     grouped = {m for pl in plans for m in pl["members"]}
-    after = len([p for p in pages if p["filename"] not in grouped]) + \
-        len({pl["canonical"] for pl in plans})
-    summary = {"before": len(pages), "after": after,
-               "groups": [(pl["canonical"], pl["members"]) for pl in plans],
-               "rename": rename}
+    after = len([p for p in pages if p["filename"] not in grouped]) + len(
+        {pl["canonical"] for pl in plans}
+    )
+    summary = {
+        "before": len(pages),
+        "after": after,
+        "groups": [(pl["canonical"], pl["members"]) for pl in plans],
+        "rename": rename,
+    }
     if dry_run:
         return summary
     for pl in plans:
@@ -1278,8 +1353,7 @@ def _consolidate_active(dry_run: bool, llm_polish: bool) -> dict:
             (_wiki() / old).unlink(missing_ok=True)
     lex_index.build()
     _rebuild_index()
-    _append_log("Consolidate",
-                f"Merged {len(rename)} pages into {len(plans)} canonical pages.")
+    _append_log("Consolidate", f"Merged {len(rename)} pages into {len(plans)} canonical pages.")
     return summary
 
 
@@ -1288,7 +1362,13 @@ def delete_source(source_name: str) -> dict:
 
     Returns a summary dict with keys: raw, manifest, chunks, qa_rows, wiki_pages.
     """
-    result: dict = {"raw": False, "manifest": False, "chunks": False, "qa_rows": 0, "wiki_pages": []}
+    result: dict = {
+        "raw": False,
+        "manifest": False,
+        "chunks": False,
+        "qa_rows": 0,
+        "wiki_pages": [],
+    }
 
     raw_file = _raw() / source_name
     if raw_file.exists():
@@ -1418,7 +1498,8 @@ def condense_followup(prev_q: str, prev_a: str, followup: str) -> str:
         out = ollama_client.generate(
             system="You rewrite follow-up questions into standalone ones.",
             prompt=CONDENSE_PROMPT.format(
-                prev_q=prev_q, prev_a=(prev_a or "")[:1600], followup=followup),
+                prev_q=prev_q, prev_a=(prev_a or "")[:1600], followup=followup
+            ),
             temperature=0.1,
         ).strip()
         return out or followup
@@ -1447,13 +1528,17 @@ def _candidate_pages_for_query(question: str) -> list[str]:
             cands.append(f)
 
     try:
-        for h in retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki", use_rerank=True):
+        for h in retrieval.search(
+            question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki", use_rerank=True
+        ):
             _add(h.get("source", ""))
     except Exception:
         pass
     src_map = _source_to_pages()
     try:
-        for h in retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope="raw", use_rerank=True):
+        for h in retrieval.search(
+            question, top_k=_QUERY_CANDIDATE_TOPK, scope="raw", use_rerank=True
+        ):
             for f in src_map.get((h.get("source") or "").strip(), []):
                 _add(f)
     except Exception:
@@ -1490,7 +1575,8 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
     rank_index = _index_text_for(candidates) if candidates else index_text
     select_prompt = SELECT_PROMPT.format(index_text=rank_index, question=question)
     selected_raw = ollama_client.generate(
-        system, select_prompt, temperature=0.1, model_id=ollama_client._QUERY_MODEL)
+        system, select_prompt, temperature=0.1, model_id=ollama_client._QUERY_MODEL
+    )
     selected = [
         ln.strip()
         for ln in selected_raw.splitlines()
@@ -1502,8 +1588,9 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
     return [s for s in selected if (_wiki() / s).exists()][:5]
 
 
-def _gather_pages(question: str, system: str,
-                  budget: int) -> tuple[str, list[str], set[str], list[dict], dict]:
+def _gather_pages(
+    question: str, system: str, budget: int
+) -> tuple[str, list[str], set[str], list[dict], dict]:
     """Collect synthesis context from the *active* DB (see `query_with_sources`).
 
     Returns (pages_text, wiki_sources, raw_sources, wiki_hits, audit); the source names
@@ -1518,7 +1605,9 @@ def _gather_pages(question: str, system: str,
     hits_by_page: dict[str, list[dict]] = {}
     wiki_hits: list[dict] = []
     try:
-        for h in retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki", use_rerank=True):
+        for h in retrieval.search(
+            question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki", use_rerank=True
+        ):
             hits_by_page.setdefault(h.get("source", ""), []).append(h)
             wiki_hits.append(h)
     except Exception:
@@ -1531,8 +1620,10 @@ def _gather_pages(question: str, system: str,
     def _best_score(fn: str) -> float | None:
         scores = [float(h["rerank_score"]) for h in hits_by_page.get(fn, []) if "rerank_score" in h]
         return max(scores) if scores else None
+
     audit = calibrate.justify(
-        [(db_context.qualify(f), _best_score(f)) for f in selected], calibrate.threshold())
+        [(db_context.qualify(f), _best_score(f)) for f in selected], calibrate.threshold()
+    )
     _below = {n for n, _ in audit["below_tau"]}
     selected = [f for f in selected if db_context.qualify(f) not in _below]
 
@@ -1606,18 +1697,27 @@ def query_with_sources(question: str) -> dict:
         raw_sources_set.update(raws)
 
     if abstain_all and best_page:  # calibrated no-confident-answer → skip the LLM synth
-        return {"answer": lang.abstain_message(question, best_db, best_page, best_rel),
-                "sources": used_sources, "raw_sources": sorted(raw_sources_set),
-                "abstained": True, "audit": audit}
+        return {
+            "answer": lang.abstain_message(question, best_db, best_page, best_rel),
+            "sources": used_sources,
+            "raw_sources": sorted(raw_sources_set),
+            "abstained": True,
+            "audit": audit,
+        }
 
     pages_text = "".join(blocks) or "(no relevant pages found)"
     answer_prompt = ANSWER_PROMPT.format(
-        pages_text=pages_text, question=question,
+        pages_text=pages_text,
+        question=question,
         language_directive=lang.response_directive(question),
     )
     answer = ollama_client.generate(system, answer_prompt, temperature=0.7)
-    return {"answer": answer, "sources": used_sources,
-            "raw_sources": sorted(raw_sources_set), "audit": audit}
+    return {
+        "answer": answer,
+        "sources": used_sources,
+        "raw_sources": sorted(raw_sources_set),
+        "audit": audit,
+    }
 
 
 def lint() -> str:
@@ -1635,18 +1735,25 @@ def lint() -> str:
         return "Wiki is empty — nothing to lint."
 
     report = ollama_client.generate(
-        system, LINT_PROMPT.format(all_pages=all_pages, today=_date()),
-        temperature=0.3, model_id=ollama_client._FAST_MODEL)
+        system,
+        LINT_PROMPT.format(all_pages=all_pages, today=_date()),
+        temperature=0.3,
+        model_id=ollama_client._FAST_MODEL,
+    )
 
     prog_blocks = []
     orphans = find_orphans()
     if orphans:
-        prog_blocks.append("**Orphans (no in-links from `related` frontmatter):**\n"
-                           + "\n".join(f"- {o}" for o in orphans))
+        prog_blocks.append(
+            "**Orphans (no in-links from `related` frontmatter):**\n"
+            + "\n".join(f"- {o}" for o in orphans)
+        )
     stale = stale_pages()
     if stale:
-        prog_blocks.append(f"**Possibly stale (past freshness window as of {_date()}):**\n"
-                           + "\n".join(f"- {s}" for s in stale))
+        prog_blocks.append(
+            f"**Possibly stale (past freshness window as of {_date()}):**\n"
+            + "\n".join(f"- {s}" for s in stale)
+        )
     if prog_blocks:
         report = "## Programmatic checks\n\n" + "\n\n".join(prog_blocks) + "\n\n---\n\n" + report
 
@@ -1679,8 +1786,14 @@ def list_pages(include_insights: bool = False) -> list[dict]:
             meta.setdefault("description", post.content[:120].replace("\n", " "))
             results.append(meta)
         except Exception:
-            results.append({"filename": fname, "title": md.stem, "description": "",
-                            **({"type": "insight"} if is_insight else {})})
+            results.append(
+                {
+                    "filename": fname,
+                    "title": md.stem,
+                    "description": "",
+                    **({"type": "insight"} if is_insight else {}),
+                }
+            )
     return results
 
 
@@ -1710,6 +1823,7 @@ def read_raw_source(filename: str) -> bytes | None:
 
 
 # --- DESCRIPTION.md: half-page high-level overview of the whole database ----
+
 
 def _cap_description(text: str) -> str:
     """Trim the overview to _DESCRIPTION_MAX_CHARS on a paragraph/sentence break."""
@@ -1788,8 +1902,7 @@ def refresh_description_after_delete(source_name: str, removed_pages: list[str])
     if not current:
         return  # nothing to update; ensure_description() seeds it lazily on render
     change_summary = (
-        f"Deleted source: {source_name}\n"
-        f"Wiki pages removed: {', '.join(removed_pages)}"
+        f"Deleted source: {source_name}\nWiki pages removed: {', '.join(removed_pages)}"
     )
     system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else ""
@@ -1831,13 +1944,15 @@ def search_wiki(query: str) -> list[dict]:
             continue
         seen.add(fname)
         excerpt = (h.get("preview") or h.get("text", "")[:320]).replace("\n", " ").strip()
-        results.append({
-            "filename": fname,
-            "title": titles.get(fname, fname.replace(".md", "")),
-            "excerpt": excerpt,
-            "score": h.get("score", 0.0),
-            "matched_terms": h.get("matched_terms", []),
-        })
+        results.append(
+            {
+                "filename": fname,
+                "title": titles.get(fname, fname.replace(".md", "")),
+                "excerpt": excerpt,
+                "score": h.get("score", 0.0),
+                "matched_terms": h.get("matched_terms", []),
+            }
+        )
     return results
 
 
@@ -1848,7 +1963,7 @@ def get_wiki_tree() -> dict[str, list[dict]]:
     other), only including non-empty groups. Order within a group matches
     list_pages(). Each page dict is annotated with `stale` (E-1).
     """
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     tree: dict[str, list[dict]] = {}
     for page in list_pages(include_insights=True):
         t = str(page.get("type", "")).strip().lower()
@@ -1955,7 +2070,7 @@ def _shared_source_siblings() -> dict[str, set[str]]:
     """
     by_source: dict[str, list[str]] = {}
     for page in list_pages(include_insights=True):
-        for src in (page.get("sources") or []):
+        for src in page.get("sources") or []:
             key = str(src).strip()
             if key:
                 by_source.setdefault(key, []).append(page["filename"])
@@ -1989,8 +2104,9 @@ def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
     if not seeds or limit <= 0:
         return []
     seed_set = set(seeds)
-    titles = {p["filename"]: str(p.get("title", p["filename"]))
-              for p in list_pages(include_insights=True)}
+    titles = {
+        p["filename"]: str(p.get("title", p["filename"])) for p in list_pages(include_insights=True)
+    }
     backlinks = _backlink_map()
     siblings = _shared_source_siblings()
 
@@ -2018,15 +2134,26 @@ def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
 
     # Tier 1: any explicit link. Tier 2: shared-source only. Stable sort, so
     # equal-ranked neighbours keep insertion order.
-    order.sort(key=lambda r: (0 if link_counts.get(r) else 1,
-                              -link_counts.get(r, 0),
-                              -shared_counts.get(r, 0)))
+    order.sort(
+        key=lambda r: (
+            0 if link_counts.get(r) else 1,
+            -link_counts.get(r, 0),
+            -shared_counts.get(r, 0),
+        )
+    )
     out: list[dict] = []
     for r in order[:limit]:
         body = read_page_parsed(r).get("content", "")
         excerpt = " ".join(body.split())[:240]
-        out.append({"filename": r, "title": titles[r], "excerpt": excerpt,
-                    "via": via[r], "kind": "link" if link_counts.get(r) else "shared-source"})
+        out.append(
+            {
+                "filename": r,
+                "title": titles[r],
+                "excerpt": excerpt,
+                "via": via[r],
+                "kind": "link" if link_counts.get(r) else "shared-source",
+            }
+        )
     return out
 
 
@@ -2055,7 +2182,6 @@ def build_typed_graph() -> dict:
     related_pairs: set[frozenset[str]] = set()
     derived_pairs: set[tuple[str, str]] = set()
     source_set: set[str] = set()
-
 
     targets = [_wiki().glob("*.md")]
     if insights.exists():
@@ -2110,7 +2236,6 @@ def build_typed_graph() -> dict:
     for s in source_set:
         nodes[f"source::{s}"] = {"id": f"source::{s}", "type": "source", "label": s}
 
-
     return {"nodes": list(nodes.values()), "edges": edges}
 
 
@@ -2124,7 +2249,9 @@ def find_orphans() -> list[str]:
     return sorted(n for n, d in in_deg.items() if d == 0)
 
 
-def resolve_contradiction(description: str, page_filenames: list[str], user_guidance: str = "") -> dict:
+def resolve_contradiction(
+    description: str, page_filenames: list[str], user_guidance: str = ""
+) -> dict:
     """Reconcile a contradiction across pages via a focused LLM call.
 
     Rewrites the affected pages in place using the standard ingest delimiter
@@ -2177,6 +2304,7 @@ def resolve_contradiction(description: str, page_filenames: list[str], user_guid
 
 
 # --- Page language + reference normalisation (Maintenance) -------------------
+
 
 def _normalize_page(content: str, dry_run: bool) -> tuple[str, dict]:
     """Clean references, pin `lang`, translate foreign runs. → (content, what changed)."""
@@ -2237,9 +2365,7 @@ def stats() -> dict:
     raw_count = len(list(_raw().glob("*"))) - 1 if _raw().exists() else 0  # exclude manifest
     data_bytes = (
         sum(p.stat().st_size for p in _wiki().rglob("*") if p.is_file()) if _wiki().exists() else 0
-    ) + (
-        sum(p.stat().st_size for p in _raw().rglob("*") if p.is_file()) if _raw().exists() else 0
-    )
+    ) + (sum(p.stat().st_size for p in _raw().rglob("*") if p.is_file()) if _raw().exists() else 0)
     return {
         "pages": len(pages),
         "raw_files": max(0, raw_count),

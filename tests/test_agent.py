@@ -2,7 +2,6 @@
 
 from unittest.mock import MagicMock
 
-import pytest
 from langchain_core.messages import AIMessage
 
 import agent
@@ -37,6 +36,7 @@ def _ai_with_tool(name, args, call_id="c1"):
 
 # --- basic step types ------------------------------------------------------
 
+
 def test_plain_text_response_yields_final_answer(monkeypatch):
     _patch_llm(monkeypatch, [AIMessage(content="just an answer")])
     steps = list(agent.run_research_agent("q?"))
@@ -55,7 +55,8 @@ def test_tool_call_emits_tool_call_and_tool_result(monkeypatch):
 
 def test_submit_final_answer_accepted_yields_report_path(monkeypatch, tmp_path):
     import db_context
-    import tools  # noqa: F401
+    import tools
+
     monkeypatch.setattr(db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
     monkeypatch.setattr(tools, "MIN_URLS", 1)
@@ -86,6 +87,7 @@ def test_submit_rejected_keeps_agent_running(monkeypatch):
 
 # --- system prompt & wiki context -----------------------------------------
 
+
 def test_wiki_context_appears_in_system_message(monkeypatch):
     fake = _patch_llm(monkeypatch, [AIMessage(content="ok")])
     list(agent.run_research_agent("q?", wiki_context="WIKI-CTX-MARKER"))
@@ -101,6 +103,7 @@ def test_thresholds_appear_in_system_prompt(monkeypatch):
 
 # --- fallback synthesis (no submit, no prose) ------------------------------
 
+
 def test_stalled_agent_synthesizes_from_notes(monkeypatch):
     # Agent calls a tool, then emits an empty completion (no prose, no submit).
     _patch_llm(
@@ -111,7 +114,8 @@ def test_stalled_agent_synthesizes_from_notes(monkeypatch):
         ],
     )
     monkeypatch.setattr(
-        agent.ollama_client, "generate",
+        agent.ollama_client,
+        "generate",
         lambda system, prompt, **kw: "SYNTHESIZED ANSWER",
     )
     steps = list(agent.run_research_agent("q?"))
@@ -137,9 +141,11 @@ def test_no_notes_no_prose_yields_error_without_synth_call(monkeypatch):
 
 # --- error handling --------------------------------------------------------
 
+
 def test_llm_init_failure_yields_error(monkeypatch):
     def boom():
         raise RuntimeError("ollama down")
+
     monkeypatch.setattr(agent, "_build_llm", boom)
     steps = list(agent.run_research_agent("q?"))
     assert steps and steps[-1]["type"] == "error"

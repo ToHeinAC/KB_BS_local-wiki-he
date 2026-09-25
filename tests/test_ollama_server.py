@@ -25,10 +25,14 @@ def _fresh(monkeypatch):
     monkeypatch.setattr(ollama_server, "_proc", None)
     monkeypatch.setattr(ollama_server, "_serving", lambda base, **k: False)
     monkeypatch.setattr(ollama_server, "_get_json", lambda url, timeout=3.0: None)
-    monkeypatch.setattr(gpu_placement, "gpus", lambda: [
-        gpu_placement.Gpu(index=0, name="card0", total_gib=24.0, free_gib=12.0),
-        gpu_placement.Gpu(index=1, name="card1", total_gib=24.0, free_gib=22.0),
-    ])
+    monkeypatch.setattr(
+        gpu_placement,
+        "gpus",
+        lambda: [
+            gpu_placement.Gpu(index=0, name="card0", total_gib=24.0, free_gib=12.0),
+            gpu_placement.Gpu(index=1, name="card1", total_gib=24.0, free_gib=22.0),
+        ],
+    )
     monkeypatch.delenv("OLLAMA_PIN_GPU", raising=False)
     monkeypatch.delenv("OLLAMA_PIN_PORT", raising=False)
     monkeypatch.setenv("OLLAMA_HOST", "http://localhost:11434")
@@ -66,12 +70,12 @@ def _spawns(monkeypatch, proc=None, comes_up=True) -> dict:
         return proc
 
     monkeypatch.setattr(ollama_server, "_spawn", _fake_spawn)
-    monkeypatch.setattr(ollama_server, "_wait_until_serving",
-                        lambda p, base, timeout_s: comes_up)
+    monkeypatch.setattr(ollama_server, "_wait_until_serving", lambda p, base, timeout_s: comes_up)
     return seen
 
 
 # --- host configuration -------------------------------------------------------
+
 
 def test_configured_host_normalises_a_bare_hostport(monkeypatch):
     monkeypatch.setenv("OLLAMA_HOST", "127.0.0.1:11434")
@@ -86,6 +90,7 @@ def test_configured_host_falls_back_when_unset_or_blank(monkeypatch):
 
 
 # --- the fail-open paths ------------------------------------------------------
+
 
 def test_a_remote_ollama_host_is_never_hijacked(monkeypatch):
     monkeypatch.setenv("OLLAMA_HOST", "http://gpu-box.lan:11434")
@@ -128,6 +133,7 @@ def test_a_daemon_that_never_comes_up_is_killed_and_falls_back(monkeypatch):
 
 # --- the pinned paths ---------------------------------------------------------
 
+
 def test_starts_a_pinned_daemon_on_the_emptiest_card(monkeypatch):
     seen = _spawns(monkeypatch)
     status = ollama_server.status()
@@ -159,8 +165,9 @@ def test_a_nonsense_port_falls_back_to_the_default(monkeypatch):
 
 def test_an_existing_pinned_daemon_is_adopted_not_duplicated(monkeypatch):
     monkeypatch.setattr(ollama_server, "_serving", lambda base, **k: True)
-    monkeypatch.setattr(ollama_server, "_spawn",
-                        lambda *a, **k: pytest.fail("must not start a second daemon"))
+    monkeypatch.setattr(
+        ollama_server, "_spawn", lambda *a, **k: pytest.fail("must not start a second daemon")
+    )
     status = ollama_server.status()
     assert status["pinned"] and status["host"].endswith(str(ollama_server.DEFAULT_PORT))
     assert not status["managed"] and "reusing" in status["reason"]
@@ -182,6 +189,7 @@ def test_resolution_is_cached_for_the_process(monkeypatch):
 
 
 # --- shutdown -----------------------------------------------------------------
+
 
 def test_stop_terminates_a_daemon_we_own(monkeypatch):
     seen = _spawns(monkeypatch)
@@ -215,6 +223,7 @@ def test_stop_kills_a_daemon_that_ignores_terminate(monkeypatch):
 
 # --- the model store and the size estimate ------------------------------------
 
+
 def test_find_models_dir_prefers_the_store_with_the_most_manifests(monkeypatch, tmp_path):
     empty, full = tmp_path / "empty", tmp_path / "full"
     (empty / "manifests").mkdir(parents=True)
@@ -226,15 +235,18 @@ def test_find_models_dir_prefers_the_store_with_the_most_manifests(monkeypatch, 
 
 
 def test_find_models_dir_is_none_when_no_store_has_models(monkeypatch, tmp_path):
-    monkeypatch.setattr(ollama_server, "_store_candidates",
-                        lambda: (None, str(tmp_path / "nope"), str(tmp_path / "also-nope")))
+    monkeypatch.setattr(
+        ollama_server,
+        "_store_candidates",
+        lambda: (None, str(tmp_path / "nope"), str(tmp_path / "also-nope")),
+    )
     assert ollama_server.find_models_dir() is None
 
 
 def test_configured_models_covers_every_role(monkeypatch):
     monkeypatch.setenv("OLLAMA_MODEL", "main:1b")
     monkeypatch.setenv("INGEST_MODEL", "ingest:2b")
-    monkeypatch.setenv("QUERY_MODEL", "")           # unset roles fall back to OLLAMA_MODEL
+    monkeypatch.setenv("QUERY_MODEL", "")  # unset roles fall back to OLLAMA_MODEL
     names = ollama_server.configured_models()
     assert {"main:1b", "ingest:2b"} <= names
     assert "" not in names
@@ -242,18 +254,25 @@ def test_configured_models_covers_every_role(monkeypatch):
 
 def test_required_gib_sums_distinct_models_plus_overhead(monkeypatch):
     for key in ("QUERY_MODEL", "INGEST_MODEL", "FAST_MODEL"):
-        monkeypatch.setenv(key, "main:1b")          # same model in three roles
+        monkeypatch.setenv(key, "main:1b")  # same model in three roles
     monkeypatch.setenv("OLLAMA_MODEL", "main:1b")
     monkeypatch.setenv("EMBED_MODEL", "embed:1b")
     monkeypatch.setenv("REWRITE_MODEL", "main:1b")
     monkeypatch.setenv("OCR_MODEL", "main:1b")
-    monkeypatch.setattr(ollama_server, "_get_json", lambda url, timeout=3.0: {"models": [
-        {"name": "main:1b", "size": 4 * gpu_placement.GIB},
-        {"name": "embed:1b", "size": 1 * gpu_placement.GIB},
-        {"name": "unused:70b", "size": 40 * gpu_placement.GIB},
-    ]})
+    monkeypatch.setattr(
+        ollama_server,
+        "_get_json",
+        lambda url, timeout=3.0: {
+            "models": [
+                {"name": "main:1b", "size": 4 * gpu_placement.GIB},
+                {"name": "embed:1b", "size": 1 * gpu_placement.GIB},
+                {"name": "unused:70b", "size": 40 * gpu_placement.GIB},
+            ]
+        },
+    )
     assert ollama_server.required_gib("http://x") == pytest.approx(
-        5.0 + gpu_placement.COMPUTE_OVERHEAD_GIB)
+        5.0 + gpu_placement.COMPUTE_OVERHEAD_GIB
+    )
 
 
 def test_required_gib_survives_an_unreachable_daemon(monkeypatch):
@@ -274,8 +293,15 @@ def test_latest_suffix_matches_either_way(monkeypatch):
     for key in ("QUERY_MODEL", "INGEST_MODEL", "FAST_MODEL", "REWRITE_MODEL", "OCR_MODEL"):
         monkeypatch.setenv(key, "vendor/m")
     monkeypatch.setenv("EMBED_MODEL", "vendor/m")
-    monkeypatch.setattr(ollama_server, "_get_json", lambda url, timeout=3.0: {"models": [
-        {"name": "vendor/m:latest", "size": 2 * gpu_placement.GIB},
-    ]})
+    monkeypatch.setattr(
+        ollama_server,
+        "_get_json",
+        lambda url, timeout=3.0: {
+            "models": [
+                {"name": "vendor/m:latest", "size": 2 * gpu_placement.GIB},
+            ]
+        },
+    )
     assert ollama_server.required_gib("http://x") == pytest.approx(
-        2.0 + gpu_placement.COMPUTE_OVERHEAD_GIB)
+        2.0 + gpu_placement.COMPUTE_OVERHEAD_GIB
+    )

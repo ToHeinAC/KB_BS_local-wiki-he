@@ -8,8 +8,18 @@ import graph_export
 import wiki_engine
 
 
-def _page(wiki_dir, filename, *, title, ptype="concept", related=(), sources=(),
-          confidence="high", updated=None, expires=None):
+def _page(
+    wiki_dir,
+    filename,
+    *,
+    title,
+    ptype="concept",
+    related=(),
+    sources=(),
+    confidence="high",
+    updated=None,
+    expires=None,
+):
     fm = [
         "---",
         f'title: "{title}"',
@@ -26,12 +36,19 @@ def _page(wiki_dir, filename, *, title, ptype="concept", related=(), sources=(),
     (wiki_dir / filename).write_text("\n".join(fm) + f"\n\n# {title}\n\nBody text.\n")
 
 
-@pytest.fixture()
+@pytest.fixture
 def bundle(wiki_dir):
     """A small typed bundle: a linked pair, a source, and an orphan."""
     _page(wiki_dir, "alpha.md", title="Alpha", related=["beta.md"], sources=["doc-a.pdf"])
-    _page(wiki_dir, "beta.md", title="Beta", ptype="entity", related=["alpha.md"],
-          sources=["doc-a.pdf"], confidence="low")
+    _page(
+        wiki_dir,
+        "beta.md",
+        title="Beta",
+        ptype="entity",
+        related=["alpha.md"],
+        sources=["doc-a.pdf"],
+        confidence="low",
+    )
     _page(wiki_dir, "gamma.md", title="Gamma", sources=["doc-b.pdf"])
     _page(wiki_dir, "lonely.md", title="Lonely")
     return wiki_dir
@@ -90,7 +107,7 @@ def test_analytics_present_and_rounded(bundle):
 def test_stale_crosses_the_date_boundary(wiki_dir):
     _page(wiki_dir, "fresh.md", title="Fresh", updated="2026-01-01", expires=90)
     on_boundary = graph_export.export(today=date(2026, 4, 1))  # 90 days
-    after = graph_export.export(today=date(2026, 4, 2))        # 91 days
+    after = graph_export.export(today=date(2026, 4, 2))  # 91 days
     assert _by_id(on_boundary)["fresh.md"]["stale"] is False
     assert _by_id(after)["fresh.md"]["stale"] is True
 

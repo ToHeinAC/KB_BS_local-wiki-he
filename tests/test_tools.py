@@ -2,21 +2,17 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 import chunker
 import run_memory
 import tools
 
-
 # --- tavily_search --------------------------------------------------------
+
 
 def _fake_tavily_response(q):
     return {
         "answer": f"answer for {q}",
-        "results": [
-            {"title": f"T-{q}", "url": f"http://e.com/{q}", "content": "x" * 50}
-        ],
+        "results": [{"title": f"T-{q}", "url": f"http://e.com/{q}", "content": "x" * 50}],
     }
 
 
@@ -52,6 +48,7 @@ def test_tavily_search_empty_input_returns_error():
 
 # --- fetch_webpage_content ------------------------------------------------
 
+
 def test_fetch_webpage_returns_markdown(monkeypatch):
     fake_resp = MagicMock(text="<h1>Hi</h1><p>body</p>")
     fake_resp.raise_for_status = lambda: None
@@ -67,6 +64,7 @@ def test_fetch_webpage_handles_failure(monkeypatch):
 
 
 # --- submit_final_answer --------------------------------------------------
+
 
 def test_submit_rejects_short_answer(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
@@ -88,9 +86,7 @@ def test_submit_accepts_and_writes_file(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
-    out = tools._submit_final_impl(
-        "My Report", "alpha beta gamma http://a.com http://b.com"
-    )
+    out = tools._submit_final_impl("My Report", "alpha beta gamma http://a.com http://b.com")
     assert out.startswith("ACCEPTED")
     written = (tmp_path / "comparisons" / "report-my-report.md").read_text()
     assert "My Report" in written and "http://a.com" in written
@@ -125,6 +121,7 @@ def test_submit_report_survives_a_quoted_title(tmp_path, monkeypatch):
     containing a quote or colon used to emit invalid YAML that okf passes
     through unchanged, leaving a report on disk that could not be read back."""
     import frontmatter as _fm
+
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
@@ -132,7 +129,7 @@ def test_submit_report_survives_a_quoted_title(tmp_path, monkeypatch):
     out = tools._submit_final_impl(title, "alpha beta gamma http://a.com http://b.com")
     assert out.startswith("ACCEPTED")
     path = tmp_path / "comparisons" / out.split("comparisons/")[1].split(" ")[0]
-    post = _fm.load(str(path))           # would raise ParserError before the fix
+    post = _fm.load(str(path))  # would raise ParserError before the fix
     assert post.metadata["title"] == title
     assert "alpha beta gamma" in post.content
 
@@ -181,7 +178,8 @@ def test_wiki_search_parallel_batch(monkeypatch):
 def test_wiki_search_appends_linked_pages(monkeypatch):
     monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", True)
     monkeypatch.setattr(
-        tools.wiki_engine, "search_wiki",
+        tools.wiki_engine,
+        "search_wiki",
         lambda q: [{"filename": "a.md", "title": "A", "excerpt": "hit"}],
     )
     captured = {}
@@ -199,12 +197,14 @@ def test_wiki_search_appends_linked_pages(monkeypatch):
 def test_wiki_search_link_expansion_skips_already_shown(monkeypatch):
     monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", True)
     monkeypatch.setattr(
-        tools.wiki_engine, "search_wiki",
+        tools.wiki_engine,
+        "search_wiki",
         lambda q: [{"filename": "a.md", "title": "A", "excerpt": "hit"}],
     )
     # linked_pages returns a page already present as a direct hit -> filtered out
     monkeypatch.setattr(
-        tools.wiki_engine, "linked_pages",
+        tools.wiki_engine,
+        "linked_pages",
         lambda seeds, limit: [{"filename": "a.md", "title": "A", "excerpt": "", "via": "a.md"}],
     )
     out = tools._wiki_search_impl(query="x")
@@ -214,11 +214,13 @@ def test_wiki_search_link_expansion_skips_already_shown(monkeypatch):
 def test_wiki_search_link_expansion_disabled(monkeypatch):
     monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", False)
     monkeypatch.setattr(
-        tools.wiki_engine, "search_wiki",
+        tools.wiki_engine,
+        "search_wiki",
         lambda q: [{"filename": "a.md", "title": "A", "excerpt": "hit"}],
     )
     monkeypatch.setattr(
-        tools.wiki_engine, "linked_pages",
+        tools.wiki_engine,
+        "linked_pages",
         lambda *a, **k: (_ for _ in ()).throw(AssertionError("should not be called")),
     )
     out = tools._wiki_search_impl(query="x")
@@ -252,21 +254,31 @@ def _ingest_source(name: str, text: str):
 _LEGAL_DOC = (
     "# StrlSchG\n\n"
     "## § 61 Anfall und Lagerung\n"
-    + "Regelungen zum Anfall ueberwachungsbeduerftiger Rueckstaende. " * 5 + "\n\n"
+    + "Regelungen zum Anfall ueberwachungsbeduerftiger Rueckstaende. "
+    * 5
+    + "\n\n"
     "## § 62 Entlassung aus der Ueberwachung\n"
-    + "Entlassung von Rueckstaenden aus der Ueberwachung erfolgt auf Antrag. " * 5 + "\n\n"
+    + "Entlassung von Rueckstaenden aus der Ueberwachung erfolgt auf Antrag. "
+    * 5
+    + "\n\n"
     "## § 63 Verbleibende Rueckstaende\n"
-    + "In der Ueberwachung verbleibende Rueckstaende unterliegen Auflagen. " * 5 + "\n"
+    + "In der Ueberwachung verbleibende Rueckstaende unterliegen Auflagen. " * 5
+    + "\n"
 )
 
 _MD_DOC = (
     "# Guide\n\n"
     "## Overview\n"
-    + "This guide gives a broad overview of the monitoring process and scope. " * 4 + "\n\n"
+    + "This guide gives a broad overview of the monitoring process and scope. "
+    * 4
+    + "\n\n"
     "## Release Procedure\n"
-    + "The release procedure describes how items leave monitoring on request. " * 4 + "\n\n"
+    + "The release procedure describes how items leave monitoring on request. "
+    * 4
+    + "\n\n"
     "## Limits\n"
-    + "Limits define the numeric thresholds applied during the assessment phase. " * 4 + "\n"
+    + "Limits define the numeric thresholds applied during the assessment phase. " * 4
+    + "\n"
 )
 
 
@@ -333,11 +345,13 @@ def test_raw_read_nudges_submit_after_paginating(wiki_dir):
 
 # --- think_tool -----------------------------------------------------------
 
+
 def test_think_tool_passthrough():
     assert tools.TOOL_FUNCTIONS["think_tool"]("just thinking") == "just thinking"
 
 
 # --- Deep chat: wiki access ------------------------------------------------
+
 
 def test_chat_tools_expose_wiki_search_and_read():
     """Deep chat can navigate the wiki (and thus follow `related:` links)."""
@@ -425,7 +439,7 @@ def test_current_run_audit_splits_sources_by_tau(monkeypatch, tmp_path):
     try:
         mem = run_memory.begin_run()
         mem.note_source_relevance("good.md", -1.0)
-        mem.note_source_relevance("good.md", -8.0)   # keeps the max
+        mem.note_source_relevance("good.md", -8.0)  # keeps the max
         mem.note_source_relevance("weak.md", -6.0)
         audit = tools.current_run_audit()
         assert audit["kept"] == [("good.md", -1.0)]
@@ -446,13 +460,22 @@ def test_current_run_audit_none_when_no_scored_source():
 def test_wiki_search_labels_shared_source_neighbours(monkeypatch):
     monkeypatch.setattr(tools, "WIKI_LINK_EXPANSION", True)
     monkeypatch.setattr(
-        tools.wiki_engine, "search_wiki",
+        tools.wiki_engine,
+        "search_wiki",
         lambda q: [{"filename": "a.md", "title": "A", "excerpt": "hit"}],
     )
     monkeypatch.setattr(
-        tools.wiki_engine, "linked_pages",
-        lambda seeds, limit: [{"filename": "b.md", "title": "B", "excerpt": "nbr",
-                               "via": "a.md", "kind": "shared-source"}],
+        tools.wiki_engine,
+        "linked_pages",
+        lambda seeds, limit: [
+            {
+                "filename": "b.md",
+                "title": "B",
+                "excerpt": "nbr",
+                "via": "a.md",
+                "kind": "shared-source",
+            }
+        ],
     )
     out = tools._wiki_search_impl(query="x")
     assert "shares a source with a.md" in out

@@ -60,8 +60,8 @@ INGEST_LANGUAGE_DIRECTIVE = {
         "English — the source text sets the FACTS, not the language. ORIGINAL TERMS stay "
         "verbatim and untranslated: technical terms, definitions, proper names, titles "
         "of laws and standards, abbreviations, and verbatim quotes. When you translate "
-        "a foreign term, give the original in parentheses, e.g. \"permissible action "
-        "space (*zulässiger Handlungsraum*)\". KEEP UNCHANGED as well: the `## Key facts` "
+        'a foreign term, give the original in parentheses, e.g. "permissible action '
+        'space (*zulässiger Handlungsraum*)". KEEP UNCHANGED as well: the `## Key facts` '
         "heading (exactly, in English), numbers, dates, units, section markers (§, Art.), "
         "and citations like [source.md]."
     ),
@@ -439,7 +439,7 @@ EVALUATE_CONDITION_DESCRIPTION = (
     "checked against numbers, categories, or labels from the source documents — do NOT "
     "decide PASS/FAIL mentally or inside think_tool.\n\n"
     "Parameters:\n"
-    '  facts (dict): named values you extracted from the text, e.g.\n'
+    "  facts (dict): named values you extracted from the text, e.g.\n"
     '                {"dose_mSv": 25, "category": "A", "label": "warning level"}\n'
     "  condition (dict): a nested logical tree. Each node is ONE of:\n"
     '    comparison : {"op": ">=", "fact": "dose_mSv", "value": 20}\n'
