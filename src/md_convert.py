@@ -11,16 +11,24 @@ https://github.com/ToHeinAC/MD-maker
 All Ollama access goes through ollama_client; all prompts live in prompts.py.
 """
 
+from __future__ import annotations
+
 import base64
 import io
 import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
 from dotenv import load_dotenv
 
 import ollama_client
 from prompts import MD_REWRITE_PROMPT, OCR_DEEPSEEK_PROMPT, OCR_SYSTEM_PROMPT, OCR_USER_PROMPT
+
+if TYPE_CHECKING:
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+    from PIL.Image import Image
 
 load_dotenv()
 
@@ -47,6 +55,8 @@ IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tiff", ".tif", ".bmp"}
 
 # Callback signature: on_progress(done: int, total: int, label: str) -> None
 ProgressCb = Callable[[int, int, str], None]
+# One PDF page: extractable text, or a rendered image for OCR.
+PdfPage = tuple[Literal["text"], str] | tuple[Literal["image"], "Image"]
 
 
 def is_convertible(filename: str) -> bool:
@@ -57,18 +67,18 @@ def is_convertible(filename: str) -> bool:
 # --- image / PDF helpers (from MD-maker pdf_utils.py) ----------------------
 
 
-def _image_to_base64(pil_image) -> str:
+def _image_to_base64(pil_image: Image) -> str:
     buf = io.BytesIO()
     pil_image.convert("RGB").save(buf, format="JPEG", quality=85)
     return base64.b64encode(buf.getvalue()).decode()
 
 
-def iter_pdf_pages(pdf_bytes: bytes, dpi: int = PDF_DPI) -> Iterator[tuple[str, object]]:
+def iter_pdf_pages(pdf_bytes: bytes, dpi: int = PDF_DPI) -> Iterator[PdfPage]:
     """Yield ('text', str) for pages with extractable text, else ('image', PIL.Image)."""
     import pypdfium2 as pdfium  # pyright: ignore[reportMissingTypeStubs]
 
     scale = dpi / 72
-    doc = pdfium.PdfDocument(pdf_bytes)
+    doc: Any = pdfium.PdfDocument(pdf_bytes)  # pypdfium2's helpers are unannotated
     for page in doc:
         textpage = page.get_textpage()
         text = textpage.get_text_range().strip()
@@ -93,7 +103,7 @@ def rewrite_text(text: str, model_id: str = REWRITE_MODEL) -> str:
     return ollama_client.rewrite(model_id, MD_REWRITE_PROMPT + text)
 
 
-def convert_image(pil_image, model_id: str = OCR_MODEL) -> str:
+def convert_image(pil_image: Image, model_id: str = OCR_MODEL) -> str:
     """OCR one image to Markdown via a vision model."""
     img_b64 = _image_to_base64(pil_image)
     if model_id.startswith("deepseek-ocr"):
@@ -106,11 +116,11 @@ def convert_image(pil_image, model_id: str = OCR_MODEL) -> str:
 # --- DOCX helpers (from MD-maker docx_utils.py) ----------------------------
 
 
-def _paragraph_md(para) -> str | None:
+def _paragraph_md(para: Paragraph) -> str | None:
     text = para.text.strip()
     if not text:
         return None
-    style = para.style.name
+    style = (para.style.name if para.style else None) or ""
     if style.startswith("Heading 1"):
         return f"# {text}"
     if style.startswith("Heading 2"):
@@ -124,11 +134,11 @@ def _paragraph_md(para) -> str | None:
     return text
 
 
-def _table_md(table) -> str | None:
+def _table_md(table: Table) -> str | None:
     rows = table.rows
     if not rows:
         return None
-    lines = []
+    lines: list[str] = []
     header = [c.text.strip() for c in rows[0].cells]
     lines.append("| " + " | ".join(header) + " |")
     lines.append("| " + " | ".join("---" for _ in header) + " |")
@@ -141,19 +151,12 @@ def _table_md(table) -> str | None:
 def extract_docx_text(docx_bytes: bytes) -> str:
     """Convert a .docx file to Markdown, preserving document order (no LLM step)."""
     from docx import Document
-    from docx.oxml.ns import qn
-    from docx.table import Table
     from docx.text.paragraph import Paragraph
 
     doc = Document(io.BytesIO(docx_bytes))
     parts: list[str] = []
-    for child in doc.element.body.iterchildren():
-        if child.tag == qn("w:p"):
-            md = _paragraph_md(Paragraph(child, doc))
-        elif child.tag == qn("w:tbl"):
-            md = _table_md(Table(child, doc))
-        else:
-            md = None
+    for block in doc.iter_inner_content():  # body-level paragraphs and tables, in order
+        md = _paragraph_md(block) if isinstance(block, Paragraph) else _table_md(block)
         if md:
             parts.append(md)
     return "\n\n".join(parts)
@@ -165,13 +168,14 @@ def extract_docx_text(docx_bytes: bytes) -> str:
 def _convert_pdf(pdf_bytes: bytes, on_progress: ProgressCb | None) -> str:
     total = _pdf_page_count(pdf_bytes)
     parts: list[str] = []
-    for i, (kind, payload) in enumerate(iter_pdf_pages(pdf_bytes)):
+    for i, page in enumerate(iter_pdf_pages(pdf_bytes)):
         if on_progress:
-            on_progress(i, total, f"Page {i + 1}/{total} ({'OCR' if kind == 'image' else 'text'})")
-        if kind == "text":
-            parts.append(rewrite_text(payload))
+            kind = "OCR" if page[0] == "image" else "text"
+            on_progress(i, total, f"Page {i + 1}/{total} ({kind})")
+        if page[0] == "text":
+            parts.append(rewrite_text(page[1]))
         else:
-            parts.append(convert_image(payload))
+            parts.append(convert_image(page[1]))
     if on_progress:
         on_progress(total, total, "Done")
     return "\n\n".join(parts)
