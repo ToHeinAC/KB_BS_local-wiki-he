@@ -9,6 +9,7 @@ than duplicated, and the child gets the full env the pin actually needs.
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -358,12 +359,14 @@ def test_spawn_os_error_returns_none(monkeypatch):
 def test_wait_until_serving(monkeypatch):
     monkeypatch.setattr(ollama_server.time, "sleep", lambda s: None)
     monkeypatch.setattr(ollama_server, "_serving", lambda base: True)
-    assert ollama_server._wait_until_serving(_FakeProc(), "b", 5.0) is True
-    assert ollama_server._wait_until_serving(_FakeProc(alive=False), "b", 5.0) is False
+    alive: Any = _FakeProc()
+    dead: Any = _FakeProc(alive=False)
+    assert ollama_server._wait_until_serving(alive, "b", 5.0) is True
+    assert ollama_server._wait_until_serving(dead, "b", 5.0) is False
     monkeypatch.setattr(ollama_server, "_serving", lambda base: False)
     clock = iter([0.0, 1.0, 10.0])
     monkeypatch.setattr(ollama_server.time, "monotonic", lambda: next(clock))
-    assert ollama_server._wait_until_serving(_FakeProc(), "b", 5.0) is False
+    assert ollama_server._wait_until_serving(alive, "b", 5.0) is False
 
 
 def test_reset_drops_the_cached_state(monkeypatch):

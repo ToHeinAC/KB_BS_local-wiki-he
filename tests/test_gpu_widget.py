@@ -80,7 +80,9 @@ def test_route_is_injected_once_and_serves_json(monkeypatch):
     assert gpu_widget._inject_gpu_route() is True  # guard: no second route
     paths = [getattr(r, "path", None) for r in app.router.routes]
     assert paths.count("/wiwi/_api/gpu") == 1
-    response = app.router.routes[0].endpoint(None)
+    route = app.router.routes[0]
+    assert isinstance(route, Route)
+    response = route.endpoint(None)
     assert response.body == b'{"gpus": []}'
     assert response.headers["cache-control"] == "no-store"
 
