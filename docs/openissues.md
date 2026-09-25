@@ -11,6 +11,20 @@ Track open work and resolved items here. Keep entries short; link to PRs/commits
 
 ## Open
 
+- **claude-dev-schema adoption: `.claude/` part pending (2026-09-25).** Not applied by Claude Code
+  (self-modification guard): copy the scaffold's `.claude/hooks/*.py` + `tests/test_claude_hooks.py`
+  (and add `.claude/hooks` to pyright `include` and coverage `source`), merge its permissions and
+  PostToolUse/Stop hooks into `.claude/settings.json`, replace `.claude/commands/commit-git.md` and
+  `documentation-update.md` with the scaffold versions (the current one has broken links, failing
+  `test_docs.py`), drop `create-prd.md`, and let ruff fix `.claude/skills/code_review/scripts/`.
+  Then `uv run pre-commit install`.
+- **CI's Python 3.14 leg is unverified locally.** uv 0.6.6 here only offers 3.14.0a5, which
+  segfaults loading compiled wheels. 3.11 and 3.13 pass the full gate.
+- **Dead code kept pending a decision:** `wiki_engine._build_existing_block` (only its test calls
+  it) and `app._render_chat_sources` (unused since the chat sources side panel). Both carry a
+  `reportUnusedFunction` ignore.
+- **No safe exit button in the app.** The global Streamlit rule asks for one (SIGTERM to the app's
+  own PID); the sidebar only has Reset.
 - **Stale `postings.json` / `stats.json` in most `data/<DB>/index/`.** Dead artifacts of the JSON-postings backend retired in `d25fbe8`; nothing reads them (~4 MB in KI alone). Safe to delete, but they are inside user databases, so removal needs an explicit go-ahead.
 - **No migration hook for derived indexes.** `d25fbe8` changed the on-disk index format with no upgrade path, which silently broke retrieval on 10 of 12 databases until 2026-07-24. A startup check (`lex_index.index_health()` per DB) or a one-shot migration script would have caught it; today only the Maintenance banner does, and only once a user visits the DB.
 

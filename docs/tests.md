@@ -15,10 +15,19 @@ author: Tobias Hein
 
 ## Allocation
 
-- **Core (≈290 tests)** — highest-risk parts of the original system; `wiki_engine` alone carries 72, `tools` 31, and the multi-DB / auth / OKF / language layers a further ~80.
-- **Retrieval layer (43 tests)** — `chunker` boundaries + chunk_id stability + persistence (6); `lex_index` BM25 ranking, diacritic/stem variants, scope filtering, incremental updates, index health (13); `embed_index` semantic arm + RRF fusion, all with mocked embeddings (15); `qa_gen` batching + persistence + question-fold rank lift (9).
-- **Deep Research, web mode (29 tests)** — `tests/test_deep_research_agent.py`. `deep_research_agent._astream_sync` is the seam: tests script `(node, state_delta)` events, so the vendored graph never runs and the suite needs no Ollama, no Tavily key and no network. Covers event → step-dict mapping, trace labels, `raw_notes` citation extraction, replay and content de-duplication, the `ResearchComplete` sentinel, metric counting, report persistence (incl. YAML-safe frontmatter for questions containing quotes/colons), the fall-back-to-Quick contract, and event-loop cleanup.
-- **New-feature buffer (~15 tests)** — recently changed UI/agent surfaces. The Streamlit UI itself is exercised ad hoc via `streamlit.testing.v1.AppTest` (page dispatch, nav state, warning banners) rather than by committed tests — see [ui.md](ui.md).
+~660 tests; branch coverage ≥ 85 % is the gate (currently ≈ 89 %), not a count.
+
+- **Core modules** — one `tests/test_<module>.py` per `src/` module (`wiki_engine`, `tools`,
+  retrieval, multi-DB, auth, OKF, language, GPU placement, …).
+- **Characterization tests** pin behaviour before a refactor where none existed:
+  `test_delete_source.py` (the cross-store cascade) and `test_evaluate_condition.py`.
+- **UI** — `tests/test_app.py` drives `src/app.py` through Streamlit's in-process `AppTest`
+  (login, Upload, Explorer, Chat, Research, Maintenance, sidebar) against a temp `DATA_ROOT`,
+  with the daemon, GPU widget and LLM-facing engine calls stubbed.
+- **Native reranker** — `test_rerank_native.py` runs `_load`/`_tokenize`/`_score_one` against
+  a pure-Python stand-in for the `llama_cpp` ctypes surface.
+- **Gate rules** — `test_code_rules.py` (functions ≤ 50 lines) and `test_docs.py` (doc size
+  limits, resolvable links), each with a test that feeds its detector a violating input.
 
 ## Priority coverage areas
 
@@ -49,4 +58,8 @@ Prefer a compact suite of high-signal unit + integration tests over a large volu
   ≥ 85 %, suite ≤ 60 s; numbers in `pyproject.toml`).
 - Offline: `tests/conftest.py` blocks every socket connect. Stub Ollama, Tavily and the pinned
   daemon (`ollama_client.host`) instead of reaching them.
+- Hermetic: `conftest.py` disables `load_dotenv`, so the developer's `.env` never changes test
+  results (CI has none), and hashes test passwords at bcrypt's minimum cost.
+- The gate runs the suite in parallel (`pytest-xdist`, `-n auto`): `AppTest` is ~3.5× slower
+  under coverage, and the suite must stay ≤ 60 s.
 - Integration test (PRD §9 step 9): upload → ingest → chat → research, end-to-end.

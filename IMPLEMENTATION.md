@@ -31,7 +31,7 @@ One row per PRD milestone. Status: `planned`, `in progress`, `done`.
 | 2 | M2: Wiki engine | done | `test_wiki_engine`, `test_integration`, `test_consolidate`, `test_okf` |
 | 3 | M3: Research and chat agents | done | `test_agent`, `test_chat_agent`, `test_tools`, `test_deep_research_agent` |
 | 4 | M4: Web UI | done | `test_app` |
-| 5 | M5: Quality gate (claude-dev-schema) | in progress | full gate green |
+| 5 | M5: Quality gate (claude-dev-schema) | in progress | full gate green on every file outside `.claude/` (3.11, 3.13); the `.claude/` part is pending, see §4 |
 | – | Extensions beyond the original spec (no PRD milestone): hybrid retrieval stages A–F, multi-DB + auth, OKF bundle, language pinning, GPU pinning | done | `test_lex_index`, `test_embed_index`, `test_rerank`, `test_calibrate`, `test_multi_db`, `test_auth`, `test_lang`, `test_page_language`, `test_gpu_placement` |
 
 ## 3. Module map
@@ -55,7 +55,8 @@ Full responsibilities per module: [docs/architecture.md](docs/architecture.md) �
 
 ## 4. Open issues
 
-Tracked in [docs/openissues.md](docs/openissues.md).
+Tracked in [docs/openissues.md](docs/openissues.md), including the pending `.claude/` part of the
+scaffold adoption (hooks, settings, commands).
 
 ## 5. Deviations from the original PRD
 
