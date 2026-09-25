@@ -40,7 +40,6 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
 # Stage D cross-encoder reranker. Optional on purpose: retrieval degrades to plain
 # RRF fusion without it (src/rerank.py). NOTE: the prebuilt CPU "linux_x86_64" wheels on
 # abetlen.github.io are musl-linked and fail to import on glibc — build from sdist (needs cmake).
@@ -55,9 +54,54 @@ rerank = ["llama-cpp-python>=0.3.19"]
 # the CUDA llama-cpp-python install afterwards. (The abetlen CUDA wheels ARE glibc-compatible.)
 rerank-cuda = ["nvidia-cuda-runtime-cu12", "nvidia-cublas-cu12", "nvidia-cuda-nvrtc-cu12"]
 
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
+[dependency-groups]
+dev = [
+    "pre-commit>=4.6",
+    "pyright[nodejs]>=1.1.414",
+    "pytest>=9.0",
+    "pytest-cov>=7.1",
+    "pytest-timeout>=2.4",
+    "ruff>=0.16",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src"]
+
+# --- Quality gate numbers live here (see AGENTS.md §5.4) ---
+# src/vendor/ is vendored third-party source (never hand-edited), so every tool skips it.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["src/vendor"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "C90", "PT", "RUF"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.pyright]
+include = ["src", "tests", "scripts"]
+exclude = ["src/vendor", "**/__pycache__"]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+strict = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["-ra", "--strict-markers", "--strict-config"]
+xfail_strict = true
+session_timeout = 60
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = ["src/vendor/*"]
+
+[tool.coverage.report]
+fail_under = 85
+show_missing = true
+skip_covered = true
+exclude_also = ['if __name__ == "__main__":']

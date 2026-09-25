@@ -1,4 +1,4 @@
-# Python
+# Python / tooling
 __pycache__/
 *.py[cod]
 *.pyo
@@ -8,12 +8,16 @@ __pycache__/
 dist/
 build/
 *.whl
+.pytest_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
 # uv / virtualenv
 .venv/
 venv/
-.python-version
-uv.lock
 
 # Environment / secrets
 .env
