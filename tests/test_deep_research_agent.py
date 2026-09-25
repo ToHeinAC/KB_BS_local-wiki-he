@@ -125,7 +125,8 @@ def test_sources_come_from_raw_notes(monkeypatch, wiki_dir):
     )
     steps = list(dra.run_deep_research("q?"))
     results = [s for s in steps if s["type"] == "tool_result"]
-    assert results and results[0]["name"] == "web_search"
+    assert results
+    assert results[0]["name"] == "web_search"
     assert [s["url"] for s in results[0]["sources"]] == [
         "https://example.org/a",
         "https://example.org/b",
@@ -306,7 +307,7 @@ def test_research_complete_is_marked_terminal_and_explained(monkeypatch, wiki_di
         tool_calls=[{"name": "ResearchComplete", "args": {}, "id": "1", "type": "tool_call"}],
     )
     _script(monkeypatch, [("supervisor", {"supervisor_messages": [ai]}), _report_event()])
-    call = [s for s in dra.run_deep_research("q?") if s["type"] == "tool_call"][0]
+    call = next(s for s in dra.run_deep_research("q?") if s["type"] == "tool_call")
     assert call["args"] == {}
     assert call["terminal"] is True
     assert "no arguments and no result" in call["note"]
@@ -325,7 +326,7 @@ def test_non_terminal_tool_calls_carry_a_note_but_are_not_terminal(monkeypatch, 
         ],
     )
     _script(monkeypatch, [("supervisor", {"supervisor_messages": [ai]}), _report_event()])
-    call = [s for s in dra.run_deep_research("q?") if s["type"] == "tool_call"][0]
+    call = next(s for s in dra.run_deep_research("q?") if s["type"] == "tool_call")
     assert call["terminal"] is False
     assert "sub-topic" in call["note"]
 
@@ -432,7 +433,8 @@ def test_report_error_string_falls_back_to_quick(monkeypatch, wiki_dir):
     _capture_quick(monkeypatch)
     _script(monkeypatch, [_report_event("Error generating final report: boom")])
     steps = list(dra.run_deep_research("q?"))
-    assert steps[0]["type"] == "notice" and "boom" in steps[0]["content"]
+    assert steps[0]["type"] == "notice"
+    assert "boom" in steps[0]["content"]
     assert steps[-1]["content"] == "quick answer"
 
 

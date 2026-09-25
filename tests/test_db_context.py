@@ -24,7 +24,7 @@ def test_using_db_binds_and_restores():
 
 
 def test_using_db_restores_on_exception():
-    with pytest.raises(ValueError), db_context.using_db("Beta"):
+    with pytest.raises(ValueError, match="boom"), db_context.using_db("Beta"):
         raise ValueError("boom")
     assert db_context.get_active_db() == "Alpha"
 

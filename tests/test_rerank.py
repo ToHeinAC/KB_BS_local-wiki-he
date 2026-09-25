@@ -196,7 +196,8 @@ def _two_cards(monkeypatch, free0: float = 12.0, free1: float = 22.0) -> None:
     )
 
 
-def test_model_params_pin_to_one_card(_gguf, monkeypatch):
+@pytest.mark.usefixtures("_gguf")
+def test_model_params_pin_to_one_card(monkeypatch):
     """llama.cpp defaults to splitting layers across every GPU; we override that."""
     _two_cards(monkeypatch)
     params = rerank._model_params(_FakeLlamaCpp)
@@ -204,20 +205,23 @@ def test_model_params_pin_to_one_card(_gguf, monkeypatch):
     assert params.main_gpu == 1  # the emptier card
 
 
-def test_pinning_can_be_turned_off(_gguf, monkeypatch):
+@pytest.mark.usefixtures("_gguf")
+def test_pinning_can_be_turned_off(monkeypatch):
     _two_cards(monkeypatch)
     monkeypatch.setenv("RERANK_PIN_GPU", "off")
     params = rerank._model_params(_FakeLlamaCpp)
     assert params.split_mode == _FakeLlamaCpp.LLAMA_SPLIT_MODE_LAYER
 
 
-def test_pin_gpu_can_name_a_card(_gguf, monkeypatch):
+@pytest.mark.usefixtures("_gguf")
+def test_pin_gpu_can_name_a_card(monkeypatch):
     _two_cards(monkeypatch)
     monkeypatch.setenv("RERANK_PIN_GPU", "0")
     assert rerank._model_params(_FakeLlamaCpp).main_gpu == 0
 
 
-def test_no_gpu_leaves_the_defaults_alone(_gguf, monkeypatch):
+@pytest.mark.usefixtures("_gguf")
+def test_no_gpu_leaves_the_defaults_alone(monkeypatch):
     monkeypatch.setattr(gpu_placement, "gpus", lambda: [])
     params = rerank._model_params(_FakeLlamaCpp)
     assert params.split_mode == _FakeLlamaCpp.LLAMA_SPLIT_MODE_LAYER

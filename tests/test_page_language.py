@@ -79,8 +79,10 @@ def test_ingest_prompt_cites_clean_source_name(wiki_dir, monkeypatch):
     ctx = w.ingest_begin("Alpha text.", "doc.md")
     w.ingest_piece(ctx, "Alpha text.", 0, 2)
     prompt = calls[0][1]
-    assert "[doc.md]" in prompt and "part 1 of 2" in prompt
-    assert "[Teil" not in prompt and ".md.md" not in prompt
+    assert "[doc.md]" in prompt
+    assert "part 1 of 2" in prompt
+    assert "[Teil" not in prompt
+    assert ".md.md" not in prompt
 
 
 def test_ingest_cleans_teil_and_double_md_refs(wiki_dir, monkeypatch):
@@ -88,7 +90,8 @@ def test_ingest_cleans_teil_and_double_md_refs(wiki_dir, monkeypatch):
     w.ingest("Alpha text.", "doc.md")
     page = (wiki_dir / "concept-alpha.md").read_text()
     assert _meta(wiki_dir / "concept-alpha.md")["sources"] == ["doc.md"]
-    assert "[Teil" not in page and ".md.md" not in page
+    assert "[Teil" not in page
+    assert ".md.md" not in page
     assert "[doc.md]" in page
 
 
@@ -137,12 +140,14 @@ def test_cross_language_merge_translates_new_lines(wiki_dir, monkeypatch):
     w.ingest(_DE_SOURCE, "doc.md")
     page = (wiki_dir / "concept-ontology.md").read_text()
     meta = _meta(wiki_dir / "concept-ontology.md")
-    assert "Sie liefert" not in page and "Eine Ontologie" not in page
+    assert "Sie liefert" not in page
+    assert "Eine Ontologie" not in page
     assert "It provides the **constraints** (*Begrenzungen*)" in page
     assert meta["lang"] == "en"
     assert meta["aliases"] == ["Ontologie"]  # titles only: aliases drive routing
     translate = [p for _, p in calls if p.startswith("Translate")]
-    assert len(translate) == 1 and "Begrenzungen" in translate[0]
+    assert len(translate) == 1
+    assert "Begrenzungen" in translate[0]
     assert "The ontology gives the agent" not in translate[0]  # only the new lines
 
 
@@ -191,7 +196,8 @@ def test_resolve_skips_rewrite_in_wrong_language(wiki_dir, monkeypatch):
         "The limit is 20 mSv per year and it applies to the workers.\n=== END ===",
     )
     res = w.resolve_contradiction("20 vs 50 mSv", ["a.md"])
-    assert res["updated"] == [] and res["skipped"] == ["a.md"]
+    assert res["updated"] == []
+    assert res["skipped"] == ["a.md"]
     assert "Der Grenzwert" in (wiki_dir / "a.md").read_text()
     assert "SPRACHE" in calls[0][0]
 
@@ -227,7 +233,8 @@ _MIXED = (
 )
 _MIXED_TRANSLATION = (
     "- An ontology is a formal specification and it is the foundation for the agent.\n"
-    "- It provides the **constraints** (*Begrenzungen*) and the structure for the system [x.md].\n\n"
+    "- It provides the **constraints** (*Begrenzungen*) and the structure for the system "
+    "[x.md].\n\n"
     "## Definition and function\n"
     "An ontology is a formal system for classifying and structuring knowledge."
 )
@@ -238,7 +245,9 @@ def test_normalize_dry_run_reports_without_writing(wiki_dir, monkeypatch):
     calls = _fake_llm(monkeypatch, translation=_MIXED_TRANSLATION)
     report = w.normalize_pages(dry_run=True)
     info = report["concept-ontology.md"]
-    assert info["lang"] == "en" and info["references"] and info["foreign_lines"] >= 4
+    assert info["lang"] == "en"
+    assert info["references"]
+    assert info["foreign_lines"] >= 4
     assert (wiki_dir / "concept-ontology.md").read_text() == _MIXED
     assert calls == []
 
@@ -249,9 +258,12 @@ def test_normalize_translates_foreign_runs_in_place(wiki_dir, monkeypatch):
     w.normalize_pages(dry_run=False)
     page = (wiki_dir / "concept-ontology.md").read_text()
     meta = _meta(wiki_dir / "concept-ontology.md")
-    assert "Eine Ontologie" not in page and "## Definition and function" in page
-    assert "[Teil" not in page and meta["sources"] == ["a.md", "x.md"]
-    assert meta["lang"] == "en" and "aliases" not in meta
+    assert "Eine Ontologie" not in page
+    assert "## Definition and function" in page
+    assert "[Teil" not in page
+    assert meta["sources"] == ["a.md", "x.md"]
+    assert meta["lang"] == "en"
+    assert "aliases" not in meta
     assert "(*Begrenzungen*)" in page  # original term kept inline
     assert "The ontology gives the agent a structure" in page  # untouched
 

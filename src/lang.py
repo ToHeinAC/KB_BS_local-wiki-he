@@ -118,7 +118,7 @@ def _sample(text: str) -> str:
     )
 
 
-def detect(text: str, default: str = "de") -> str:
+def detect(text: str | None, default: str = "de") -> str:
     """Return 'de' or 'en' for ``text``.
 
     The language with more function-word hits wins. An umlaut/ß only breaks a

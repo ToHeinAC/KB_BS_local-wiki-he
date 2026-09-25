@@ -22,7 +22,8 @@ def test_tavily_search_single_query(monkeypatch):
     monkeypatch.setenv("TAVILY_API_KEY", "test")
     with patch("tavily.TavilyClient", return_value=fake_client):
         out = tools._tavily_search_impl(query="rust")
-    assert "rust" in out and "http://e.com/rust" in out
+    assert "rust" in out
+    assert "http://e.com/rust" in out
 
 
 def test_tavily_search_parallel_batch(monkeypatch):
@@ -38,7 +39,9 @@ def test_tavily_search_parallel_batch(monkeypatch):
     with patch("tavily.TavilyClient", return_value=fake_client):
         out = tools._tavily_search_impl(queries=["a", "b", "c"])
     assert set(calls) == {"a", "b", "c"}
-    assert "## Query: a" in out and "## Query: b" in out and "## Query: c" in out
+    assert "## Query: a" in out
+    assert "## Query: b" in out
+    assert "## Query: c" in out
 
 
 def test_tavily_search_empty_input_returns_error():
@@ -54,7 +57,8 @@ def test_fetch_webpage_returns_markdown(monkeypatch):
     fake_resp.raise_for_status = lambda: None
     with patch("httpx.get", return_value=fake_resp):
         out = tools._fetch_webpage_impl(["http://x.com"])
-    assert "Hi" in out and "http://x.com" in out
+    assert "Hi" in out
+    assert "http://x.com" in out
 
 
 def test_fetch_webpage_handles_failure(monkeypatch):
@@ -71,7 +75,8 @@ def test_submit_rejects_short_answer(tmp_path, monkeypatch):
     monkeypatch.setattr(tools, "MIN_WORDS", 100)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     out = tools._submit_final_impl("T", "too short http://a.com")
-    assert out.startswith("REJECTED") and "words" in out
+    assert out.startswith("REJECTED")
+    assert "words" in out
 
 
 def test_submit_rejects_few_sources(tmp_path, monkeypatch):
@@ -79,7 +84,8 @@ def test_submit_rejects_few_sources(tmp_path, monkeypatch):
     monkeypatch.setattr(tools, "MIN_WORDS", 3)
     monkeypatch.setattr(tools, "MIN_URLS", 3)
     out = tools._submit_final_impl("T", "one two three http://a.com")
-    assert out.startswith("REJECTED") and "sources" in out
+    assert out.startswith("REJECTED")
+    assert "sources" in out
 
 
 def test_submit_accepts_and_writes_file(tmp_path, monkeypatch):
@@ -89,7 +95,8 @@ def test_submit_accepts_and_writes_file(tmp_path, monkeypatch):
     out = tools._submit_final_impl("My Report", "alpha beta gamma http://a.com http://b.com")
     assert out.startswith("ACCEPTED")
     written = (tmp_path / "comparisons" / "report-my-report.md").read_text()
-    assert "My Report" in written and "http://a.com" in written
+    assert "My Report" in written
+    assert "http://a.com" in written
 
 
 def test_submit_accepts_wiki_citations_as_sources(tmp_path, monkeypatch):
@@ -111,7 +118,8 @@ def test_submit_accepts_file_source_citations(tmp_path, monkeypatch):
     out = tools._submit_final_impl(
         "Legal", "alpha beta gamma [Source: StrlSchG.md § 78] [Source: StrlSchV.md § 33]"
     )
-    assert out.startswith("ACCEPTED") and "2 source cites" in out
+    assert out.startswith("ACCEPTED")
+    assert "2 source cites" in out
     written = (tmp_path / "comparisons" / "report-legal.md").read_text()
     assert "src:StrlSchG.md § 78" in written
 
@@ -140,7 +148,8 @@ def test_submit_does_not_double_count_url_source_citations(tmp_path, monkeypatch
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     # A single [Source: <URL>.html] must count once (as a URL), not twice.
     out = tools._submit_final_impl("Once", "alpha beta gamma [Source: https://x.com/a.html]")
-    assert out.startswith("REJECTED") and "1 unique source" in out
+    assert out.startswith("REJECTED")
+    assert "1 unique source" in out
 
 
 # --- wiki_search / wiki_read ---------------------------------------------
@@ -153,7 +162,9 @@ def test_wiki_search_returns_hits(monkeypatch):
     ]
     monkeypatch.setattr(tools.wiki_engine, "search_wiki", lambda q: fake_hits)
     out = tools._wiki_search_impl(query="german industrial")
-    assert "siemens-ag.md" in out and "Siemens AG" in out and "industrial..." in out
+    assert "siemens-ag.md" in out
+    assert "Siemens AG" in out
+    assert "industrial..." in out
 
 
 def test_wiki_search_no_results(monkeypatch):
@@ -172,7 +183,9 @@ def test_wiki_search_parallel_batch(monkeypatch):
     monkeypatch.setattr(tools.wiki_engine, "search_wiki", fake)
     out = tools._wiki_search_impl(queries=["a", "b", "c"])
     assert set(seen) == {"a", "b", "c"}
-    assert "a.md" in out and "b.md" in out and "c.md" in out
+    assert "a.md" in out
+    assert "b.md" in out
+    assert "c.md" in out
 
 
 def test_wiki_search_appends_linked_pages(monkeypatch):
@@ -191,7 +204,9 @@ def test_wiki_search_appends_linked_pages(monkeypatch):
     monkeypatch.setattr(tools.wiki_engine, "linked_pages", fake_linked)
     out = tools._wiki_search_impl(query="x")
     assert captured["seeds"] == ["a.md"]
-    assert "Wiki linked 1" in out and "b.md" in out and "related via a.md" in out
+    assert "Wiki linked 1" in out
+    assert "b.md" in out
+    assert "related via a.md" in out
 
 
 def test_wiki_search_link_expansion_skips_already_shown(monkeypatch):
@@ -230,7 +245,8 @@ def test_wiki_search_link_expansion_disabled(monkeypatch):
 def test_wiki_read_returns_body(monkeypatch):
     monkeypatch.setattr(tools.wiki_engine, "read_page", lambda f: f"BODY OF {f}")
     out = tools._wiki_read_impl(["siemens-ag.md"])
-    assert "siemens-ag.md" in out and "BODY OF siemens-ag.md" in out
+    assert "siemens-ag.md" in out
+    assert "BODY OF siemens-ag.md" in out
 
 
 def test_wiki_read_empty_input():
@@ -286,15 +302,18 @@ def test_raw_read_resolves_legal_section(wiki_dir):
     _ingest_source("StrlSchG.md", _LEGAL_DOC)
     out62 = tools._raw_read_one("StrlSchG.md § 62")
     out63 = tools._raw_read_one("StrlSchG.md § 63")
-    assert "§ 62" in out62 and "Entlassung" in out62
-    assert "§ 63" in out63 and "verbleibende" in out63
+    assert "§ 62" in out62
+    assert "Entlassung" in out62
+    assert "§ 63" in out63
+    assert "verbleibende" in out63
     assert out62 != out63  # distinct sections, not the same offset-0 window
 
 
 def test_raw_read_resolves_markdown_heading(wiki_dir):
     _ingest_source("guide.md", _MD_DOC)
     out = tools._raw_read_one("guide.md ## Release Procedure")
-    assert "Release Procedure" in out and "release procedure" in out
+    assert "Release Procedure" in out
+    assert "release procedure" in out
     assert "Overview" not in out.split("\n", 1)[1]  # not the wrong section body
 
 
@@ -308,7 +327,8 @@ def test_raw_read_section_memory_keys_distinct(wiki_dir):
     again = tools.raw_read.invoke({"filenames": ["StrlSchG.md § 61"]})
     assert "[memory] Already read this section" in again
     # menu lists only sections not yet read this run (§61, §62 already read)
-    assert "§ 63" in again and "§ 62" not in again
+    assert "§ 63" in again
+    assert "§ 62" not in again
 
 
 def test_raw_read_duplicate_offset_names_next_unread_window(wiki_dir):
@@ -329,7 +349,8 @@ def test_raw_read_duplicate_offset_after_full_read_has_no_offset_hint(wiki_dir):
     tools.raw_read.invoke({"filenames": ["small.md"], "offset": 0})  # whole file in one window
     dup = tools.raw_read.invoke({"filenames": ["small.md"], "offset": 0})
     assert "[memory] Already read" in dup
-    assert "Whole file already read" in dup and "offset=" not in dup
+    assert "Whole file already read" in dup
+    assert "offset=" not in dup
 
 
 def test_raw_read_nudges_submit_after_paginating(wiki_dir):
@@ -442,6 +463,7 @@ def test_current_run_audit_splits_sources_by_tau(monkeypatch, tmp_path):
         mem.note_source_relevance("good.md", -8.0)  # keeps the max
         mem.note_source_relevance("weak.md", -6.0)
         audit = tools.current_run_audit()
+        assert audit is not None
         assert audit["kept"] == [("good.md", -1.0)]
         assert audit["below_tau"] == [("weak.md", -6.0)]
     finally:

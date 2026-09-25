@@ -52,7 +52,7 @@ def test_set_user_maintains_persists(users_root):
 
 
 def test_set_user_maintains_unknown_user_raises(users_root):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown user"):
         auth.set_user_maintains("ghost", ["DB1"])
 
 
@@ -74,7 +74,7 @@ def test_grant_maintainer_is_idempotent(users_root):
 
 
 def test_grant_maintainer_unknown_user_raises(users_root):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unknown user"):
         auth.grant_maintainer("ghost", "DB1")
 
 

@@ -91,7 +91,8 @@ def test_raw_search_spans_scope_and_qualifies(two_dbs):
     out = tools._raw_search_one("shielding", 6)
     assert "Alpha::alpha.md" in out
     assert "Beta::beta.md" in out
-    assert "### Database: Alpha" in out and "### Database: Beta" in out
+    assert "### Database: Alpha" in out
+    assert "### Database: Beta" in out
 
 
 def test_raw_search_reports_per_db_misses(two_dbs):
@@ -159,8 +160,10 @@ def test_raw_read_disambiguates_same_named_file_across_dbs(two_dbs):
     db_context.set_search_scope(["Alpha", "Beta"])
     a = tools._raw_read_one("Alpha::shared.md")
     b = tools._raw_read_one("Beta::shared.md")
-    assert "Alpha lead" in a and "Beta hedging" not in a
-    assert "Beta hedging" in b and "Alpha lead" not in b
+    assert "Alpha lead" in a
+    assert "Beta hedging" not in a
+    assert "Beta hedging" in b
+    assert "Alpha lead" not in b
 
 
 def test_raw_read_unqualified_falls_back_to_active_db(two_dbs):
@@ -189,17 +192,18 @@ def test_read_guard_keys_are_db_distinct(two_dbs):
     """Same filename in two DBs must not collapse into one visited entry."""
     run_memory.begin_run()
     db_context.set_search_scope(["Alpha", "Beta"])
-    first = tools.raw_read.func(["Alpha::shared.md"])
-    second = tools.raw_read.func(["Beta::shared.md"])
+    first = tools.raw_read.invoke({"filenames": ["Alpha::shared.md"]})
+    second = tools.raw_read.invoke({"filenames": ["Beta::shared.md"]})
     assert "[memory]" not in second, "Beta read was wrongly suppressed as a duplicate"
-    assert "Alpha lead" in first and "Beta hedging" in second
+    assert "Alpha lead" in first
+    assert "Beta hedging" in second
 
 
 def test_read_guard_still_catches_true_duplicates(two_dbs):
     run_memory.begin_run()
     db_context.set_search_scope(["Alpha", "Beta"])
-    tools.raw_read.func(["Beta::shared.md"])
-    again = tools.raw_read.func(["Beta::shared.md"])
+    tools.raw_read.invoke({"filenames": ["Beta::shared.md"]})
+    again = tools.raw_read.invoke({"filenames": ["Beta::shared.md"]})
     assert "[memory]" in again
 
 
@@ -221,7 +225,8 @@ def test_with_active_db_restores_scope_in_worker(two_dbs):
 def test_parallel_raw_search_keeps_scope(two_dbs):
     db_context.set_search_scope(["Alpha", "Beta"])
     out = tools._raw_search_impl(queries=["shielding", "disposal"])
-    assert "Alpha::" in out and "Beta::" in out
+    assert "Alpha::" in out
+    assert "Beta::" in out
 
 
 # --- chat_agent raw index -------------------------------------------------
@@ -236,8 +241,10 @@ def test_raw_index_single_db_is_ungrouped(two_dbs):
 def test_raw_index_groups_and_qualifies_across_scope(two_dbs):
     db_context.set_search_scope(["Alpha", "Beta"])
     text = chat_agent._build_raw_index()
-    assert "Database Alpha:" in text and "Database Beta:" in text
-    assert "- Alpha::alpha.md" in text and "- Beta::beta.md" in text
+    assert "Database Alpha:" in text
+    assert "Database Beta:" in text
+    assert "- Alpha::alpha.md" in text
+    assert "- Beta::beta.md" in text
 
 
 # --- citation parsing -----------------------------------------------------

@@ -914,7 +914,7 @@ CHAT_TOOLS = [
 ]
 
 # Plain-callable map (used by tests and the LangGraph ToolNode fallback path).
-TOOL_FUNCTIONS = {
+TOOL_FUNCTIONS: dict[str, Callable[..., str]] = {
     "wiki_search": _wiki_search_impl,
     "wiki_read": _wiki_read_impl,
     "tavily_search": _tavily_search_impl,

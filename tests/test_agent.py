@@ -1,5 +1,6 @@
 """Tests for agent.py — LangGraph deep researcher."""
 
+from typing import Any
 from unittest.mock import MagicMock
 
 from langchain_core.messages import AIMessage
@@ -67,7 +68,9 @@ def test_submit_final_answer_accepted_yields_report_path(monkeypatch, tmp_path):
     )
     steps = list(agent.run_research_agent("q?"))
     final = [s for s in steps if s["type"] == "final_answer"]
-    assert final and final[-1]["report_path"] and "report-t.md" in final[-1]["report_path"]
+    assert final
+    assert final[-1]["report_path"]
+    assert "report-t.md" in final[-1]["report_path"]
 
 
 def test_submit_rejected_keeps_agent_running(monkeypatch):
@@ -81,7 +84,8 @@ def test_submit_rejected_keeps_agent_running(monkeypatch):
     )
     steps = list(agent.run_research_agent("q?"))
     tr = [s for s in steps if s["type"] == "tool_result" and s["name"] == "submit_final_answer"]
-    assert tr and tr[0]["result"].startswith("REJECTED")
+    assert tr
+    assert tr[0]["result"].startswith("REJECTED")
     assert any(s["type"] == "final_answer" for s in steps)
 
 
@@ -98,7 +102,8 @@ def test_thresholds_appear_in_system_prompt(monkeypatch):
     fake = _patch_llm(monkeypatch, [AIMessage(content="ok")])
     list(agent.run_research_agent("q?"))
     sys_text = fake.calls[0][0].content
-    assert str(agent.MIN_SEARCHES) in sys_text and str(agent.MIN_WORDS) in sys_text
+    assert str(agent.MIN_SEARCHES) in sys_text
+    assert str(agent.MIN_WORDS) in sys_text
 
 
 # --- fallback synthesis (no submit, no prose) ------------------------------
@@ -120,7 +125,8 @@ def test_stalled_agent_synthesizes_from_notes(monkeypatch):
     )
     steps = list(agent.run_research_agent("q?"))
     final = [s for s in steps if s["type"] == "final_answer"]
-    assert final and "SYNTHESIZED ANSWER" in final[-1]["content"]
+    assert final
+    assert "SYNTHESIZED ANSWER" in final[-1]["content"]
     assert final[-1].get("note", "").startswith("Fallback synthesis")
 
 
@@ -136,7 +142,8 @@ def test_no_notes_no_prose_yields_error_without_synth_call(monkeypatch):
     monkeypatch.setattr(agent.ollama_client, "generate", _spy)
     steps = list(agent.run_research_agent("q?"))
     assert called["n"] == 0
-    assert steps and steps[-1]["type"] == "error"
+    assert steps
+    assert steps[-1]["type"] == "error"
 
 
 # --- error handling --------------------------------------------------------
@@ -148,7 +155,8 @@ def test_llm_init_failure_yields_error(monkeypatch):
 
     monkeypatch.setattr(agent, "_build_llm", boom)
     steps = list(agent.run_research_agent("q?"))
-    assert steps and steps[-1]["type"] == "error"
+    assert steps
+    assert steps[-1]["type"] == "error"
 
 
 def test_invoke_failure_yields_error(monkeypatch):
@@ -162,5 +170,5 @@ def test_invoke_failure_yields_error(monkeypatch):
 def test_build_llm_applies_the_per_call_timeout(monkeypatch):
     # ChatOllama ignores unknown kwargs, so the timeout must reach the HTTP client.
     monkeypatch.setattr(agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
-    llm = agent._build_llm()
+    llm: Any = agent._build_llm()
     assert llm.bound._client._client.timeout.read == agent.LLM_TIMEOUT

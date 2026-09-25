@@ -39,7 +39,8 @@ def test_collapses_teil_summaries(wiki_dir):
     summaries = sorted(p.name for p in wiki_dir.glob("summary-*.md"))
     assert summaries == ["summary-doc.md"]
     body = (wiki_dir / "summary-doc.md").read_text()
-    assert "Part one body" in body and "Part two body" in body
+    assert "Part one body" in body
+    assert "Part two body" in body
 
 
 def test_collapses_near_duplicate_concepts(wiki_dir):
@@ -51,7 +52,8 @@ def test_collapses_near_duplicate_concepts(wiki_dir):
     concepts = sorted(p.name for p in wiki_dir.glob("concept-*.md"))
     assert concepts == ["concept-dense-llm.md"]  # shorter/more-general kept
     body = (wiki_dir / "concept-dense-llm.md").read_text()
-    assert "From one" in body and "From two" in body
+    assert "From one" in body
+    assert "From two" in body
 
 
 def test_remaps_related_and_cleans_citations(wiki_dir):
@@ -70,7 +72,8 @@ def test_remaps_related_and_cleans_citations(wiki_dir):
     other = frontmatter.load(str(wiki_dir / "concept-other.md"))
     assert other.metadata["related"] == ["concept-dense-llm.md"]  # repointed
     kept = (wiki_dir / "concept-dense-llm.md").read_text()
-    assert "[Teil 1/2]" not in kept and ".md.md" not in kept  # citation cleaned
+    assert "[Teil 1/2]" not in kept
+    assert ".md.md" not in kept
 
 
 def test_clean_teil_text_collapses_repeated_md():
@@ -89,7 +92,7 @@ def test_summary_base_normalizes_variants():
 
 def test_idempotent_on_clean_wiki(wiki_dir):
     _write(wiki_dir, "concept-alpha.md", "Alpha", "concept", "## Key facts\n- a\nBody")
-    res1 = wiki_engine.consolidate(dry_run=False)
+    wiki_engine.consolidate(dry_run=False)
     files1 = sorted(p.name for p in wiki_dir.glob("*.md"))
     res2 = wiki_engine.consolidate(dry_run=False)
     files2 = sorted(p.name for p in wiki_dir.glob("*.md"))

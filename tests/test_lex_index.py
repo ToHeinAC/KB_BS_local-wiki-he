@@ -67,12 +67,14 @@ def test_scope_separates_raw_and_wiki(tmp_path, monkeypatch):
     lex_index.build()
 
     wiki_hits = lex_index.query("attention", scope="wiki")
-    assert wiki_hits and all(h["scope"] == "wiki" for h in wiki_hits)
+    assert wiki_hits
+    assert all(h["scope"] == "wiki" for h in wiki_hits)
     assert any(h["source"] == "alpha.md" for h in wiki_hits)
     assert "attention" in wiki_hits[0]["text"].lower()  # text available inline
 
     raw_hits = lex_index.query("plutonium", scope="raw")
-    assert raw_hits and all(h["scope"] == "raw" for h in raw_hits)
+    assert raw_hits
+    assert all(h["scope"] == "raw" for h in raw_hits)
     # A raw-scoped query must not leak wiki chunks.
     assert lex_index.query("attention", scope="raw") == []
 

@@ -83,6 +83,7 @@ def test_long_document_sampled_beyond_english_abstract():
 def test_ingest_directives_protect_original_terms():
     de = lang.ingest_directive("Der Bericht beschreibt die Anlage.")
     en = lang.ingest_directive("The report describes the plant.")
-    assert "ORIGINALBEGRIFFE" in de and "ORIGINAL TERMS" in en
+    assert "ORIGINALBEGRIFFE" in de
+    assert "ORIGINAL TERMS" in en
     assert "fasse fremdsprachige Passagen" not in de
     assert "summarise non-English" not in en

@@ -85,9 +85,11 @@ def test_available_reflects_model_match(semantic_db, monkeypatch):
 
 def test_query_ranks_by_cosine(semantic_db):
     hits = embed_index.query("neutron dose in a reactor", top_k=5)
-    assert hits and hits[0]["source"] == "radon.md"
+    assert hits
+    assert hits[0]["source"] == "radon.md"
     assert all(h["matched_terms"] == [] for h in hits)  # dense arm: no term overlap
-    assert "text" in hits[0] and hits[0]["text"]
+    assert "text" in hits[0]
+    assert hits[0]["text"]
 
 
 def test_query_scope_filter(semantic_db):
@@ -195,7 +197,8 @@ def test_okf_prefix_applied_to_wiki_only_not_leaked(tmp_path, monkeypatch):
     assert any(t.startswith("type: concept | title: Photosynthesis") for t in captured["texts"])
     # ... but the prefix never reaches the returned hit text
     hits = embed_index.query("Photosynthesis", scope="wiki")
-    assert hits and "type: concept | title:" not in hits[0]["text"]
+    assert hits
+    assert "type: concept | title:" not in hits[0]["text"]
 
 
 # --- RRF fusion / graceful degradation ---------------------------------------
@@ -217,10 +220,12 @@ def test_search_falls_back_to_lexical_without_vectors(tmp_path, monkeypatch):
 
 def test_search_fuses_both_arms(semantic_db):
     fused = retrieval.search("neutron dose reactor", top_k=5)
-    assert fused and fused[0]["source"] == "radon.md"
+    assert fused
+    assert fused[0]["source"] == "radon.md"
     # a fused hit keeps the lexical hit's fields (matched_terms present when lexical)
     top = fused[0]
-    assert "matched_terms" in top and "score" in top
+    assert "matched_terms" in top
+    assert "score" in top
 
 
 def test_rrf_prefers_lexical_hit_dict_on_overlap():

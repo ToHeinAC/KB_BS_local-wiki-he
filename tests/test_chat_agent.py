@@ -1,5 +1,7 @@
 """Tests for chat_agent.py — fallback synthesis when the agent stalls."""
 
+from typing import Any
+
 from langchain_core.messages import AIMessage
 
 import chat_agent
@@ -48,7 +50,8 @@ def test_stalled_agent_synthesizes_from_notes(monkeypatch):
     )
     steps = list(chat_agent.run_chat_agent("q?"))
     final = [s for s in steps if s["type"] == "final_answer"]
-    assert final and "SYNTHESIZED" in final[-1]["content"]
+    assert final
+    assert "SYNTHESIZED" in final[-1]["content"]
     assert final[-1].get("note", "").startswith("Fallback synthesis")
     assert "foo.md" in final[-1]["sources"]
 
@@ -68,7 +71,8 @@ def test_iteration_limit_appends_end_hint(monkeypatch):
     )
     steps = list(chat_agent.run_chat_agent("q?"))
     final = [s for s in steps if s["type"] == "final_answer"]
-    assert final and "iteration limit (4)" in final[-1]["content"]
+    assert final
+    assert "iteration limit (4)" in final[-1]["content"]
     assert final[-1]["content"].rstrip().endswith("may be partial.*")
 
 
@@ -84,11 +88,12 @@ def test_no_notes_no_prose_yields_error_without_synth_call(monkeypatch):
     monkeypatch.setattr(chat_agent.ollama_client, "generate", _spy)
     steps = list(chat_agent.run_chat_agent("q?"))
     assert called["n"] == 0
-    assert steps and steps[-1]["type"] == "error"
+    assert steps
+    assert steps[-1]["type"] == "error"
 
 
 def test_build_llm_applies_the_per_call_timeout(monkeypatch):
     # ChatOllama ignores unknown kwargs, so the timeout must reach the HTTP client.
     monkeypatch.setattr(chat_agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
-    llm = chat_agent._build_llm()
+    llm: Any = chat_agent._build_llm()
     assert llm.bound._client._client.timeout.read == chat_agent.LLM_TIMEOUT

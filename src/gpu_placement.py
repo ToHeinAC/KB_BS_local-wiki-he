@@ -104,7 +104,9 @@ def gpus() -> list[Gpu]:
     return found
 
 
-def plan(required_gib: float, mode: str = "auto", headroom_gib: float = HEADROOM_GIB) -> Placement:
+def plan(
+    required_gib: float, mode: str | None = "auto", headroom_gib: float = HEADROOM_GIB
+) -> Placement:
     """Pick the card for a model needing `required_gib`.
 
     `mode` is the raw value of a `*_PIN_GPU` env var: "auto" pins to the emptiest

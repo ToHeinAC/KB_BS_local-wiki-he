@@ -1,6 +1,5 @@
 """Unit tests for the structural chunker."""
 
-
 import chunker
 
 LEGAL_SAMPLE = """\

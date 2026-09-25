@@ -97,7 +97,9 @@ def test_apply_to_page_appends_citations_once():
 def test_apply_to_page_refreshes_citations_on_source_change():
     once = okf.apply_to_page(CONCEPT, db="Investing")
     post = frontmatter.loads(once)
-    post.metadata["sources"] = post.metadata["sources"] + ["newsrc.md"]
+    sources = post.metadata["sources"]
+    assert isinstance(sources, list)
+    post.metadata["sources"] = [*sources, "newsrc.md"]
     out = okf.apply_to_page(frontmatter.dumps(post), db="Investing")
     assert out.count("## Citations") == 1
     assert "3. newsrc.md" in out

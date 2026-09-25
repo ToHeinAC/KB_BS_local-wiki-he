@@ -3,6 +3,7 @@
 import io
 
 import pytest
+from PIL import Image
 
 import md_convert
 
@@ -78,7 +79,9 @@ def test_pdf_progress_callback(monkeypatch):
     monkeypatch.setattr(md_convert, "iter_pdf_pages", lambda b, dpi=md_convert.PDF_DPI: iter(pages))
     monkeypatch.setattr(md_convert, "rewrite_text", lambda t: t)
     calls = []
-    md_convert.convert_to_markdown(b"x", "x.pdf", on_progress=lambda d, t, l: calls.append((d, t)))
+    md_convert.convert_to_markdown(
+        b"x", "x.pdf", on_progress=lambda d, t, _label: calls.append((d, t))
+    )
     assert calls[-1] == (2, 2)  # final "Done" tick
 
 
@@ -106,7 +109,7 @@ def test_convert_image_uses_deepseek_prompt(monkeypatch):
         "ocr",
         lambda model, prompt, img_b64: seen.update(model=model, prompt=prompt) or "ok",
     )
-    md_convert.convert_image(object(), model_id="deepseek-ocr:3b")
+    md_convert.convert_image(Image.new("RGB", (1, 1)), model_id="deepseek-ocr:3b")
     assert seen["prompt"] == md_convert.OCR_DEEPSEEK_PROMPT
 
 
@@ -118,10 +121,10 @@ def test_convert_image_uses_system_prompt_for_non_deepseek(monkeypatch):
         "ocr",
         lambda model, prompt, img_b64: seen.update(prompt=prompt) or "ok",
     )
-    md_convert.convert_image(object(), model_id="some-vision:1b")
+    md_convert.convert_image(Image.new("RGB", (1, 1)), model_id="some-vision:1b")
     assert md_convert.OCR_SYSTEM_PROMPT in seen["prompt"]
 
 
 def test_unsupported_extension_raises():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Unsupported file type"):
         md_convert.convert_to_markdown(b"x", "file.csv")

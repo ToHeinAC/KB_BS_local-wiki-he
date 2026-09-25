@@ -97,14 +97,16 @@ def test_a_remote_ollama_host_is_never_hijacked(monkeypatch):
     _spawns(monkeypatch)  # would be a bug to call
     status = ollama_server.status()
     assert status["host"] == "http://gpu-box.lan:11434"
-    assert not status["pinned"] and "remote" in status["reason"]
+    assert not status["pinned"]
+    assert "remote" in status["reason"]
 
 
 def test_pinning_off_uses_the_configured_host(monkeypatch):
     monkeypatch.setenv("OLLAMA_PIN_GPU", "off")
     _spawns(monkeypatch)
     status = ollama_server.status()
-    assert status["host"] == "http://localhost:11434" and not status["pinned"]
+    assert status["host"] == "http://localhost:11434"
+    assert not status["pinned"]
 
 
 def test_a_model_too_big_for_one_card_stays_on_the_shared_daemon(monkeypatch):
@@ -112,21 +114,24 @@ def test_a_model_too_big_for_one_card_stays_on_the_shared_daemon(monkeypatch):
     _spawns(monkeypatch)
     status = ollama_server.status()
     assert status["host"] == "http://localhost:11434"
-    assert not status["pinned"] and "split" in status["reason"]
+    assert not status["pinned"]
+    assert "split" in status["reason"]
 
 
 def test_a_missing_ollama_binary_falls_back(monkeypatch):
     monkeypatch.setattr(ollama_server, "_spawn", lambda port, gpu_index: None)
     status = ollama_server.status()
     assert status["host"] == "http://localhost:11434"
-    assert not status["pinned"] and "PATH" in status["reason"]
+    assert not status["pinned"]
+    assert "PATH" in status["reason"]
 
 
 def test_a_daemon_that_never_comes_up_is_killed_and_falls_back(monkeypatch):
     proc = _FakeProc()
     _spawns(monkeypatch, proc=proc, comes_up=False)
     status = ollama_server.status()
-    assert status["host"] == "http://localhost:11434" and not status["pinned"]
+    assert status["host"] == "http://localhost:11434"
+    assert not status["pinned"]
     assert proc.killed, "a daemon that never answered must not be left running"
     assert ollama_server._proc is None
 
@@ -138,15 +143,19 @@ def test_starts_a_pinned_daemon_on_the_emptiest_card(monkeypatch):
     seen = _spawns(monkeypatch)
     status = ollama_server.status()
     assert status["host"] == f"http://127.0.0.1:{ollama_server.DEFAULT_PORT}"
-    assert status["pinned"] and status["gpu"] == 1 and status["managed"]
-    assert seen["gpu_index"] == 1 and seen["port"] == ollama_server.DEFAULT_PORT
+    assert status["pinned"]
+    assert status["gpu"] == 1
+    assert status["managed"]
+    assert seen["gpu_index"] == 1
+    assert seen["port"] == ollama_server.DEFAULT_PORT
     assert ollama_server._proc is seen["proc"]
 
 
 def test_pin_gpu_can_name_a_card_explicitly(monkeypatch):
     monkeypatch.setenv("OLLAMA_PIN_GPU", "0")
     seen = _spawns(monkeypatch)
-    assert ollama_server.status()["gpu"] == 0 and seen["gpu_index"] == 0
+    assert ollama_server.status()["gpu"] == 0
+    assert seen["gpu_index"] == 0
 
 
 def test_port_is_configurable(monkeypatch):
@@ -169,14 +178,16 @@ def test_an_existing_pinned_daemon_is_adopted_not_duplicated(monkeypatch):
         ollama_server, "_spawn", lambda *a, **k: pytest.fail("must not start a second daemon")
     )
     status = ollama_server.status()
-    assert status["pinned"] and status["host"].endswith(str(ollama_server.DEFAULT_PORT))
-    assert not status["managed"] and "reusing" in status["reason"]
+    assert status["pinned"]
+    assert status["host"].endswith(str(ollama_server.DEFAULT_PORT))
+    assert not status["managed"]
+    assert "reusing" in status["reason"]
     assert ollama_server._proc is None
 
 
 def test_resolution_is_cached_for_the_process(monkeypatch):
     calls = []
-    seen = _spawns(monkeypatch)
+    _spawns(monkeypatch)
     original = ollama_server._spawn
 
     def _counted(port, gpu_index):
@@ -185,7 +196,8 @@ def test_resolution_is_cached_for_the_process(monkeypatch):
 
     monkeypatch.setattr(ollama_server, "_spawn", _counted)
     first, second = ollama_server.host(), ollama_server.host()
-    assert first == second and len(calls) == 1
+    assert first == second
+    assert len(calls) == 1
 
 
 # --- shutdown -----------------------------------------------------------------
@@ -195,7 +207,8 @@ def test_stop_terminates_a_daemon_we_own(monkeypatch):
     seen = _spawns(monkeypatch)
     ollama_server.status()
     ollama_server.stop()
-    assert seen["proc"].terminated and ollama_server._proc is None
+    assert seen["proc"].terminated
+    assert ollama_server._proc is None
 
 
 def test_stop_leaves_an_adopted_daemon_running(monkeypatch):
@@ -211,7 +224,7 @@ def test_stop_kills_a_daemon_that_ignores_terminate(monkeypatch):
 
         def wait(self, timeout=None):
             if not self.killed:
-                raise subprocess.TimeoutExpired("ollama", timeout)
+                raise subprocess.TimeoutExpired("ollama", timeout or 0.0)
             return -9
 
     proc = _Stubborn()

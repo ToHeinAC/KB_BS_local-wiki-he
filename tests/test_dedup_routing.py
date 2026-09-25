@@ -42,7 +42,9 @@ def test_canonical_slug_tokens_subset_relations():
 def test_densing_law_not_confused_with_dense_llm():
     a = w._canonical_slug_tokens("densing-law")
     b = w._canonical_slug_tokens("dense-llm")
-    assert a != b and not (a <= b) and not (b <= a)
+    assert a != b
+    assert not (a <= b)
+    assert not (b <= a)
 
 
 # --- _route_page -------------------------------------------------------------
@@ -114,7 +116,8 @@ def test_parse_and_extract_key_terms_roundtrip():
     facts = w._parse_index_block(content)
     assert facts == ["transformer scaling", "flash attention"]
     terms = w._extract_key_terms(content)
-    assert "llm" in terms and "transform" in " ".join(terms)
+    assert "llm" in terms
+    assert "transform" in " ".join(terms)
 
 
 def test_ensure_index_block_synthesizes_when_missing():
@@ -136,9 +139,13 @@ def test_merge_pages_unions_sections_without_dropping_facts():
         "## Overview\n- fact two\n## Details\n- detail A\n"
     )
     merged = w._merge_pages(existing, new, "b.md")
-    assert "fact one" in merged and "fact two" in merged and "detail A" in merged
+    assert "fact one" in merged
+    assert "fact two" in merged
+    assert "detail A" in merged
     meta = frontmatter.loads(merged).metadata
-    assert set(meta["sources"]) == {"a.md", "b.md"}
+    sources = meta["sources"]
+    assert isinstance(sources, list)
+    assert set(sources) == {"a.md", "b.md"}
     assert meta["created"] == "2026-01-01"  # earliest kept
 
 
@@ -152,7 +159,8 @@ def test_merge_flags_numeric_contradiction_when_unresolved():
     existing = '---\ntitle: "Dose"\ntype: concept\n---\n## Limits\n- annual limit is 20 mSv\n'
     new = '---\ntitle: "Dose"\ntype: concept\n---\n## Limits\n- annual limit is 50 mSv\n'
     merged = w._merge_pages(existing, new, "n.md")
-    assert "20 mSv" in merged and "50 mSv" in merged
+    assert "20 mSv" in merged
+    assert "50 mSv" in merged
     assert "## Contradictions" in merged
 
 
@@ -166,18 +174,23 @@ def test_merge_resolves_contradiction_with_date_signal():
         "## Limits\n- annual limit is 50 mSv\n"
     )
     merged = w._merge_pages(existing, new, "n.md")
-    assert "newer source" in merged and "previously" in merged
+    assert "newer source" in merged
+    assert "previously" in merged
 
 
 # --- ingest-level: stable slug + in-ingest registry --------------------------
 
 _PIECE1 = (
-    "=== summary-doc.md ===\n---\ntitle: Doc\ntype: source-summary\n---\n## Key facts\n- s1\nP1\n=== END ===\n"
-    "=== concept-dense-llm.md ===\n---\ntitle: Dense LLM\ntype: concept\n---\n## Key facts\n- dense\nC1\n=== END ==="
+    "=== summary-doc.md ===\n---\ntitle: Doc\ntype: source-summary\n---\n"
+    "## Key facts\n- s1\nP1\n=== END ===\n"
+    "=== concept-dense-llm.md ===\n---\ntitle: Dense LLM\ntype: concept\n---\n"
+    "## Key facts\n- dense\nC1\n=== END ==="
 )
 _PIECE2 = (
-    "=== summary-doc-part2.md ===\n---\ntitle: Doc\ntype: source-summary\n---\n## Key facts\n- s2\nP2\n=== END ===\n"
-    "=== concept-dense-llms.md ===\n---\ntitle: Dense LLMs\ntype: concept\n---\n## Key facts\n- dense2\nC2\n=== END ==="
+    "=== summary-doc-part2.md ===\n---\ntitle: Doc\ntype: source-summary\n---\n"
+    "## Key facts\n- s2\nP2\n=== END ===\n"
+    "=== concept-dense-llms.md ===\n---\ntitle: Dense LLMs\ntype: concept\n---\n"
+    "## Key facts\n- dense2\nC2\n=== END ==="
 )
 
 
@@ -185,7 +198,7 @@ def test_multipiece_collapses_to_one_summary_and_one_concept(wiki_dir, monkeypat
     mock = MagicMock()
     mock.generate.side_effect = [{"response": _PIECE1}, {"response": _PIECE2}]
     monkeypatch.setattr(ollama_client, "_client", lambda: mock)
-    ctx = wiki_engine_ingest_two_pieces(monkeypatch)
+    wiki_engine_ingest_two_pieces(monkeypatch)
     # exactly one summary file, named from the source ("mydoc.txt")
     summaries = sorted(p.name for p in wiki_dir.glob("summary-*.md"))
     assert summaries == ["summary-mydoc.md"]
@@ -193,7 +206,8 @@ def test_multipiece_collapses_to_one_summary_and_one_concept(wiki_dir, monkeypat
     concepts = sorted(p.name for p in wiki_dir.glob("concept-*.md"))
     assert concepts == ["concept-dense-llm.md"]
     body = (wiki_dir / "concept-dense-llm.md").read_text()
-    assert "C1" in body and "C2" in body  # nothing dropped
+    assert "C1" in body
+    assert "C2" in body
 
 
 def wiki_engine_ingest_two_pieces(monkeypatch):

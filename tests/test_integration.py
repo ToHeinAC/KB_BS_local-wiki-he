@@ -58,7 +58,9 @@ def test_ingest_creates_valid_page_then_query_grounds_in_it(wiki_dir, monkeypatc
     assert page.exists()
     post = frontmatter.load(str(page))
     assert post.metadata["type"] == "concept"
-    assert "strlschg.md" in post.metadata["sources"]
+    sources = post.metadata["sources"]
+    assert isinstance(sources, list)
+    assert "strlschg.md" in sources
 
     # Query selects the page and answers grounded in its content.
     out = wiki_engine.query_with_sources("Was ist der Jahresdosisgrenzwert?")
@@ -103,4 +105,6 @@ def test_second_source_merges_into_existing_page_no_duplicate(wiki_dir, monkeypa
     concept_pages = [p["filename"] for p in wiki_engine.list_pages() if p.get("type") == "concept"]
     assert concept_pages == ["dose-limit.md"]
     post = frontmatter.load(str(wiki_dir / "dose-limit.md"))
-    assert "strlschv.md" in post.metadata["sources"]
+    sources = post.metadata["sources"]
+    assert isinstance(sources, list)
+    assert "strlschv.md" in sources

@@ -6,6 +6,7 @@ map, per-DB threshold resolution, and the fail-safe that abstention fires ONLY u
 genuine calibrated below-τ signal.
 """
 
+import itertools
 import json
 import sys
 from pathlib import Path
@@ -36,7 +37,7 @@ def test_relevance_monotonic_and_bounded():
     xs = [-10.0, -4.0, 0.0, 3.0, 8.0]
     ys = [calibrate.relevance(x) for x in xs]
     assert all(0.0 < y < 1.0 for y in ys)
-    assert all(a < b for a, b in zip(ys, ys[1:]))
+    assert all(a < b for a, b in itertools.pairwise(ys))
     assert calibrate.relevance(0.0) == 0.5
 
 
@@ -69,6 +70,7 @@ def test_abstains_below_threshold(monkeypatch, tmp_path):
     _calibrated_db(monkeypatch, tmp_path, tau=-4.14)
     confident, rel, closest = calibrate.assess(_hits(-6.0, -5.5), db="KI")
     assert confident is False
+    assert closest is not None
     assert closest["source"] == "p1.md"  # best (max) passage of the two
     assert 0.0 < rel < 0.5
 
@@ -83,7 +85,9 @@ def test_failsafe_no_rerank_score(monkeypatch, tmp_path):
     """Reranker unavailable / failed open: no rerank_score ⇒ never abstain."""
     _calibrated_db(monkeypatch, tmp_path, tau=-4.14)
     confident, rel, closest = calibrate.assess([{"source": "p.md", "score": 0.9}], db="KI")
-    assert confident is True and closest is None and rel == 1.0
+    assert confident is True
+    assert closest is None
+    assert rel == 1.0
 
 
 def test_failsafe_uncalibrated_db(monkeypatch, tmp_path):

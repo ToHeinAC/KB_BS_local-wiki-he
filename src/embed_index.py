@@ -51,6 +51,7 @@ _MAX_EMBED_CHARS = 8000
 
 Progress = Callable[[int, int], None]  # (done, total)
 
+
 def model_name() -> str:
     return os.getenv("EMBED_MODEL", "bge-m3").strip()
 

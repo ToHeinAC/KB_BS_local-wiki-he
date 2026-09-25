@@ -74,14 +74,16 @@ def test_gpus_empty_on_nonzero_exit(monkeypatch):
 def test_pins_to_the_emptiest_card_that_fits(monkeypatch):
     _fake_gpus(monkeypatch, _cards(12.0, 22.0))
     placement = gpu_placement.plan(10.0)
-    assert placement.index == 1 and placement.is_pinned
+    assert placement.index == 1
+    assert placement.is_pinned
     assert "fits on GPU 1" in placement.reason
 
 
 def test_stays_split_when_no_card_can_hold_it(monkeypatch):
     _fake_gpus(monkeypatch, _cards(12.0, 14.0))
     placement = gpu_placement.plan(20.0)
-    assert placement.index is None and not placement.is_pinned
+    assert placement.index is None
+    assert not placement.is_pinned
     assert "split" in placement.reason
 
 
@@ -112,7 +114,8 @@ def test_blank_and_none_mean_auto(monkeypatch):
 def test_explicit_index_skips_the_estimate(monkeypatch):
     _fake_gpus(monkeypatch, _cards(2.0, 2.0))
     placement = gpu_placement.plan(999.0, "0")
-    assert placement.index == 0 and "requested" in placement.reason
+    assert placement.index == 0
+    assert "requested" in placement.reason
 
 
 def test_explicit_index_that_is_not_present_is_refused(monkeypatch):
@@ -123,13 +126,15 @@ def test_explicit_index_that_is_not_present_is_refused(monkeypatch):
 def test_unusable_mode_degrades_instead_of_raising(monkeypatch):
     _fake_gpus(monkeypatch, _cards(22.0, 22.0))
     placement = gpu_placement.plan(1.0, "gpu1")
-    assert placement.index is None and "expected auto" in placement.reason
+    assert placement.index is None
+    assert "expected auto" in placement.reason
 
 
 def test_single_card_is_left_alone(monkeypatch):
     _fake_gpus(monkeypatch, _cards(22.0))
     placement = gpu_placement.plan(1.0)
-    assert placement.index is None and "nothing to split across" in placement.reason
+    assert placement.index is None
+    assert "nothing to split across" in placement.reason
 
 
 def test_no_gpu_at_all_is_left_alone(monkeypatch):

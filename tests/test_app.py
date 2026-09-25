@@ -642,8 +642,8 @@ def test_maintenance_admin_creates_database_and_user(wiki):
     form_inputs[0].set_value("Fresh")
     at.button[[b.label for b in at.button].index("Create database")].click().run()
     assert "Fresh" in db_context.list_dbs()
-    user_in = [t for t in _ok(at).text_input if t.label == "Username"][0]
-    pw_in = [t for t in at.text_input if t.label == "Password"][0]
+    user_in = next(t for t in _ok(at).text_input if t.label == "Username")
+    pw_in = next(t for t in at.text_input if t.label == "Password")
     user_in.set_value("newbie")
     pw_in.set_value("pw")
     at.button[[b.label for b in at.button].index("Add user")].click().run()

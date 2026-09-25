@@ -72,7 +72,8 @@ def test_system_pages_excluded(bundle):
     (bundle / "index.md").write_text("---\ntitle: Index\n---\n\n# Pages\n")
     (bundle / "log.md").write_text("## 2026-07-01\n- 10:00 — test\n")
     ids = set(_by_id(graph_export.export()))
-    assert "index.md" not in ids and "log.md" not in ids
+    assert "index.md" not in ids
+    assert "log.md" not in ids
 
 
 def test_edges_carry_type_and_are_sorted(bundle):
@@ -129,7 +130,8 @@ def test_confidence_is_carried_through(bundle):
 
 def test_export_is_deterministic(bundle):
     a, b = graph_export.export(), graph_export.export()
-    a.pop("generated_at"), b.pop("generated_at")
+    a.pop("generated_at")
+    b.pop("generated_at")
     assert a == b
 
 
@@ -158,7 +160,8 @@ def test_max_nodes_guardrail(wiki_dir, monkeypatch):
 
 def test_empty_wiki_is_safe(wiki_dir):
     payload = graph_export.export()
-    assert payload["nodes"] == [] and payload["edges"] == []
+    assert payload["nodes"] == []
+    assert payload["edges"] == []
 
 
 # --- health view (§6.9.3 item 5) ---------------------------------------------
@@ -205,4 +208,6 @@ def test_health_stale_agrees_with_the_payload(wiki_dir):
 
 def test_health_on_empty_wiki(wiki_dir):
     h = graph_export.health(graph_export.export())
-    assert h["pages"] == 0 and h["clusters"] == [] and h["orphans"] == []
+    assert h["pages"] == 0
+    assert h["clusters"] == []
+    assert h["orphans"] == []

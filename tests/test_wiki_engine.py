@@ -117,7 +117,8 @@ def test_ingest_as_source_registers_a_raw_document(wiki_dir, monkeypatch):
     assert res["duplicate"] is False
     assert res["source_name"] == "research-swot-on-repositrak.md"
     raw = wiki_dir.parent / "raw" / res["source_name"]
-    assert raw.exists() and raw.read_text() == "some text"
+    assert raw.exists()
+    assert raw.read_text() == "some text"
     assert dedup.list_sources() == [res["source_name"]]
 
 
@@ -137,7 +138,8 @@ def test_ingest_as_source_is_idempotent_on_identical_text(wiki_dir, monkeypatch)
     _mock_ingest_llm(monkeypatch)
     wiki_engine.ingest_as_source("same body", "Research: X")
     again = wiki_engine.ingest_as_source("same body", "Research: X")
-    assert again["duplicate"] is True and again["source_name"] is None
+    assert again["duplicate"] is True
+    assert again["source_name"] is None
     assert len(dedup.list_sources()) == 1
 
 

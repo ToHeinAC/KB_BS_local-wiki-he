@@ -70,7 +70,7 @@ def using_db(name: str):
         _active.reset(token)
 
 
-def set_search_scope(names: Iterable[str] | None) -> None:
+def set_search_scope(names: Iterable[str | None] | None) -> None:
     """Set the DBs that read-only retrieval fans out over. Empty = follow active."""
     _scope.set(tuple(dict.fromkeys(n for n in (names or []) if n)))
 
