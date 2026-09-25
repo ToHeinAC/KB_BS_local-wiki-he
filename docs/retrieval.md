@@ -109,4 +109,3 @@ Two edge types feed it:
 **Shared-source edges are clique-guarded.** A source backing many pages carries no topical signal (`StrlSchG.md` alone backs 25 pages, `BImSchG.md` 22), so `_shared_source_siblings()` skips any source feeding more than `_SHARED_SOURCE_MAX_CLIQUE` (8) pages rather than flooding results with "both mention the big law".
 
 Ranking is tiered: explicit `link` edges outrank `shared-source` ones, then neighbours reached from more seeds win, with insertion order breaking ties (stable sort). Measured effect on real databases (neighbours reachable, out-links-only → undirected + shared-source): Strahlenschutz 153 → 220, Investing 37 → 166, KI 77 → 298 (KI: every page now reaches at least one neighbour, up from 26 of 44).
-

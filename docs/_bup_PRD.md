@@ -306,7 +306,7 @@ When asked to ingest a document:
 5. If the document contradicts existing pages, FLAG the contradiction clearly
 6. Update data/wiki/index.md with any new pages
 7. Append an entry to data/wiki/log.md
-8. Return a JSON summary: {"pages_created": [...], "pages_updated": [...], "contradictions": [...]} 
+8. Return a JSON summary: {"pages_created": [...], "pages_updated": [...], "contradictions": [...]}
 
 ## Query Workflow
 When asked a question:
@@ -346,7 +346,7 @@ Flow:
    - Write each page to the correct wiki subdirectory
    - Update data/wiki/index.md
    - Append to data/wiki/log.md
-6. Return summary dict: {"pages_created": [...], "pages_updated": [...], "contradictions": [...]} 
+6. Return summary dict: {"pages_created": [...], "pages_updated": [...], "contradictions": [...]}
 ```
 
 **Rules:**

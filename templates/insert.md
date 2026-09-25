@@ -1,7 +1,7 @@
 ---
-name: 
+name:
 fullname:
-description: 
+description:
 effective as of:
 part of:
 ---
