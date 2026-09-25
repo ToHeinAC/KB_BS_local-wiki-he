@@ -13,11 +13,17 @@ from __future__ import annotations
 
 import os
 from collections.abc import Generator
+from typing import Any
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
-from langgraph.graph import END, START, MessagesState, StateGraph  # pyright: ignore[reportMissingTypeStubs]
+from langgraph.graph import (  # pyright: ignore[reportMissingTypeStubs]
+    END,
+    START,
+    MessagesState,
+    StateGraph,
+)
 from langgraph.prebuilt import ToolNode
 
 import db_context
@@ -56,7 +62,7 @@ def _build_llm():
 def _build_graph(llm, directive: str = ""):
     nudge = RESEARCH_BUDGET_NUDGE + (f"\n\n{directive}" if directive else "")
 
-    def agent_node(state: MessagesState) -> dict:
+    def agent_node(state: MessagesState) -> dict[str, Any]:
         msgs = list(state["messages"])
         ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
         if ai_count >= NUDGE_AT:
@@ -136,7 +142,7 @@ def _tool_to_result(msg: ToolMessage):
     yield {"type": "tool_result", "name": msg.name, "result": content}
 
 
-def _gather_notes(all_messages: list) -> str:
+def _gather_notes(all_messages: list[Any]) -> str:
     """Concatenate search/read tool results so a fallback pass can synthesise
     from what the agent gathered. Keeps the most recent notes within the cap."""
     blocks: list[str] = []
@@ -149,7 +155,7 @@ def _gather_notes(all_messages: list) -> str:
     return notes[-FALLBACK_NOTES_CAP:] if len(notes) > FALLBACK_NOTES_CAP else notes
 
 
-def _synthesize_fallback(question: str, all_messages: list, directive: str = "") -> str:
+def _synthesize_fallback(question: str, all_messages: list[Any], directive: str = "") -> str:
     """Best-effort report from gathered notes when the agent stalled without
     calling submit_final_answer. Returns '' if there are no notes or on error."""
     notes = _gather_notes(all_messages)
@@ -169,7 +175,9 @@ def _synthesize_fallback(question: str, all_messages: list, directive: str = "")
         return ""
 
 
-def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict, None, None]:
+def run_research_agent(
+    question: str, wiki_context: str = ""
+) -> Generator[dict[str, Any], None, None]:
     run_memory.begin_run()
     directive = lang.response_directive(question)
     try:
@@ -190,8 +198,8 @@ def run_research_agent(question: str, wiki_context: str = "") -> Generator[dict,
     seen = 0
     final_msg: ToolMessage | AIMessage | None = None
     report_path: str | None = None
-    last_submit_args: dict | None = None
-    all_messages: list = []
+    last_submit_args: dict[str, Any] | None = None
+    all_messages: list[Any] = []
     recursion_hit = False
 
     try:

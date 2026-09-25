@@ -37,6 +37,7 @@ import glob
 import os
 import threading
 from pathlib import Path
+from typing import Any
 
 import gpu_placement
 
@@ -46,7 +47,7 @@ _MAX_DOC_CHARS = 4000
 _N_CTX = 4096
 
 _lock = threading.Lock()  # llama.cpp contexts are not thread-safe; Streamlit reruns
-_state: dict | None = None
+_state: dict[str, Any] | None = None
 
 
 def _model_path() -> Path:
@@ -124,7 +125,7 @@ def _model_params(L):
     return params
 
 
-def _load() -> dict | None:
+def _load() -> dict[str, Any] | None:
     """Lazily build the model + RANK-pooled context. Cached for the process."""
     global _state
     if _state is not None:
@@ -153,14 +154,14 @@ def _load() -> dict | None:
         return None
 
 
-def _tokenize(st: dict, text: str) -> list[int]:
+def _tokenize(st: dict[str, Any], text: str) -> list[int]:
     L, buf = st["L"], (st["L"].llama_token * _N_CTX)()
     raw = text.encode()
     n = L.llama_tokenize(st["vocab"], raw, len(raw), buf, _N_CTX, False, True)
     return list(buf[:n]) if n > 0 else []
 
 
-def _score_one(st: dict, q_toks: list[int], doc: str) -> float:
+def _score_one(st: dict[str, Any], q_toks: list[int], doc: str) -> float:
     """One cross-encoder forward pass over [BOS] q [EOS] [SEP] doc [EOS]."""
     L, vocab = st["L"], st["vocab"]
     toks = (
@@ -232,7 +233,7 @@ def _normalize(values: list[float]) -> list[float]:
     return [(v - lo) / (hi - lo) for v in values]
 
 
-def rerank(query: str, hits: list[dict], top_k: int) -> list[dict]:
+def rerank(query: str, hits: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
     """Reorder fused `hits` with the cross-encoder. Fails open to `hits[:top_k]`.
 
     Blends normalized fused and reranker scores position-awarely (D.1) rather than

@@ -22,6 +22,7 @@ import json
 import re
 import unicodedata
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -71,11 +72,11 @@ def _is_legal(text: str) -> bool:
 
 def _split_long(
     text: str, anchor: str, heading_path: list[str], base_offset: int, lang: str
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Window an oversize section into overlapping paragraph-bounded chunks."""
     if len(text) <= MAX_CHUNK_CHARS:
         return [_mk(text, anchor, heading_path, base_offset, lang)]
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     paragraphs = re.split(r"\n\s*\n", text)
     buf: list[str] = []
     buf_len = 0
@@ -109,7 +110,9 @@ def _split_long(
     return out
 
 
-def _mk(text: str, anchor: str, heading_path: list[str], char_start: int, lang: str) -> dict:
+def _mk(
+    text: str, anchor: str, heading_path: list[str], char_start: int, lang: str
+) -> dict[str, Any]:
     text = text.strip()
     return {
         "chunk_id": chunk_id(text),
@@ -122,10 +125,10 @@ def _mk(text: str, anchor: str, heading_path: list[str], char_start: int, lang: 
     }
 
 
-def _chunk_legal(text: str, lang: str) -> list[dict]:
+def _chunk_legal(text: str, lang: str) -> list[dict[str, Any]]:
     """Split on `## § N` headers. Each § becomes one chunk (windowed if huge)."""
     matches = list(_LEGAL_HEAD_RE.finditer(text))
-    chunks: list[dict] = []
+    chunks: list[dict[str, Any]] = []
     # Preamble before first §
     if matches and matches[0].start() > 0:
         pre = text[: matches[0].start()]
@@ -142,12 +145,12 @@ def _chunk_legal(text: str, lang: str) -> list[dict]:
     return chunks
 
 
-def _chunk_markdown(text: str, lang: str) -> list[dict]:
+def _chunk_markdown(text: str, lang: str) -> list[dict[str, Any]]:
     """Split on `##`/`###` headings; window long sections."""
     matches = [m for m in _MD_HEAD_RE.finditer(text) if 2 <= len(m.group(1)) <= 4]
     if not matches:
         return _chunk_plain(text, lang)
-    chunks: list[dict] = []
+    chunks: list[dict[str, Any]] = []
     heading_stack: list[tuple[int, str]] = []
     # Preamble
     if matches[0].start() > 0:
@@ -168,11 +171,11 @@ def _chunk_markdown(text: str, lang: str) -> list[dict]:
     return chunks
 
 
-def _chunk_plain(text: str, lang: str) -> list[dict]:
+def _chunk_plain(text: str, lang: str) -> list[dict[str, Any]]:
     return _split_long(text, "", [], 0, lang)
 
 
-def split(text: str) -> list[dict]:
+def split(text: str) -> list[dict[str, Any]]:
     """Return a list of chunk dicts for `text`. Pure function — no I/O."""
     if not text or not text.strip():
         return []
@@ -182,7 +185,7 @@ def split(text: str) -> list[dict]:
     else:
         chunks = _chunk_markdown(text, lang)
     # Drop too-small chunks (merge into previous when feasible)
-    merged: list[dict] = []
+    merged: list[dict[str, Any]] = []
     for ch in chunks:
         if merged and len(ch["text"]) < MIN_CHUNK_CHARS:
             prev = merged[-1]
@@ -195,7 +198,7 @@ def split(text: str) -> list[dict]:
     return merged
 
 
-def write_chunks(source_name: str, chunks: list[dict]) -> Path:
+def write_chunks(source_name: str, chunks: list[dict[str, Any]]) -> Path:
     """Persist chunks for a source as JSONL. Returns the file path."""
     _chunks_dir().mkdir(parents=True, exist_ok=True)
     out = _chunks_dir() / f"{source_slug(source_name)}.jsonl"
@@ -207,18 +210,18 @@ def write_chunks(source_name: str, chunks: list[dict]) -> Path:
     return out
 
 
-def load_chunks(source_name: str) -> list[dict]:
+def load_chunks(source_name: str) -> list[dict[str, Any]]:
     path = _chunks_dir() / f"{source_slug(source_name)}.jsonl"
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
-def all_chunks() -> list[dict]:
+def all_chunks() -> list[dict[str, Any]]:
     """Load every chunk across every source. Used for index rebuilds."""
     if not _chunks_dir().exists():
         return []
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for p in sorted(_chunks_dir().glob("*.jsonl")):
         for line in p.read_text().splitlines():
             if line.strip():

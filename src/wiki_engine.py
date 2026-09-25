@@ -5,6 +5,7 @@ import re
 import shutil
 from datetime import UTC, date, datetime
 from pathlib import Path
+from typing import Any
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 import numpy as np
@@ -119,7 +120,7 @@ def _parse_date(value) -> date | None:
         return None
 
 
-def is_page_stale(meta: dict, today: date | None = None) -> bool:
+def is_page_stale(meta: dict[str, Any], today: date | None = None) -> bool:
     """True when a page is past its freshness window (E-1).
 
     Window = the page's `expires_after_days` frontmatter (int), else
@@ -157,7 +158,7 @@ def _rebuild_index() -> None:
     main = [p for p in pages if p.get("type") != "insight"]
     insights = [p for p in pages if p.get("type") == "insight"]
 
-    def _line(p: dict) -> str:
+    def _line(p: dict[str, Any]) -> str:
         return (
             f"* [{p.get('title', p['filename'])}]({p['filename']}) - {p.get('description', '')}\n"
         )
@@ -371,7 +372,7 @@ def _overlap_coef(a: frozenset, b: frozenset) -> float:
 
 
 def _route_page(
-    ptype: str, tokens: frozenset, terms: frozenset, registry: dict, self_filename: str
+    ptype: str, tokens: frozenset, terms: frozenset, registry: dict[str, Any], self_filename: str
 ) -> str | None:
     """Existing filename this page should merge into, or None to create new.
 
@@ -397,9 +398,9 @@ def _route_page(
     return exact or subset
 
 
-def _split_sections(body: str) -> list[list]:
+def _split_sections(body: str) -> list[list[Any]]:
     """[[heading, [lines]]]; pre-heading lead text uses heading ''."""
-    sections: list[list] = [["", []]]
+    sections: list[list[Any]] = [["", []]]
     for line in body.splitlines():
         if re.match(r"^#{1,6}\s", line):
             sections.append([line.strip(), []])
@@ -437,7 +438,7 @@ def _merge_bodies(existing: str, new: str) -> str:
     return "\n".join(out).strip() + "\n"
 
 
-def _union_list(a, b) -> list:
+def _union_list(a, b) -> list[Any]:
     merged = [str(x).strip() for x in (a or []) if str(x).strip()]
     for v in b or []:
         v = str(v).strip()
@@ -446,7 +447,7 @@ def _union_list(a, b) -> list:
     return merged
 
 
-def _is_newer(nmeta: dict, emeta: dict) -> bool:
+def _is_newer(nmeta: dict[str, Any], emeta: dict[str, Any]) -> bool:
     nd = _parse_date(nmeta.get("effective as of") or nmeta.get("updated") or nmeta.get("created"))
     ed = _parse_date(emeta.get("effective as of") or emeta.get("updated") or emeta.get("created"))
     return bool(nd and ed and nd > ed)
@@ -477,7 +478,7 @@ _CONTRADICTION_NOTES = {
 
 
 def _contradiction_check(
-    existing: str, new: str, emeta: dict, nmeta: dict, page_lang: str = "en"
+    existing: str, new: str, emeta: dict[str, Any], nmeta: dict[str, Any], page_lang: str = "en"
 ) -> list[str]:
     """Flag same-term/same-unit numeric conflicts. Resolves only on a date signal."""
     ef, nf = _extract_facts(existing), _extract_facts(new)
@@ -582,7 +583,7 @@ def _align_language(existing: str, new: str, source_lang: str) -> str:
     return frontmatter.dumps(post) + "\n"
 
 
-def _registry_entry(content: str, fname: str) -> dict:
+def _registry_entry(content: str, fname: str) -> dict[str, Any]:
     try:
         aliases = frontmatter.loads(content).metadata.get("aliases") or []
     except Exception:
@@ -599,7 +600,7 @@ def _registry_entry(content: str, fname: str) -> dict:
     }
 
 
-def _build_registry() -> dict:
+def _build_registry() -> dict[str, Any]:
     """{filename: {type, title, lang, tokens, aliases, terms}} per page (routing input)."""
     return {
         p["filename"]: _registry_entry(read_page(p["filename"]), p["filename"])
@@ -607,7 +608,7 @@ def _build_registry() -> dict:
     }
 
 
-def _registry_add(registry: dict, target: str, content: str) -> None:
+def _registry_add(registry: dict[str, Any], target: str, content: str) -> None:
     registry[target] = _registry_entry(content, target)
 
 
@@ -618,7 +619,7 @@ _XLANG_MIN_COS = 0.80
 _XLANG_MARGIN = 0.05
 
 
-def _route_cross_language(title: str, ptype: str, plang: str, ctx: dict) -> str | None:
+def _route_cross_language(title: str, ptype: str, plang: str, ctx: dict[str, Any]) -> str | None:
     """Existing same-type page in the OTHER language with the same meaning, or None.
 
     Best-effort: no embed model, no candidates or any error → None (create new).
@@ -632,7 +633,9 @@ def _route_cross_language(title: str, ptype: str, plang: str, ctx: dict) -> str 
         cache = ctx.setdefault("title_vecs", {})
         todo = [fn for fn in cands if fn not in cache]
         vecs = np.asarray(
-            ollama_client.embed([title] + [reg[fn]["title"] for fn in todo], embed_index.model_name()),
+            ollama_client.embed(
+                [title] + [reg[fn]["title"] for fn in todo], embed_index.model_name()
+            ),
             dtype=np.float32,
         )
         vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
@@ -645,7 +648,7 @@ def _route_cross_language(title: str, ptype: str, plang: str, ctx: dict) -> str 
     return fname if best >= _XLANG_MIN_COS and best - runner_up >= _XLANG_MARGIN else None
 
 
-def _resolve_target(content: str, llm_filename: str, ctx: dict) -> str:
+def _resolve_target(content: str, llm_filename: str, ctx: dict[str, Any]) -> str:
     """Deterministic on-disk filename for an LLM-emitted page.
 
     Source-summaries always collapse to one stable `summary-<doc>.md` (kills the
@@ -666,7 +669,7 @@ def _resolve_target(content: str, llm_filename: str, ctx: dict) -> str:
     return _route_cross_language(title, ptype, plang, ctx) or llm_filename
 
 
-def _parse_llm_pages(response: str) -> list[dict]:
+def _parse_llm_pages(response: str) -> list[dict[str, Any]]:
     """Extract filename→content pairs from LLM output.
 
     Expected LLM format:
@@ -869,7 +872,9 @@ def _summary_slug(source_name: str) -> str:
     return slug
 
 
-def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None) -> dict:
+def ingest_begin(
+    full_text: str, source_name: str, user_meta: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Source-scoped ingest setup. Runs the once-per-source LLM/index work.
 
     Builds the chunk store, runs qa_gen on the whole document, and selects
@@ -933,7 +938,7 @@ def ingest_begin(full_text: str, source_name: str, user_meta: dict | None = None
     }
 
 
-def _write_piece_page(ctx: dict, page: dict) -> None:
+def _write_piece_page(ctx: dict[str, Any], page: dict[str, Any]) -> None:
     """Normalise one LLM-emitted page, route it, merge or create it, write it."""
     content = _ensure_frontmatter(page["content"], page["filename"])
     content = _clean_refs(content)
@@ -966,7 +971,7 @@ def _write_piece_page(ctx: dict, page: dict) -> None:
     _registry_add(ctx["registry"], target, content)
 
 
-def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> None:
+def ingest_piece(ctx: dict[str, Any], piece_text: str, index: int = 0, total: int = 1) -> None:
     """Run the LLM wiki-synthesis for one 40 KB piece. Mutates `ctx` in place."""
     # BM25-select the existing pages THIS piece most likely updates, then inject
     # their content (rank-weighted budget) for an accurate merge. Per-piece so a
@@ -1023,7 +1028,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
                 ctx["contradictions"].append(desc)
 
 
-def ingest_end(ctx: dict, finalize: bool = True) -> dict:
+def ingest_end(ctx: dict[str, Any], finalize: bool = True) -> dict[str, Any]:
     """Finalise: index page rebuild + log entry, and (when ``finalize``) the
     single corpus-wide `lex_index` rebuild + description refresh.
 
@@ -1073,7 +1078,7 @@ def ingest_end(ctx: dict, finalize: bool = True) -> dict:
     }
 
 
-def ingest(text: str, source_name: str, user_meta: dict | None = None) -> dict:
+def ingest(text: str, source_name: str, user_meta: dict[str, Any] | None = None) -> dict[str, Any]:
     """Back-compat single-call ingest. New callers should use begin/piece/end.
 
     Internally: begin + one piece + end. Identical end-state to the previous
@@ -1089,7 +1094,9 @@ def _source_slug(text: str) -> str:
     return (s or "source")[:60]
 
 
-def ingest_as_source(text: str, title: str, user_meta: dict | None = None) -> dict:
+def ingest_as_source(
+    text: str, title: str, user_meta: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """Register `text` in `data/raw/` as a first-class source, then ingest it.
 
     Plain `ingest()` synthesises wiki pages against a source *name* that has no
@@ -1122,7 +1129,7 @@ def ingest_as_source(text: str, title: str, user_meta: dict | None = None) -> di
     return result
 
 
-def rebuild_lex_index() -> dict:
+def rebuild_lex_index() -> dict[str, Any]:
     """Rebuild the BM25 index from all persisted chunks. Returns a summary."""
     return lex_index.build()
 
@@ -1173,7 +1180,7 @@ def _needs_cleanup(filename: str) -> bool:
     return "[Teil " in txt or ".md.md" in txt
 
 
-def _group_concept_pages(pages: list[dict]) -> list[list[str]]:
+def _group_concept_pages(pages: list[dict[str, Any]]) -> list[list[str]]:
     """Connected components of concept/entity pages under the same-topic relation."""
     items = []
     for p in pages:
@@ -1218,9 +1225,9 @@ def _canonical_concept(members: list[str], title_by: dict[str, str]) -> str:
     return min(members, key=lambda m: (len(_canonical_slug_tokens(title_by.get(m, m))), len(m), m))
 
 
-def _plan_groups(pages: list[dict]) -> list[dict]:
+def _plan_groups(pages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Build {canonical, members, base} merge plans for summaries + concepts."""
-    plans: list[dict] = []
+    plans: list[dict[str, Any]] = []
     summaries: dict[str, list[str]] = {}
     for p in pages:
         if str(p.get("type") or "").lower() == "source-summary" or p["filename"].startswith(
@@ -1304,7 +1311,9 @@ def _polish_page(content: str) -> str:
     return frontmatter.dumps(post) + "\n"
 
 
-def consolidate(db: str | None = None, dry_run: bool = True, llm_polish: bool = False) -> dict:
+def consolidate(
+    db: str | None = None, dry_run: bool = True, llm_polish: bool = False
+) -> dict[str, Any]:
     """Collapse legacy chunk-derived duplicate pages into one page per topic.
 
     Groups source-summaries by document base (Teil-stripped) and concept/entity
@@ -1323,7 +1332,7 @@ def consolidate(db: str | None = None, dry_run: bool = True, llm_polish: bool = 
             db_context.set_active_db(prev)
 
 
-def _consolidate_active(dry_run: bool, llm_polish: bool) -> dict:
+def _consolidate_active(dry_run: bool, llm_polish: bool) -> dict[str, Any]:
     pages = list_pages()
     plans = _plan_groups(pages)
     rename = {m: pl["canonical"] for pl in plans for m in pl["members"] if m != pl["canonical"]}
@@ -1357,12 +1366,12 @@ def _consolidate_active(dry_run: bool, llm_polish: bool) -> dict:
     return summary
 
 
-def delete_source(source_name: str) -> dict:
+def delete_source(source_name: str) -> dict[str, Any]:
     """Remove a source and all derived data. Wiki pages referencing it are deleted.
 
     Returns a summary dict with keys: raw, manifest, chunks, qa_rows, wiki_pages.
     """
-    result: dict = {
+    result: dict[str, Any] = {
         "raw": False,
         "manifest": False,
         "chunks": False,
@@ -1464,7 +1473,7 @@ def delete_source(source_name: str) -> dict:
     return result
 
 
-def reset_all_data() -> dict:
+def reset_all_data() -> dict[str, Any]:
     """Wipe every raw source, chunk, lexical index entry, and wiki page.
 
     Re-initialises the wiki to its empty bootstrap state. Returns a count
@@ -1590,7 +1599,7 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
 
 def _gather_pages(
     question: str, system: str, budget: int
-) -> tuple[str, list[str], set[str], list[dict], dict]:
+) -> tuple[str, list[str], set[str], list[dict[str, Any]], dict[str, Any]]:
     """Collect synthesis context from the *active* DB (see `query_with_sources`).
 
     Returns (pages_text, wiki_sources, raw_sources, wiki_hits, audit); the source names
@@ -1602,8 +1611,8 @@ def _gather_pages(
     selected = _select_pages(question, system, index_text)
 
     # Q-3: inject the most relevant chunks per page (with anchors), not full pages.
-    hits_by_page: dict[str, list[dict]] = {}
-    wiki_hits: list[dict] = []
+    hits_by_page: dict[str, list[dict[str, Any]]] = {}
+    wiki_hits: list[dict[str, Any]] = []
     try:
         for h in retrieval.search(
             question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki", use_rerank=True
@@ -1658,7 +1667,7 @@ def _gather_pages(
     return pages_text, used_sources, raw_sources_set, wiki_hits, audit
 
 
-def query_with_sources(question: str) -> dict:
+def query_with_sources(question: str) -> dict[str, Any]:
     """Answer a question using wiki content. Returns {answer, sources, raw_sources}.
 
     Retrieval fans out over `db_context.search_scope()` — one page-selection pass
@@ -1761,7 +1770,7 @@ def lint() -> str:
     return report
 
 
-def list_pages(include_insights: bool = False) -> list[dict]:
+def list_pages(include_insights: bool = False) -> list[dict[str, Any]]:
     """Return metadata for all non-system wiki pages.
 
     With `include_insights=True`, also lists `insights/*.md` (E-2) — their
@@ -1804,7 +1813,7 @@ def read_page(filename: str) -> str:
     return path.read_text()
 
 
-def read_page_parsed(filename: str) -> dict:
+def read_page_parsed(filename: str) -> dict[str, Any]:
     """Return body content and frontmatter sources/related without the YAML header."""
     path = _wiki() / filename
     if not path.exists():
@@ -1866,7 +1875,7 @@ def ensure_description() -> None:
         pass  # best-effort; never block the page render on it
 
 
-def update_description(ctx: dict) -> None:
+def update_description(ctx: dict[str, Any]) -> None:
     """Conditionally refresh the overview after an ingest (LLM decides via NO_CHANGE)."""
     current = read_description()
     if not current:
@@ -1920,7 +1929,7 @@ def refresh_description_after_delete(source_name: str, removed_pages: list[str])
 _TYPE_GROUPS = ("concept", "entity", "source-summary", "comparison", "insight")
 
 
-def search_wiki(query: str) -> list[dict]:
+def search_wiki(query: str) -> list[dict[str, Any]]:
     """BM25 full-text search over wiki page bodies (R-1).
 
     Queries the wiki-scoped lexical index (page bodies + their title/filename),
@@ -1936,7 +1945,7 @@ def search_wiki(query: str) -> list[dict]:
     except Exception:
         hits = []
     titles = {p["filename"]: str(p.get("title", p["filename"])) for p in list_pages()}
-    results: list[dict] = []
+    results: list[dict[str, Any]] = []
     seen: set[str] = set()
     for h in hits:
         fname = h.get("source", "")
@@ -1956,7 +1965,7 @@ def search_wiki(query: str) -> list[dict]:
     return results
 
 
-def get_wiki_tree() -> dict[str, list[dict]]:
+def get_wiki_tree() -> dict[str, list[dict[str, Any]]]:
     """Group `list_pages()` output by frontmatter `type`.
 
     Returns dict keyed by type (concept/entity/source-summary/comparison/insight/
@@ -1964,7 +1973,7 @@ def get_wiki_tree() -> dict[str, list[dict]]:
     list_pages(). Each page dict is annotated with `stale` (E-1).
     """
     today = datetime.now(UTC).date()
-    tree: dict[str, list[dict]] = {}
+    tree: dict[str, list[dict[str, Any]]] = {}
     for page in list_pages(include_insights=True):
         t = str(page.get("type", "")).strip().lower()
         key = t if t in _TYPE_GROUPS else "other"
@@ -2083,7 +2092,7 @@ def _shared_source_siblings() -> dict[str, set[str]]:
     return out
 
 
-def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
+def linked_pages(filenames: list[str], limit: int = 5) -> list[dict[str, Any]]:
     """1-hop link expansion: neighbours of `filenames` in the wiki link graph.
 
     Used by link-aware retrieval — after a wiki search, pull the neighbours of the
@@ -2141,7 +2150,7 @@ def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
             -shared_counts.get(r, 0),
         )
     )
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for r in order[:limit]:
         body = read_page_parsed(r).get("content", "")
         excerpt = " ".join(body.split())[:240]
@@ -2157,7 +2166,7 @@ def linked_pages(filenames: list[str], limit: int = 5) -> list[dict]:
     return out
 
 
-def build_typed_graph() -> dict:
+def build_typed_graph() -> dict[str, Any]:
     """Return a typed node/edge list for the wiki graph viz.
 
     Two node types:
@@ -2177,8 +2186,8 @@ def build_typed_graph() -> dict:
     def _raw_source(name: str) -> str:
         return _TEIL_SUFFIX_RE.sub("", str(name)).strip()
 
-    nodes: dict[str, dict] = {}
-    edges: list[dict] = []
+    nodes: dict[str, dict[str, Any]] = {}
+    edges: list[dict[str, Any]] = []
     related_pairs: set[frozenset[str]] = set()
     derived_pairs: set[tuple[str, str]] = set()
     source_set: set[str] = set()
@@ -2251,7 +2260,7 @@ def find_orphans() -> list[str]:
 
 def resolve_contradiction(
     description: str, page_filenames: list[str], user_guidance: str = ""
-) -> dict:
+) -> dict[str, Any]:
     """Reconcile a contradiction across pages via a focused LLM call.
 
     Rewrites the affected pages in place using the standard ingest delimiter
@@ -2306,7 +2315,7 @@ def resolve_contradiction(
 # --- Page language + reference normalisation (Maintenance) -------------------
 
 
-def _normalize_page(content: str, dry_run: bool) -> tuple[str, dict]:
+def _normalize_page(content: str, dry_run: bool) -> tuple[str, dict[str, Any]]:
     """Clean references, pin `lang`, translate foreign runs. → (content, what changed)."""
     try:
         frontmatter.loads(content)
@@ -2315,7 +2324,7 @@ def _normalize_page(content: str, dry_run: bool) -> tuple[str, dict]:
     fixed = _clean_refs(content)
     post = frontmatter.loads(fixed)
     plang = page_lang.page_lang(fixed)
-    info: dict = {}
+    info: dict[str, Any] = {}
     if fixed != content:
         info["references"] = True
     if post.metadata.get("lang") != plang:
@@ -2330,7 +2339,7 @@ def _normalize_page(content: str, dry_run: bool) -> tuple[str, dict]:
     return _okf_apply(frontmatter.dumps(post) + "\n"), info
 
 
-def normalize_pages(dry_run: bool = True) -> dict:
+def normalize_pages(dry_run: bool = True) -> dict[str, Any]:
     """Maintenance pass over existing pages: one language per page, clean references.
 
     Per page: strips `[Teil n/m]` / `.md.md` from citations and `sources:`, stamps
@@ -2338,7 +2347,7 @@ def normalize_pages(dry_run: bool = True) -> dict:
     language in place (labelled original quote when a translation fails
     verification). `dry_run=True` only reports. Returns {filename: info}.
     """
-    report: dict[str, dict] = {}
+    report: dict[str, dict[str, Any]] = {}
     for p in list_pages():
         fname = p["filename"]
         path = _wiki() / fname
@@ -2360,7 +2369,7 @@ def normalize_pages(dry_run: bool = True) -> dict:
     return report
 
 
-def stats() -> dict:
+def stats() -> dict[str, Any]:
     pages = list_pages()
     raw_count = len(list(_raw().glob("*"))) - 1 if _raw().exists() else 0  # exclude manifest
     data_bytes = (

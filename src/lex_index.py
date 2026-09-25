@@ -29,6 +29,7 @@ import re
 import sqlite3
 import unicodedata
 from pathlib import Path
+from typing import Any
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 
@@ -265,7 +266,7 @@ def tokenize(text: str) -> list[str]:
 WIKI_SYSTEM_PAGES = {"index.md", "log.md", "DESCRIPTION.md"}
 
 
-def wiki_page_chunks(md: Path) -> list[dict]:
+def wiki_page_chunks(md: Path) -> list[dict[str, Any]]:
     """Pseudo-chunks over one wiki page's body, tagged scope='wiki' (R-1).
 
     The page title + filename stem are prepended so a term that lives only in the
@@ -284,7 +285,7 @@ def wiki_page_chunks(md: Path) -> list[dict]:
     indexable = f"{title} {md.stem}\n\n{body}".strip()
     if not indexable:
         return []
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for ch in chunker.split(indexable):
         c = dict(ch)
         c["chunk_id"] = f"wiki:{md.name}:{ch['chunk_id']}"
@@ -294,7 +295,7 @@ def wiki_page_chunks(md: Path) -> list[dict]:
     return out
 
 
-def wiki_chunks() -> list[dict]:
+def wiki_chunks() -> list[dict[str, Any]]:
     """Pseudo-chunks over all wiki page bodies (main + insights). See R-1.
 
     Lets BM25 search synthesized/merged wiki content — which may use different
@@ -303,7 +304,7 @@ def wiki_chunks() -> list[dict]:
     wiki = db_context.wiki_dir()
     if not wiki.exists():
         return []
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for md in sorted(wiki.glob("*.md")) + sorted(wiki.glob("insights/*.md")):
         out.extend(wiki_page_chunks(md))
     return out
@@ -324,7 +325,7 @@ _FTS_INSERT = (
 )
 
 
-def _row_for_chunk(ch: dict, qa_by_chunk: dict) -> tuple:
+def _row_for_chunk(ch: dict[str, Any], qa_by_chunk: dict[str, Any]) -> tuple[Any, ...]:
     """Build the FTS5 row for one chunk: the pre-expanded variant token stream
     plus the metadata columns the hit dict is rebuilt from.
 
@@ -361,7 +362,7 @@ def _row_for_chunk(ch: dict, qa_by_chunk: dict) -> tuple:
     )
 
 
-def _dedup(chunks: list[dict]):
+def _dedup(chunks: list[dict[str, Any]]):
     """Yield chunks skipping repeated chunk_ids (same content across sources)."""
     seen: set[str] = set()
     for ch in chunks:
@@ -372,7 +373,7 @@ def _dedup(chunks: list[dict]):
         yield ch
 
 
-def build(chunks: list[dict] | None = None) -> dict:
+def build(chunks: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Full (re)build of the FTS5 index over all chunks. Returns a small summary.
 
     When no chunks are passed, indexes raw source chunks (scope='raw') plus wiki
@@ -402,7 +403,9 @@ def build(chunks: list[dict] | None = None) -> dict:
 # --- Incremental updates (per source, keyed on the `source` column) ----------
 
 
-def index_replace_source(source: str, chunks: list[dict], qa: dict | None = None) -> None:
+def index_replace_source(
+    source: str, chunks: list[dict[str, Any]], qa: dict[str, Any] | None = None
+) -> None:
     """Replace all rows for `source` with rows for `chunks` (delete + insert).
 
     O(change), not O(corpus): only this source's rows are touched. Creates the
@@ -453,7 +456,7 @@ def index_delete(source: str) -> None:
 # --- Query -------------------------------------------------------------------
 
 
-def index_health() -> dict:
+def index_health() -> dict[str, Any]:
     """Row counts per scope for the active DB's FTS5 store: `{raw, wiki}`.
 
     Both zero means the index is missing or empty — `query()` silently returns []
@@ -474,7 +477,7 @@ def index_health() -> dict:
     return {"raw": int(counts.get("raw", 0)), "wiki": int(counts.get("wiki", 0))}
 
 
-def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
+def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, Any]]:
     """BM25 over the FTS5 chunk index. Returns up to top_k hits (empty if no index).
 
     `scope` filters by chunk scope: "raw" (source chunks), "wiki" (wiki page
@@ -488,7 +491,7 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
     return _query_fts5(q, top_k, scope)
 
 
-def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
+def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, Any]]:
     """BM25 over the FTS5 index.
 
     Query tokens are expanded to the same `variants()` forms the index stored, so
@@ -512,7 +515,7 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]
         "char_end, lang, text, terms, bm25(chunks_fts) AS score "
         "FROM chunks_fts WHERE chunks_fts MATCH ?"
     )
-    params: list = [match]
+    params: list[Any] = [match]
     if scope is not None:
         sql += " AND scope = ?"
         params.append(scope)
@@ -537,7 +540,7 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]
             text_cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
         return text_cache[source].get(cid, "")
 
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for cid, source, sc, anchor, hp_json, cs, ce, lang, inline, terms, score in rows:
         if cid in seen:

@@ -33,6 +33,7 @@ import os
 import re
 from collections.abc import Generator
 from datetime import UTC, datetime
+from typing import Any
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 from dotenv import load_dotenv
@@ -99,7 +100,7 @@ TOOL_NOTES = {
 }
 
 
-def _configurable() -> dict:
+def _configurable() -> dict[str, Any]:
     """Our overrides for the vendored `Configuration` (all four roles → Ollama).
 
     NOTE: `Configuration.from_runnable_config` reads `os.environ[FIELD.upper()]`
@@ -124,7 +125,7 @@ def _configurable() -> dict:
     }
 
 
-def _extract_sources(text: str) -> list[dict]:
+def _extract_sources(text: str) -> list[dict[str, Any]]:
     """Pull {url, title} citation cards out of a web_search tool result."""
     return [{"title": t.strip(), "url": u} for t, u in _SOURCE_RE.findall(text or "")]
 
@@ -141,7 +142,7 @@ def _slug(text: str) -> str:
     return (s or "report")[:60]
 
 
-def _save_report(question: str, report: str, sources: list[dict]) -> str | None:
+def _save_report(question: str, report: str, sources: list[dict[str, Any]]) -> str | None:
     """Persist the report to `comparisons/` in the same shape as the Quick path
     (`tools._submit_final_impl`), so the Research page reads it back unchanged.
 
@@ -171,7 +172,7 @@ def _save_report(question: str, report: str, sources: list[dict]) -> str | None:
         return None
 
 
-def _message_steps(msg) -> Generator[dict, None, None]:
+def _message_steps(msg) -> Generator[dict[str, Any], None, None]:
     """Map one LangChain message to step-dicts (mirrors agent._ai_to_thought)."""
     if isinstance(msg, AIMessage):
         text = msg.content if isinstance(msg.content, str) else str(msg.content or "")
@@ -198,7 +199,7 @@ def _message_steps(msg) -> Generator[dict, None, None]:
         }
 
 
-def _update_steps(update: dict) -> Generator[dict, None, None]:
+def _update_steps(update: dict[str, Any]) -> Generator[dict[str, Any], None, None]:
     """Map one node's state delta to step-dicts.
 
     `raw_notes` is where the web citations actually live. The researcher
@@ -230,7 +231,7 @@ def _update_steps(update: dict) -> Generator[dict, None, None]:
             yield from _message_steps(msg)
 
 
-def _step_key(step: dict):
+def _step_key(step: dict[str, Any]):
     """Identity used to drop replayed steps.
 
     A parent node's update echoes the whole accumulated sub-state (the
@@ -284,11 +285,11 @@ def _astream_sync(question: str, directive: str):
         loop.close()
 
 
-def _run_graph(question: str, directive: str) -> Generator[dict, None, None]:
+def _run_graph(question: str, directive: str) -> Generator[dict[str, Any], None, None]:
     """Stream the vendored graph. Ends with a `final_answer`, or a `notice`
     carrying the reason Deep mode could not produce one."""
     report, sources, failure = "", [], ""
-    emitted: set = set()
+    emitted: set[Any] = set()
     tasks = searches = 0
     try:
         for node, delta in _astream_sync(question, directive):
@@ -339,7 +340,9 @@ def _run_graph(question: str, directive: str) -> Generator[dict, None, None]:
     }
 
 
-def run_deep_research(question: str, wiki_context: str = "") -> Generator[dict, None, None]:
+def run_deep_research(
+    question: str, wiki_context: str = ""
+) -> Generator[dict[str, Any], None, None]:
     """Web-only Deep Research over the vendored open_deep_research graph.
 
     `wiki_context` is ignored by Deep mode itself (it is web-only) and is passed

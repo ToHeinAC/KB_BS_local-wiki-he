@@ -4,6 +4,7 @@ import gc
 import os
 import re
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 import streamlit as st
@@ -84,7 +85,7 @@ def _show_md_dialog(title: str, content: str) -> None:
 
 
 @st.dialog("Concept", width="large")
-def _show_node_details(node_id: str, graph: dict) -> None:
+def _show_node_details(node_id: str, graph: dict[str, Any]) -> None:
     nodes_by_id = {n["id"]: n for n in graph["nodes"]}
     node = nodes_by_id.get(node_id)
     if not node:
@@ -133,8 +134,8 @@ def _render_legacy_graph() -> None:
         def _abbrev(text: str, n: int = 5) -> str:
             return " ".join(str(text).replace("-", " ").split()[:n])
 
-        nodes_data: list[dict] = []
-        edges_data: list[dict] = []
+        nodes_data: list[dict[str, Any]] = []
+        edges_data: list[dict[str, Any]] = []
         keep_ids: set[str] = set()
         for node in graph["nodes"]:
             if node["type"] == "source" and not show_sources:
@@ -542,7 +543,7 @@ def _render_research_sources_panel() -> None:
             st.markdown("---")
 
 
-def _record_research_urls(step: dict) -> None:
+def _record_research_urls(step: dict[str, Any]) -> None:
     """Append newly-seen web citations from a Deep-mode step, de-duped by URL."""
     panel = st.session_state.setdefault("research_sources", [])
     known = {s["url"] for s in panel if s.get("url")}
@@ -552,7 +553,7 @@ def _record_research_urls(step: dict) -> None:
             panel.append(src)
 
 
-def _render_research_step(step: dict) -> None:
+def _render_research_step(step: dict[str, Any]) -> None:
     """One trace step. Intermediate results go in collapsed expanders; the
     one-line control-flow steps stay inline so the trace stays scannable.
 
@@ -592,7 +593,7 @@ def _render_research_step(step: dict) -> None:
         st.error(step["content"])
 
 
-def _render_research_metrics(metrics: dict | None) -> None:
+def _render_research_metrics(metrics: dict[str, Any] | None) -> None:
     """Key metrics for a finished Deep run. `Sources checked` is dropped when it
     would just repeat the search count (per the spec: only show it if it differs)."""
     if not metrics:
@@ -607,7 +608,7 @@ def _render_research_metrics(metrics: dict | None) -> None:
         col.metric(label, value)
 
 
-def _render_research_trace(steps: list[dict] | None) -> None:
+def _render_research_trace(steps: list[dict[str, Any]] | None) -> None:
     """Replay the persisted agent trace under the report."""
     if not steps:
         return
@@ -748,7 +749,7 @@ def _render_chat_sources(sources: list[str], raw_sources: list[str], key_prefix:
                 _raw_source_button(r, f"{key_prefix}_raw_{r}")
 
 
-def _render_why_sources(audit: dict | None) -> None:
+def _render_why_sources(audit: dict[str, Any] | None) -> None:
     """Search-ladder audit panel (idea.md §6.9.1): which sources were kept vs dropped
     below the calibrated τ. Silent when no source carried a rerank score (τ off / no
     reranker), so a fusion-only DB shows no empty panel."""
@@ -1519,7 +1520,7 @@ elif page == "Wiki Chat":
                 }
             )
         else:
-            steps: list[dict] = []
+            steps: list[dict[str, Any]] = []
             answer = ""
             raw_sources: list[str] = []
             wiki_pages: list[str] = []

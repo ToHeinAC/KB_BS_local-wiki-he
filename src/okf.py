@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 
@@ -85,7 +86,7 @@ def _derive_description(body: str) -> str:
 # --- Frontmatter enrichment --------------------------------------------------
 
 
-def _derive_tags(meta: dict, db: str, ptype: str) -> list[str]:
+def _derive_tags(meta: dict[str, Any], db: str, ptype: str) -> list[str]:
     """Coarse, deterministic categories (no LLM): db + page type + `part of`."""
     tags: list[str] = []
     for t in (_slug(db), ptype):
@@ -99,7 +100,7 @@ def _derive_tags(meta: dict, db: str, ptype: str) -> list[str]:
     return tags
 
 
-def _derive_resource(meta: dict, ptype: str) -> str | None:
+def _derive_resource(meta: dict[str, Any], ptype: str) -> str | None:
     """A URI for the underlying asset — source-summary / report only."""
     if ptype not in ("source-summary", "report"):
         return None
@@ -117,7 +118,7 @@ def _iso_timestamp(value) -> str | None:
     return f"{s}T00:00:00Z" if _ISO_DATE_RE.match(s) else None
 
 
-def enrich_frontmatter(meta: dict, body: str, *, db: str) -> dict:
+def enrich_frontmatter(meta: dict[str, Any], body: str, *, db: str) -> dict[str, Any]:
     """Add OKF-recommended fields (description/tags/resource/timestamp).
 
     Idempotent and additive: keeps an existing non-empty `description`; never

@@ -16,6 +16,7 @@ import json
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 
@@ -45,7 +46,7 @@ CHUNK_PREVIEW_CHARS = 600
 MAX_PAIRS_PER_SOURCE = int(os.getenv("QA_MAX_PAIRS_PER_SOURCE", "5"))
 
 
-def _chunks_block(batch: list[dict]) -> str:
+def _chunks_block(batch: list[dict[str, Any]]) -> str:
     parts: list[str] = []
     for ch in batch:
         text = (ch.get("text") or "")[:CHUNK_PREVIEW_CHARS].strip()
@@ -67,7 +68,7 @@ def _strip_json_fences(s: str) -> str:
     return s
 
 
-def _run_batch(batch: list[dict], temperature: float = 0.2) -> list[tuple[str, str]]:
+def _run_batch(batch: list[dict[str, Any]], temperature: float = 0.2) -> list[tuple[str, str]]:
     try:
         system = schema_loader.get_system_prompt(mode="query")
     except Exception:
@@ -98,7 +99,7 @@ def _run_batch(batch: list[dict], temperature: float = 0.2) -> list[tuple[str, s
     return out
 
 
-def _select_target_chunks(chunks: list[dict], k: int) -> list[dict]:
+def _select_target_chunks(chunks: list[dict[str, Any]], k: int) -> list[dict[str, Any]]:
     """Pick the top-k retrieval-valuable chunks (heading-anchored, dense).
 
     Heuristic (no LLM): prefer chunks whose anchor or heading_path names a
@@ -113,14 +114,14 @@ def _select_target_chunks(chunks: list[dict], k: int) -> list[dict]:
         return []
     import lex_index
 
-    def density(ch: dict) -> int:
+    def density(ch: dict[str, Any]) -> int:
         seen: set[str] = set()
         for tok in lex_index.tokenize(ch.get("text") or ""):
             for v in lex_index.variants(tok):
                 seen.add(v)
         return len(seen)
 
-    def is_anchored(ch: dict) -> int:
+    def is_anchored(ch: dict[str, Any]) -> int:
         anchor = (ch.get("anchor") or "").strip()
         if anchor.startswith("§") or anchor.startswith("#"):
             return 1
@@ -150,7 +151,7 @@ def _title_question(source: str) -> str:
     return f"Worum geht es in {stem}?" if stem else "Worum geht es in diesem Dokument?"
 
 
-def generate(chunks: list[dict], source: str = "") -> list[tuple[str, str]]:
+def generate(chunks: list[dict[str, Any]], source: str = "") -> list[tuple[str, str]]:
     """Return 1–`MAX_PAIRS_PER_SOURCE` (chunk_id, question) pairs.
 
     Picks the top-k highest-value chunks and runs a single LLM batch against

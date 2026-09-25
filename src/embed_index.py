@@ -29,6 +29,7 @@ import functools
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 import numpy as np
@@ -140,7 +141,7 @@ def _okf_prefix_map() -> dict[str, str]:
     return out
 
 
-def _embed_text(ch: dict, prefix_map: dict[str, str]) -> str:
+def _embed_text(ch: dict[str, Any], prefix_map: dict[str, str]) -> str:
     """Text actually embedded for a chunk (may differ from `chunk.text`)."""
     text = ch.get("text", "")
     if ch.get("scope") == "wiki":
@@ -150,7 +151,7 @@ def _embed_text(ch: dict, prefix_map: dict[str, str]) -> str:
     return text
 
 
-def _row_meta(ch: dict) -> dict:
+def _row_meta(ch: dict[str, Any]) -> dict[str, Any]:
     """Per-row metadata persisted alongside the vector (rebuilds the hit dict)."""
     scope = ch.get("scope", "raw")
     meta = {
@@ -168,7 +169,9 @@ def _row_meta(ch: dict) -> dict:
     return meta
 
 
-def _embed_chunks(chunks: list[dict], *, progress=None) -> tuple[np.ndarray, list[dict]]:
+def _embed_chunks(
+    chunks: list[dict[str, Any]], *, progress=None
+) -> tuple[np.ndarray, list[dict[str, Any]]]:
     """Embed chunks (dedup by chunk_id) → (float16 matrix, aligned row metadata).
 
     Wiki chunks get the deterministic OKF identity prefix; the wiki-frontmatter scan
@@ -188,7 +191,7 @@ def _embed_chunks(chunks: list[dict], *, progress=None) -> tuple[np.ndarray, lis
     return np.vstack(mats).astype(np.float16), rows
 
 
-def build(chunks: list[dict] | None = None, *, progress=None) -> dict:
+def build(chunks: list[dict[str, Any]] | None = None, *, progress=None) -> dict[str, Any]:
     """Full (re)build of the semantic index over all chunks. Returns a summary.
 
     Embeds raw source chunks (scope='raw') + wiki page pseudo-chunks (scope='wiki').
@@ -205,7 +208,7 @@ def build(chunks: list[dict] | None = None, *, progress=None) -> dict:
     }
 
 
-def _write(matrix: np.ndarray, rows: list[dict], *, model: str | None = None) -> None:
+def _write(matrix: np.ndarray, rows: list[dict[str, Any]], *, model: str | None = None) -> None:
     """Persist matrix + aligned rows. `model` defaults to the current model (full
     build); incremental ops pass the existing index's model to avoid restamping."""
     db_context.index_dir().mkdir(parents=True, exist_ok=True)
@@ -243,7 +246,7 @@ def index_delete(source: str) -> None:
     _write(new_matrix, [rows[i] for i in keep], model=meta.get("model"))
 
 
-def index_replace_source(source: str, chunks: list[dict]) -> None:
+def index_replace_source(source: str, chunks: list[dict[str, Any]]) -> None:
     """Re-embed one source's chunks and replace its rows. O(change) embed calls.
 
     Only touches an EXISTING, model-matching index (`available()`); DBs with no
@@ -293,7 +296,7 @@ def available() -> bool:
     return bool(meta.get("rows")) and meta.get("model") == model_name()
 
 
-def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
+def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, Any]]:
     """Cosine search over the vector matrix. Same hit-dict shape as lex_index.query.
 
     Returns [] (never raises) when the arm is unavailable or the query can't be
@@ -316,7 +319,7 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
 
     text_cache: dict[str, dict[str, str]] = {}
 
-    def _text_for(row: dict) -> str:
+    def _text_for(row: dict[str, Any]) -> str:
         if "text" in row:
             return row["text"]
         source = row.get("source", "")
@@ -324,7 +327,7 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
             text_cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
         return text_cache[source].get(row["chunk_id"], "")
 
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for i in order:
         row = rows[int(i)]
         if scope is not None and row.get("scope", "raw") != scope:

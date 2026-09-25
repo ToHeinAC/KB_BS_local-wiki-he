@@ -20,13 +20,14 @@ import json
 import logging
 import subprocess
 import time
+from typing import Any
 
 import streamlit as st
 import streamlit.components.v1 as components
 
 logger = logging.getLogger(__name__)
 
-_timer: dict = {"start": None, "end": None}
+_timer: dict[str, Any] = {"start": None, "end": None}
 
 
 def set_research_start() -> None:
@@ -49,7 +50,7 @@ def reset_research_timer() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _get_gpu_stats() -> list[dict]:
+def _get_gpu_stats() -> list[dict[str, Any]]:
     """Query nvidia-smi. Returns [] on failure."""
     try:
         result = subprocess.run(

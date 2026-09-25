@@ -37,6 +37,7 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
@@ -66,7 +67,7 @@ _MODEL_ENV = {
 }
 
 _lock = threading.Lock()
-_state: dict | None = None
+_state: dict[str, Any] | None = None
 _proc: subprocess.Popen | None = None
 
 
@@ -135,7 +136,7 @@ def configured_models() -> set[str]:
     return names
 
 
-def _get_json(url: str, timeout: float = 3.0) -> dict | None:
+def _get_json(url: str, timeout: float = 3.0) -> dict[str, Any] | None:
     try:
         with urllib.request.urlopen(url, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
@@ -234,12 +235,12 @@ atexit.register(stop)
 # resolution
 
 
-def _resolve() -> dict:
+def _resolve() -> dict[str, Any]:
     global _proc
     fallback = configured_host()
     mode = os.getenv("OLLAMA_PIN_GPU", "auto")
 
-    def unpinned(reason: str) -> dict:
+    def unpinned(reason: str) -> dict[str, Any]:
         return {"host": fallback, "pinned": False, "gpu": None, "managed": False, "reason": reason}
 
     if not _is_local(fallback):
@@ -281,7 +282,7 @@ def host() -> str:
     return status()["host"]
 
 
-def status() -> dict:
+def status() -> dict[str, Any]:
     """Resolved placement: host, pinned, gpu, managed, reason. Cached per process."""
     global _state
     with _lock:

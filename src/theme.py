@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import os
+from typing import Any
 
 import streamlit as st
 
@@ -111,14 +112,14 @@ def theme_name() -> str:
     return st.session_state.get("theme", "Forest")
 
 
-def tokens() -> dict:
+def tokens() -> dict[str, Any]:
     return _THEMES[theme_name()]
 
 
 # ── CSS ──────────────────────────────────────────────────────────────────────
 
 
-def _base_css(t: dict) -> str:
+def _base_css(t: dict[str, Any]) -> str:
     """Token-parametric chrome. Shared by every skin."""
     return f"""
     @import url('{_GOOGLE_FONTS["newspaper" if is_newspaper() else "default"]}');
@@ -466,7 +467,7 @@ def _base_css(t: dict) -> str:
     """
 
 
-def _newspaper_css(t: dict) -> str:
+def _newspaper_css(t: dict[str, Any]) -> str:
     """What a palette alone cannot say: metal rules, cut corners, mono figures.
 
     Layered *after* the base block, so every selector here is deliberately
@@ -598,7 +599,7 @@ def _newspaper_css(t: dict) -> str:
     """
 
 
-def inject_css() -> dict:
+def inject_css() -> dict[str, Any]:
     """Write this run's stylesheet and hand back the tokens app.py reads."""
     t = tokens()
     css = _base_css(t) + (_newspaper_css(t) if is_newspaper() else "")

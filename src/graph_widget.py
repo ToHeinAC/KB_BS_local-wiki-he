@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -118,7 +119,7 @@ def _bundle_signature() -> str:
 
 
 @st.cache_data(show_spinner=False)
-def _payload(signature: str) -> dict:
+def _payload(signature: str) -> dict[str, Any]:
     return graph_export.export()
 
 
@@ -129,7 +130,7 @@ def render_graph(
     layout: str = "galaxy",
     height: int = 720,
     paper: bool = False,
-) -> dict | None:
+) -> dict[str, Any] | None:
     """Draw the graph. Returns the double-clicked node `{node, kind, n}` or None.
 
     `size_by` picks the metric a dot's radius and the ranked-circle chart show:
@@ -161,11 +162,11 @@ def render_graph(
     )
 
 
-def graph_stats() -> dict:
+def graph_stats() -> dict[str, Any]:
     """Payload-level counts for captions, without re-exporting."""
     return _payload(_bundle_signature())
 
 
-def graph_health() -> dict:
+def graph_health() -> dict[str, Any]:
     """Health summary of the same cached payload the canvas is drawing."""
     return graph_export.health(_payload(_bundle_signature()))

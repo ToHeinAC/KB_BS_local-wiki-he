@@ -17,11 +17,17 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Generator
+from typing import Any
 
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
-from langgraph.graph import END, START, MessagesState, StateGraph  # pyright: ignore[reportMissingTypeStubs]
+from langgraph.graph import (  # pyright: ignore[reportMissingTypeStubs]
+    END,
+    START,
+    MessagesState,
+    StateGraph,
+)
 from langgraph.prebuilt import ToolNode
 
 import db_context
@@ -53,7 +59,7 @@ _RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]]+\.(?:md|txt|html))\s*\]")
 _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([^\]\n]+?\.md)\s*\]")
 
 
-def _cites(text: str, extra: list[str] | None = None) -> dict:
+def _cites(text: str, extra: list[str] | None = None) -> dict[str, Any]:
     """Split the citations in `text` into raw originals and wiki pages."""
     return {
         "sources": sorted(set(_RAW_CITE_RE.findall(text)) | set(extra or [])),
@@ -73,7 +79,7 @@ def _build_llm():
 def _build_graph(llm, directive: str = ""):
     nudge = CHAT_BUDGET_NUDGE + (f"\n\n{directive}" if directive else "")
 
-    def agent_node(state: MessagesState) -> dict:
+    def agent_node(state: MessagesState) -> dict[str, Any]:
         msgs = list(state["messages"])
         ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
         if ai_count >= NUDGE_AT:
@@ -248,7 +254,7 @@ def _extract_submitted_answer(messages) -> tuple[str, list[str]] | None:
     return None
 
 
-def run_chat_agent(question: str) -> Generator[dict, None, None]:
+def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
     run_memory.begin_run()
     directive = lang.response_directive(question)
     try:
@@ -268,7 +274,7 @@ def run_chat_agent(question: str) -> Generator[dict, None, None]:
 
     seen = 0
     final_msg: ToolMessage | AIMessage | None = None
-    all_messages: list = []
+    all_messages: list[Any] = []
     recursion_hit = False
 
     try:

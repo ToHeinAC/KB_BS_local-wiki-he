@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import math
 import os
+from typing import Any
 
 import db_context
 
@@ -62,7 +63,7 @@ def threshold(db: str | None = None) -> float | None:
     return float(env) if env not in (None, "") else None
 
 
-def _best(hits: list[dict]) -> tuple[float | None, dict | None]:
+def _best(hits: list[dict[str, Any]]) -> tuple[float | None, dict[str, Any] | None]:
     """The highest-`rerank_score` hit — the best passage the query found."""
     scored = [(float(h["rerank_score"]), h) for h in hits if "rerank_score" in h]
     return max(scored, key=lambda t: t[0]) if scored else (None, None)
@@ -70,7 +71,7 @@ def _best(hits: list[dict]) -> tuple[float | None, dict | None]:
 
 def justify(
     scored: list[tuple[str, float | None]], tau: float | None, cap: int | None = None
-) -> dict:
+) -> dict[str, Any]:
     """Split (name, best_score) pairs into an audit record for the search ladder.
 
     Rung 4 of the ladder (idea.md §6.9.1): open the *justified set* — every candidate
@@ -92,7 +93,9 @@ def justify(
     return {"tau": tau, "kept": kept, "below_tau": below, "over_cap": over_cap}
 
 
-def assess(hits: list[dict], db: str | None = None) -> tuple[bool, float, dict | None]:
+def assess(
+    hits: list[dict[str, Any]], db: str | None = None
+) -> tuple[bool, float, dict[str, Any] | None]:
     """Decide whether retrieval is confident enough to answer.
 
     Returns (confident, relevance∈(0,1], closest_hit). Abstain (confident=False) only when

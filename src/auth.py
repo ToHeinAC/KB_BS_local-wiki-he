@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import bcrypt
 
@@ -33,7 +34,7 @@ def _path() -> Path:
     return db_context.users_json_path()
 
 
-def _load() -> dict:
+def _load() -> dict[str, Any]:
     p = _path()
     if not p.exists():
         return {"users": {}}
@@ -43,7 +44,7 @@ def _load() -> dict:
         return {"users": {}}
 
 
-def _save(data: dict) -> None:
+def _save(data: dict[str, Any]) -> None:
     p = _path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(data, indent=2, ensure_ascii=False))
@@ -89,7 +90,7 @@ def backfill_maintainers() -> None:
         _save(data)
 
 
-def list_users() -> list[dict]:
+def list_users() -> list[dict[str, Any]]:
     data = _load()
     return [
         {

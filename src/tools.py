@@ -11,6 +11,7 @@ import os
 import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
+from typing import Any
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 from dotenv import load_dotenv
@@ -93,7 +94,7 @@ def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-") or "report"
 
 
-def _format_tavily_result(idx: int, r: dict) -> str:
+def _format_tavily_result(idx: int, r: dict[str, Any]) -> str:
     content = (r.get("content") or "")[:CONTENT_TRUNCATE]
     url = r.get("url", "")
     return f"Result {idx}: {r.get('title', '')}\nCite as: [Source: {url}]\nContent: {content}\n---"
@@ -153,7 +154,7 @@ def _fetch_webpage_impl(urls) -> str:
     return "\n\n".join(outs)
 
 
-def _format_wiki_hit(idx: int, hit: dict) -> str:
+def _format_wiki_hit(idx: int, hit: dict[str, Any]) -> str:
     return (
         f"[Wiki hit {idx}]\n"
         f"file: {db_context.qualify(hit.get('filename', ''))}\n"
@@ -162,7 +163,7 @@ def _format_wiki_hit(idx: int, hit: dict) -> str:
     )
 
 
-def _format_wiki_link(idx: int, hit: dict) -> str:
+def _format_wiki_link(idx: int, hit: dict[str, Any]) -> str:
     via = hit.get("via", "")
     why = (
         f"shares a source with {via}"
@@ -359,7 +360,7 @@ def _section_anchors(base: str) -> list[str]:
     return out
 
 
-def _resolve_section(base: str, section: str) -> dict | None:
+def _resolve_section(base: str, section: str) -> dict[str, Any] | None:
     """Find the chunk in `base` whose anchor matches `section`, or None."""
     want = _norm_anchor(section)
     if not want:
@@ -375,7 +376,7 @@ def _resolve_section(base: str, section: str) -> dict | None:
     return None
 
 
-def _format_section(base: str, ch: dict, label: str | None = None) -> str:
+def _format_section(base: str, ch: dict[str, Any], label: str | None = None) -> str:
     """Render a section. `label` is the name echoed back to the model (DB-qualified
     under a multi-DB scope) — `base` still addresses the chunk store."""
     label = label or base
@@ -502,7 +503,7 @@ def _low_confidence_nudge() -> str | None:
     return None
 
 
-def current_run_audit(db: str | None = None) -> dict | None:
+def current_run_audit(db: str | None = None) -> dict[str, Any] | None:
     """Search-ladder audit for the just-finished agentic run (Deep chat / research).
 
     Reads the per-source best rerank_scores accumulated in run memory and splits them by
@@ -784,7 +785,7 @@ def _fmt_val(v) -> str:
     return str(v)
 
 
-def _eval_node(node, facts: dict, trace: list) -> bool:
+def _eval_node(node, facts: dict[str, Any], trace: list[Any]) -> bool:
     if not isinstance(node, dict):
         trace.append((False, f"Error: condition node not a dict: {node!r}"))
         return False
@@ -840,7 +841,7 @@ def _eval_node(node, facts: dict, trace: list) -> bool:
     return False
 
 
-def _evaluate_condition_impl(facts: dict, condition: dict) -> str:
+def _evaluate_condition_impl(facts: dict[str, Any], condition: dict[str, Any]) -> str:
     if not isinstance(facts, dict) or not facts:
         return "Error: `facts` must be a non-empty dict."
     if not isinstance(condition, dict) or not condition:
@@ -859,7 +860,7 @@ def _evaluate_condition_impl(facts: dict, condition: dict) -> str:
 
 
 @tool(description=EVALUATE_CONDITION_DESCRIPTION)
-def evaluate_condition(facts: dict, condition: dict) -> str:
+def evaluate_condition(facts: dict[str, Any], condition: dict[str, Any]) -> str:
     return _evaluate_condition_impl(facts, condition)
 
 

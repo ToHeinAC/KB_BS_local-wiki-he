@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, date, datetime, timedelta
+from typing import Any
 
 import networkx as nx
 from networkx.algorithms.community import louvain_communities
@@ -54,7 +55,7 @@ def _quantile_threshold(values: list[float], q: float) -> float:
     return ordered[idx]
 
 
-def _to_networkx(typed: dict) -> nx.Graph:
+def _to_networkx(typed: dict[str, Any]) -> nx.Graph:
     """Undirected view of the typed graph, for analytics only.
 
     Direction is preserved in the exported edge list (`derived-from` renders as
@@ -70,7 +71,7 @@ def _to_networkx(typed: dict) -> nx.Graph:
     return G
 
 
-def _cap(typed: dict, limit: int) -> tuple[dict, bool]:
+def _cap(typed: dict[str, Any], limit: int) -> tuple[dict[str, Any], bool]:
     """Keep the ``limit`` best-connected nodes; drop edges that dangle after."""
     nodes = typed["nodes"]
     if len(nodes) <= limit:
@@ -90,12 +91,12 @@ def _cap(typed: dict, limit: int) -> tuple[dict, bool]:
     )
 
 
-def _page_meta() -> dict[str, dict]:
+def _page_meta() -> dict[str, dict[str, Any]]:
     """Frontmatter per wiki page, keyed the way the typed graph keys its nodes."""
     return {p["filename"]: p for p in wiki_engine.list_pages(include_insights=True)}
 
 
-def export(today=None) -> dict:
+def export(today=None) -> dict[str, Any]:
     """Build the renderer payload from the live wiki. Deterministic."""
     typed, truncated = _cap(wiki_engine.build_typed_graph(), MAX_NODES)
     meta = _page_meta()
@@ -176,7 +177,7 @@ def export(today=None) -> dict:
     }
 
 
-def health(payload: dict, today=None) -> dict:
+def health(payload: dict[str, Any], today=None) -> dict[str, Any]:
     """Bundle health from an exported payload: what is growing, what sits alone.
 
     Pure and deterministic — it reads only what `export()` already stamped, so
@@ -188,7 +189,7 @@ def health(payload: dict, today=None) -> dict:
     cutoff = today or datetime.now(UTC).date()
     cutoff = cutoff - timedelta(days=HEALTH_WINDOW_DAYS)
 
-    clusters: dict[int, dict] = {}
+    clusters: dict[int, dict[str, Any]] = {}
     for node in pages:
         c = clusters.setdefault(node["comm"], {"size": 0, "recent": 0, "top": node})
         c["size"] += 1

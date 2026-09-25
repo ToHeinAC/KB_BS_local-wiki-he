@@ -16,6 +16,8 @@ when a chunk is found by both arms (it carries `matched_terms` and inline text).
 
 from __future__ import annotations
 
+from typing import Any
+
 import embed_index
 import lex_index
 import rerank
@@ -43,21 +45,23 @@ def _arm_contribution(rank: int) -> float:
     return c
 
 
-def _rrf_fuse(lex_hits: list[dict], sem_hits: list[dict], top_k: int) -> list[dict]:
+def _rrf_fuse(
+    lex_hits: list[dict[str, Any]], sem_hits: list[dict[str, Any]], top_k: int
+) -> list[dict[str, Any]]:
     """Weighted Reciprocal Rank Fusion of two ranked lists, keyed on chunk_id.
 
     score(d) = Σ_arms w_arm · (1/(k + rank) + top-rank bonus) (idea.md C.2). The
     lexical hit dict wins ties (iterated first) so `matched_terms`/text survive.
     """
     score: dict[str, float] = {}
-    hit: dict[str, dict] = {}
+    hit: dict[str, dict[str, Any]] = {}
     for hits, w in ((lex_hits, W_LEXICAL), (sem_hits, W_SEMANTIC)):
         for rank, h in enumerate(hits):
             cid = h["chunk_id"]
             score[cid] = score.get(cid, 0.0) + w * _arm_contribution(rank)
             hit.setdefault(cid, h)
     ranked = sorted(score, key=lambda c: (-score[c], c))[:top_k]
-    out: list[dict] = []
+    out: list[dict[str, Any]] = []
     for cid in ranked:
         h = dict(hit[cid])
         h["score"] = round(score[cid], 4)
@@ -67,7 +71,7 @@ def _rrf_fuse(lex_hits: list[dict], sem_hits: list[dict], top_k: int) -> list[di
 
 def search(
     q: str, top_k: int = 10, scope: str | None = None, use_rerank: bool = False
-) -> list[dict]:
+) -> list[dict[str, Any]]:
     """Hybrid lexical+semantic retrieval. Falls back to pure lexical when the
     semantic arm is unavailable (identical to `lex_index.query`).
 
