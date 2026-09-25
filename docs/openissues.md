@@ -11,13 +11,6 @@ Track open work and resolved items here. Keep entries short; link to PRs/commits
 
 ## Open
 
-- **claude-dev-schema adoption: `.claude/` part pending (2026-09-25).** Not applied by Claude Code
-  (self-modification guard): copy the scaffold's `.claude/hooks/*.py` + `tests/test_claude_hooks.py`
-  (and add `.claude/hooks` to pyright `include` and coverage `source`), merge its permissions and
-  PostToolUse/Stop hooks into `.claude/settings.json`, replace `.claude/commands/commit-git.md` and
-  `documentation-update.md` with the scaffold versions (the current one has broken links, failing
-  `test_docs.py`), drop `create-prd.md`, and let ruff fix `.claude/skills/code_review/scripts/`.
-  Then `uv run pre-commit install`.
 - **CI's Python 3.14 leg is unverified locally.** uv 0.6.6 here only offers 3.14.0a5, which
   segfaults loading compiled wheels. 3.11 and 3.13 pass the full gate.
 - **Dead code kept pending a decision:** `wiki_engine._build_existing_block` (only its test calls
