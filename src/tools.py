@@ -12,7 +12,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 
-import frontmatter
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 from dotenv import load_dotenv
 from langchain_core.tools import tool
 
@@ -100,7 +100,7 @@ def _format_tavily_result(idx: int, r: dict) -> str:
 
 
 def _tavily_one(query: str, max_results: int) -> str:
-    from tavily import TavilyClient
+    from tavily import TavilyClient  # pyright: ignore[reportMissingTypeStubs]
 
     client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
     results = client.search(query, max_results=max_results, include_answer=True)

@@ -34,7 +34,7 @@ import re
 from collections.abc import Generator
 from datetime import UTC, datetime
 
-import frontmatter
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
@@ -49,7 +49,7 @@ from vendor.open_deep_research.deep_researcher import deep_researcher
 
 load_dotenv()
 
-MODEL = os.getenv("DEEP_RESEARCH_MODEL") or ollama_client._QUERY_MODEL
+MODEL = os.getenv("DEEP_RESEARCH_MODEL") or ollama_client.QUERY_MODEL
 CONCURRENCY = int(os.getenv("DEEP_RESEARCH_CONCURRENCY", "1"))
 MAX_ITERATIONS = int(os.getenv("DEEP_RESEARCH_MAX_ITERATIONS", "4"))
 MAX_TOOL_CALLS = int(os.getenv("DEEP_RESEARCH_MAX_TOOL_CALLS", "6"))

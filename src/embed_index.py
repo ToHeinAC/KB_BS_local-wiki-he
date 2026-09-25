@@ -30,7 +30,7 @@ import json
 import os
 from pathlib import Path
 
-import frontmatter
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 import numpy as np
 
 import chunker
@@ -47,7 +47,7 @@ _EMBED_BATCH = 64
 _MAX_EMBED_CHARS = 8000
 
 
-def _model() -> str:
+def model_name() -> str:
     return os.getenv("EMBED_MODEL", "bge-m3").strip()
 
 
@@ -64,7 +64,7 @@ def _meta_path() -> Path:
 
 def _embed_raw(texts: list[str]) -> np.ndarray:
     """One Ollama embed call + L2-normalize each row (float32). Raises on failure."""
-    vecs = ollama_client.embed(list(texts), _model())
+    vecs = ollama_client.embed(list(texts), model_name())
     arr = np.asarray(vecs, dtype=np.float32)
     norms = np.linalg.norm(arr, axis=1, keepdims=True)
     norms[norms == 0] = 1.0
@@ -126,7 +126,7 @@ def _okf_prefix_map() -> dict[str, str]:
         return out
     db = db_context.get_active_db()
     for md in wiki.glob("*.md"):
-        if md.name in lex_index._WIKI_SYSTEM_PAGES:
+        if md.name in lex_index.WIKI_SYSTEM_PAGES:
             continue
         try:
             post = frontmatter.load(str(md))
@@ -195,12 +195,12 @@ def build(chunks: list[dict] | None = None, *, progress=None) -> dict:
     Stamps the current model. `progress` is an optional callable(done, total).
     """
     if chunks is None:
-        chunks = chunker.all_chunks() + lex_index._wiki_chunks()
+        chunks = chunker.all_chunks() + lex_index.wiki_chunks()
     matrix, rows = _embed_chunks(chunks, progress=progress)
     _write(matrix, rows)
     return {
         "chunks": len(rows),
-        "model": _model(),
+        "model": model_name(),
         "dim": int(matrix.shape[1]) if matrix.size else 0,
     }
 
@@ -213,7 +213,7 @@ def _write(matrix: np.ndarray, rows: list[dict], *, model: str | None = None) ->
     _meta_path().write_text(
         json.dumps(
             {
-                "model": model or _model(),
+                "model": model or model_name(),
                 "dim": int(matrix.shape[1]) if matrix.size else 0,
                 "rows": rows,
             },
@@ -276,7 +276,7 @@ def index_replace_wiki_page(name: str) -> None:
     if not md.exists():
         index_delete(name)
         return
-    index_replace_source(name, lex_index._wiki_page_chunks(md))
+    index_replace_source(name, lex_index.wiki_page_chunks(md))
 
 
 # --- query -------------------------------------------------------------------
@@ -290,7 +290,7 @@ def available() -> bool:
         meta = json.loads(_meta_path().read_text())
     except Exception:
         return False
-    return bool(meta.get("rows")) and meta.get("model") == _model()
+    return bool(meta.get("rows")) and meta.get("model") == model_name()
 
 
 def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
@@ -304,7 +304,7 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict]:
     try:
         meta = json.loads(_meta_path().read_text())
         matrix = np.load(_vectors_path())
-        qv = _embed_query(q, _model())
+        qv = _embed_query(q, model_name())
     except Exception:
         return []
     if matrix.size == 0:

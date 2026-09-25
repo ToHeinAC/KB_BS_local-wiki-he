@@ -42,7 +42,7 @@ _LEGAL_HEAD_RE = re.compile(r"^(#{1,4})\s*§\s*(\d+[a-z]?)\b(.*)$", re.MULTILINE
 _MD_HEAD_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.MULTILINE)
 
 
-def _slug(name: str) -> str:
+def source_slug(name: str) -> str:
     base = Path(name).stem.lower()
     return re.sub(r"[^a-z0-9]+", "-", base).strip("-") or "source"
 
@@ -198,7 +198,7 @@ def split(text: str) -> list[dict]:
 def write_chunks(source_name: str, chunks: list[dict]) -> Path:
     """Persist chunks for a source as JSONL. Returns the file path."""
     _chunks_dir().mkdir(parents=True, exist_ok=True)
-    out = _chunks_dir() / f"{_slug(source_name)}.jsonl"
+    out = _chunks_dir() / f"{source_slug(source_name)}.jsonl"
     with out.open("w") as f:
         for ch in chunks:
             record = dict(ch)
@@ -208,7 +208,7 @@ def write_chunks(source_name: str, chunks: list[dict]) -> Path:
 
 
 def load_chunks(source_name: str) -> list[dict]:
-    path = _chunks_dir() / f"{_slug(source_name)}.jsonl"
+    path = _chunks_dir() / f"{source_slug(source_name)}.jsonl"
     if not path.exists():
         return []
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]

@@ -56,7 +56,7 @@ _STARTUP_TIMEOUT_S = 40.0
 # so this module stays free of an import cycle (ollama_client calls host()) — keep
 # the defaults in step with those two modules; a drift only skews the size estimate.
 _MODEL_ENV = {
-    "OLLAMA_MODEL": "gemma4:e4b",  # ollama_client._MODEL
+    "OLLAMA_MODEL": "gemma4:e4b",  # ollama_client.MODEL
     "QUERY_MODEL": "",  # the three role overrides fall back to OLLAMA_MODEL
     "INGEST_MODEL": "",
     "FAST_MODEL": "",

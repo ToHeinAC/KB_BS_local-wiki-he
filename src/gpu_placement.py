@@ -84,7 +84,7 @@ def gpus() -> list[Gpu]:
         return []
     if proc.returncode != 0:
         return []
-    found = []
+    found: list[Gpu] = []
     for line in proc.stdout.strip().splitlines():
         parts = [p.strip() for p in line.split(",")]
         if len(parts) != 4:

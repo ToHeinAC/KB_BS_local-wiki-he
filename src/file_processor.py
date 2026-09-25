@@ -62,7 +62,8 @@ def chunk_text(text: str, chunk_size: int = MAX_CHARS) -> list[str]:
     """Split text into chunks at paragraph boundaries; fall back to hard split."""
     if len(text) <= chunk_size:
         return [text]
-    chunks, start = [], 0
+    chunks: list[str] = []
+    start = 0
     while start < len(text):
         end = min(start + chunk_size, len(text))
         if end < len(text):

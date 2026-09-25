@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-import frontmatter
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 
 import lang
 import ollama_client
@@ -98,10 +98,10 @@ def original_terms(text: str) -> list[str]:
 def missing_protected(source: str, translated: str) -> list[str]:
     """Numbers, § references and citations of ``source`` absent from ``translated``."""
 
-    def numbers(t):
+    def numbers(t: str) -> set[str]:
         return {re.sub(r"[.,]", "", n) for n in _NUMBER_RE.findall(t)}
 
-    def refs(t):
+    def refs(t: str) -> set[str]:
         return {re.sub(r"\s+", "", r) for r in _SECTION_REF_RE.findall(t)}
 
     return (
@@ -127,7 +127,7 @@ def _restore_markers(source: str, translated: str) -> str:
     idx = [i for i, ln in enumerate(out) if ln.strip()]
     if len(src) != len(idx):
         return translated
-    for s_line, i in zip(src, idx):
+    for s_line, i in zip(src, idx, strict=True):
         m = _MARKER_RE.match(s_line)
         if m and not _MARKER_RE.match(out[i]) and not _HEADING_RE.match(out[i].strip()):
             out[i] = m.group(1) + out[i].lstrip()
@@ -150,7 +150,7 @@ def translate(text: str, src: str, tgt: str) -> str | None:
     try:
         out = _strip_fence(
             ollama_client.generate(
-                system, prompt, temperature=0.1, model_id=ollama_client._INGEST_MODEL
+                system, prompt, temperature=0.1, model_id=ollama_client.INGEST_MODEL
             )
             or ""
         )
@@ -163,7 +163,7 @@ def translate(text: str, src: str, tgt: str) -> str | None:
 
 def quote(text: str) -> list[str]:
     """``text`` as blockquote lines (headings become bold) — the labelled fallback."""
-    out = []
+    out: list[str] = []
     for line in text.splitlines():
         if not line.strip():
             continue
@@ -205,7 +205,8 @@ def _classify(lines: list[str], plang: str) -> list[str | None]:
 def foreign_runs(body: str, plang: str) -> list[tuple[int, int]]:
     """[start, end) line ranges of consecutive foreign lines (blanks/short lines inside)."""
     cls = _classify(body.splitlines(), plang)
-    runs, i = [], 0
+    runs: list[tuple[int, int]] = []
+    i = 0
     while i < len(cls):
         if cls[i] != "f":
             i += 1

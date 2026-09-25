@@ -919,7 +919,7 @@ if _NEWSPAPER:
         edition=st.session_state["active_db"],
         pages=_s["pages"],
         sources=_s["raw_files"],
-        model=ollama_client._MODEL,
+        model=ollama_client.MODEL,
     )
     _bar_db, _bar_nav = _db_slot, st.container()
 else:

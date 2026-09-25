@@ -14,7 +14,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-import frontmatter
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 
 OKF_VERSION = "0.1"
 

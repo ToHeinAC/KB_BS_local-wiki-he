@@ -29,6 +29,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+from collections.abc import Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
@@ -69,7 +70,7 @@ def using_db(name: str):
         _active.reset(token)
 
 
-def set_search_scope(names) -> None:
+def set_search_scope(names: Iterable[str] | None) -> None:
     """Set the DBs that read-only retrieval fans out over. Empty = follow active."""
     _scope.set(tuple(dict.fromkeys(n for n in (names or []) if n)))
 

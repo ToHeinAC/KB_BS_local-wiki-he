@@ -70,7 +70,7 @@ def _preload_cuda() -> None:
     # before the runtime loads — see gpu_placement's module docstring.
     os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
     try:
-        import nvidia  # namespace package provided by the nvidia-*-cu12 wheels
+        import nvidia  # pyright: ignore[reportMissingTypeStubs]  # namespace pkg of the nvidia-*-cu12 wheels
     except Exception:
         return
     for pkg in ("cuda_runtime", "cuda_nvrtc", "cublas"):

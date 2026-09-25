@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-import frontmatter
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 
 _TEMPLATE_PATH = Path(__file__).parent.parent / "templates" / "insert.md"
 

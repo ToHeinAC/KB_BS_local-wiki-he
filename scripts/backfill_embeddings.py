@@ -58,7 +58,7 @@ def main() -> int:
     if not dbs:
         ap.error("give a DB name or --all")
 
-    print(f"Backfilling embeddings (model={embed_index._model()}) for {len(dbs)} DB(s)")
+    print(f"Backfilling embeddings (model={embed_index.model_name()}) for {len(dbs)} DB(s)")
     grand = 0
     for db in dbs:
         try:

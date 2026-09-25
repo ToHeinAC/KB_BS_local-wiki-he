@@ -1,7 +1,10 @@
 """Thin wrapper around the Ollama SDK."""
 
+import contextlib
 import os
 import time
+from collections.abc import Mapping, Sequence
+from typing import Any, Protocol, cast
 
 from dotenv import load_dotenv
 
@@ -9,14 +12,14 @@ import ollama_server
 
 load_dotenv()
 
-_MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
+MODEL = os.getenv("OLLAMA_MODEL", "gemma4:e4b")
 
-# Per-role model overrides. Each defaults to _MODEL, so behaviour is unchanged
+# Per-role model overrides. Each defaults to MODEL, so behaviour is unchanged
 # unless the operator sets the env var. QUERY = precision/selection calls,
 # INGEST = page synthesis, FAST = lightweight maintenance (lint).
-_QUERY_MODEL = os.getenv("QUERY_MODEL") or _MODEL
-_INGEST_MODEL = os.getenv("INGEST_MODEL") or _MODEL
-_FAST_MODEL = os.getenv("FAST_MODEL") or _MODEL
+QUERY_MODEL = os.getenv("QUERY_MODEL") or MODEL
+INGEST_MODEL = os.getenv("INGEST_MODEL") or MODEL
+FAST_MODEL = os.getenv("FAST_MODEL") or MODEL
 
 # Cap the KV context for generate(). Models like gemma4:e4b (Gemma 3n) default
 # to a 131072-token window; that inflates the compute graph enough to trip the
@@ -43,10 +46,23 @@ def host() -> str:
     return ollama_server.host()
 
 
-def _client():
+class _Api(Protocol):
+    """The slice of `ollama.Client` this app calls. Responses stay `Any`: the SDK's
+    pydantic models and the tests' plain dicts are both read by subscript."""
+
+    def ps(self) -> Any: ...
+    def embed(self, *, model: str, input: list[str]) -> Any: ...
+    def generate(self, *, model: str, prompt: str, **kwargs: Any) -> Any: ...
+    def chat(
+        self, *, model: str, messages: Sequence[Mapping[str, Any]], options: Mapping[str, Any]
+    ) -> Any: ...
+    def list(self) -> Any: ...  # last: the name would shadow `list` in the annotations above
+
+
+def _client() -> _Api:
     import ollama
 
-    return ollama.Client(host=host())
+    return cast(_Api, ollama.Client(host=host()))
 
 
 def is_available() -> bool:
@@ -64,7 +80,7 @@ def embed(texts: list[str], model_id: str) -> list[list[float]]:
     """
     try:
         resp = _client().embed(model=model_id, input=list(texts))
-        vecs = resp["embeddings"] if isinstance(resp, dict) else resp.embeddings
+        vecs: list[list[float]] = resp["embeddings"]
         if not vecs:
             raise RuntimeError("empty embeddings response")
         return vecs
@@ -85,7 +101,7 @@ def _generate_once(model: str, system: str, prompt: str, temperature: float, num
 def generate(
     system: str, prompt: str, temperature: float = 0.3, model_id: str | None = None
 ) -> str:
-    model = model_id or _MODEL
+    model = model_id or MODEL
     try:
         return _generate_once(model, system, prompt, temperature, _NUM_CTX)
     except Exception as exc:
@@ -98,10 +114,10 @@ def generate(
         raise RuntimeError(f"Ollama generate failed: {exc}") from exc
 
 
-def chat(messages: list[dict], temperature: float = 0.7) -> str:
+def chat(messages: list[dict[str, Any]], temperature: float = 0.7) -> str:
     try:
         resp = _client().chat(
-            model=_MODEL,
+            model=MODEL,
             messages=messages,
             options={"temperature": temperature, "num_ctx": _NUM_CTX},
         )
@@ -113,31 +129,20 @@ def chat(messages: list[dict], temperature: float = 0.7) -> str:
 def unload(model_id: str) -> None:
     """Evict a model from VRAM (keep_alive=0). Frees the GPU so a following
     generate() model isn't forced to share/split. Best-effort; ignores errors."""
-    try:
+    with contextlib.suppress(Exception):
         _client().generate(model=model_id, prompt="", keep_alive=0)
-    except Exception:
-        pass
 
 
 def loaded_model() -> str:
-    """Model currently loaded in Ollama VRAM; falls back to configured _MODEL when idle."""
+    """Model currently loaded in Ollama VRAM; falls back to configured MODEL when idle."""
     try:
         resp = _client().ps()
-        models = (
-            getattr(resp, "models", None)
-            or (resp.get("models") if isinstance(resp, dict) else None)
-            or []
-        )
+        models: list[Any] = resp["models"] or []
         if models:
-            m = models[0]
-            return (
-                getattr(m, "model", None)
-                or (m.get("model") if isinstance(m, dict) else None)
-                or _MODEL
-            )
+            return str(models[0]["model"] or MODEL)
     except Exception:
         pass
-    return _MODEL
+    return MODEL
 
 
 def ocr(model_id: str, prompt: str, image_b64: str, temperature: float = 0.0) -> str:

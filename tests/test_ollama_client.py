@@ -43,7 +43,7 @@ def test_generate_passes_correct_args(monkeypatch):
     mock.generate.return_value = {"response": "ok"}
     ollama_client.generate("system", "user prompt", temperature=0.5)
     mock.generate.assert_called_once_with(
-        model=ollama_client._MODEL,
+        model=ollama_client.MODEL,
         system="system",
         prompt="user prompt",
         options={"temperature": 0.5, "num_ctx": ollama_client._NUM_CTX},
@@ -63,7 +63,7 @@ def test_generate_defaults_to_base_model_when_no_model_id(monkeypatch):
     mock.generate.return_value = {"response": "ok"}
     ollama_client.generate("s", "p")
     _, kwargs = mock.generate.call_args
-    assert kwargs.get("model") == ollama_client._MODEL
+    assert kwargs.get("model") == ollama_client.MODEL
 
 
 def test_generate_raises_runtime_error_on_failure(monkeypatch):
@@ -135,7 +135,7 @@ def test_chat_passes_messages(monkeypatch):
     msgs = [{"role": "user", "content": "hello"}]
     ollama_client.chat(msgs)
     mock.chat.assert_called_once_with(
-        model=ollama_client._MODEL,
+        model=ollama_client.MODEL,
         messages=msgs,
         options={"temperature": 0.7, "num_ctx": ollama_client._NUM_CTX},
     )
@@ -157,7 +157,7 @@ def test_chat_default_temperature(monkeypatch):
 
 
 def test_ollama_model_env_var(monkeypatch):
-    monkeypatch.setattr(ollama_client, "_MODEL", "custom-model:7b")
+    monkeypatch.setattr(ollama_client, "MODEL", "custom-model:7b")
     mock = _make_mock(monkeypatch)
     mock.generate.return_value = {"response": "ok"}
     ollama_client.generate("s", "p")

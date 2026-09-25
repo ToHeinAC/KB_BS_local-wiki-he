@@ -65,7 +65,7 @@ def _image_to_base64(pil_image) -> str:
 
 def iter_pdf_pages(pdf_bytes: bytes, dpi: int = PDF_DPI) -> Iterator[tuple[str, object]]:
     """Yield ('text', str) for pages with extractable text, else ('image', PIL.Image)."""
-    import pypdfium2 as pdfium
+    import pypdfium2 as pdfium  # pyright: ignore[reportMissingTypeStubs]
 
     scale = dpi / 72
     doc = pdfium.PdfDocument(pdf_bytes)
@@ -80,7 +80,7 @@ def iter_pdf_pages(pdf_bytes: bytes, dpi: int = PDF_DPI) -> Iterator[tuple[str, 
 
 
 def _pdf_page_count(pdf_bytes: bytes) -> int:
-    import pypdfium2 as pdfium
+    import pypdfium2 as pdfium  # pyright: ignore[reportMissingTypeStubs]
 
     return len(pdfium.PdfDocument(pdf_bytes))
 

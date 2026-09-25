@@ -30,7 +30,7 @@ import sqlite3
 import unicodedata
 from pathlib import Path
 
-import frontmatter
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 
 import chunker
 import db_context
@@ -212,18 +212,18 @@ _ENGLISH_SUFFIXES = (
 )
 
 
-def _nfkd_fold(token: str) -> str:
+def nfkd_fold(token: str) -> str:
     """Strip combining marks (ü→u, é→e). Stable canonical form for stemming."""
     t = unicodedata.normalize("NFKD", token)
     return "".join(c for c in t if not unicodedata.combining(c))
 
 
-def _umlaut_fold(token: str) -> str:
+def umlaut_fold(token: str) -> str:
     """German digraph fold (ü→ue, ß→ss). Catches users who type ASCII digraphs."""
     return token.translate(_UMLAUT_MAP)
 
 
-def _stem(folded: str) -> str:
+def light_stem(folded: str) -> str:
     """Trim the longest known suffix (greedy, single-pass).
 
     Operates on the folded form so umlauts don't trip suffix matching. Always
@@ -247,9 +247,9 @@ def variants(token: str) -> list[str]:
     t = token.lower()
     if len(t) < MIN_TOKEN_LEN or t in _STOPWORDS:
         return []
-    nfkd = _nfkd_fold(t)
-    umlaut = _umlaut_fold(t)
-    stem = _stem(nfkd)
+    nfkd = nfkd_fold(t)
+    umlaut = umlaut_fold(t)
+    stem = light_stem(nfkd)
     seen: list[str] = []
     for v in (t, nfkd, umlaut, stem):
         if v and v not in seen:
@@ -262,10 +262,10 @@ def tokenize(text: str) -> list[str]:
     return [m.group(0).lower() for m in _TOKEN_RE.finditer(text)]
 
 
-_WIKI_SYSTEM_PAGES = {"index.md", "log.md", "DESCRIPTION.md"}
+WIKI_SYSTEM_PAGES = {"index.md", "log.md", "DESCRIPTION.md"}
 
 
-def _wiki_page_chunks(md: Path) -> list[dict]:
+def wiki_page_chunks(md: Path) -> list[dict]:
     """Pseudo-chunks over one wiki page's body, tagged scope='wiki' (R-1).
 
     The page title + filename stem are prepended so a term that lives only in the
@@ -273,7 +273,7 @@ def _wiki_page_chunks(md: Path) -> list[dict]:
     is carried inline (wiki pseudo-chunks aren't persisted to data/chunks/).
     System pages (index/log/DESCRIPTION) index to nothing.
     """
-    if md.name in _WIKI_SYSTEM_PAGES:
+    if md.name in WIKI_SYSTEM_PAGES:
         return []
     try:
         post = frontmatter.load(str(md))
@@ -294,7 +294,7 @@ def _wiki_page_chunks(md: Path) -> list[dict]:
     return out
 
 
-def _wiki_chunks() -> list[dict]:
+def wiki_chunks() -> list[dict]:
     """Pseudo-chunks over all wiki page bodies (main + insights). See R-1.
 
     Lets BM25 search synthesized/merged wiki content — which may use different
@@ -305,7 +305,7 @@ def _wiki_chunks() -> list[dict]:
         return []
     out: list[dict] = []
     for md in sorted(wiki.glob("*.md")) + sorted(wiki.glob("insights/*.md")):
-        out.extend(_wiki_page_chunks(md))
+        out.extend(wiki_page_chunks(md))
     return out
 
 
@@ -381,7 +381,7 @@ def build(chunks: list[dict] | None = None) -> dict:
     `index_replace_source` / `index_delete` helpers.
     """
     if chunks is None:
-        chunks = chunker.all_chunks() + _wiki_chunks()
+        chunks = chunker.all_chunks() + wiki_chunks()
     qa_by_chunk = qa_gen.load()
     rows = [_row_for_chunk(ch, qa_by_chunk) for ch in _dedup(chunks)]
 
@@ -433,7 +433,7 @@ def index_replace_wiki_page(name: str) -> None:
     if not md.exists():
         index_delete(name)
         return
-    index_replace_source(name, _wiki_page_chunks(md), qa={})
+    index_replace_source(name, wiki_page_chunks(md), qa={})
 
 
 def index_delete(source: str) -> None:

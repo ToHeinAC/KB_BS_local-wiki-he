@@ -17,8 +17,8 @@ from dataclasses import dataclass, field
 
 @dataclass
 class RunMemory:
-    reads: dict[str, int] = field(default_factory=dict)
-    searches: dict[str, int] = field(default_factory=dict)
+    reads: dict[str, int] = field(default_factory=dict[str, int])
+    searches: dict[str, int] = field(default_factory=dict[str, int])
     step: int = 0
     # Stage E: best cross-encoder rerank_score seen this run, and whether the low-
     # confidence nudge has already fired (bounds it to one extra iteration).
@@ -26,7 +26,7 @@ class RunMemory:
     low_conf_nudged: bool = False
     # Search-ladder audit (idea.md §6.9.1): best rerank_score seen per source, so the
     # answer surface can show a "Why these sources" record (kept vs below-τ).
-    relevance_by_source: dict[str, float] = field(default_factory=dict)
+    relevance_by_source: dict[str, float] = field(default_factory=dict[str, float])
 
     def tick(self) -> int:
         self.step += 1

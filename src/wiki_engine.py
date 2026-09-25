@@ -6,7 +6,7 @@ import shutil
 from datetime import UTC, date, datetime
 from pathlib import Path
 
-import frontmatter
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 import numpy as np
 from dotenv import load_dotenv
 
@@ -177,7 +177,7 @@ def _rebuild_index() -> None:
 
 def _ascii_fold(text: str) -> str:
     """Lowercase ASCII form: German digraphs (ü→ue, ß→ss), then accents stripped."""
-    return lex_index._nfkd_fold(lex_index._umlaut_fold(text.lower()))
+    return lex_index.nfkd_fold(lex_index.umlaut_fold(text.lower()))
 
 
 def _slugify(text: str) -> str:
@@ -229,7 +229,7 @@ _NUM_UNIT_RE = re.compile(
 def _depluralize(tok: str) -> str:
     """Fold simple English plurals the lex stemmer's 4-char floor misses.
 
-    `lex_index._stem` leaves <=4-char tokens untouched, so `llms` would not fold
+    `lex_index.light_stem` leaves <=4-char tokens untouched, so `llms` would not fold
     to `llm` — the flagship duplicate case. This closes that gap.
     """
     if len(tok) >= 5 and tok.endswith("es"):
@@ -246,8 +246,8 @@ def _term_key(tok: str) -> str:
     the stemmer already handled the suffix and a second strip would over-trim
     (e.g. `densing`→`dens` must NOT become `den`).
     """
-    folded = lex_index._nfkd_fold(tok.lower())
-    stemmed = lex_index._stem(folded)
+    folded = lex_index.nfkd_fold(tok.lower())
+    stemmed = lex_index.light_stem(folded)
     return _depluralize(stemmed) if stemmed == folded else stemmed
 
 
@@ -632,7 +632,7 @@ def _route_cross_language(title: str, ptype: str, plang: str, ctx: dict) -> str 
         cache = ctx.setdefault("title_vecs", {})
         todo = [fn for fn in cands if fn not in cache]
         vecs = np.asarray(
-            ollama_client.embed([title] + [reg[fn]["title"] for fn in todo], embed_index._model()),
+            ollama_client.embed([title] + [reg[fn]["title"] for fn in todo], embed_index.model_name()),
             dtype=np.float32,
         )
         vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
@@ -994,7 +994,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
     )
 
     response = ollama_client.generate(
-        ctx["system"], prompt, temperature=0.3, model_id=ollama_client._INGEST_MODEL
+        ctx["system"], prompt, temperature=0.3, model_id=ollama_client.INGEST_MODEL
     )
     pages = _parse_llm_pages(response)
 
@@ -1005,7 +1005,7 @@ def ingest_piece(ctx: dict, piece_text: str, index: int = 0, total: int = 1) -> 
             f"Original task was:\n{prompt}"
         )
         response = ollama_client.generate(
-            ctx["system"], retry_prompt, temperature=0.2, model_id=ollama_client._INGEST_MODEL
+            ctx["system"], retry_prompt, temperature=0.2, model_id=ollama_client.INGEST_MODEL
         )
         pages = _parse_llm_pages(response)
 
@@ -1294,7 +1294,7 @@ def _polish_page(content: str) -> str:
             system,
             CONSOLIDATE_POLISH_PROMPT.format(page=post.content),
             temperature=0.2,
-            model_id=ollama_client._INGEST_MODEL,
+            model_id=ollama_client.INGEST_MODEL,
         )
     except Exception:
         return content
@@ -1377,7 +1377,7 @@ def delete_source(source_name: str) -> dict:
 
     result["manifest"] = dedup.deregister_source(source_name)
 
-    chunk_file = db_context.chunks_dir() / f"{chunker._slug(source_name)}.jsonl"
+    chunk_file = db_context.chunks_dir() / f"{chunker.source_slug(source_name)}.jsonl"
     if chunk_file.exists():
         chunk_file.unlink()
         result["chunks"] = True
@@ -1575,7 +1575,7 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
     rank_index = _index_text_for(candidates) if candidates else index_text
     select_prompt = SELECT_PROMPT.format(index_text=rank_index, question=question)
     selected_raw = ollama_client.generate(
-        system, select_prompt, temperature=0.1, model_id=ollama_client._QUERY_MODEL
+        system, select_prompt, temperature=0.1, model_id=ollama_client.QUERY_MODEL
     )
     selected = [
         ln.strip()
@@ -1738,7 +1738,7 @@ def lint() -> str:
         system,
         LINT_PROMPT.format(all_pages=all_pages, today=_date()),
         temperature=0.3,
-        model_id=ollama_client._FAST_MODEL,
+        model_id=ollama_client.FAST_MODEL,
     )
 
     prog_blocks = []

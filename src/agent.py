@@ -17,7 +17,7 @@ from collections.abc import Generator
 from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
-from langgraph.graph import END, START, MessagesState, StateGraph
+from langgraph.graph import END, START, MessagesState, StateGraph  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.prebuilt import ToolNode
 
 import db_context
@@ -46,7 +46,7 @@ FALLBACK_NOTES_CAP = int(os.getenv("RESEARCH_FALLBACK_NOTES_CAP", "12000"))
 
 def _build_llm():
     return ChatOllama(
-        model=ollama_client._QUERY_MODEL,
+        model=ollama_client.QUERY_MODEL,
         base_url=ollama_client.host(),
         temperature=0.3,
         timeout=LLM_TIMEOUT,
@@ -163,7 +163,7 @@ def _synthesize_fallback(question: str, all_messages: list, directive: str = "")
             RESEARCH_FALLBACK_SYSTEM,
             prompt,
             temperature=0.3,
-            model_id=ollama_client._QUERY_MODEL,
+            model_id=ollama_client.QUERY_MODEL,
         ).strip()
     except Exception:
         return ""

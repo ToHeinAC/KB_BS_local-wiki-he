@@ -11,6 +11,9 @@ import db_context
 
 load_dotenv()
 
+# sha256(original upload bytes) -> {"filename": ..., "added_at": ...}
+Manifest = dict[str, dict[str, str]]
+
 
 def _raw_dir() -> Path:
     return db_context.raw_dir()
@@ -20,14 +23,14 @@ def _manifest_path() -> Path:
     return _raw_dir() / "manifest.json"
 
 
-def _load_manifest() -> dict:
+def _load_manifest() -> Manifest:
     p = _manifest_path()
     if p.exists():
         return json.loads(p.read_text())
     return {}
 
 
-def _save_manifest(manifest: dict) -> None:
+def _save_manifest(manifest: Manifest) -> None:
     p = _manifest_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(manifest, indent=2))
