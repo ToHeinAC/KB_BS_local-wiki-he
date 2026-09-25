@@ -93,7 +93,7 @@ allowed-confusables = ["–", "×", "−"]
 max-complexity = 10
 
 [tool.pyright]
-include = ["src", "tests", "scripts"]
+include = ["src", "tests", "scripts", ".claude/hooks"]
 exclude = ["src/vendor", "**/__pycache__"]
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
@@ -108,7 +108,7 @@ session_timeout = 60
 
 [tool.coverage.run]
 branch = true
-source = ["src"]
+source = ["src", ".claude/hooks"]
 omit = ["src/vendor/*"]
 
 [tool.coverage.report]

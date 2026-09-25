@@ -1,12 +1,18 @@
-Your task is to update the documentation based on the latest changes.
-Starting point is the last git commit. Minimally use git git status && git diff HEAD && git status --porcelain to find out.
-From there, analyse the latest changes in the codebase etc.:
-- Firstly, change the CLAUDE.md.
-- Then go to the implementation details (IMPLEMENTATION.md, SCHEMA.md) within the docs/ folder and make changes accordingly.
-- In the end, reflect all critical changes also in README.md, if necessary.
+---
+description: Update project docs to match the code changes since the last commit (or since a given git ref)
+argument-hint: "[git-ref, default HEAD]"
+---
 
-CRITICAL RULES:
-- Keep README.md < 15.000 chars (general)
-- Keep CLAUDE.md < 25.000 chars (use references to docs/ folder documentation in the form e. g. [docs/architecture.md](docs/architecture.md) @docs/architecture.md Full architecture diagram, state objects, data flow)
-- Keep IMPLEMENTATION.md, SCHEMA.md < 35.000 chars
-- Keep each single doc in docs/ folder < 35.000 chars
+Update the documentation to match the code. Base ref: `$ARGUMENTS` (use `HEAD` if empty).
+
+1. Find what changed: `git diff <ref>` and `git status --porcelain` (include untracked files).
+2. Update, in this order, only what the changes affect:
+   - `IMPLEMENTATION.md`: phase table, module map, run/verify commands. Current state only, no history.
+   - `docs/<component>.md`: deep details of each changed component (create one if a new component
+     appeared, and link it from `IMPLEMENTATION.md`). `docs/architecture.md` for data flow and design decisions.
+   - `README.md`: only user-facing changes (install, usage, features).
+   - `AGENTS.md`: only if a convention or workflow rule changed. Never restate phase status there.
+   - `PRD.md`: never edit silently. If the code contradicts the PRD, report it to the user instead.
+3. State each fact once and link to it elsewhere. Remove statements the change made false.
+4. Verify: `uv run pytest tests/test_docs.py -q`. It checks size limits (AGENTS.md §5.1)
+   and that every local link resolves.

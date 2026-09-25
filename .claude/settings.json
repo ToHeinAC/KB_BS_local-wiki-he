@@ -1,5 +1,23 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(uv sync *)",
+      "Bash(uv run pytest *)",
+      "Bash(uv run ruff *)",
+      "Bash(uv run pyright *)",
+      "Bash(uv run pre-commit run *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Bash(* --no-verify*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
@@ -19,6 +37,28 @@
             "type": "command",
             "command": "c=$(jq -r '.tool_input.command // empty'); if printf '%s' \"$c\" | grep -oE 'data/[A-Za-z0-9_.-]+' | grep -qv '^data/KI$'; then printf '%s' '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"ask\",\"permissionDecisionReason\":\"AGENTS.md 5.5: this command names a data/ database other than data/KI. Those are off-limits to AI coding tools for reads and writes alike. Approve only if you intended this DB to be touched.\"}}' ;fi",
             "statusMessage": "Checking data/ access guard"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet --directory \"$CLAUDE_PROJECT_DIR\" python .claude/hooks/format_on_edit.py"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet --directory \"$CLAUDE_PROJECT_DIR\" python .claude/hooks/stop_gate.py",
+            "timeout": 300
           }
         ]
       }
