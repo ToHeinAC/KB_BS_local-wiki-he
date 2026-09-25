@@ -2,7 +2,7 @@
 
 > Modules: [`src/gpu_placement.py`](../src/gpu_placement.py) (policy),
 > [`src/ollama_server.py`](../src/ollama_server.py) (the pinned Ollama daemon).
-> Config table: [IMPLEMENTATION.md §6](../IMPLEMENTATION.md#6-configuration).
+> Config table: [configuration.md](configuration.md).
 
 ## The policy
 

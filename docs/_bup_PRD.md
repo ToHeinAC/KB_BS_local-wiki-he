@@ -1,4 +1,7 @@
 # LocalWiki — Product Requirements Document
+
+> **Archived** original PRD v1.1 (2026-05-01), kept verbatim. The current, condensed PRD is [PRD.md](../PRD.md); older docs that cite `PRD §x.y` refer to the sections of this file.
+
 ### Karpathy-Style Self-Compiling Knowledge Management System
 **Version:** 1.1 | **Target Implementer:** Claude Code | **Date:** 2026-05-01
 
@@ -744,7 +747,7 @@ On first run, the application must:[1]
 
 The project must include automated tests, but the total number of automatic tests must be capped at **100 tests maximum**. This cap is intended to keep the suite intentionally lean, fast, and focused.[1]
 
-> **Superseded — see [IMPLEMENTATION.md](IMPLEMENTATION.md) §5 for the current policy.** The hard 100-test cap was relaxed in 2026-05: whole new modules with verifiable behaviour are exempt, so the suite now stands at ≈233 tests. The cap's *intent* — a lean, high-signal suite with no low-value proliferation — still governs. Other "100 tests" mentions in this spec are historical.
+> **Superseded — see [IMPLEMENTATION.md](../IMPLEMENTATION.md) §5 for the current policy.** The hard 100-test cap was relaxed in 2026-05: whole new modules with verifiable behaviour are exempt, so the suite now stands at ≈233 tests. The cap's *intent* — a lean, high-signal suite with no low-value proliferation — still governs. Other "100 tests" mentions in this spec are historical.
 
 **Test allocation rules:**
 - Approximately **90%** of tests shall cover the most important parts of the system.

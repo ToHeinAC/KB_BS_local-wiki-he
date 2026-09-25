@@ -11,7 +11,6 @@ Track open work and resolved items here. Keep entries short; link to PRs/commits
 
 ## Open
 
-- **3 failing tests in `tests/test_file_processor.py`** (`test_truncation_respects_max_chars`, `test_result_len_at_most_max_chars`, `test_large_file_content_after_max_absent`). Pre-existing — they fail on a clean tree too, so they predate the 2026-07-24 nav/search work. Suite is otherwise 361/364 green. Either `chunk_text`'s truncation contract or the tests' expectation of it has drifted; decide which is right before touching either.
 - **Stale `postings.json` / `stats.json` in most `data/<DB>/index/`.** Dead artifacts of the JSON-postings backend retired in `d25fbe8`; nothing reads them (~4 MB in KI alone). Safe to delete, but they are inside user databases, so removal needs an explicit go-ahead.
 - **No migration hook for derived indexes.** `d25fbe8` changed the on-disk index format with no upgrade path, which silently broke retrieval on 10 of 12 databases until 2026-07-24. A startup check (`lex_index.index_health()` per DB) or a one-shot migration script would have caught it; today only the Maintenance banner does, and only once a user visits the DB.
 

@@ -26,7 +26,7 @@ graph pointed at local Ollama + Tavily. It does **not** touch the wiki or `data/
 Upstream's `pyproject.toml` declares ~40 runtime dependencies — `azure-identity`,
 `azure-search-documents`, `supabase`, `langchain-aws`, `langchain-google-vertexai`,
 `openai`, `pandas`, `pymupdf`, `ipykernel`, `langgraph-cli[inmem]` — and pins the
-LangChain **0.3** line. `uv add`ing it would (a) contradict IMPLEMENTATION.md §5's
+LangChain **0.3** line. `uv add`ing it would (a) contradict AGENTS.md §5.3's
 no-cloud-LLM-APIs rule with a wall of cloud SDKs, and (b) very likely downgrade this
 project's `langchain-core` 1.x / `langgraph` 1.x, breaking `src/agent.py` and
 `src/chat_agent.py`.
@@ -72,7 +72,7 @@ pumps the graph, and maps its events onto the Research page's step-dict contract
 | `max_react_tool_calls` | 10 | `DEEP_RESEARCH_MAX_TOOL_CALLS` (6) |
 | `*_model_max_tokens` | 8192–10000 | `DEEP_RESEARCH_MAX_TOKENS` (8192) |
 
-All `DEEP_RESEARCH_*` vars are registered in IMPLEMENTATION.md §6 and `.env.example`.
+All `DEEP_RESEARCH_*` vars are registered in [configuration.md](configuration.md) and `.env.example`.
 
 ## Non-obvious facts (each cost a debugging round-trip — do not re-guess)
 
@@ -169,7 +169,7 @@ All `DEEP_RESEARCH_*` vars are registered in IMPLEMENTATION.md §6 and `.env.exa
   `_astream_sync` creates a private event loop, pumps `astream(..., stream_mode="updates",
   subgraphs=True)` one event at a time via `run_until_complete(agen.__anext__())`, and
   closes the loop in a `finally`. No background thread, no queue. This is the approved
-  async exception (IMPLEMENTATION.md §5).
+  async exception (AGENTS.md §5.3).
 
 - **Report persistence.** `_save_report` writes `comparisons/report-<slug>.md` with the
   same frontmatter shape as the Quick path's `tools._submit_final_impl`, stamped through

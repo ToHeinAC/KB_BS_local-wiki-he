@@ -7,7 +7,7 @@ author: Tobias Hein
 
 # Tech Stack
 
-> Authoritative spec: [`PRD.md`](../PRD.md) §2.3 (Tech Stack), §4.4 (Simplicity Rules), §5 (Configuration & Environment).
+> Original spec: [`_bup_PRD.md`](_bup_PRD.md) §2.3 (Tech Stack), §4.4 (Simplicity Rules), §5 (Configuration & Environment).
 
 ## Runtime
 
@@ -51,17 +51,19 @@ Dev: `pytest ≥ 8.0`.
 - **No database** of any kind — files + JSON only.
 - **No Docker** in the primary workflow.
 - **No configuration UI** — `.env` is the only config surface.
-- **No sub-packages** — every module is one Python file at project root.
+- **No sub-packages** — every module is one Python file in `src/` (except `src/vendor/`).
 
 ## Environment commands
 
 ```bash
-uv sync                                             # create .venv, install locked deps
-uv run pytest                                       # run tests
-uv run streamlit run app.py --server.port 8520      # run app
+uv sync && uv run pre-commit install                  # create .venv, install locked deps + gate
+uv run pytest                                         # run tests
+uv run pre-commit run --all-files                     # full quality gate
+uv run streamlit run src/app.py --server.port 8520    # run app
 ```
 
-`pyproject.toml` is checked in; `uv.lock` is gitignored (`.gitignore:16`), so `uv sync` resolves against the declared ranges.
+`pyproject.toml` and `uv.lock` are checked in (`uv sync --locked` in CI). Add dependencies with
+`uv add <pkg>` (dev tools: `uv add --dev <pkg>`), never `pip install`.
 
 ## Streamlit notes
 
@@ -71,4 +73,4 @@ The app is served under the base path **`/wiwi/`** (`baseUrlPath` in `.streamlit
 
 ## Licensing
 
-All implementation must be under Apache 2.0 or a more permissive licence (MIT) — CLAUDE.md §5.4.
+All implementation must be under Apache 2.0 or a more permissive licence (MIT) — AGENTS.md §5.7.

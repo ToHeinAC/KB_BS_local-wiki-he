@@ -7,7 +7,7 @@ author: Tobias Hein
 
 # Domain
 
-> Authoritative spec: [`PRD.md`](../PRD.md) §1 (Executive Summary) and §10 (Key Design Decisions & Rationale).
+> Original spec: [`_bup_PRD.md`](_bup_PRD.md) §1 (Executive Summary) and §10 (Key Design Decisions & Rationale).
 
 ## What LocalWiki is
 

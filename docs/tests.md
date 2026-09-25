@@ -7,11 +7,11 @@ author: Tobias Hein
 
 # Tests
 
-> Authoritative spec: [`PRD.md`](../PRD.md) §4.5 (Testing Strategy).
+> Original spec: [`_bup_PRD.md`](_bup_PRD.md) §4.5 (Testing Strategy).
 
 ## Cap (relaxed)
 
-**Originally capped at 100; cap relaxed 2026-05. Current suite 527 tests (524 passing; the 3 `test_file_processor` truncation tests fail)** (canonical count: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §5). The original cap was relaxed in 2026-05 when the retrieval layer (chunker, lex_index, extractor, qa_gen) added 30 high-signal unit + end-to-end tests; Tier A ingest speedup added 5 more (qa_gen cap, anchored-preference selection, begin/piece/end roundtrip, single-select assertion, back-compat wrapper); the non-Markdown upload converter (`md_convert`) added 10 (plus a `dedup` content-param test); the Stage D cross-encoder (`rerank`) added 14, all mocked so the suite needs no GGUF; page-language pinning (`tests/test_page_language.py`) added 22 with a prompt-routed fake LLM and a stubbed embedder, so they need no Ollama. The relaxation principle: the cap exists to discourage low-value proliferation; whole new modules with verifiable behaviour are exempt.
+**Originally capped at 100; cap relaxed 2026-05.** The suite is now gated by coverage instead of a count (AGENTS.md §5.4). The original cap was relaxed in 2026-05 when the retrieval layer (chunker, lex_index, extractor, qa_gen) added 30 high-signal unit + end-to-end tests; Tier A ingest speedup added 5 more (qa_gen cap, anchored-preference selection, begin/piece/end roundtrip, single-select assertion, back-compat wrapper); the non-Markdown upload converter (`md_convert`) added 10 (plus a `dedup` content-param test); the Stage D cross-encoder (`rerank`) added 14, all mocked so the suite needs no GGUF; page-language pinning (`tests/test_page_language.py`) added 22 with a prompt-routed fake LLM and a stubbed embedder, so they need no Ollama. The relaxation principle: the cap exists to discourage low-value proliferation; whole new modules with verifiable behaviour are exempt.
 
 ## Allocation
 
@@ -44,6 +44,9 @@ Prefer a compact suite of high-signal unit + integration tests over a large volu
 
 ## Tooling
 
-- `pytest ≥ 8.0` (dev dependency).
-- Run with `uv run pytest`.
+- pytest with pytest-cov and pytest-timeout (`[dependency-groups] dev` in `pyproject.toml`).
+- Fast loop: `uv run pytest`; full gate: `uv run pre-commit run --all-files` (branch coverage
+  ≥ 85 %, suite ≤ 60 s; numbers in `pyproject.toml`).
+- Offline: `tests/conftest.py` blocks every socket connect. Stub Ollama, Tavily and the pinned
+  daemon (`ollama_client.host`) instead of reaching them.
 - Integration test (PRD §9 step 9): upload → ingest → chat → research, end-to-end.

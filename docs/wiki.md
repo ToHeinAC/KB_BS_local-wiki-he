@@ -7,7 +7,7 @@ author: Tobias Hein
 
 # Wiki & Storage
 
-> Authoritative spec: [`PRD.md`](../PRD.md) §2.1 (Three-Layer Knowledge Model), §3.5 (`SCHEMA.md`), §6 (Schema Initialization).
+> Original spec: [`_bup_PRD.md`](_bup_PRD.md) §2.1 (Three-Layer Knowledge Model), §3.5 (`SCHEMA.md`), §6 (Schema Initialization).
 
 ## Layout
 

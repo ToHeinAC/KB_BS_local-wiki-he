@@ -7,7 +7,7 @@ author: Tobias Hein
 
 # UI
 
-> Authoritative spec: [`PRD.md`](../PRD.md) §2.4 (GUI Design Direction) and §3.9 (Web Application).
+> Original spec: [`_bup_PRD.md`](_bup_PRD.md) §2.4 (GUI Design Direction) and §3.9 (Web Application).
 
 ## Visual style — New York Times editorial
 
