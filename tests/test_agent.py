@@ -157,3 +157,10 @@ def test_invoke_failure_yields_error(monkeypatch):
     monkeypatch.setattr(agent, "_build_llm", lambda: fake)
     steps = list(agent.run_research_agent("q?"))
     assert any(s["type"] == "error" for s in steps)
+
+
+def test_build_llm_applies_the_per_call_timeout(monkeypatch):
+    # ChatOllama ignores unknown kwargs, so the timeout must reach the HTTP client.
+    monkeypatch.setattr(agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
+    llm = agent._build_llm()
+    assert llm.bound._client._client.timeout.read == agent.LLM_TIMEOUT

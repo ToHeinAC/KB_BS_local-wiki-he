@@ -85,3 +85,10 @@ def test_no_notes_no_prose_yields_error_without_synth_call(monkeypatch):
     steps = list(chat_agent.run_chat_agent("q?"))
     assert called["n"] == 0
     assert steps and steps[-1]["type"] == "error"
+
+
+def test_build_llm_applies_the_per_call_timeout(monkeypatch):
+    # ChatOllama ignores unknown kwargs, so the timeout must reach the HTTP client.
+    monkeypatch.setattr(chat_agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
+    llm = chat_agent._build_llm()
+    assert llm.bound._client._client.timeout.read == chat_agent.LLM_TIMEOUT

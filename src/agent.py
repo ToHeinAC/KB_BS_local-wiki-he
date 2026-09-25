@@ -55,7 +55,7 @@ def _build_llm():
         model=ollama_client.QUERY_MODEL,
         base_url=ollama_client.host(),
         temperature=0.3,
-        timeout=LLM_TIMEOUT,
+        client_kwargs={"timeout": LLM_TIMEOUT},  # ChatOllama drops a bare timeout=
     ).bind_tools(tool_module.TOOLS)
 
 
