@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, date, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 import networkx as nx
 from networkx.algorithms.community import louvain_communities
@@ -55,7 +55,7 @@ def _quantile_threshold(values: list[float], q: float) -> float:
     return ordered[idx]
 
 
-def _to_networkx(typed: dict[str, Any]) -> nx.Graph:
+def _to_networkx(typed: dict[str, Any]) -> nx.Graph[str]:
     """Undirected view of the typed graph, for analytics only.
 
     Direction is preserved in the exported edge list (`derived-from` renders as
@@ -63,7 +63,7 @@ def _to_networkx(typed: dict[str, Any]) -> nx.Graph:
     a page and the source it derives from belong to the same neighbourhood
     regardless of which way the arrow points.
     """
-    G = nx.Graph()
+    G: nx.Graph[str] = nx.Graph()
     for node in typed["nodes"]:
         G.add_node(node["id"])
     for edge in typed["edges"]:
@@ -96,66 +96,60 @@ def _page_meta() -> dict[str, dict[str, Any]]:
     return {p["filename"]: p for p in wiki_engine.list_pages(include_insights=True)}
 
 
-def export(today=None) -> dict[str, Any]:
-    """Build the renderer payload from the live wiki. Deterministic."""
-    typed, truncated = _cap(wiki_engine.build_typed_graph(), MAX_NODES)
-    meta = _page_meta()
-    G = _to_networkx(typed)
-
+def _analytics(G: nx.Graph[str]) -> tuple[dict[str, float], dict[str, float], list[set[str]]]:
+    """PageRank, betweenness and Louvain communities (seeded) of the undirected graph."""
     if G.number_of_edges():
-        pagerank = nx.pagerank(G)
-        communities = louvain_communities(G, seed=_LOUVAIN_SEED)
+        pagerank: dict[str, float] = nx.pagerank(G)
+        communities: list[set[str]] = louvain_communities(G, seed=_LOUVAIN_SEED)
     else:
-        pagerank = {n: 0.0 for n in G}
+        pagerank = dict.fromkeys(G, 0.0)
         communities = [set(G)] if G else []
-    betweenness = nx.betweenness_centrality(G) if G.number_of_nodes() > 2 else {n: 0.0 for n in G}
-    # Sort communities by their smallest member so ids are stable across runs
-    # even if Louvain returns them in a different order.
-    community_of = {
-        node: i
-        for i, group in enumerate(sorted(communities, key=lambda c: min(c)))
-        for node in group
+    betweenness: dict[str, float] = (
+        nx.betweenness_centrality(G) if G.number_of_nodes() > 2 else dict.fromkeys(G, 0.0)
+    )
+    return pagerank, betweenness, communities
+
+
+def _node_payload(
+    node: dict[str, Any],
+    fm: dict[str, Any],
+    G: nx.Graph[str],
+    scores: dict[str, float],
+    today: date | None,
+) -> dict[str, Any]:
+    """One renderer node. ``scores`` holds pr/bridge/comm plus the hub/bridge cut-offs."""
+    nid = node["id"]
+    degree = cast(int, G.degree(nid)) if nid in G else 0  # networkx stubs leave it unknown
+    tags: list[Any] = fm.get("tags") or []
+    pr, bridge = scores["pr"], scores["bridge"]
+    return {
+        "id": nid,
+        "label": node["label"],
+        # `cat` drives colour: the page's own frontmatter type for pages,
+        # a synthetic "source" category for raw documents.
+        "cat": "source" if node["type"] == "source" else str(fm.get("type", "concept")).lower(),
+        "kind": node["type"],
+        "comm": int(scores["comm"]),
+        "deg": degree,
+        "pr": round(pr, 5),
+        "bridge": round(bridge, 5),
+        "confidence": str(fm.get("confidence", "")).lower() or None,
+        "created": _iso_or_none(fm.get("created")),
+        "updated": _iso_or_none(fm.get("updated")),
+        "tags": [str(t) for t in tags],
+        "stale": bool(fm) and wiki_engine.is_page_stale(fm, today),
+        "orphan": degree == 0,
+        "hub": bool(pr) and pr >= scores["hub_cut"],
+        "bridgeHub": bool(bridge) and bridge >= scores["bridge_cut"],
     }
 
-    hub_cut = _quantile_threshold(list(pagerank.values()), _HUB_QUANTILE)
-    bridge_cut = _quantile_threshold(list(betweenness.values()), _BRIDGE_QUANTILE)
 
-    nodes = []
-    for node in sorted(typed["nodes"], key=lambda n: n["id"]):
-        nid = node["id"]
-        fm = meta.get(nid, {})
-        is_source = node["type"] == "source"
-        pr = pagerank.get(nid, 0.0)
-        bridge = betweenness.get(nid, 0.0)
-        degree = G.degree(nid) if nid in G else 0
-        nodes.append(
-            {
-                "id": nid,
-                "label": node["label"],
-                # `cat` drives colour: the page's own frontmatter type for pages,
-                # a synthetic "source" category for raw documents.
-                "cat": "source" if is_source else str(fm.get("type", "concept")).lower(),
-                "kind": node["type"],
-                "comm": community_of.get(nid, 0),
-                "deg": degree,
-                "pr": round(pr, 5),
-                "bridge": round(bridge, 5),
-                "confidence": str(fm.get("confidence", "")).lower() or None,
-                "created": _iso_or_none(fm.get("created")),
-                "updated": _iso_or_none(fm.get("updated")),
-                "tags": [str(t) for t in (fm.get("tags") or [])],
-                "stale": bool(fm) and wiki_engine.is_page_stale(fm, today),
-                "orphan": degree == 0,
-                "hub": bool(pr) and pr >= hub_cut,
-                "bridgeHub": bool(bridge) and bridge >= bridge_cut,
-            }
-        )
-
-    # `related-to` is undirected, and which end the typed graph emits first
-    # depends on `Path.glob` order — i.e. on the filesystem. Orient those pairs
-    # alphabetically so the payload is byte-identical across machines;
-    # `derived-from` keeps its page → source direction (the renderer arrows it).
-    edges = sorted(
+def _edges(typed: dict[str, Any]) -> list[dict[str, str]]:
+    """`related-to` is undirected, and which end the typed graph emits first
+    depends on `Path.glob` order — i.e. on the filesystem. Orient those pairs
+    alphabetically so the payload is byte-identical across machines;
+    `derived-from` keeps its page → source direction (the renderer arrows it)."""
+    return sorted(
         (
             {"s": min(e["from"], e["to"]), "t": max(e["from"], e["to"]), "type": e["type"]}
             if e["type"] == "related-to"
@@ -165,9 +159,42 @@ def export(today=None) -> dict[str, Any]:
         key=lambda e: (e["s"], e["t"], e["type"]),
     )
 
+
+def export(today: date | None = None) -> dict[str, Any]:
+    """Build the renderer payload from the live wiki. Deterministic."""
+    typed, truncated = _cap(wiki_engine.build_typed_graph(), MAX_NODES)
+    meta = _page_meta()
+    G = _to_networkx(typed)
+    pagerank, betweenness, communities = _analytics(G)
+    # Sort communities by their smallest member so ids are stable across runs
+    # even if Louvain returns them in a different order.
+    community_of = {
+        node: i
+        for i, group in enumerate(sorted(communities, key=lambda c: min(c)))
+        for node in group
+    }
+    cuts = {
+        "hub_cut": _quantile_threshold(list(pagerank.values()), _HUB_QUANTILE),
+        "bridge_cut": _quantile_threshold(list(betweenness.values()), _BRIDGE_QUANTILE),
+    }
+    nodes = [
+        _node_payload(
+            node,
+            meta.get(node["id"], {}),
+            G,
+            {
+                **cuts,
+                "pr": pagerank.get(node["id"], 0.0),
+                "bridge": betweenness.get(node["id"], 0.0),
+                "comm": community_of.get(node["id"], 0),
+            },
+            today,
+        )
+        for node in sorted(typed["nodes"], key=lambda n: n["id"])
+    ]
     return {
         "nodes": nodes,
-        "edges": edges,
+        "edges": _edges(typed),
         "communities": len(communities),
         "truncated": truncated,
         # Widget chrome follows the bundle's own language, detected in code from
@@ -177,7 +204,7 @@ def export(today=None) -> dict[str, Any]:
     }
 
 
-def health(payload: dict[str, Any], today=None) -> dict[str, Any]:
+def health(payload: dict[str, Any], today: date | None = None) -> dict[str, Any]:
     """Bundle health from an exported payload: what is growing, what sits alone.
 
     Pure and deterministic — it reads only what `export()` already stamped, so
@@ -186,8 +213,7 @@ def health(payload: dict[str, Any], today=None) -> dict[str, Any]:
     Counts cover *pages* only: a raw source document has no health of its own.
     """
     pages = [n for n in payload["nodes"] if n["kind"] == "page"]
-    cutoff = today or datetime.now(UTC).date()
-    cutoff = cutoff - timedelta(days=HEALTH_WINDOW_DAYS)
+    cutoff = (today or datetime.now(UTC).date()) - timedelta(days=HEALTH_WINDOW_DAYS)
 
     clusters: dict[int, dict[str, Any]] = {}
     for node in pages:
@@ -216,7 +242,7 @@ def health(payload: dict[str, Any], today=None) -> dict[str, Any]:
     }
 
 
-def _is_recent(updated: str | None, cutoff) -> bool:
+def _is_recent(updated: str | None, cutoff: date) -> bool:
     """`updated` is the ISO date `export()` stamped, or None on a bare page."""
     if not updated:
         return False
@@ -226,7 +252,7 @@ def _is_recent(updated: str | None, cutoff) -> bool:
         return False
 
 
-def _iso_or_none(value) -> str | None:
+def _iso_or_none(value: object) -> str | None:
     """Frontmatter dates arrive as `date` or `str`; normalise to ISO or None."""
     if not value:
         return None
