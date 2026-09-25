@@ -163,3 +163,68 @@ def test_ollama_model_env_var(monkeypatch):
     ollama_client.generate("s", "p")
     _, kwargs = mock.generate.call_args
     assert kwargs.get("model") == "custom-model:7b"
+
+
+# --- embed / loaded_model / ocr / rewrite ---
+
+
+def test_embed_returns_vectors(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.embed.return_value = {"embeddings": [[0.1, 0.2]]}
+    assert ollama_client.embed(["x"], "bge-m3") == [[0.1, 0.2]]
+    assert mock.embed.call_args.kwargs == {"model": "bge-m3", "input": ["x"]}
+
+
+@pytest.mark.parametrize("response", [{"embeddings": []}, ConnectionError("down")])
+def test_embed_failure_names_the_model(monkeypatch, response):
+    mock = _make_mock(monkeypatch)
+    if isinstance(response, Exception):
+        mock.embed.side_effect = response
+    else:
+        mock.embed.return_value = response
+    with pytest.raises(RuntimeError, match=r"Ollama embed failed \(bge-m3\)"):
+        ollama_client.embed(["x"], "bge-m3")
+
+
+def test_loaded_model_reports_the_resident_model(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.ps.return_value = {"models": [{"model": "qwen3:8b"}]}
+    assert ollama_client.loaded_model() == "qwen3:8b"
+
+
+@pytest.mark.parametrize("ps", [{"models": []}, ConnectionError("down")])
+def test_loaded_model_falls_back_when_idle_or_down(monkeypatch, ps):
+    mock = _make_mock(monkeypatch)
+    if isinstance(ps, Exception):
+        mock.ps.side_effect = ps
+    else:
+        mock.ps.return_value = ps
+    assert ollama_client.loaded_model() == ollama_client.MODEL
+
+
+def test_ocr_sends_the_image(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.chat.return_value = {"message": {"content": "# Page"}}
+    assert ollama_client.ocr("deepseek-ocr:3b", "read", "B64") == "# Page"
+    assert mock.chat.call_args.kwargs["messages"][0]["images"] == ["B64"]
+
+
+def test_rewrite_uses_the_given_model(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.chat.return_value = {"message": {"content": "md"}}
+    assert ollama_client.rewrite("small:1b", "text") == "md"
+    assert mock.chat.call_args.kwargs["model"] == "small:1b"
+
+
+@pytest.mark.parametrize(("fn", "label"), [("ocr", "OCR"), ("rewrite", "rewrite")])
+def test_vision_and_rewrite_failures_raise(monkeypatch, fn, label):
+    mock = _make_mock(monkeypatch)
+    mock.chat.side_effect = ConnectionError("down")
+    args = ("m", "p", "img") if fn == "ocr" else ("m", "p")
+    with pytest.raises(RuntimeError, match=f"Ollama {label} failed"):
+        getattr(ollama_client, fn)(*args)
+
+
+def test_host_delegates_to_the_pinned_daemon(monkeypatch):
+    monkeypatch.setattr(ollama_client.ollama_server, "host", lambda: "http://127.0.0.1:11435")
+    assert ollama_client.host() == "http://127.0.0.1:11435"

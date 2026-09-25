@@ -91,3 +91,28 @@ def test_persistence_roundtrip(tmp_path, monkeypatch):
     assert len(loaded) == len(chunks)
     assert loaded[0]["chunk_id"] == chunks[0]["chunk_id"]
     assert loaded[0]["source"] == "StrlSchG.md"
+
+
+def test_oversize_section_is_windowed_with_overlap():
+    paras = [f"Absatz {i} " + "x" * 900 for i in range(10)]
+    text = "## § 7 Lang\n\n" + "\n\n".join(paras) + "\n\n## § 8 Kurz\nText.\n\n## § 9 Ende\nText."
+    chunks = [c for c in chunker.split(text) if c["anchor"].startswith("§ 7")]
+    assert len(chunks) >= 3
+    assert all(len(c["text"]) <= chunker.MAX_CHUNK_CHARS + 1000 for c in chunks)
+    assert chunks[0]["anchor"] == "§ 7 (Teil 1)"
+    assert chunks[1]["anchor"] == "§ 7 (Teil 2)"
+    # overlap: the second window starts with the tail of the first
+    tail = chunks[0]["text"].split("\n\n")[-1]
+    assert chunks[1]["text"].startswith(tail)
+
+
+def test_all_chunks_reads_every_source(tmp_path, monkeypatch):
+    monkeypatch.setattr(chunker, "_chunks_dir", lambda: tmp_path)
+    assert chunker.all_chunks() == []  # directory exists but is empty
+    chunker.write_chunks("a.md", chunker.split("## A\n" + "a " * 60))
+    chunker.write_chunks("b.md", chunker.split("## B\n" + "b " * 60))
+    sources = sorted({c["source"] for c in chunker.all_chunks()})
+    assert sources == ["a.md", "b.md"]
+    assert chunker.load_chunks("missing.md") == []
+    monkeypatch.setattr(chunker, "_chunks_dir", lambda: tmp_path / "absent")
+    assert chunker.all_chunks() == []

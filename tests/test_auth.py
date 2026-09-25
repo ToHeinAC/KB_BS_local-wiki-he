@@ -110,3 +110,49 @@ def test_list_users_includes_maintains(users_root):
     auth.add_user("m", "pw", ["DB1"], maintains=["DB1"])
     entry = next(u for u in auth.list_users() if u["username"] == "m")
     assert entry["maintains"] == ["DB1"]
+
+
+def test_corrupt_user_store_reads_as_empty(users_root):
+    auth._path().write_text("{not json")
+    assert auth.list_users() == []
+
+
+def test_verify_rejects_unknown_user_and_broken_hash(users_root):
+    auth.add_user("u", "pw", ["DB1"])
+    assert auth.verify("u", "pw") is True
+    assert auth.verify("ghost", "pw") is False
+    data = auth._load()
+    data["users"]["u"]["pw_hash"] = "not-a-bcrypt-hash"
+    auth._save(data)
+    assert auth.verify("u", "pw") is False
+
+
+@pytest.mark.parametrize(("user", "pw", "match"), [("", "pw", "required"), ("u", "", "required")])
+def test_add_user_requires_credentials(users_root, user, pw, match):
+    with pytest.raises(ValueError, match=match):
+        auth.add_user(user, pw, [])
+
+
+def test_add_user_rejects_duplicates(users_root):
+    auth.add_user("u", "pw", [])
+    with pytest.raises(ValueError, match="already exists"):
+        auth.add_user("u", "pw2", [])
+
+
+def test_delete_user(users_root):
+    auth.add_user("u", "pw", [])
+    assert auth.delete_user("u") is True
+    assert auth.delete_user("u") is False
+
+
+def test_change_password(users_root):
+    auth.add_user("u", "old", [])
+    auth.change_password("u", "new")
+    assert auth.verify("u", "new") is True
+    with pytest.raises(ValueError, match="Unknown user"):
+        auth.change_password("ghost", "x")
+
+
+def test_set_user_dbs_unknown_user(users_root):
+    with pytest.raises(ValueError, match="Unknown user"):
+        auth.set_user_dbs("ghost", ["DB1"])

@@ -128,3 +128,83 @@ def test_convert_image_uses_system_prompt_for_non_deepseek(monkeypatch):
 def test_unsupported_extension_raises():
     with pytest.raises(ValueError, match="Unsupported file type"):
         md_convert.convert_to_markdown(b"x", "file.csv")
+
+
+# --- real PDF parsing (pypdfium2, no model) -----------------------------------
+
+_PDF_TEXT = "Paragraph one of a digital page with enough extractable characters."
+
+
+def _pdf(pages: list[bytes]) -> bytes:
+    """A minimal PDF: one page per content stream, Helvetica for text pages."""
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", b""]
+    kids = []
+    for stream in pages:
+        content_no = len(objs) + 2
+        kids.append(len(objs) + 1)
+        objs.append(
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] "
+            b"/Resources << /Font << /F1 << /Type /Font /Subtype /Type1 "
+            b"/BaseFont /Helvetica >> >> >> " + f"/Contents {content_no} 0 R >>".encode()
+        )
+        objs.append(f"<< /Length {len(stream)} >>\nstream\n".encode() + stream + b"\nendstream")
+    refs = " ".join(f"{k} 0 R" for k in kids)
+    objs[1] = f"<< /Type /Pages /Kids [{refs}] /Count {len(kids)} >>".encode()
+    out, offsets = b"%PDF-1.4\n", []
+    for i, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += f"{i} 0 obj\n".encode() + body + b"\nendobj\n"
+    xref = len(out)
+    out += f"xref\n0 {len(objs) + 1}\n0000000000 65535 f \n".encode()
+    out += b"".join(f"{o:010d} 00000 n \n".encode() for o in offsets)
+    out += f"trailer\n<< /Size {len(objs) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode()
+    return out
+
+
+def test_pdf_pages_route_text_and_image():
+    text_page = f"BT /F1 12 Tf 72 700 Td ({_PDF_TEXT}) Tj ET".encode()
+    blank_page = b"0 0 m 10 10 l S"  # vector only: no extractable text
+    pdf = _pdf([text_page, blank_page])
+    assert md_convert._pdf_page_count(pdf) == 2
+    pages = list(md_convert.iter_pdf_pages(pdf, dpi=36))
+    assert pages[0] == ("text", _PDF_TEXT)
+    assert pages[1][0] == "image"
+    assert md_convert._image_to_base64(pages[1][1])  # rendered bitmap encodes as JPEG
+
+
+def test_rewrite_text_prefixes_the_prompt(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        md_convert.ollama_client,
+        "rewrite",
+        lambda model, prompt: seen.update(model=model, prompt=prompt) or "md",
+    )
+    assert md_convert.rewrite_text("body", model_id="m") == "md"
+    assert seen["prompt"].endswith("body")
+    assert seen["model"] == "m"
+
+
+def test_docx_styles_and_empty_paragraphs():
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading("Sub", level=3)
+    doc.add_paragraph("item", style="List Bullet")
+    doc.add_paragraph("step", style="List Number")
+    doc.add_paragraph("   ")
+    buf = io.BytesIO()
+    doc.save(buf)
+    assert md_convert.extract_docx_text(buf.getvalue()) == "### Sub\n\n- item\n\n1. step"
+
+
+def test_docx_and_image_report_progress(monkeypatch):
+    from PIL import Image
+
+    monkeypatch.setattr(md_convert, "convert_image", lambda img: "OCR")
+    monkeypatch.setattr(md_convert.ollama_client, "unload", lambda m: None)
+    calls = []
+    md_convert.convert_to_markdown(_make_docx(), "a.docx", lambda d, t, label: calls.append(label))
+    buf = io.BytesIO()
+    Image.new("RGB", (2, 2)).save(buf, format="PNG")
+    md_convert.convert_to_markdown(buf.getvalue(), "a.png", lambda d, t, label: calls.append(label))
+    assert calls == ["Converting DOCX", "Done", "OCR image", "Done"]

@@ -318,3 +318,71 @@ def test_latest_suffix_matches_either_way(monkeypatch):
     assert ollama_server.required_gib("http://x") == pytest.approx(
         2.0 + gpu_placement.COMPUTE_OVERHEAD_GIB
     )
+
+
+# --- spawning and waiting (no real process) -----------------------------------
+
+
+def test_spawn_needs_the_ollama_binary(monkeypatch):
+    monkeypatch.setattr(ollama_server.shutil, "which", lambda name: None)
+    assert ollama_server._spawn(11435, 1) is None
+
+
+def test_spawn_pins_the_daemon(monkeypatch, tmp_path):
+    started = {}
+    monkeypatch.setattr(ollama_server.shutil, "which", lambda name: "/usr/bin/ollama")
+    monkeypatch.setattr(ollama_server, "find_models_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(
+        ollama_server.subprocess, "Popen", lambda cmd, **kw: started.update(cmd=cmd, **kw) or "proc"
+    )
+    assert ollama_server._spawn(11435, 1) == "proc"
+    env = started["env"]
+    assert started["cmd"] == ["/usr/bin/ollama", "serve"]
+    assert env["OLLAMA_HOST"] == "127.0.0.1:11435"
+    assert env["OLLAMA_VULKAN"] == "0"
+    assert env["OLLAMA_NUM_PARALLEL"] == "1"
+    assert env["OLLAMA_MODELS"] == str(tmp_path)
+    assert started["start_new_session"] is True
+
+
+def test_spawn_os_error_returns_none(monkeypatch):
+    def boom(*a, **k):
+        raise OSError("exec format error")
+
+    monkeypatch.setattr(ollama_server.shutil, "which", lambda name: "/usr/bin/ollama")
+    monkeypatch.setattr(ollama_server, "find_models_dir", lambda: None)
+    monkeypatch.setattr(ollama_server.subprocess, "Popen", boom)
+    assert ollama_server._spawn(11435, 0) is None
+
+
+def test_wait_until_serving(monkeypatch):
+    monkeypatch.setattr(ollama_server.time, "sleep", lambda s: None)
+    monkeypatch.setattr(ollama_server, "_serving", lambda base: True)
+    assert ollama_server._wait_until_serving(_FakeProc(), "b", 5.0) is True
+    assert ollama_server._wait_until_serving(_FakeProc(alive=False), "b", 5.0) is False
+    monkeypatch.setattr(ollama_server, "_serving", lambda base: False)
+    clock = iter([0.0, 1.0, 10.0])
+    monkeypatch.setattr(ollama_server.time, "monotonic", lambda: next(clock))
+    assert ollama_server._wait_until_serving(_FakeProc(), "b", 5.0) is False
+
+
+def test_reset_drops_the_cached_state(monkeypatch):
+    stopped = []
+    monkeypatch.setattr(ollama_server, "_state", {"host": "x"})
+    monkeypatch.setattr(ollama_server, "stop", lambda: stopped.append(True))
+    ollama_server.reset()
+    assert ollama_server._state is None
+    assert stopped == [True]
+
+
+def test_models_dir_prefers_the_fullest_store(monkeypatch, tmp_path):
+    empty, full = tmp_path / "empty", tmp_path / "full"
+    (empty / "manifests").mkdir(parents=True)
+    (full / "manifests" / "lib").mkdir(parents=True)
+    (full / "manifests" / "lib" / "m1").write_text("")
+    monkeypatch.setattr(
+        ollama_server,
+        "_store_candidates",
+        lambda: (None, str(empty), str(tmp_path / "x"), str(full)),
+    )
+    assert ollama_server.find_models_dir() == str(full)

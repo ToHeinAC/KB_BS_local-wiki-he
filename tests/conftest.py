@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import bcrypt
 import dotenv
 import pytest
 
@@ -27,6 +28,13 @@ def _block_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
     monkeypatch.setattr(socket.socket, "connect", refuse)
     monkeypatch.setattr(socket.socket, "connect_ex", refuse)
+
+
+@pytest.fixture(autouse=True)
+def _fast_bcrypt(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hash test passwords at bcrypt's minimum cost; the default makes every seed slow."""
+    gensalt = bcrypt.gensalt
+    monkeypatch.setattr(bcrypt, "gensalt", lambda *_a, **_k: gensalt(rounds=4))
 
 
 def _patch_data_root(monkeypatch, tmp_path: Path, db_name: str = "test") -> Path:

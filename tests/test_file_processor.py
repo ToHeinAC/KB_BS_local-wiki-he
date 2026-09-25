@@ -152,3 +152,18 @@ def test_extract_text_always_returns_str(tmp_path):
     f = tmp_path / "t.txt"
     f.write_text("data")
     assert isinstance(file_processor.extract_text(f), str)
+
+
+def test_chunk_text_keeps_short_text_whole():
+    assert file_processor.chunk_text("short", chunk_size=100) == ["short"]
+
+
+def test_chunk_text_splits_at_paragraph_boundaries():
+    text = "aaaa\n\nbbbb\n\ncccc"
+    chunks = file_processor.chunk_text(text, chunk_size=8)
+    assert chunks == ["aaaa\n\n", "bbbb\n\n", "cccc"]
+    assert "".join(chunks) == text
+
+
+def test_chunk_text_hard_splits_without_paragraphs():
+    assert file_processor.chunk_text("x" * 10, chunk_size=4) == ["xxxx", "xxxx", "xx"]
