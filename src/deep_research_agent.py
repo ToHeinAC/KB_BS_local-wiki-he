@@ -29,11 +29,13 @@ so Streamlit's synchronous rerun model is unaffected.
 from __future__ import annotations
 
 import asyncio
+import importlib
 import os
 import re
-from collections.abc import Generator
+from collections.abc import Generator, Iterator
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 from dotenv import load_dotenv
@@ -46,7 +48,11 @@ import okf
 import ollama_client
 from prompts import DEEP_RESEARCH_FALLBACK_NOTICE, DEEP_RESEARCH_QUESTION
 from vendor.open_deep_research.configuration import SearchAPI
-from vendor.open_deep_research.deep_researcher import deep_researcher
+
+# The vendored graph is third-party, untyped source (never hand-edited); drive it as Any.
+deep_researcher: Any = importlib.import_module(
+    "vendor.open_deep_research.deep_researcher"
+).deep_researcher
 
 load_dotenv()
 
@@ -172,14 +178,14 @@ def _save_report(question: str, report: str, sources: list[dict[str, Any]]) -> s
         return None
 
 
-def _message_steps(msg) -> Generator[dict[str, Any], None, None]:
+def _message_steps(msg: object) -> Generator[dict[str, Any], None, None]:
     """Map one LangChain message to step-dicts (mirrors agent._ai_to_thought)."""
     if isinstance(msg, AIMessage):
         text = msg.content if isinstance(msg.content, str) else str(msg.content or "")
         if text.strip():
             yield {"type": "thought", "label": "Supervisor reasoning", "content": text}
-        for tc in getattr(msg, "tool_calls", None) or []:
-            name = tc.get("name")
+        for tc in msg.tool_calls:
+            name = tc["name"]
             yield {
                 "type": "tool_call",
                 "name": name,
@@ -193,7 +199,7 @@ def _message_steps(msg) -> Generator[dict[str, Any], None, None]:
             "type": "tool_result",
             "name": msg.name,
             "result": content,
-            "note": TOOL_NOTES.get(msg.name, ""),
+            "note": TOOL_NOTES.get(msg.name or "", ""),
             "sources": _extract_sources(content),
             "searches": len(_SEARCH_CALL_RE.findall(content)),
         }
@@ -215,7 +221,8 @@ def _update_steps(update: dict[str, Any]) -> Generator[dict[str, Any], None, Non
     compressed = update.get("compressed_research")
     if compressed:
         yield {"type": "thought", "label": "Sub-topic findings", "content": compressed}
-    for notes in update.get("raw_notes") or []:
+    raw_notes: list[str] = update.get("raw_notes") or []
+    for notes in raw_notes:
         sources = _extract_sources(notes)
         if sources:
             yield {
@@ -227,11 +234,12 @@ def _update_steps(update: dict[str, Any]) -> Generator[dict[str, Any], None, Non
                 "searches": len(_SEARCH_CALL_RE.findall(notes)),
             }
     for key in _MESSAGE_KEYS:
-        for msg in update.get(key) or []:
+        messages: list[Any] = update.get(key) or []
+        for msg in messages:
             yield from _message_steps(msg)
 
 
-def _step_key(step: dict[str, Any]):
+def _step_key(step: dict[str, Any]) -> tuple[str, ...]:
     """Identity used to drop replayed steps.
 
     A parent node's update echoes the whole accumulated sub-state (the
@@ -248,32 +256,32 @@ def _step_key(step: dict[str, Any]):
     return ("body", (step.get("content") or step.get("result", ""))[:400])
 
 
-def _astream_sync(question: str, directive: str):
+def _astream_sync(question: str, directive: str) -> Iterator[tuple[str, dict[str, Any]]]:
     """Pump the async graph from a private event loop, yielding `(node, update)`.
 
     Streamlit reruns are synchronous, so the loop is created and closed inside
     this generator's lifetime — no background thread, no queue.
     """
     payload = DEEP_RESEARCH_QUESTION.format(question=question, language_directive=directive)
-    stream_args = dict(
-        input={"messages": [HumanMessage(content=payload)]},
-        config={"configurable": _configurable(), "recursion_limit": 100},
-        stream_mode="updates",
-        subgraphs=True,
-    )
     loop = asyncio.new_event_loop()
-    agen = None
+    agen: Any = None
     try:
         asyncio.set_event_loop(loop)
-        agen = deep_researcher.astream(**stream_args)
+        agen = deep_researcher.astream(
+            input={"messages": [HumanMessage(content=payload)]},
+            config={"configurable": _configurable(), "recursion_limit": 100},
+            stream_mode="updates",
+            subgraphs=True,
+        )
         while True:
             try:
                 _ns, update = loop.run_until_complete(agen.__anext__())
             except StopAsyncIteration:
                 break
-            for node, delta in (update or {}).items():
+            deltas: dict[str, Any] = update or {}
+            for node, delta in deltas.items():
                 if isinstance(delta, dict):
-                    yield node, delta
+                    yield node, cast(dict[str, Any], delta)
     finally:
         try:
             if agen is not None:
@@ -285,55 +293,73 @@ def _astream_sync(question: str, directive: str):
         loop.close()
 
 
-def _run_graph(question: str, directive: str) -> Generator[dict[str, Any], None, None]:
-    """Stream the vendored graph. Ends with a `final_answer`, or a `notice`
-    carrying the reason Deep mode could not produce one."""
-    report, sources, failure = "", [], ""
-    emitted: set[Any] = set()
-    tasks = searches = 0
-    try:
-        for node, delta in _astream_sync(question, directive):
-            if node == "final_report_generation":
-                # Its `messages` delta is the finished report echoed as an
-                # AIMessage; emitting it would print the whole report twice.
-                report = delta.get("final_report") or ""
+@dataclass
+class _Tally:
+    """What a streamed run gathered: the report, its citation cards and counters."""
+
+    report: str = ""
+    sources: list[dict[str, str]] = field(default_factory=list[dict[str, str]])
+    tasks: int = 0
+    searches: int = 0
+
+
+def _stream_steps(question: str, directive: str, tally: _Tally) -> Iterator[dict[str, Any]]:
+    """Live, de-duplicated steps of the vendored graph, recorded into ``tally``."""
+    emitted: set[tuple[str, ...]] = set()
+    for node, delta in _astream_sync(question, directive):
+        if node == "final_report_generation":
+            # Its `messages` delta is the finished report echoed as an
+            # AIMessage; emitting it would print the whole report twice.
+            tally.report = delta.get("final_report") or ""
+            continue
+        for step in _update_steps(delta):
+            key = _step_key(step)
+            if key in emitted:
                 continue
-            for step in _update_steps(delta):
-                key = _step_key(step)
-                if key in emitted:
-                    continue
-                emitted.add(key)
-                if step["type"] == "tool_result":
-                    sources.extend(step["sources"])
-                    searches += step.get("searches", 0)
-                elif step["type"] == "tool_call" and step["name"] == "ConductResearch":
-                    tasks += 1
-                yield step
-    except Exception as exc:
-        failure = f"{type(exc).__name__}: {exc}"
+            emitted.add(key)
+            if step["type"] == "tool_result":
+                tally.sources.extend(step["sources"])
+                tally.searches += step.get("searches", 0)
+            elif step["type"] == "tool_call" and step["name"] == "ConductResearch":
+                tally.tasks += 1
+            yield step
 
-    if failure:
-        yield {"type": "notice", "content": DEEP_RESEARCH_FALLBACK_NOTICE.format(reason=failure)}
-        return
-    if not report.strip() or report.startswith(_REPORT_ERROR_PREFIX):
-        reason = report.strip() or "the graph finished without writing a report"
-        yield {"type": "notice", "content": DEEP_RESEARCH_FALLBACK_NOTICE.format(reason=reason)}
-        return
 
-    # De-duplicate citation cards by URL, preserving first-seen order.
-    seen, uniq = set(), []
+def _unique_by_url(sources: list[dict[str, str]]) -> list[dict[str, str]]:
+    """De-duplicate citation cards by URL, preserving first-seen order."""
+    seen: set[str] = set()
+    uniq: list[dict[str, str]] = []
     for s in sources:
         if s["url"] not in seen:
             seen.add(s["url"])
             uniq.append(s)
+    return uniq
+
+
+def _run_graph(question: str, directive: str) -> Generator[dict[str, Any], None, None]:
+    """Stream the vendored graph. Ends with a `final_answer`, or a `notice`
+    carrying the reason Deep mode could not produce one."""
+    tally = _Tally()
+    try:
+        yield from _stream_steps(question, directive, tally)
+    except Exception as exc:
+        reason = f"{type(exc).__name__}: {exc}"
+        yield {"type": "notice", "content": DEEP_RESEARCH_FALLBACK_NOTICE.format(reason=reason)}
+        return
+    report = tally.report
+    if not report.strip() or report.startswith(_REPORT_ERROR_PREFIX):
+        reason = report.strip() or "the graph finished without writing a report"
+        yield {"type": "notice", "content": DEEP_RESEARCH_FALLBACK_NOTICE.format(reason=reason)}
+        return
+    uniq = _unique_by_url(tally.sources)
     yield {
         "type": "final_answer",
         "content": report,
         "report_path": _save_report(question, report, uniq),
         "sources": uniq,
         "metrics": {
-            "tasks": tasks,
-            "searches": searches,
+            "tasks": tally.tasks,
+            "searches": tally.searches,
             "sources_checked": len(uniq),
             "sources_cited": len(_report_urls(report)),
         },
