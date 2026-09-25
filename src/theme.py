@@ -119,20 +119,20 @@ def tokens() -> dict[str, Any]:
 # ── CSS ──────────────────────────────────────────────────────────────────────
 
 
-def _base_css(t: dict[str, Any]) -> str:
-    """Token-parametric chrome. Shared by every skin."""
-    return f"""
-    @import url('{_GOOGLE_FONTS["newspaper" if is_newspaper() else "default"]}');
+# Token-parametric chrome shared by every skin; filled by str.format (CSS braces are
+# doubled). Module-level so the stylesheet is data, not a 350-line function.
+_BASE_CSS = """
+    @import url('{fonts_url}');
 
     /* ── Global text & font ── */
     html, body {{
-        font-family: {t["font_body"]};
-        font-size: {t["base_size"]};
+        font-family: {font_body};
+        font-size: {base_size};
     }}
     /* Catch ALL elements' color — overrides Streamlit's inline textColor from config.toml.
        Do NOT set font-family here: it breaks Material icon ligatures. */
     .stApp, .stApp * {{
-        color: {t["text"]} !important;
+        color: {text} !important;
     }}
     /* Re-assert the Material icon font so ligatures render as glyphs, not text */
     [data-testid="stIconMaterial"],
@@ -146,14 +146,14 @@ def _base_css(t: dict[str, Any]) -> str:
 
     /* ── Backgrounds ── */
     .stApp {{
-        background-color: {t["bg"]} !important;
+        background-color: {bg} !important;
     }}
     /* Narrower than Streamlit's ~21rem default: nothing in here needs the
        width, and the main column gets it instead. 280px is about the floor —
        the GPU line (gpu_widget.py, 13px monospace, nowrap) is ~225px wide and
        clips below roughly 260px. */
     [data-testid="stSidebar"] {{
-        background-color: {t["sidebar_bg"]} !important;
+        background-color: {sidebar_bg} !important;
         width: 280px !important;
         min-width: 280px !important;
     }}
@@ -161,12 +161,12 @@ def _base_css(t: dict[str, Any]) -> str:
     [data-testid="block-container"],
     [data-testid="stVerticalBlock"],
     section.main > div {{
-        background-color: {t["bg"]} !important;
+        background-color: {bg} !important;
     }}
 
     /* ── Headings ── */
     h1, h2, h3 {{
-        font-family: {t["font_head"]} !important;
+        font-family: {font_head} !important;
         font-weight: 700;
     }}
     h1 {{ font-size: 1.75rem; margin-bottom: 0.25rem; }}
@@ -175,45 +175,45 @@ def _base_css(t: dict[str, Any]) -> str:
     /* ── Input widgets ── */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {{
-        background-color: {t["widget_bg"]} !important;
-        color: {t["text"]} !important;
-        border-color: {t["border"]} !important;
-        border-radius: {t["radius"]} !important;
+        background-color: {widget_bg} !important;
+        color: {text} !important;
+        border-color: {border} !important;
+        border-radius: {radius} !important;
     }}
     .stTextInput > div > div > input::placeholder,
     .stTextArea > div > div > textarea::placeholder {{
-        color: {t["text_muted"]} !important;
+        color: {text_muted} !important;
         opacity: 1 !important;
     }}
     /* Selectbox */
     .stSelectbox > div > div,
     .stSelectbox > div > div > div {{
-        background-color: {t["widget_bg"]} !important;
-        color: {t["text"]} !important;
-        border-color: {t["border"]} !important;
-        border-radius: {t["radius"]} !important;
+        background-color: {widget_bg} !important;
+        color: {text} !important;
+        border-color: {border} !important;
+        border-radius: {radius} !important;
     }}
 
     /* ── Buttons ── */
     .stButton > button {{
-        border-radius: {t["radius"]} !important;
+        border-radius: {radius} !important;
         font-weight: 500 !important;
         text-transform: none !important;
         font-size: 0.875rem !important;
-        border: 1px solid {t["border"]} !important;
-        background-color: {t["widget_bg"]} !important;
-        color: {t["text"]} !important;
+        border: 1px solid {border} !important;
+        background-color: {widget_bg} !important;
+        color: {text} !important;
         transition: background-color 0.15s ease, box-shadow 0.15s ease !important;
     }}
     .stButton > button:hover {{
-        background-color: {t["hover"]} !important;
+        background-color: {hover} !important;
         box-shadow: 0 1px 4px rgba(0,0,0,0.15) !important;
     }}
     .stButton > button[kind="primary"],
     .stButton > button[kind="primary"]:hover {{
-        background-color: {t["primary"]} !important;
+        background-color: {primary} !important;
         color: #ffffff !important;
-        border-color: {t["primary"]} !important;
+        border-color: {primary} !important;
     }}
     /* The label lives in a nested <p>, which `.stApp *` would paint dark. */
     .stButton > button[kind="primary"] *,
@@ -224,40 +224,40 @@ def _base_css(t: dict[str, Any]) -> str:
     }}
     /* Form submit buttons (not caught by .stButton) */
     [data-testid="stFormSubmitButton"] button {{
-        border-radius: {t["radius"]} !important;
+        border-radius: {radius} !important;
         font-weight: 500 !important;
-        border: 1px solid {t["border"]} !important;
-        background-color: {t["widget_bg"]} !important;
-        color: {t["text"]} !important;
+        border: 1px solid {border} !important;
+        background-color: {widget_bg} !important;
+        color: {text} !important;
     }}
     [data-testid="stFormSubmitButton"] button[kind="primary"],
     [data-testid="stFormSubmitButton"] button[kind="primary"]:hover {{
-        background-color: {t["primary"]} !important;
+        background-color: {primary} !important;
         color: #ffffff !important;
-        border-color: {t["primary"]} !important;
+        border-color: {primary} !important;
     }}
     /* Download buttons */
     .stDownloadButton > button {{
-        background-color: {t["widget_bg"]} !important;
-        color: {t["text"]} !important;
-        border: 1px solid {t["border"]} !important;
-        border-radius: {t["radius"]} !important;
+        background-color: {widget_bg} !important;
+        color: {text} !important;
+        border: 1px solid {border} !important;
+        border-radius: {radius} !important;
     }}
 
     /* ── File uploader (dropzone uses config secondaryBackgroundColor — force theme) ── */
     [data-testid="stFileUploaderDropzone"],
     [data-testid="stFileUploader"] section {{
-        background-color: {t["widget_bg"]} !important;
-        border: 1px solid {t["border"]} !important;
+        background-color: {widget_bg} !important;
+        border: 1px solid {border} !important;
     }}
     [data-testid="stFileUploaderDropzoneInstructions"],
     [data-testid="stFileUploaderDropzoneInstructions"] * {{
-        color: {t["text_muted"]} !important;
+        color: {text_muted} !important;
     }}
     [data-testid="stFileUploader"] button {{
-        background-color: {t["bg"]} !important;
-        color: {t["text"]} !important;
-        border: 1px solid {t["border"]} !important;
+        background-color: {bg} !important;
+        color: {text} !important;
+        border: 1px solid {border} !important;
     }}
 
     /* ── Sidebar buttons (nav style) ── */
@@ -268,45 +268,45 @@ def _base_css(t: dict[str, Any]) -> str:
         padding: 0.3rem 0.5rem !important;
         border-radius: 4px !important;
         width: 100% !important;
-        color: {t["text"]} !important;
+        color: {text} !important;
     }}
     [data-testid="stSidebar"] .stButton > button:hover,
     [data-testid="stSidebar"] .stButton > button:focus,
     [data-testid="stSidebar"] .stButton > button:active {{
-        background: {t["hover"]} !important;
-        color: {t["text"]} !important;
+        background: {hover} !important;
+        color: {text} !important;
         box-shadow: none !important;
     }}
     /* Reset & Logout: identical boxed buttons (override transparent nav style) */
     [data-testid="stSidebar"] .st-key-reset_btn button,
     [data-testid="stSidebar"] .st-key-logout_btn button {{
-        background-color: {t["widget_bg"]} !important;
-        border: 1px solid {t["border"]} !important;
+        background-color: {widget_bg} !important;
+        border: 1px solid {border} !important;
         text-align: center !important;
         padding: 0.35rem 0.75rem !important;
-        border-radius: {t["radius"]} !important;
+        border-radius: {radius} !important;
     }}
     [data-testid="stSidebar"] .st-key-reset_btn button:hover,
     [data-testid="stSidebar"] .st-key-logout_btn button:hover {{
-        background-color: {t["hover"]} !important;
-        border-color: {t["primary"]} !important;
+        background-color: {hover} !important;
+        border-color: {primary} !important;
     }}
     /* Lint, Delete source, Start research: same boxed style as Reset/Logout */
     .st-key-run_lint_btn button,
     .st-key-delete_source_btn button,
     .st-key-start_research_btn button {{
-        background-color: {t["widget_bg"]} !important;
-        border: 1px solid {t["border"]} !important;
+        background-color: {widget_bg} !important;
+        border: 1px solid {border} !important;
         text-align: center !important;
         padding: 0.35rem 0.75rem !important;
-        border-radius: {t["radius"]} !important;
-        color: {t["text"]} !important;
+        border-radius: {radius} !important;
+        color: {text} !important;
     }}
     .st-key-run_lint_btn button:hover,
     .st-key-delete_source_btn button:hover,
     .st-key-start_research_btn button:hover {{
-        background-color: {t["hover"]} !important;
-        border-color: {t["primary"]} !important;
+        background-color: {hover} !important;
+        border-color: {primary} !important;
     }}
     /* Collapsed explorer rail: its column is only a hair wider than the button,
        so pin the button to the right edge rather than leaving the slack sitting
@@ -321,34 +321,34 @@ def _base_css(t: dict[str, Any]) -> str:
 
     /* ── Radio / Checkbox / Toggle ── */
     .stRadio > div, .stCheckbox > label, .stRadio label {{
-        color: {t["text"]} !important;
+        color: {text} !important;
     }}
 
     /* ── Tabs ── */
     [data-testid="stTabs"] button,
     [data-testid="stTabs"] button p {{
-        color: {t["text"]} !important;
+        color: {text} !important;
     }}
     [data-testid="stTabs"] [data-baseweb="tab-list"] {{
-        background-color: {t["bg"]} !important;
+        background-color: {bg} !important;
     }}
 
     /* ── Segmented control (primary navigation) ──
        Streamlit's testid is stButtonGroup, and the selected pill is marked with
        kind="segmented_controlActive" — not aria-checked. */
     [data-testid="stButtonGroup"] button {{
-        background-color: {t["widget_bg"]} !important;
-        border-color: {t["border"]} !important;
+        background-color: {widget_bg} !important;
+        border-color: {border} !important;
     }}
     [data-testid="stButtonGroup"] button * {{
-        color: {t["text"]} !important;
+        color: {text} !important;
     }}
     [data-testid="stButtonGroup"] button:hover {{
-        background-color: {t["hover"]} !important;
+        background-color: {hover} !important;
     }}
     [data-testid="stButtonGroup"] button[kind="segmented_controlActive"] {{
-        background-color: {t["primary"]} !important;
-        border-color: {t["primary"]} !important;
+        background-color: {primary} !important;
+        border-color: {primary} !important;
     }}
     [data-testid="stButtonGroup"] button[kind="segmented_controlActive"] * {{
         color: #ffffff !important;
@@ -389,64 +389,64 @@ def _base_css(t: dict[str, Any]) -> str:
 
     /* ── Expanders (use page bg so widget-bg buttons inside stand out as boxes) ── */
     [data-testid="stExpander"] {{
-        border: 1px solid {t["border"]} !important;
-        background-color: {t["bg"]} !important;
-        border-radius: {t["radius"]} !important;
+        border: 1px solid {border} !important;
+        background-color: {bg} !important;
+        border-radius: {radius} !important;
     }}
     [data-testid="stExpander"] summary,
     [data-testid="stExpander"] summary p,
     [data-testid="stExpander"] summary span {{
-        color: {t["text"]} !important;
+        color: {text} !important;
     }}
     /* Nav/list buttons inside expanders: lighter than the expander, clear border */
     [data-testid="stExpander"] .stButton > button {{
-        background-color: {t["widget_bg"]} !important;
-        color: {t["text"]} !important;
-        border: 1px solid {t["border"]} !important;
+        background-color: {widget_bg} !important;
+        color: {text} !important;
+        border: 1px solid {border} !important;
         margin-bottom: 0.25rem !important;
     }}
     [data-testid="stExpander"] .stButton > button:hover {{
-        background-color: {t["hover"]} !important;
-        border-color: {t["primary"]} !important;
+        background-color: {hover} !important;
+        border-color: {primary} !important;
     }}
 
     /* ── Chat messages ── */
     [data-testid="stChatMessage"],
     [data-testid="stChatMessage"] * {{
-        background-color: {t["widget_bg"]} !important;
-        color: {t["text"]} !important;
+        background-color: {widget_bg} !important;
+        color: {text} !important;
     }}
 
     /* ── Alert / info / warning / error boxes ── */
     [data-testid="stAlert"],
     [data-testid="stAlert"] * {{
-        color: {t["text"]} !important;
+        color: {text} !important;
     }}
 
     /* ── Metric cards ── */
     [data-testid="stMetric"] {{
-        background: {t["metric_bg"]} !important;
-        border: 1px solid {t["border"]};
-        border-radius: {t["radius"]};
+        background: {metric_bg} !important;
+        border: 1px solid {border};
+        border-radius: {radius};
         padding: 0.75rem 1rem;
     }}
     [data-testid="stMetricValue"],
     [data-testid="stMetricLabel"] {{
-        color: {t["text"]} !important;
+        color: {text} !important;
     }}
 
     /* ── Dividers ── */
-    hr {{ border: none; border-top: 1px solid {t["border"]}; margin: 1.25rem 0; }}
+    hr {{ border: none; border-top: 1px solid {border}; margin: 1.25rem 0; }}
 
     /* ── Container borders (st.container(border=True)) ── */
     [data-testid="stVerticalBlockBorderWrapper"] > div {{
-        border-color: {t["border"]} !important;
-        background-color: {t["widget_bg"]} !important;
+        border-color: {border} !important;
+        background-color: {widget_bg} !important;
     }}
 
     /* ── Spinner ── */
     .stSpinner > div {{
-        border-top-color: {t["primary"]} !important;
+        border-top-color: {primary} !important;
     }}
 
     /* Streamlit's fixed stHeader is opaque and overlays the top of the main
@@ -458,8 +458,8 @@ def _base_css(t: dict[str, Any]) -> str:
        They are selections, so they take the same accent as the active nav pill —
        not a colour of their own. */
     [data-baseweb="tag"] {{
-        background-color: {t["primary"]} !important;
-        border-color: {t["primary"]} !important;
+        background-color: {primary} !important;
+        border-color: {primary} !important;
     }}
     [data-baseweb="tag"] span {{
         color: #ffffff !important;
@@ -467,14 +467,14 @@ def _base_css(t: dict[str, Any]) -> str:
     """
 
 
-def _newspaper_css(t: dict[str, Any]) -> str:
-    """What a palette alone cannot say: metal rules, cut corners, mono figures.
+def _base_css(t: dict[str, Any]) -> str:
+    """Token-parametric chrome. Shared by every skin."""
+    fonts_url = _GOOGLE_FONTS["newspaper" if is_newspaper() else "default"]
+    return _BASE_CSS.format(**t, fonts_url=fonts_url)
 
-    Layered *after* the base block, so every selector here is deliberately
-    re-stating a base rule rather than duplicating the whole sheet.
-    """
-    ink, soft, rule, dotted = t["ink"], t["ink_soft"], t["rule"], t["dotted"]
-    return f"""
+
+# The newspaper override block; same str.format conventions as _BASE_CSS.
+_NEWSPAPER_CSS = """
     /* Headlines are the Bodoni display cut; body copy is Garamond at a size
        that actually reads as print. */
     h1, h2, h3 {{ letter-spacing: -0.01em; }}
@@ -484,17 +484,17 @@ def _newspaper_css(t: dict[str, Any]) -> str:
     /* Figures, labels and identifiers run in mono — the paper's "agate" voice. */
     code, kbd, samp, pre,
     [data-testid="stMetricValue"] {{
-        font-family: {t["font_mono"]} !important;
+        font-family: {font_mono} !important;
     }}
     [data-testid="stMetricLabel"] {{
-        font-family: {t["font_mono"]} !important;
+        font-family: {font_mono} !important;
         font-size: 0.66rem !important;
         letter-spacing: 0.18em;
         text-transform: uppercase;
     }}
     [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * {{
-        color: {t["text_muted"]} !important;
-        font-family: {t["font_mono"]} !important;
+        color: {text_muted} !important;
+        font-family: {font_mono} !important;
         font-size: 0.68rem !important;
         letter-spacing: 0.06em;
     }}
@@ -507,7 +507,7 @@ def _newspaper_css(t: dict[str, Any]) -> str:
         border-radius: 0 !important;
     }}
     [data-testid="stExpander"] summary {{
-        font-family: {t["font_mono"]} !important;
+        font-family: {font_mono} !important;
         font-size: 0.72rem !important;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -542,7 +542,7 @@ def _newspaper_css(t: dict[str, Any]) -> str:
         padding: 0.55rem 1.6rem !important;
     }}
     [data-testid="stButtonGroup"] button * {{
-        font-family: {t["font_mono"]} !important;
+        font-family: {font_mono} !important;
         font-size: 0.72rem !important;
         letter-spacing: 0.2em;
         text-transform: uppercase;
@@ -568,7 +568,7 @@ def _newspaper_css(t: dict[str, Any]) -> str:
     /* Sidebar is the left rail of the front page: ruled sections, no shading. */
     [data-testid="stSidebar"] {{ border-right: 1px solid {ink}; }}
     [data-testid="stSidebar"] h2 {{
-        font-family: {t["font_head"]} !important;
+        font-family: {font_head} !important;
         font-weight: 900 !important;
     }}
     [data-testid="stSidebar"] hr {{ border-top: 0.5px solid {rule}; opacity: 1; }}
@@ -593,10 +593,19 @@ def _newspaper_css(t: dict[str, Any]) -> str:
     }}
     [data-testid="stChatMessage"] * {{ background-color: transparent !important; }}
 
-    a {{ color: {t["primary"]} !important; border-bottom: 1px solid {t["hover"]}; }}
+    a {{ color: {primary} !important; border-bottom: 1px solid {hover}; }}
     a:hover {{ color: {ink} !important; border-bottom-color: {ink}; }}
     blockquote {{ border-left: 2px solid {soft}; font-style: italic; }}
     """
+
+
+def _newspaper_css(t: dict[str, Any]) -> str:
+    """What a palette alone cannot say: metal rules, cut corners, mono figures.
+
+    Layered *after* the base block, so every selector here is deliberately
+    re-stating a base rule rather than duplicating the whole sheet.
+    """
+    return _NEWSPAPER_CSS.format(**t, soft=t["ink_soft"])
 
 
 def inject_css() -> dict[str, Any]:
@@ -635,7 +644,8 @@ def masthead(*, edition: str, pages: int, sources: int, model: str) -> None:
                       line-height:0.92;color:{ink} !important">LocalWiki</div>
           <div style="font-family:{t["font_body"]};font-style:italic;font-size:1.05rem;
                       color:{soft} !important;padding-top:6px">
-            Documents in, a linked knowledge archive out &mdash; local infrastructure, full data privacy
+            Documents in, a linked knowledge archive out &mdash; local infrastructure,
+            full data privacy
           </div>
         </div>
         <div style="border-top:0.5px solid {ink};border-bottom:2px solid {ink};height:3px"></div>
@@ -643,7 +653,8 @@ def masthead(*, edition: str, pages: int, sources: int, model: str) -> None:
                     padding:8px 2px;font-family:{mono};font-size:0.68rem;
                     letter-spacing:0.08em;color:{soft} !important">
           <span>{today}</span>
-          <span style="text-transform:uppercase;letter-spacing:0.16em">Edition &middot; {edition}</span>
+          <span style="text-transform:uppercase;
+                       letter-spacing:0.16em">Edition &middot; {edition}</span>
           <span>{pages} pages &middot; {sources} sources</span>
           <span style="color:{t["primary"]} !important">{model}</span>
         </div>
