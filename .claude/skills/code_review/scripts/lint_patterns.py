@@ -20,10 +20,9 @@ Usage:
 
 import re
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
-def check_magic_numbers(code: str) -> List[Dict[str, any]]:
+def check_magic_numbers(code: str) -> list[dict[str, any]]:
     """
     Check for magic numbers in code.
 
@@ -36,27 +35,39 @@ def check_magic_numbers(code: str) -> List[Dict[str, any]]:
     Returns:
         List of issues found, each with 'line', 'column', 'message', 'severity'
     """
-    issues: List[Dict[str, any]] = []
+    issues: list[dict[str, any]] = []
 
     # Numbers that are commonly acceptable
     allowed_numbers = {
-        "0", "1", "2", "-1", "0.0", "1.0", "0.5",
-        "100", "1000", "10",  # Common bases/percentages
-        "60", "24", "365",  # Time-related
-        "256", "255", "1024",  # Computing-related
+        "0",
+        "1",
+        "2",
+        "-1",
+        "0.0",
+        "1.0",
+        "0.5",
+        "100",
+        "1000",
+        "10",  # Common bases/percentages
+        "60",
+        "24",
+        "365",  # Time-related
+        "256",
+        "255",
+        "1024",  # Computing-related
     }
 
     # Pattern for numeric literals (excluding those in strings or comments)
-    number_pattern = re.compile(r'\b(\d+\.?\d*)\b')
+    number_pattern = re.compile(r"\b(\d+\.?\d*)\b")
 
-    lines = code.split('\n')
+    lines = code.split("\n")
     for line_num, line in enumerate(lines, start=1):
         # Skip comments
-        if line.strip().startswith('#'):
+        if line.strip().startswith("#"):
             continue
 
         # Skip lines that are likely constant definitions
-        if re.match(r'^\s*[A-Z_]+\s*=', line):
+        if re.match(r"^\s*[A-Z_]+\s*=", line):
             continue
 
         # Find numbers in the line
@@ -68,22 +79,24 @@ def check_magic_numbers(code: str) -> List[Dict[str, any]]:
                 continue
 
             # Skip if it looks like an index or simple arithmetic
-            context = line[max(0, match.start() - 5):match.end() + 5]
-            if re.search(r'[\[\]:]', context):
+            context = line[max(0, match.start() - 5) : match.end() + 5]
+            if re.search(r"[\[\]:]", context):
                 continue
 
-            issues.append({
-                'line': line_num,
-                'column': match.start() + 1,
-                'message': f"Magic number '{number}' - consider using a named constant",
-                'severity': 'warning',
-                'rule': 'magic-number',
-            })
+            issues.append(
+                {
+                    "line": line_num,
+                    "column": match.start() + 1,
+                    "message": f"Magic number '{number}' - consider using a named constant",
+                    "severity": "warning",
+                    "rule": "magic-number",
+                }
+            )
 
     return issues
 
 
-def check_deep_nesting(code: str, max_depth: int = 4) -> List[Dict[str, any]]:
+def check_deep_nesting(code: str, max_depth: int = 4) -> list[dict[str, any]]:
     """
     Check for deeply nested code blocks.
 
@@ -97,13 +110,13 @@ def check_deep_nesting(code: str, max_depth: int = 4) -> List[Dict[str, any]]:
     Returns:
         List of issues found
     """
-    issues: List[Dict[str, any]] = []
+    issues: list[dict[str, any]] = []
 
-    lines = code.split('\n')
+    lines = code.split("\n")
     for line_num, line in enumerate(lines, start=1):
         # Skip empty lines and comments
         stripped = line.strip()
-        if not stripped or stripped.startswith('#'):
+        if not stripped or stripped.startswith("#"):
             continue
 
         # Count leading spaces (assuming 4-space indent)
@@ -111,22 +124,24 @@ def check_deep_nesting(code: str, max_depth: int = 4) -> List[Dict[str, any]]:
         indent_level = leading_spaces // 4
 
         if indent_level > max_depth:
-            issues.append({
-                'line': line_num,
-                'column': 1,
-                'message': f"Deep nesting detected (level {indent_level}) - consider refactoring",
-                'severity': 'warning',
-                'rule': 'deep-nesting',
-            })
+            issues.append(
+                {
+                    "line": line_num,
+                    "column": 1,
+                    "message": (
+                        f"Deep nesting detected (level {indent_level}) - consider refactoring"
+                    ),
+                    "severity": "warning",
+                    "rule": "deep-nesting",
+                }
+            )
 
     return issues
 
 
 def check_long_functions(
-    code: str,
-    max_lines: int = 50,
-    max_params: int = 5
-) -> List[Dict[str, any]]:
+    code: str, max_lines: int = 50, max_params: int = 5
+) -> list[dict[str, any]]:
     """
     Check for functions that are too long or have too many parameters.
 
@@ -141,15 +156,12 @@ def check_long_functions(
     Returns:
         List of issues found
     """
-    issues: List[Dict[str, any]] = []
+    issues: list[dict[str, any]] = []
 
     # Pattern to match function definitions
-    func_pattern = re.compile(
-        r'^(\s*)(async\s+)?def\s+(\w+)\s*\((.*?)\)',
-        re.MULTILINE | re.DOTALL
-    )
+    func_pattern = re.compile(r"^(\s*)(async\s+)?def\s+(\w+)\s*\((.*?)\)", re.MULTILINE | re.DOTALL)
 
-    lines = code.split('\n')
+    lines = code.split("\n")
 
     for match in func_pattern.finditer(code):
         func_indent = len(match.group(1))
@@ -158,30 +170,32 @@ def check_long_functions(
 
         # Find line number of function start
         func_start_pos = match.start()
-        func_line = code[:func_start_pos].count('\n') + 1
+        func_line = code[:func_start_pos].count("\n") + 1
 
         # Count parameters (excluding self, cls)
-        params = [p.strip() for p in params_str.split(',') if p.strip()]
-        params = [p for p in params if not p.startswith(('self', 'cls'))]
+        params = [p.strip() for p in params_str.split(",") if p.strip()]
+        params = [p for p in params if not p.startswith(("self", "cls"))]
         param_count = len(params)
 
         if param_count > max_params:
-            issues.append({
-                'line': func_line,
-                'column': 1,
-                'message': (
-                    f"Function '{func_name}' has {param_count} parameters "
-                    f"(max: {max_params}) - consider using a config object"
-                ),
-                'severity': 'warning',
-                'rule': 'too-many-params',
-            })
+            issues.append(
+                {
+                    "line": func_line,
+                    "column": 1,
+                    "message": (
+                        f"Function '{func_name}' has {param_count} parameters "
+                        f"(max: {max_params}) - consider using a config object"
+                    ),
+                    "severity": "warning",
+                    "rule": "too-many-params",
+                }
+            )
 
         # Count function lines (until next function or dedent)
         func_lines = 0
         in_function = False
 
-        for i, line in enumerate(lines[func_line - 1:], start=func_line):
+        for i, line in enumerate(lines[func_line - 1 :], start=func_line):
             stripped = line.strip()
 
             if i == func_line:
@@ -201,21 +215,23 @@ def check_long_functions(
                 func_lines += 1
 
         if func_lines > max_lines:
-            issues.append({
-                'line': func_line,
-                'column': 1,
-                'message': (
-                    f"Function '{func_name}' is {func_lines} lines "
-                    f"(max: {max_lines}) - consider splitting into smaller functions"
-                ),
-                'severity': 'warning',
-                'rule': 'function-too-long',
-            })
+            issues.append(
+                {
+                    "line": func_line,
+                    "column": 1,
+                    "message": (
+                        f"Function '{func_name}' is {func_lines} lines "
+                        f"(max: {max_lines}) - consider splitting into smaller functions"
+                    ),
+                    "severity": "warning",
+                    "rule": "function-too-long",
+                }
+            )
 
     return issues
 
 
-def check_broad_exceptions(code: str) -> List[Dict[str, any]]:
+def check_broad_exceptions(code: str) -> list[dict[str, any]]:
     """
     Check for overly broad exception handling.
 
@@ -228,36 +244,40 @@ def check_broad_exceptions(code: str) -> List[Dict[str, any]]:
     Returns:
         List of issues found
     """
-    issues: List[Dict[str, any]] = []
+    issues: list[dict[str, any]] = []
 
-    lines = code.split('\n')
+    lines = code.split("\n")
     for line_num, line in enumerate(lines, start=1):
         stripped = line.strip()
 
         # Check for bare except
-        if re.match(r'^except\s*:', stripped):
-            issues.append({
-                'line': line_num,
-                'column': 1,
-                'message': "Bare 'except:' catches all exceptions including KeyboardInterrupt",
-                'severity': 'error',
-                'rule': 'bare-except',
-            })
+        if re.match(r"^except\s*:", stripped):
+            issues.append(
+                {
+                    "line": line_num,
+                    "column": 1,
+                    "message": "Bare 'except:' catches all exceptions including KeyboardInterrupt",
+                    "severity": "error",
+                    "rule": "bare-except",
+                }
+            )
 
         # Check for catching Exception (but allow if re-raising)
-        elif re.match(r'^except\s+Exception\b', stripped):
-            issues.append({
-                'line': line_num,
-                'column': 1,
-                'message': "Catching 'Exception' is too broad - catch specific exceptions",
-                'severity': 'warning',
-                'rule': 'broad-exception',
-            })
+        elif re.match(r"^except\s+Exception\b", stripped):
+            issues.append(
+                {
+                    "line": line_num,
+                    "column": 1,
+                    "message": "Catching 'Exception' is too broad - catch specific exceptions",
+                    "severity": "warning",
+                    "rule": "broad-exception",
+                }
+            )
 
     return issues
 
 
-def check_print_statements(code: str) -> List[Dict[str, any]]:
+def check_print_statements(code: str) -> list[dict[str, any]]:
     """
     Check for print statements that should probably be logging.
 
@@ -270,32 +290,34 @@ def check_print_statements(code: str) -> List[Dict[str, any]]:
     Returns:
         List of issues found
     """
-    issues: List[Dict[str, any]] = []
+    issues: list[dict[str, any]] = []
 
     # Pattern for print function calls
-    print_pattern = re.compile(r'\bprint\s*\(')
+    print_pattern = re.compile(r"\bprint\s*\(")
 
-    lines = code.split('\n')
+    lines = code.split("\n")
     for line_num, line in enumerate(lines, start=1):
         stripped = line.strip()
 
         # Skip comments
-        if stripped.startswith('#'):
+        if stripped.startswith("#"):
             continue
 
         for match in print_pattern.finditer(line):
-            issues.append({
-                'line': line_num,
-                'column': match.start() + 1,
-                'message': "print() statement found - consider using logging instead",
-                'severity': 'info',
-                'rule': 'print-statement',
-            })
+            issues.append(
+                {
+                    "line": line_num,
+                    "column": match.start() + 1,
+                    "message": "print() statement found - consider using logging instead",
+                    "severity": "info",
+                    "rule": "print-statement",
+                }
+            )
 
     return issues
 
 
-def analyze_file(file_path: str) -> List[Dict[str, any]]:
+def analyze_file(file_path: str) -> list[dict[str, any]]:
     """
     Run all checks on a Python file.
 
@@ -310,12 +332,12 @@ def analyze_file(file_path: str) -> List[Dict[str, any]]:
     if not path.exists():
         raise FileNotFoundError(f"File not found: {file_path}")
 
-    if path.suffix != '.py':
+    if path.suffix != ".py":
         raise ValueError(f"Not a Python file: {file_path}")
 
-    code = path.read_text(encoding='utf-8')
+    code = path.read_text(encoding="utf-8")
 
-    all_issues: List[Dict[str, any]] = []
+    all_issues: list[dict[str, any]] = []
 
     # Run all checks
     all_issues.extend(check_magic_numbers(code))
@@ -325,12 +347,12 @@ def analyze_file(file_path: str) -> List[Dict[str, any]]:
     all_issues.extend(check_print_statements(code))
 
     # Sort by line number
-    all_issues.sort(key=lambda x: (x['line'], x['column']))
+    all_issues.sort(key=lambda x: (x["line"], x["column"]))
 
     return all_issues
 
 
-def format_issues(issues: List[Dict[str, any]], file_path: str = "") -> str:
+def format_issues(issues: list[dict[str, any]], file_path: str = "") -> str:
     """
     Format issues into a readable report.
 
@@ -351,11 +373,11 @@ def format_issues(issues: List[Dict[str, any]], file_path: str = "") -> str:
         lines.append("")
 
     # Group by severity
-    by_severity = {'error': [], 'warning': [], 'info': []}
+    by_severity = {"error": [], "warning": [], "info": []}
     for issue in issues:
-        by_severity[issue['severity']].append(issue)
+        by_severity[issue["severity"]].append(issue)
 
-    for severity in ['error', 'warning', 'info']:
+    for severity in ["error", "warning", "info"]:
         severity_issues = by_severity[severity]
         if not severity_issues:
             continue
@@ -363,9 +385,7 @@ def format_issues(issues: List[Dict[str, any]], file_path: str = "") -> str:
         lines.append(f"{severity.upper()}S ({len(severity_issues)}):")
         lines.append("-" * 40)
         for issue in severity_issues:
-            lines.append(
-                f"  Line {issue['line']}: [{issue['rule']}] {issue['message']}"
-            )
+            lines.append(f"  Line {issue['line']}: [{issue['rule']}] {issue['message']}")
         lines.append("")
 
     lines.append(f"Total: {len(issues)} issue(s) found")
@@ -385,7 +405,7 @@ if __name__ == "__main__":
     try:
         issues = analyze_file(target_file)
         print(format_issues(issues, target_file))
-        sys.exit(1 if any(i['severity'] == 'error' for i in issues) else 0)
+        sys.exit(1 if any(i["severity"] == "error" for i in issues) else 0)
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}")
         sys.exit(1)
