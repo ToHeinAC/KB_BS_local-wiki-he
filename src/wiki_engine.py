@@ -3,9 +3,11 @@
 import os
 import re
 import shutil
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 import numpy as np
@@ -31,6 +33,7 @@ from prompts import (
     DESCRIPTION_BUILD_PROMPT,
     DESCRIPTION_DELETE_PROMPT,
     DESCRIPTION_UPDATE_PROMPT,
+    INGEST_FORMAT_RETRY_PROMPT,
     INGEST_LANGUAGE_DIRECTIVE,
     INGEST_PROMPT,
     LINT_PROMPT,
@@ -113,11 +116,22 @@ def _date() -> str:
     return datetime.now(UTC).strftime("%Y-%m-%d")
 
 
-def _parse_date(value) -> date | None:
+def _parse_date(value: object) -> date | None:
     try:
         return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
     except (TypeError, ValueError):
         return None
+
+
+def _as_items(value: object) -> list[Any]:
+    """A frontmatter list value: absent/empty → [], a lone scalar → a one-item list."""
+    if not value:
+        return []
+    return cast(list[Any], value) if isinstance(value, list) else [value]
+
+
+def _meta_list(meta: Mapping[str, object], key: str) -> list[Any]:
+    return _as_items(meta.get(key))
 
 
 def is_page_stale(meta: dict[str, Any], today: date | None = None) -> bool:
@@ -130,8 +144,9 @@ def is_page_stale(meta: dict[str, Any], today: date | None = None) -> bool:
     updated = _parse_date(meta.get("updated"))
     if updated is None:
         return False
+    raw_ttl: Any = meta.get("expires_after_days")
     try:
-        ttl = int(meta.get("expires_after_days"))
+        ttl = int(raw_ttl)
     except (TypeError, ValueError):
         ttl = _DEFAULT_EXPIRE_DAYS
     if ttl <= 0:
@@ -264,7 +279,8 @@ def _canonical_slug_tokens(name: str) -> frozenset[str]:
 
 def _parse_index_block(body: str) -> list[str]:
     """Bullet lines under a leading '## Key facts' heading (the page's index)."""
-    out, capturing = [], False
+    out: list[str] = []
+    capturing = False
     for line in body.splitlines():
         s = line.strip()
         if s.lower().startswith("## key facts"):
@@ -286,7 +302,8 @@ def _extract_key_terms(content: str) -> list[str]:
     except Exception:
         title, body = "", content
     text = title + "\n" + "\n".join(_parse_index_block(body))
-    terms, seen = [], set()
+    terms: list[str] = []
+    seen: set[str] = set()
     for tok in re.split(r"[^a-z0-9]+", _ascii_fold(text)):
         if len(tok) < 2 or tok.lower() in _STOPWORDS_SLUG:
             continue
@@ -365,14 +382,18 @@ def _page_title(content: str, filename: str = "") -> str:
         return filename
 
 
-def _overlap_coef(a: frozenset, b: frozenset) -> float:
+def _overlap_coef(a: frozenset[str], b: frozenset[str]) -> float:
     if not a or not b:
         return 0.0
     return len(a & b) / min(len(a), len(b))
 
 
 def _route_page(
-    ptype: str, tokens: frozenset, terms: frozenset, registry: dict[str, Any], self_filename: str
+    ptype: str,
+    tokens: frozenset[str],
+    terms: frozenset[str],
+    registry: dict[str, Any],
+    self_filename: str,
 ) -> str | None:
     """Existing filename this page should merge into, or None to create new.
 
@@ -438,10 +459,10 @@ def _merge_bodies(existing: str, new: str) -> str:
     return "\n".join(out).strip() + "\n"
 
 
-def _union_list(a, b) -> list[Any]:
-    merged = [str(x).strip() for x in (a or []) if str(x).strip()]
-    for v in b or []:
-        v = str(v).strip()
+def _union_list(a: object, b: object) -> list[Any]:
+    merged = [str(x).strip() for x in _as_items(a) if str(x).strip()]
+    for raw in _as_items(b):
+        v = str(raw).strip()
         if v and v not in merged:
             merged.append(v)
     return merged
@@ -483,7 +504,7 @@ def _contradiction_check(
     """Flag same-term/same-unit numeric conflicts. Resolves only on a date signal."""
     ef, nf = _extract_facts(existing), _extract_facts(new)
     newer = _is_newer(nmeta, emeta)
-    out = []
+    out: list[str] = []
     for key, nvals in nf.items():
         evals = ef.get(key)
         if not evals or not (nvals - evals):
@@ -523,13 +544,15 @@ def _merge_pages(existing: str, new: str, source: str) -> str:
             + "\n"
         )
         meta["confidence"] = "low"
-    out = frontmatter.dumps(frontmatter.Post(body, **meta)) + "\n"
+    merged = frontmatter.Post(body)
+    merged.metadata.update(meta)
+    out = frontmatter.dumps(merged) + "\n"
     out = _ensure_key_terms(out)
     out = _ensure_index_block(out)
     return _okf_apply(out)  # keep merged pages OKF-conformant for every caller
 
 
-def _set_meta(content: str, **fields) -> str:
+def _set_meta(content: str, **fields: object) -> str:
     post = frontmatter.loads(content)
     post.metadata.update(fields)
     return frontmatter.dumps(post) + "\n"
@@ -585,7 +608,7 @@ def _align_language(existing: str, new: str, source_lang: str) -> str:
 
 def _registry_entry(content: str, fname: str) -> dict[str, Any]:
     try:
-        aliases = frontmatter.loads(content).metadata.get("aliases") or []
+        aliases = _meta_list(frontmatter.loads(content).metadata, "aliases")
     except Exception:
         aliases = []
     title = _page_title(content, fname)
@@ -677,7 +700,7 @@ def _parse_llm_pages(response: str) -> list[dict[str, Any]]:
     <full page content including frontmatter>
     === END ===
     """
-    pages = []
+    pages: list[dict[str, str]] = []
     pattern = re.compile(r"===\s*([\w\-\.]+\.md)\s*===\s*(.*?)(?====|\Z)", re.DOTALL)
     for match in pattern.finditer(response):
         fname = match.group(1).strip()
@@ -695,7 +718,7 @@ def _source_to_pages() -> dict[str, list[str]]:
     """
     mapping: dict[str, list[str]] = {}
     for page in list_pages():
-        for src in page.get("sources") or []:
+        for src in _meta_list(page, "sources"):
             key = str(src).strip()
             if key:
                 mapping.setdefault(key, []).append(page["filename"])
@@ -730,7 +753,7 @@ def _select_affected_pages(
     return ranked[:_MAX_AFFECTED_PAGES]
 
 
-def _build_existing_block(filenames: list[str]) -> str:
+def _build_existing_block(filenames: list[str]) -> str:  # pyright: ignore[reportUnusedFunction]
     """Render an 'Existing page content' block with rank-weighted per-page budgets.
 
     `filenames` is ordered most-relevant-first (BM25 rank). The top page gets the
@@ -788,7 +811,7 @@ def _scrub_related(content: str, existing: set[str]) -> str:
         post = frontmatter.loads(content)
     except Exception:
         return content
-    related = post.metadata.get("related", []) or []
+    related = _meta_list(post.metadata, "related")
     cleaned = [r for r in related if str(r).strip() in existing]
     if len(cleaned) == len(related):
         return content
@@ -809,10 +832,7 @@ def _ensure_source_in_frontmatter(content: str, source_name: str) -> str:
         post = frontmatter.loads(content)
     except Exception:
         return content
-    existing = post.metadata.get("sources") or []
-    if not isinstance(existing, list):
-        existing = [existing]
-    existing = [str(s).strip() for s in existing if str(s).strip()]
+    existing = [str(s).strip() for s in _meta_list(post.metadata, "sources") if str(s).strip()]
     if source_name not in existing:
         existing.append(source_name)
     post.metadata["sources"] = existing
@@ -1004,11 +1024,7 @@ def ingest_piece(ctx: dict[str, Any], piece_text: str, index: int = 0, total: in
     pages = _parse_llm_pages(response)
 
     if not pages:
-        retry_prompt = (
-            "Your previous response did not contain any `=== filename.md === ... === END ===` blocks. "
-            "Reformat your output now using EXACTLY that delimiter. Same content, correct format.\n\n"
-            f"Original task was:\n{prompt}"
-        )
+        retry_prompt = INGEST_FORMAT_RETRY_PROMPT.format(prompt=prompt)
         response = ollama_client.generate(
             ctx["system"], retry_prompt, temperature=0.2, model_id=ollama_client.INGEST_MODEL
         )
@@ -1150,7 +1166,7 @@ def _strip_teil_sources(content: str) -> str:
     except Exception:
         return content
     cleaned: list[str] = []
-    for s in post.metadata.get("sources") or []:
+    for s in _meta_list(post.metadata, "sources"):
         s2 = _TEIL_SUFFIX_RE.sub("", str(s)).strip()
         if s2 and s2 not in cleaned:
             cleaned.append(s2)
@@ -1182,7 +1198,7 @@ def _needs_cleanup(filename: str) -> bool:
 
 def _group_concept_pages(pages: list[dict[str, Any]]) -> list[list[str]]:
     """Connected components of concept/entity pages under the same-topic relation."""
-    items = []
+    items: list[tuple[str, str, frozenset[str], frozenset[str]]] = []
     for p in pages:
         if str(p.get("type") or "").lower() not in ("concept", "entity"):
             continue
@@ -1198,7 +1214,7 @@ def _group_concept_pages(pages: list[dict[str, Any]]) -> list[list[str]]:
         )
     parent = {it[0]: it[0] for it in items}
 
-    def find(x):
+    def find(x: str) -> str:
         while parent[x] != x:
             parent[x] = parent[parent[x]]
             x = parent[x]
@@ -1274,7 +1290,7 @@ def _remap_related(rename: dict[str, str]) -> None:
             post = frontmatter.load(str(p))
         except Exception:
             continue
-        related = post.metadata.get("related") or []
+        related = _meta_list(post.metadata, "related")
         new: list[str] = []
         for r in related:
             r2 = rename.get(str(r).strip(), str(r).strip())
@@ -1414,7 +1430,7 @@ def delete_source(source_name: str) -> dict[str, Any]:
             post = frontmatter.load(str(md))
         except Exception:
             continue
-        sources = post.metadata.get("sources", []) or []
+        sources = _meta_list(post.metadata, "sources")
         kept = [s for s in sources if not str(s).startswith(source_name)]
         if sources and not kept:
             md.unlink()
@@ -1431,7 +1447,7 @@ def delete_source(source_name: str) -> dict[str, Any]:
                 post = frontmatter.load(str(md))
             except Exception:
                 continue
-            related = post.metadata.get("related", []) or []
+            related = _meta_list(post.metadata, "related")
             cleaned = [r for r in related if str(r).strip() not in removed_pages]
             if len(cleaned) != len(related):
                 post.metadata["related"] = cleaned
@@ -1516,6 +1532,15 @@ def condense_followup(prev_q: str, prev_a: str, followup: str) -> str:
         return followup
 
 
+def _hit_sources(question: str, scope: str) -> list[str]:
+    """`source` of each reranked hit in ``scope``; [] when retrieval fails."""
+    try:
+        hits = retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope=scope, use_rerank=True)
+    except Exception:
+        return []
+    return [h.get("source") or "" for h in hits]
+
+
 def _candidate_pages_for_query(question: str) -> list[str]:
     """BM25 candidate wiki pages for a question (Q-1), plus 1-hop link expansion.
 
@@ -1536,22 +1561,12 @@ def _candidate_pages_for_query(question: str) -> list[str]:
             seen.add(f)
             cands.append(f)
 
-    try:
-        for h in retrieval.search(
-            question, top_k=_QUERY_CANDIDATE_TOPK, scope="wiki", use_rerank=True
-        ):
-            _add(h.get("source", ""))
-    except Exception:
-        pass
+    for src in _hit_sources(question, "wiki"):
+        _add(src)
     src_map = _source_to_pages()
-    try:
-        for h in retrieval.search(
-            question, top_k=_QUERY_CANDIDATE_TOPK, scope="raw", use_rerank=True
-        ):
-            for f in src_map.get((h.get("source") or "").strip(), []):
-                _add(f)
-    except Exception:
-        pass
+    for src in _hit_sources(question, "raw"):
+        for f in src_map.get(src.strip(), []):
+            _add(f)
     cands = cands[:_QUERY_MAX_CANDIDATES]
     if not cands:
         return cands
@@ -1565,7 +1580,7 @@ def _candidate_pages_for_query(question: str) -> list[str]:
 def _index_text_for(filenames: list[str]) -> str:
     """A minimal `index.md`-style block (title — description) for given pages."""
     by_name = {p["filename"]: p for p in list_pages()}
-    lines = []
+    lines: list[str] = []
     for f in filenames:
         p = by_name.get(f)
         if p:
@@ -1597,20 +1612,10 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
     return [s for s in selected if (_wiki() / s).exists()][:5]
 
 
-def _gather_pages(
-    question: str, system: str, budget: int
-) -> tuple[str, list[str], set[str], list[dict[str, Any]], dict[str, Any]]:
-    """Collect synthesis context from the *active* DB (see `query_with_sources`).
-
-    Returns (pages_text, wiki_sources, raw_sources, wiki_hits, audit); the source names
-    are DB-qualified when the search scope spans several DBs. `wiki_hits` (carrying
-    `rerank_score` when the reranker ran) feeds the Stage E abstention check upstream;
-    `audit` is the search-ladder record of which pages were kept vs dropped below τ.
-    """
-    index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
-    selected = _select_pages(question, system, index_text)
-
-    # Q-3: inject the most relevant chunks per page (with anchors), not full pages.
+def _wiki_hits_by_page(
+    question: str,
+) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, Any]]]:
+    """Reranked wiki-scope hits grouped by page (Q-3), plus the flat list; empty on error."""
     hits_by_page: dict[str, list[dict[str, Any]]] = {}
     wiki_hits: list[dict[str, Any]] = []
     try:
@@ -1621,11 +1626,17 @@ def _gather_pages(
             wiki_hits.append(h)
     except Exception:
         pass
+    return hits_by_page, wiki_hits
 
-    # Search-ladder rung 4 (idea.md §6.9.1): τ-gate the picked pages by their best
-    # reranked-chunk score, keeping the picker's order for synthesis. Fail-open — an
-    # uncalibrated DB / no reranker leaves τ None, so `justify` keeps every page and this
-    # is behaviour-identical to fusion-only.
+
+def _tau_gate(
+    selected: list[str], hits_by_page: dict[str, list[dict[str, Any]]]
+) -> tuple[list[str], dict[str, Any]]:
+    """Search-ladder rung 4 (idea.md §6.9.1): τ-gate the picked pages by their best
+    reranked-chunk score, keeping the picker's order for synthesis. Fail-open — an
+    uncalibrated DB / no reranker leaves τ None, so `justify` keeps every page and this
+    is behaviour-identical to fusion-only."""
+
     def _best_score(fn: str) -> float | None:
         scores = [float(h["rerank_score"]) for h in hits_by_page.get(fn, []) if "rerank_score" in h]
         return max(scores) if scores else None
@@ -1633,9 +1644,17 @@ def _gather_pages(
     audit = calibrate.justify(
         [(db_context.qualify(f), _best_score(f)) for f in selected], calibrate.threshold()
     )
-    _below = {n for n, _ in audit["below_tau"]}
-    selected = [f for f in selected if db_context.qualify(f) not in _below]
+    below = {n for n, _ in audit["below_tau"]}
+    return [f for f in selected if db_context.qualify(f) not in below], audit
 
+
+def _page_context(
+    selected: list[str], hits_by_page: dict[str, list[dict[str, Any]]], budget: int
+) -> tuple[str, list[str], set[str]]:
+    """(pages_text, wiki_sources, raw_sources) for the selected pages, within ``budget``.
+
+    Q-3: inject the most relevant chunks per page (with anchors), not full pages.
+    """
     pages_text = ""
     used_sources: list[str] = []
     raw_sources_set: set[str] = set()
@@ -1648,7 +1667,7 @@ def _gather_pages(
         try:
             raw_sources_set.update(
                 db_context.qualify(s)
-                for s in frontmatter.loads(path.read_text()).get("sources", [])
+                for s in _meta_list(frontmatter.loads(path.read_text()).metadata, "sources")
             )
         except Exception:
             pass
@@ -1664,7 +1683,67 @@ def _gather_pages(
         if len(pages_text) >= budget:
             pages_text = pages_text[:budget] + "\n…[truncated]"
             break
+    return pages_text, used_sources, raw_sources_set
+
+
+def _gather_pages(
+    question: str, system: str, budget: int
+) -> tuple[str, list[str], set[str], list[dict[str, Any]], dict[str, Any]]:
+    """Collect synthesis context from the *active* DB (see `query_with_sources`).
+
+    Returns (pages_text, wiki_sources, raw_sources, wiki_hits, audit); the source names
+    are DB-qualified when the search scope spans several DBs. `wiki_hits` (carrying
+    `rerank_score` when the reranker ran) feeds the Stage E abstention check upstream;
+    `audit` is the search-ladder record of which pages were kept vs dropped below τ.
+    """
+    index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
+    selected = _select_pages(question, system, index_text)
+    hits_by_page, wiki_hits = _wiki_hits_by_page(question)
+    selected, audit = _tau_gate(selected, hits_by_page)
+    pages_text, used_sources, raw_sources_set = _page_context(selected, hits_by_page, budget)
     return pages_text, used_sources, raw_sources_set, wiki_hits, audit
+
+
+@dataclass
+class _Gathered:
+    """Synthesis context and Stage E evidence collected across the search scope."""
+
+    blocks: list[str] = field(default_factory=list[str])
+    used_sources: list[str] = field(default_factory=list[str])
+    raw_sources: set[str] = field(default_factory=set[str])
+    # Abstain only when every contributing DB was calibrated AND its best passage fell
+    # below τ. `assess` fail-opens (confident) on an uncalibrated DB / no reranker, so
+    # abstain_all survives only under a genuine calibrated below-threshold signal.
+    abstain_all: bool = True
+    best_rel: float = 0.0
+    best_page: str = ""
+    best_db: str = ""
+    audit: dict[str, Any] = field(
+        default_factory=lambda: {"tau": None, "kept": [], "below_tau": [], "over_cap": []}
+    )
+
+
+def _gather_scope(question: str, system: str, scope: tuple[str, ...], budget: int) -> _Gathered:
+    """One page-selection pass per DB in ``scope``, merged into a single record."""
+    g = _Gathered(best_db=scope[0] if scope else db_context.get_active_db())
+    for db in scope:
+        with db_context.using_db(db):
+            text, used, raws, hits, db_audit = _gather_pages(question, system, budget)
+            confident, rel, closest = calibrate.assess(hits, db=db)
+        if g.audit["tau"] is None:
+            g.audit["tau"] = db_audit.get("tau")
+        for key in ("kept", "below_tau", "over_cap"):
+            g.audit[key].extend(db_audit.get(key, []))
+        if confident:
+            g.abstain_all = False
+        if closest is not None and rel > g.best_rel:
+            g.best_rel, g.best_page, g.best_db = rel, closest.get("source", ""), db
+        if not text.strip():
+            continue
+        g.blocks.append(f"\n\n===== Database: {db} ====={text}" if len(scope) > 1 else text)
+        g.used_sources.extend(used)
+        g.raw_sources.update(raws)
+    return g
 
 
 def query_with_sources(question: str) -> dict[str, Any]:
@@ -1677,56 +1756,23 @@ def query_with_sources(question: str) -> dict[str, Any]:
     system = schema_loader.get_system_prompt(mode="query")
     scope = db_context.search_scope()
     budget = max(_QUERY_SYNTH_MAX_CHARS // len(scope), _QUERY_MIN_DB_SYNTH_CHARS)
+    g = _gather_scope(question, system, scope, budget)
+    result: dict[str, Any] = {
+        "sources": g.used_sources,
+        "raw_sources": sorted(g.raw_sources),
+        "audit": g.audit,
+    }
+    if g.abstain_all and g.best_page:  # calibrated no-confident-answer → skip the LLM synth
+        answer = lang.abstain_message(question, g.best_db, g.best_page, g.best_rel)
+        return {"answer": answer, **result, "abstained": True}
 
-    blocks: list[str] = []
-    used_sources: list[str] = []
-    raw_sources_set: set[str] = set()
-    # Stage E: abstain only when every contributing DB was calibrated AND its best passage
-    # fell below τ. `assess` fail-opens (confident) on an uncalibrated DB / no reranker, so
-    # abstain_all survives only under a genuine calibrated below-threshold signal.
-    abstain_all = True
-    best_rel, best_page, best_db = 0.0, "", scope[0] if scope else db_context.get_active_db()
-    audit = {"tau": None, "kept": [], "below_tau": [], "over_cap": []}
-    for db in scope:
-        with db_context.using_db(db):
-            text, used, raws, hits, db_audit = _gather_pages(question, system, budget)
-            confident, rel, closest = calibrate.assess(hits, db=db)
-        if audit["tau"] is None:
-            audit["tau"] = db_audit.get("tau")
-        for _k in ("kept", "below_tau", "over_cap"):
-            audit[_k].extend(db_audit.get(_k, []))
-        if confident:
-            abstain_all = False
-        if closest is not None and rel > best_rel:
-            best_rel, best_page, best_db = rel, closest.get("source", ""), db
-        if not text.strip():
-            continue
-        blocks.append(f"\n\n===== Database: {db} ====={text}" if len(scope) > 1 else text)
-        used_sources.extend(used)
-        raw_sources_set.update(raws)
-
-    if abstain_all and best_page:  # calibrated no-confident-answer → skip the LLM synth
-        return {
-            "answer": lang.abstain_message(question, best_db, best_page, best_rel),
-            "sources": used_sources,
-            "raw_sources": sorted(raw_sources_set),
-            "abstained": True,
-            "audit": audit,
-        }
-
-    pages_text = "".join(blocks) or "(no relevant pages found)"
     answer_prompt = ANSWER_PROMPT.format(
-        pages_text=pages_text,
+        pages_text="".join(g.blocks) or "(no relevant pages found)",
         question=question,
         language_directive=lang.response_directive(question),
     )
     answer = ollama_client.generate(system, answer_prompt, temperature=0.7)
-    return {
-        "answer": answer,
-        "sources": used_sources,
-        "raw_sources": sorted(raw_sources_set),
-        "audit": audit,
-    }
+    return {"answer": answer, **result}
 
 
 def lint() -> str:
@@ -1750,7 +1796,7 @@ def lint() -> str:
         model_id=ollama_client.FAST_MODEL,
     )
 
-    prog_blocks = []
+    prog_blocks: list[str] = []
     orphans = find_orphans()
     if orphans:
         prog_blocks.append(
@@ -1780,7 +1826,7 @@ def list_pages(include_insights: bool = False) -> list[dict[str, Any]]:
     files = sorted(_wiki().glob("*.md"))
     if include_insights:
         files += sorted((_wiki() / _INSIGHTS_DIR).glob("*.md"))
-    results = []
+    results: list[dict[str, Any]] = []
     for md in files:
         if md.name in _SYSTEM_PAGES:
             continue
@@ -1821,8 +1867,8 @@ def read_page_parsed(filename: str) -> dict[str, Any]:
     post = frontmatter.load(str(path))
     return {
         "content": post.content,
-        "sources": post.metadata.get("sources", []),
-        "related": post.metadata.get("related", []),
+        "sources": _meta_list(post.metadata, "sources"),
+        "related": _meta_list(post.metadata, "related"),
     }
 
 
@@ -2048,11 +2094,11 @@ def build_link_graph() -> dict[str, set[str]]:
                 continue
             try:
                 post = frontmatter.load(str(md))
-                rel = post.metadata.get("related", []) or []
+                rel = _meta_list(post.metadata, "related")
             except Exception:
                 rel = []
             key = md.name if md.parent == _wiki() else f"{_INSIGHTS_DIR}/{md.name}"
-            edges = set()
+            edges: set[str] = set()
             for r in rel:
                 r = str(r).strip()
                 if r and r != key and r in existing and r not in _SYSTEM_PAGES:
@@ -2079,7 +2125,7 @@ def _shared_source_siblings() -> dict[str, set[str]]:
     """
     by_source: dict[str, list[str]] = {}
     for page in list_pages(include_insights=True):
-        for src in page.get("sources") or []:
+        for src in _meta_list(page, "sources"):
             key = str(src).strip()
             if key:
                 by_source.setdefault(key, []).append(page["filename"])
@@ -2134,7 +2180,7 @@ def linked_pages(filenames: list[str], limit: int = 5) -> list[dict[str, Any]]:
         counts[r] = counts.get(r, 0) + 1
 
     for seed in seeds:
-        for r in read_page_parsed(seed).get("related", []) or []:
+        for r in _meta_list(read_page_parsed(seed), "related"):
             _note(r, seed, link_counts)
         for r in sorted(backlinks.get(seed, set())):
             _note(r, seed, link_counts)
@@ -2202,8 +2248,8 @@ def build_typed_graph() -> dict[str, Any]:
                 continue
             try:
                 post = frontmatter.load(str(md))
-                related = post.metadata.get("related", []) or []
-                sources = post.metadata.get("sources", []) or []
+                related = _meta_list(post.metadata, "related")
+                sources = _meta_list(post.metadata, "sources")
                 title = str(post.metadata.get("title", md.stem))
                 ptype = str(post.metadata.get("type", "other")).strip().lower()
             except Exception:
@@ -2289,7 +2335,8 @@ def resolve_contradiction(
     response = ollama_client.generate(system, prompt, temperature=0.2)
     pages = _parse_llm_pages(response)
 
-    updated, skipped = [], []
+    updated: list[str] = []
+    skipped: list[str] = []
     for page in pages:
         fname = page["filename"]
         dest = _wiki() / fname

@@ -176,6 +176,14 @@ AGENT_SYSTEM = RESEARCHER_INSTRUCTIONS
 
 # --- Wiki engine prompts (unchanged) ---------------------------------------
 
+# Sent once when an ingest response carried no `=== filename.md ===` blocks. The exact
+# text predates its move here from wiki_engine; {prompt} is the original ingest prompt.
+INGEST_FORMAT_RETRY_PROMPT = (
+    "Your previous response did not contain any `=== filename.md === ... === END ===` "
+    "blocks. Reformat your output now using EXACTLY that delimiter. Same content, correct "
+    "format.\n\nOriginal task was:\n{prompt}"
+)
+
 INGEST_PROMPT = """You are ingesting a new source document into the wiki.
 
 Source name: {source_name}{part_note}
