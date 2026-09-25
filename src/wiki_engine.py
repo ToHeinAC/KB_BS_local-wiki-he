@@ -1,5 +1,6 @@
 """Core wiki operations: init, ingest, query, lint, list, read."""
 
+import contextlib
 import os
 import re
 import shutil
@@ -39,6 +40,7 @@ from prompts import (
     LINT_PROMPT,
     RESOLVE_CONTRADICTION_PROMPT,
     SELECT_PROMPT,
+    USER_META_PROMPT,
 )
 
 load_dotenv()
@@ -438,19 +440,19 @@ def _merge_bodies(existing: str, new: str) -> str:
     """Union of sections; appends only non-duplicate lines (no fact dropped)."""
     e_secs = _split_sections(existing)
     heading_idx = {h.lower(): i for i, (h, _) in enumerate(e_secs) if h}
-    seen = {_norm_line(l) for _, ls in e_secs for l in ls if l.strip()}
+    seen = {_norm_line(ln) for _, ls in e_secs for ln in ls if ln.strip()}
     for h, lines in _split_sections(new):
-        add = [l for l in lines if not l.strip() or _norm_line(l) not in seen]
-        add = [l for l in add if l.strip() or (add and h)]  # drop leading blanks
+        add = [ln for ln in lines if not ln.strip() or _norm_line(ln) not in seen]
+        add = [ln for ln in add if ln.strip() or (add and h)]  # drop leading blanks
         key = h.lower()
         if h and key in heading_idx:
-            e_secs[heading_idx[key]][1].extend(l for l in add if l.strip())
+            e_secs[heading_idx[key]][1].extend(ln for ln in add if ln.strip())
         elif h:
-            e_secs.append([h, [l for l in lines if l.strip()]])
+            e_secs.append([h, [ln for ln in lines if ln.strip()]])
             heading_idx[key] = len(e_secs) - 1
         else:
-            e_secs[0][1].extend(l for l in add if l.strip())
-        seen.update(_norm_line(l) for l in lines if l.strip())
+            e_secs[0][1].extend(ln for ln in add if ln.strip())
+        seen.update(_norm_line(ln) for ln in lines if ln.strip())
     out: list[str] = []
     for h, lines in e_secs:
         if h:
@@ -662,7 +664,7 @@ def _route_cross_language(title: str, ptype: str, plang: str, ctx: dict[str, Any
             dtype=np.float32,
         )
         vecs /= np.linalg.norm(vecs, axis=1, keepdims=True)
-        cache.update(zip(todo, vecs[1:]))
+        cache.update(zip(todo, vecs[1:], strict=True))
         scores = sorted(((float(vecs[0] @ cache[fn]), fn) for fn in cands), reverse=True)
     except Exception:
         return None
@@ -892,6 +894,31 @@ def _summary_slug(source_name: str) -> str:
     return slug
 
 
+def _user_meta_prompt(user_meta: dict[str, Any] | None) -> tuple[str, str]:
+    """(prompt block, extra example frontmatter) for the non-empty user metadata."""
+    clean_meta = {k: v for k, v in (user_meta or {}).items() if v and str(v).strip()}
+    if not clean_meta:
+        return "", ""
+    meta_lines = "\n".join(f"- {k}: {v}" for k, v in clean_meta.items())
+    extra_frontmatter = "\n".join(f'{k}: "{v}"' for k, v in clean_meta.items())
+    return USER_META_PROMPT.format(meta_lines=meta_lines), "\n" + extra_frontmatter
+
+
+def _build_chunk_layer(full_text: str, source_name: str) -> list[dict[str, Any]]:
+    """Build the lexical ground-truth layer once on the whole document so § / ##
+    boundaries are honoured across former 40 KB cuts; qa-gen rides on it."""
+    chunks = chunker.split(full_text)
+    if chunks:
+        chunker.write_chunks(source_name, chunks)
+        if os.getenv("INGEST_QA", "1") == "1":
+            try:
+                qa_items = qa_gen.generate(chunks, source=source_name)
+                qa_gen.persist(qa_items, source_name)
+            except Exception:
+                pass  # qa-gen is best-effort; never fail ingest on it
+    return chunks
+
+
 def ingest_begin(
     full_text: str, source_name: str, user_meta: dict[str, Any] | None = None
 ) -> dict[str, Any]:
@@ -908,33 +935,8 @@ def ingest_begin(
     system = schema_loader.get_system_prompt() + "\n\n" + lang.ingest_directive(full_text)
     index_text = _index_path().read_text() if _index_path().exists() else ""
 
-    clean_meta = {k: v for k, v in (user_meta or {}).items() if v and str(v).strip()}
-    if clean_meta:
-        meta_lines = "\n".join(f"- {k}: {v}" for k, v in clean_meta.items())
-        meta_block = (
-            "User-supplied metadata (authoritative — prefer these over filename inference;\n"
-            "use `name`/`fullname` for the page title and copy `description`,\n"
-            "`effective as of`, `part of` verbatim into the source-summary frontmatter):\n"
-            f"{meta_lines}\n\n"
-        )
-        extra_frontmatter = "\n".join(f'{k}: "{v}"' for k, v in clean_meta.items())
-        example_extra = "\n" + extra_frontmatter
-    else:
-        meta_block = ""
-        example_extra = ""
-
-    # Build the lexical ground-truth layer once on the whole document so § / ##
-    # boundaries are honoured across former 40 KB cuts.
-    chunks = chunker.split(full_text)
-    if chunks:
-        chunker.write_chunks(source_name, chunks)
-        if os.getenv("INGEST_QA", "1") == "1":
-            try:
-                qa_items = qa_gen.generate(chunks, source=source_name)
-                qa_gen.persist(qa_items, source_name)
-            except Exception:
-                pass  # qa-gen is best-effort; never fail ingest on it
-
+    meta_block, example_extra = _user_meta_prompt(user_meta)
+    chunks = _build_chunk_layer(full_text, source_name)
     return {
         "system": system,
         "source_name": source_name,
@@ -1018,21 +1020,30 @@ def ingest_piece(ctx: dict[str, Any], piece_text: str, index: int = 0, total: in
         date=_date(),
     )
 
+    response, pages = _synthesize_pages(ctx["system"], prompt)
+    for page in pages:
+        _write_piece_page(ctx, page)
+    _note_markers(ctx, response)
+
+
+def _synthesize_pages(system: str, prompt: str) -> tuple[str, list[dict[str, str]]]:
+    """(response, parsed pages) of the ingest call, retried once with a format nudge
+    when the response carried no `=== filename.md ===` blocks."""
     response = ollama_client.generate(
-        ctx["system"], prompt, temperature=0.3, model_id=ollama_client.INGEST_MODEL
+        system, prompt, temperature=0.3, model_id=ollama_client.INGEST_MODEL
     )
     pages = _parse_llm_pages(response)
-
     if not pages:
         retry_prompt = INGEST_FORMAT_RETRY_PROMPT.format(prompt=prompt)
         response = ollama_client.generate(
-            ctx["system"], retry_prompt, temperature=0.2, model_id=ollama_client.INGEST_MODEL
+            system, retry_prompt, temperature=0.2, model_id=ollama_client.INGEST_MODEL
         )
         pages = _parse_llm_pages(response)
+    return response, pages
 
-    for page in pages:
-        _write_piece_page(ctx, page)
 
+def _note_markers(ctx: dict[str, Any], response: str) -> None:
+    """Record the `UPDATE:` / `CONTRADICTION:` marker lines of an ingest response."""
     for line in response.splitlines():
         if line.startswith("UPDATE:"):
             fname = line.split(":", 1)[1].strip()
@@ -1064,22 +1075,16 @@ def ingest_end(ctx: dict[str, Any], finalize: bool = True) -> dict[str, Any]:
         # Semantic arm: best-effort + gated on an existing model-matching index, so
         # it keeps an already-embedded DB current without failing ingest or building
         # a partial index on a never-backfilled DB.
-        try:
+        with contextlib.suppress(Exception):
             embed_index.index_replace_source(ctx["source_name"], raw_chunks)
-        except Exception:
-            pass
     for name in dict.fromkeys(ctx["created"] + ctx["updated"]):
         lex_index.index_replace_wiki_page(name)
-        try:
+        with contextlib.suppress(Exception):
             embed_index.index_replace_wiki_page(name)
-        except Exception:
-            pass
-    if finalize:
-        if os.getenv("INGEST_DESCRIPTION", "1") == "1":
-            try:
-                update_description(ctx)
-            except Exception:
-                pass  # best-effort; never fail ingest on the overview refresh
+    if finalize and os.getenv("INGEST_DESCRIPTION", "1") == "1":
+        # best-effort; never fail ingest on the overview refresh
+        with contextlib.suppress(Exception):
+            update_description(ctx)
     _append_log(
         f"Ingest: {ctx['source_name']}",
         f"Affected: {ctx['affected']}\nCreated: {ctx['created']}\n"
@@ -1365,7 +1370,7 @@ def _consolidate_active(dry_run: bool, llm_polish: bool) -> dict[str, Any]:
     if dry_run:
         return summary
     for pl in plans:
-        order = [pl["base"]] + sorted(m for m in pl["members"] if m != pl["base"])
+        order = [pl["base"], *sorted(m for m in pl["members"] if m != pl["base"])]
         content = _merge_group([read_page(m) for m in order])
         content = _strip_teil_sources(_clean_teil_text(content))
         if llm_polish:
@@ -1382,50 +1387,25 @@ def _consolidate_active(dry_run: bool, llm_polish: bool) -> dict[str, Any]:
     return summary
 
 
-def delete_source(source_name: str) -> dict[str, Any]:
-    """Remove a source and all derived data. Wiki pages referencing it are deleted.
-
-    Returns a summary dict with keys: raw, manifest, chunks, qa_rows, wiki_pages.
-    """
-    result: dict[str, Any] = {
-        "raw": False,
-        "manifest": False,
-        "chunks": False,
-        "qa_rows": 0,
-        "wiki_pages": [],
-    }
-
-    raw_file = _raw() / source_name
-    if raw_file.exists():
-        raw_file.unlink()
-        result["raw"] = True
-
-    result["manifest"] = dedup.deregister_source(source_name)
-
-    chunk_file = db_context.chunks_dir() / f"{chunker.source_slug(source_name)}.jsonl"
-    if chunk_file.exists():
-        chunk_file.unlink()
-        result["chunks"] = True
-
-    result["qa_rows"] = qa_gen.delete_source_entries(source_name)
-
-    # Cascade through wiki pages: drop this source from every page's
-    # frontmatter; delete pages whose `sources:` becomes empty; then scrub
-    # surviving pages' `related:` lists of any references to deleted pages.
-    _SKIP = set(_SYSTEM_PAGES)
+def _content_pages() -> list[Path]:
+    """Every non-system wiki page, top level and `insights/`."""
+    out = [p for p in _wiki().glob("*.md") if p.name not in _SYSTEM_PAGES]
     insights = _wiki() / _INSIGHTS_DIR
+    if insights.exists():
+        out.extend(p for p in insights.glob("*.md") if p.name not in _SYSTEM_PAGES)
+    return out
 
-    def _all_pages() -> list[Path]:
-        out = [p for p in _wiki().glob("*.md") if p.name not in _SKIP]
-        if insights.exists():
-            out.extend(p for p in insights.glob("*.md") if p.name not in _SKIP)
-        return out
 
-    def _rel(md: Path) -> str:
-        return md.name if md.parent == _wiki() else f"{_INSIGHTS_DIR}/{md.name}"
+def _page_ref(md: Path) -> str:
+    """How pages reference ``md``: its filename, prefixed with `insights/` there."""
+    return md.name if md.parent == _wiki() else f"{_INSIGHTS_DIR}/{md.name}"
 
-    removed_pages: set[str] = set()
-    for md in _all_pages():
+
+def _drop_source_from_pages(source_name: str) -> set[str]:
+    """Drop ``source_name`` from every page's `sources:`; delete pages left without
+    one. Returns the refs of the deleted pages."""
+    removed: set[str] = set()
+    for md in _content_pages():
         try:
             post = frontmatter.load(str(md))
         except Exception:
@@ -1434,49 +1414,79 @@ def delete_source(source_name: str) -> dict[str, Any]:
         kept = [s for s in sources if not str(s).startswith(source_name)]
         if sources and not kept:
             md.unlink()
-            removed_pages.add(_rel(md))
+            removed.add(_page_ref(md))
         elif len(kept) != len(sources):
             post.metadata["sources"] = kept
             post.metadata["updated"] = _date()
             md.write_text(frontmatter.dumps(post))
+    return removed
 
+
+def _scrub_links_to(removed: set[str]) -> int:
+    """Remove links to ``removed`` pages from surviving `related:` lists. Returns
+    how many pages changed."""
     scrubbed = 0
-    if removed_pages:
-        for md in _all_pages():
-            try:
-                post = frontmatter.load(str(md))
-            except Exception:
-                continue
-            related = _meta_list(post.metadata, "related")
-            cleaned = [r for r in related if str(r).strip() not in removed_pages]
-            if len(cleaned) != len(related):
-                post.metadata["related"] = cleaned
-                post.metadata["updated"] = _date()
-                md.write_text(frontmatter.dumps(post))
-                scrubbed += 1
+    for md in _content_pages() if removed else []:
+        try:
+            post = frontmatter.load(str(md))
+        except Exception:
+            continue
+        related = _meta_list(post.metadata, "related")
+        cleaned = [r for r in related if str(r).strip() not in removed]
+        if len(cleaned) != len(related):
+            post.metadata["related"] = cleaned
+            post.metadata["updated"] = _date()
+            md.write_text(frontmatter.dumps(post))
+            scrubbed += 1
+    return scrubbed
 
-    result["wiki_pages"] = sorted(removed_pages)
-    result["related_scrubbed"] = scrubbed
 
-    # Incremental index update: drop the deleted raw source's chunks and the
-    # pseudo-chunks of any removed wiki page. Surviving pages only had frontmatter
-    # edited (sources/related/updated) — their indexed body text is unchanged — so
-    # they need no re-index.
-    lex_index.index_delete(source_name)
-    for rel in removed_pages:
-        lex_index.index_delete(Path(rel).name)
+def _unindex(source_name: str, removed: set[str]) -> None:
+    """Incremental index update: drop the deleted raw source's chunks and the
+    pseudo-chunks of any removed wiki page. Surviving pages only had frontmatter
+    edited (sources/related/updated) — their indexed body text is unchanged — so
+    they need no re-index."""
+    names = [source_name, *(Path(ref).name for ref in removed)]
+    for name in names:
+        lex_index.index_delete(name)
     try:
-        embed_index.index_delete(source_name)
-        for rel in removed_pages:
-            embed_index.index_delete(Path(rel).name)
+        for name in names:
+            embed_index.index_delete(name)
     except Exception:
         pass  # semantic arm is best-effort; the vectors are a rebuildable cache
+
+
+def delete_source(source_name: str) -> dict[str, Any]:
+    """Remove a source and all derived data. Wiki pages referencing it are deleted.
+
+    Returns a summary dict with keys: raw, manifest, chunks, qa_rows, wiki_pages,
+    related_scrubbed.
+    """
+    raw_file = _raw() / source_name
+    chunk_file = db_context.chunks_dir() / f"{chunker.source_slug(source_name)}.jsonl"
+    had_raw, had_chunks = raw_file.exists(), chunk_file.exists()
+    raw_file.unlink(missing_ok=True)
+    result: dict[str, Any] = {
+        "raw": had_raw,
+        "manifest": dedup.deregister_source(source_name),
+        "chunks": had_chunks,
+    }
+    chunk_file.unlink(missing_ok=True)
+    result["qa_rows"] = qa_gen.delete_source_entries(source_name)
+
+    # Cascade through wiki pages: drop this source from every page's frontmatter;
+    # delete pages whose `sources:` becomes empty; then scrub surviving pages'
+    # `related:` lists of any references to deleted pages.
+    removed = _drop_source_from_pages(source_name)
+    result["wiki_pages"] = sorted(removed)
+    result["related_scrubbed"] = _scrub_links_to(removed)
+
+    _unindex(source_name, removed)
     _rebuild_index()
     if os.getenv("INGEST_DESCRIPTION", "1") == "1":
-        try:
+        # best-effort; never fail deletion on the overview refresh
+        with contextlib.suppress(Exception):
             refresh_description_after_delete(source_name, result["wiki_pages"])
-        except Exception:
-            pass  # best-effort; never fail deletion on the overview refresh
     _append_log(
         "Source deleted",
         f"Source: {source_name}\n"
@@ -1484,7 +1494,7 @@ def delete_source(source_name: str) -> dict[str, Any]:
         f"Chunks removed: {result['chunks']}\n"
         f"QA rows removed: {result['qa_rows']}\n"
         f"Wiki pages removed: {result['wiki_pages']}\n"
-        f"Related scrubbed: {scrubbed}",
+        f"Related scrubbed: {result['related_scrubbed']}",
     )
     return result
 
@@ -1664,13 +1674,11 @@ def _page_context(
             continue
         label = db_context.qualify(fname)
         used_sources.append(label)
-        try:
+        with contextlib.suppress(Exception):
             raw_sources_set.update(
                 db_context.qualify(s)
                 for s in _meta_list(frontmatter.loads(path.read_text()).metadata, "sources")
             )
-        except Exception:
-            pass
         hits = hits_by_page.get(fname, [])[:_QUERY_CHUNKS_PER_PAGE]
         if hits:
             for h in hits:
@@ -1915,10 +1923,8 @@ def ensure_description() -> None:
     """One-time seed: build the overview if it's missing and the wiki has pages."""
     if read_description() or not list_pages():
         return
-    try:
+    with contextlib.suppress(Exception):  # best-effort; never block the page render
         build_description()
-    except Exception:
-        pass  # best-effort; never block the page render on it
 
 
 def update_description(ctx: dict[str, Any]) -> None:
@@ -2158,13 +2164,39 @@ def linked_pages(filenames: list[str], limit: int = 5) -> list[dict[str, Any]]:
     seeds = [f for f in filenames if f]
     if not seeds or limit <= 0:
         return []
-    seed_set = set(seeds)
     titles = {
         p["filename"]: str(p.get("title", p["filename"])) for p in list_pages(include_insights=True)
     }
+    order, link_counts, shared_counts, via = _collect_neighbours(seeds, titles)
+    # Tier 1: any explicit link. Tier 2: shared-source only. Stable sort, so
+    # equal-ranked neighbours keep insertion order.
+    order.sort(
+        key=lambda r: (
+            0 if link_counts.get(r) else 1,
+            -link_counts.get(r, 0),
+            -shared_counts.get(r, 0),
+        )
+    )
+    return [
+        {
+            "filename": r,
+            "title": titles[r],
+            "excerpt": " ".join(read_page_parsed(r).get("content", "").split())[:240],
+            "via": via[r],
+            "kind": "link" if link_counts.get(r) else "shared-source",
+        }
+        for r in order[:limit]
+    ]
+
+
+def _collect_neighbours(
+    seeds: list[str], titles: dict[str, str]
+) -> tuple[list[str], dict[str, int], dict[str, int], dict[str, str]]:
+    """(first-seen order, link counts, shared-source counts, reaching seed) of every
+    existing non-seed page adjacent to ``seeds``."""
+    seed_set = set(seeds)
     backlinks = _backlink_map()
     siblings = _shared_source_siblings()
-
     order: list[str] = []
     link_counts: dict[str, int] = {}
     shared_counts: dict[str, int] = {}
@@ -2186,30 +2218,68 @@ def linked_pages(filenames: list[str], limit: int = 5) -> list[dict[str, Any]]:
             _note(r, seed, link_counts)
         for r in sorted(siblings.get(seed, set())):
             _note(r, seed, shared_counts)
+    return order, link_counts, shared_counts, via
 
-    # Tier 1: any explicit link. Tier 2: shared-source only. Stable sort, so
-    # equal-ranked neighbours keep insertion order.
-    order.sort(
-        key=lambda r: (
-            0 if link_counts.get(r) else 1,
-            -link_counts.get(r, 0),
-            -shared_counts.get(r, 0),
+
+_GRAPH_SKIP_SOURCE_PREFIXES = ("summary-", "concept-", "entity-")
+
+
+def _graph_source(name: object) -> str | None:
+    """The raw source a `sources:` entry names, or None for pseudo-sources."""
+    raw = _TEIL_SUFFIX_RE.sub("", str(name)).strip()
+    if not raw or raw == "chat" or raw.startswith(_GRAPH_SKIP_SOURCE_PREFIXES):
+        return None
+    return raw
+
+
+def _graph_page_meta(md: Path) -> tuple[list[Any], list[Any], str, str]:
+    """(related, sources, title, type) of a page; defaults when it can't be parsed."""
+    try:
+        post = frontmatter.load(str(md))
+        return (
+            _meta_list(post.metadata, "related"),
+            _meta_list(post.metadata, "sources"),
+            str(post.metadata.get("title", md.stem)),
+            str(post.metadata.get("type", "other")).strip().lower(),
         )
-    )
-    out: list[dict[str, Any]] = []
-    for r in order[:limit]:
-        body = read_page_parsed(r).get("content", "")
-        excerpt = " ".join(body.split())[:240]
-        out.append(
-            {
-                "filename": r,
-                "title": titles[r],
-                "excerpt": excerpt,
-                "via": via[r],
-                "kind": "link" if link_counts.get(r) else "shared-source",
-            }
-        )
-    return out
+    except Exception:
+        return [], [], md.stem, "other"
+
+
+@dataclass
+class _TypedGraph:
+    """Accumulates typed nodes/edges, emitting each page pair or page→source once."""
+
+    existing: set[str]
+    nodes: dict[str, dict[str, Any]] = field(default_factory=dict[str, dict[str, Any]])
+    edges: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
+    related_pairs: set[frozenset[str]] = field(default_factory=set[frozenset[str]])
+    derived_pairs: set[tuple[str, str]] = field(default_factory=set[tuple[str, str]])
+    sources: set[str] = field(default_factory=set[str])
+
+    def relate(self, page_id: str, related: list[Any]) -> None:
+        for item in related:
+            r = str(item).strip()
+            if not r or r == page_id or r not in self.existing or r in _SYSTEM_PAGES:
+                continue
+            pair = frozenset({page_id, r})
+            if pair not in self.related_pairs:
+                self.related_pairs.add(pair)
+                self.edges.append({"from": page_id, "to": r, "type": "related-to"})
+
+    def derive(self, page_id: str, sources: list[Any], is_page: bool) -> None:
+        for s in sources:
+            raw = _graph_source(s)
+            if raw is None:
+                continue
+            self.sources.add(raw)
+            if not is_page:
+                # source-summary: register source node but emit no page→source edge
+                continue
+            pair = (page_id, f"source::{raw}")
+            if pair not in self.derived_pairs:
+                self.derived_pairs.add(pair)
+                self.edges.append({"from": page_id, "to": pair[1], "type": "derived-from"})
 
 
 def build_typed_graph() -> dict[str, Any]:
@@ -2229,69 +2299,21 @@ def build_typed_graph() -> dict[str, Any]:
         for md in insights.glob("*.md"):
             existing.add(f"{_INSIGHTS_DIR}/{md.name}")
 
-    def _raw_source(name: str) -> str:
-        return _TEIL_SUFFIX_RE.sub("", str(name)).strip()
+    g = _TypedGraph(existing)
+    for md in _content_pages():
+        related, sources, title, ptype = _graph_page_meta(md)
+        if ptype not in ("concept", "entity", "source-summary"):
+            continue
+        is_page = ptype in ("concept", "entity")
+        page_id = _page_ref(md)
+        if is_page:
+            g.nodes[page_id] = {"id": page_id, "type": "page", "label": title}
+            g.relate(page_id, related)
+        g.derive(page_id, sources, is_page)
 
-    nodes: dict[str, dict[str, Any]] = {}
-    edges: list[dict[str, Any]] = []
-    related_pairs: set[frozenset[str]] = set()
-    derived_pairs: set[tuple[str, str]] = set()
-    source_set: set[str] = set()
-
-    targets = [_wiki().glob("*.md")]
-    if insights.exists():
-        targets.append(insights.glob("*.md"))
-
-    for src_iter in targets:
-        for md in src_iter:
-            if md.name in _SYSTEM_PAGES:
-                continue
-            try:
-                post = frontmatter.load(str(md))
-                related = _meta_list(post.metadata, "related")
-                sources = _meta_list(post.metadata, "sources")
-                title = str(post.metadata.get("title", md.stem))
-                ptype = str(post.metadata.get("type", "other")).strip().lower()
-            except Exception:
-                related, sources, title, ptype = [], [], md.stem, "other"
-            if ptype not in ("concept", "entity", "source-summary"):
-                continue
-            is_page = ptype in ("concept", "entity")
-            page_id = md.name if md.parent == _wiki() else f"{_INSIGHTS_DIR}/{md.name}"
-            if is_page:
-                nodes[page_id] = {"id": page_id, "type": "page", "label": title}
-                for r in related:
-                    r = str(r).strip()
-                    if r and r != page_id and r in existing and r not in _SYSTEM_PAGES:
-                        pair = frozenset({page_id, r})
-                        if pair not in related_pairs:
-                            related_pairs.add(pair)
-                            edges.append({"from": page_id, "to": r, "type": "related-to"})
-            for s in sources:
-                raw = _raw_source(s)
-                if (
-                    not raw
-                    or raw == "chat"
-                    or raw.startswith("summary-")
-                    or raw.startswith("concept-")
-                    or raw.startswith("entity-")
-                ):
-                    continue
-                source_id = f"source::{raw}"
-                source_set.add(raw)
-                if not is_page:
-                    # source-summary: register source node but emit no page→source edge
-                    continue
-                pair = (page_id, source_id)
-                if pair in derived_pairs:
-                    continue
-                derived_pairs.add(pair)
-                edges.append({"from": page_id, "to": source_id, "type": "derived-from"})
-
-    for s in source_set:
-        nodes[f"source::{s}"] = {"id": f"source::{s}", "type": "source", "label": s}
-
-    return {"nodes": list(nodes.values()), "edges": edges}
+    for s in g.sources:
+        g.nodes[f"source::{s}"] = {"id": f"source::{s}", "type": "source", "label": s}
+    return {"nodes": list(g.nodes.values()), "edges": g.edges}
 
 
 def find_orphans() -> list[str]:
@@ -2302,6 +2324,28 @@ def find_orphans() -> list[str]:
         for tgt in edges:
             in_deg[tgt] = in_deg.get(tgt, 0) + 1
     return sorted(n for n, d in in_deg.items() if d == 0)
+
+
+def _write_resolved_pages(
+    pages: list[dict[str, str]], langs: dict[str, str]
+) -> tuple[list[str], list[str]]:
+    """Write rewritten existing pages that kept their language. Returns (updated,
+    skipped); a rewrite in another language is skipped, never written."""
+    updated: list[str] = []
+    skipped: list[str] = []
+    for page in pages:
+        fname = page["filename"]
+        dest = _wiki() / fname
+        if not dest.exists():
+            continue
+        plang = langs.get(fname) or page_lang.page_lang(dest.read_text())
+        content = _ensure_frontmatter(page["content"], fname)
+        if page_lang.clearly_other(frontmatter.loads(content).content, plang):
+            skipped.append(fname)
+            continue
+        dest.write_text(_okf_apply(_set_meta(content, lang=plang)))
+        updated.append(fname)
+    return updated, skipped
 
 
 def resolve_contradiction(
@@ -2335,21 +2379,7 @@ def resolve_contradiction(
     response = ollama_client.generate(system, prompt, temperature=0.2)
     pages = _parse_llm_pages(response)
 
-    updated: list[str] = []
-    skipped: list[str] = []
-    for page in pages:
-        fname = page["filename"]
-        dest = _wiki() / fname
-        if not dest.exists():
-            continue
-        plang = langs.get(fname) or page_lang.page_lang(dest.read_text())
-        content = _ensure_frontmatter(page["content"], fname)
-        if page_lang.clearly_other(frontmatter.loads(content).content, plang):
-            skipped.append(fname)
-            continue
-        dest.write_text(_okf_apply(_set_meta(content, lang=plang)))
-        updated.append(fname)
-
+    updated, skipped = _write_resolved_pages(pages, langs)
     _append_log(
         "Contradiction resolved",
         f"Description: {description}\nUpdated: {updated}\nSkipped (language changed): {skipped}\n"
@@ -2406,10 +2436,8 @@ def normalize_pages(dry_run: bool = True) -> dict[str, Any]:
         if not dry_run and new != old:
             path.write_text(new)
             lex_index.index_replace_wiki_page(fname)
-            try:
+            with contextlib.suppress(Exception):
                 embed_index.index_replace_wiki_page(fname)
-            except Exception:
-                pass
     if not dry_run and report:
         _rebuild_index()
         _append_log("Normalize pages", f"{len(report)} pages: {', '.join(sorted(report))}")

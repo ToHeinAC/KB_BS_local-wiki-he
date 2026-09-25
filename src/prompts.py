@@ -176,6 +176,15 @@ AGENT_SYSTEM = RESEARCHER_INSTRUCTIONS
 
 # --- Wiki engine prompts (unchanged) ---------------------------------------
 
+# Prepended to the ingest prompt when the user filled in metadata; {meta_lines} is one
+# "- key: value" line per non-empty field.
+USER_META_PROMPT = (
+    "User-supplied metadata (authoritative — prefer these over filename inference;\n"
+    "use `name`/`fullname` for the page title and copy `description`,\n"
+    "`effective as of`, `part of` verbatim into the source-summary frontmatter):\n"
+    "{meta_lines}\n\n"
+)
+
 # Sent once when an ingest response carried no `=== filename.md ===` blocks. The exact
 # text predates its move here from wiki_engine; {prompt} is the original ingest prompt.
 INGEST_FORMAT_RETRY_PROMPT = (
