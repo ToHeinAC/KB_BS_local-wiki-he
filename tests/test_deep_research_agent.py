@@ -33,6 +33,14 @@ def _tavily_key(monkeypatch):
     monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
 
 
+@pytest.fixture(autouse=True)
+def _no_daemon(monkeypatch):
+    """run_deep_research resolves (and may spawn) the pinned Ollama daemon, then
+    writes OLLAMA_HOST; stub the resolution and restore the env var afterwards."""
+    monkeypatch.setattr(dra.ollama_client, "host", lambda: "http://127.0.0.1:11434")
+    monkeypatch.setenv("OLLAMA_HOST", "http://127.0.0.1:11434")
+
+
 def _script(monkeypatch, events):
     """Replace the async bridge with a scripted (node, delta) sequence."""
     monkeypatch.setattr(dra, "_astream_sync", lambda q, d: iter(events))

@@ -1,5 +1,6 @@
-"""Shared fixtures for LocalWiki test suite."""
+"""Shared fixtures for LocalWiki test suite. The suite is offline: any socket connect raises."""
 
+import socket
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -12,6 +13,15 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 import db_context
 import ollama_client
 import wiki_engine
+
+
+@pytest.fixture(autouse=True)
+def _block_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("tests must stay offline; use synthetic fixtures")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
 
 
 def _patch_data_root(monkeypatch, tmp_path: Path, db_name: str = "test") -> Path:
