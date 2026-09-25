@@ -491,24 +491,18 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, A
     return _query_fts5(q, top_k, scope)
 
 
-def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, Any]]:
-    """BM25 over the FTS5 index.
-
-    Query tokens are expanded to the same `variants()` forms the index stored, so
-    German morphology matching is deterministic and identical at index and query
-    time. FTS5's `bm25()` returns lower=better, so it is negated into the usual
-    higher=better score. Results are deduplicated by chunk_id (a chunk shared by
-    two sources can appear twice after incremental updates); the higher-scored row
-    wins since rows arrive best-first.
-    """
+def _expand_query(q: str) -> list[str]:
+    """The query's tokens expanded to their stored `variants()` forms, in order, unique."""
     expanded: list[str] = []
     for tok in tokenize(q):
         for v in variants(tok):
             if v not in expanded:
                 expanded.append(v)
-    if not expanded:
-        return []
+    return expanded
 
+
+def _fts5_rows(expanded: list[str], scope: str | None, top_k: int) -> list[tuple[Any, ...]]:
+    """Best-first FTS5 rows matching any expanded token; [] on a SQLite error."""
     match = " OR ".join(f'"{v}"' for v in expanded)
     sql = (
         "SELECT chunk_id, source, scope, anchor, heading_path, char_start, "
@@ -524,48 +518,66 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[
 
     con = sqlite3.connect(str(_fts5_path()))
     try:
-        rows = con.execute(sql, params).fetchall()
+        return con.execute(sql, params).fetchall()
     except sqlite3.Error:
         return []
     finally:
         con.close()
 
+
+def _chunk_text(cid: str, source: str, inline: str, cache: dict[str, dict[str, str]]) -> str:
+    """A row's text: stored inline for wiki rows, else read from the chunk store."""
+    if inline:
+        return inline
+    if source not in cache:
+        cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
+    return cache[source].get(cid, "")
+
+
+def _fts5_hit(row: tuple[Any, ...], text: str, expanded: set[str]) -> dict[str, Any]:
+    cid, source, sc, anchor, hp_json, cs, ce, lang, _inline, terms, score = row
+    preview = text.replace("\n", " ").strip()
+    if len(preview) > 320:
+        preview = preview[:320] + "…"
+    return {
+        "chunk_id": cid,
+        "score": round(-score, 3),
+        "source": source,
+        "scope": sc,
+        "anchor": anchor,
+        "heading_path": json.loads(hp_json) if hp_json else [],
+        "char_start": cs,
+        "char_end": ce,
+        "lang": lang,
+        "text": text,
+        "preview": preview,
+        "matched_terms": sorted(expanded.intersection(terms.split())),
+    }
+
+
+def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, Any]]:
+    """BM25 over the FTS5 index.
+
+    Query tokens are expanded to the same `variants()` forms the index stored, so
+    German morphology matching is deterministic and identical at index and query
+    time. FTS5's `bm25()` returns lower=better, so it is negated into the usual
+    higher=better score. Results are deduplicated by chunk_id (a chunk shared by
+    two sources can appear twice after incremental updates); the higher-scored row
+    wins since rows arrive best-first.
+    """
+    expanded = _expand_query(q)
+    if not expanded:
+        return []
     exp_set = set(expanded)
     text_cache: dict[str, dict[str, str]] = {}
-
-    def _text_for(cid: str, source: str, inline: str) -> str:
-        if inline:
-            return inline
-        if source not in text_cache:
-            text_cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
-        return text_cache[source].get(cid, "")
-
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for cid, source, sc, anchor, hp_json, cs, ce, lang, inline, terms, score in rows:
+    for row in _fts5_rows(expanded, scope, top_k):
+        cid, source, inline = row[0], row[1], row[8]
         if cid in seen:
             continue
         seen.add(cid)
-        text = _text_for(cid, source, inline)
-        preview = text.replace("\n", " ").strip()
-        if len(preview) > 320:
-            preview = preview[:320] + "…"
-        out.append(
-            {
-                "chunk_id": cid,
-                "score": round(-score, 3),
-                "source": source,
-                "scope": sc,
-                "anchor": anchor,
-                "heading_path": json.loads(hp_json) if hp_json else [],
-                "char_start": cs,
-                "char_end": ce,
-                "lang": lang,
-                "text": text,
-                "preview": preview,
-                "matched_terms": sorted(exp_set.intersection(terms.split())),
-            }
-        )
+        out.append(_fts5_hit(row, _chunk_text(cid, source, inline, text_cache), exp_set))
         if len(out) >= top_k:
             break
     return out

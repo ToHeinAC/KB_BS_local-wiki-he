@@ -96,7 +96,7 @@ def _split_long(
                     break
                 tail.insert(0, p)
                 tail_len += len(p) + 2
-            buf = tail + [para]
+            buf = [*tail, para]
             buf_len = sum(len(p) + 2 for p in buf)
             cursor += len(joined) - tail_len
             part_no += 1
@@ -180,10 +180,7 @@ def split(text: str) -> list[dict[str, Any]]:
     if not text or not text.strip():
         return []
     lang = _detect_lang(text)
-    if _is_legal(text):
-        chunks = _chunk_legal(text, lang)
-    else:
-        chunks = _chunk_markdown(text, lang)
+    chunks = _chunk_legal(text, lang) if _is_legal(text) else _chunk_markdown(text, lang)
     # Drop too-small chunks (merge into previous when feasible)
     merged: list[dict[str, Any]] = []
     for ch in chunks:
