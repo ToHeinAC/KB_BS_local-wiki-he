@@ -6,12 +6,15 @@ ThreadPoolExecutor. LLM calls remain sequential at the agent layer.
 
 from __future__ import annotations
 
+import contextlib
 import operator as _op
 import os
 import re
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
-from typing import Any
+from functools import partial
+from typing import Any, ParamSpec, TypeVar, cast
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 from dotenv import load_dotenv
@@ -58,8 +61,11 @@ WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended 
 # wide scope starves every DB into uselessness.
 MIN_HITS_PER_DB = 3
 
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 
-def _with_active_db(fn):
+
+def _with_active_db(fn: Callable[_P, _R]) -> Callable[_P, _R]:
     """Wrap `fn` so a ThreadPoolExecutor worker re-applies the caller's DB context.
 
     Worker threads don't inherit the main thread's ContextVar context, so the
@@ -73,7 +79,7 @@ def _with_active_db(fn):
     db = db_context.get_active_db()
     scope = db_context.search_scope()
 
-    def _wrapped(*args, **kwargs):
+    def _wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         db_context.set_active_db(db)
         db_context.set_search_scope(scope)
         return fn(*args, **kwargs)
@@ -103,8 +109,8 @@ def _format_tavily_result(idx: int, r: dict[str, Any]) -> str:
 def _tavily_one(query: str, max_results: int) -> str:
     from tavily import TavilyClient  # pyright: ignore[reportMissingTypeStubs]
 
-    client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-    results = client.search(query, max_results=max_results, include_answer=True)
+    client: Any = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))  # loosely typed SDK
+    results: dict[str, Any] = client.search(query, max_results=max_results, include_answer=True)
     parts = [f"## Query: {query}"]
     answer = results.get("answer")
     if answer:
@@ -114,15 +120,26 @@ def _tavily_one(query: str, max_results: int) -> str:
     return "\n".join(parts) if len(parts) > 1 else f"## Query: {query}\n(no results)"
 
 
-def _tavily_search_impl(query=None, queries=None, max_results: int = 5) -> str:
-    qs = queries if queries else ([query] if query else [])
-    qs = [q for q in qs if q]
+def _query_list(query: str | None, queries: list[str] | None) -> list[str]:
+    """The non-empty queries of a `query=` / `queries=` tool call."""
+    return [q for q in (queries or ([query] if query else [])) if q]
+
+
+def _names(value: str | list[str] | None) -> list[str]:
+    """The non-empty names of a tool argument that may be one string or a list."""
+    return [v for v in ([value] if isinstance(value, str) else value or []) if v]
+
+
+def _tavily_search_impl(
+    query: str | None = None, queries: list[str] | None = None, max_results: int = 5
+) -> str:
+    qs = _query_list(query, queries)
     if not qs:
         return "Error: provide `query` or `queries`."
     if len(qs) == 1:
         return _tavily_one(qs[0], max_results)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(lambda q: _tavily_one(q, max_results), qs))
+        outs = list(ex.map(partial(_tavily_one, max_results=max_results), qs))
     return "\n\n".join(outs)
 
 
@@ -141,10 +158,8 @@ def _fetch_one(url: str) -> str:
     return f"## {url}\n{md}"
 
 
-def _fetch_webpage_impl(urls) -> str:
-    if isinstance(urls, str):
-        urls = [urls]
-    urls = [u for u in (urls or []) if u]
+def _fetch_webpage_impl(urls: str | list[str] | None) -> str:
+    urls = _names(urls)
     if not urls:
         return "Error: provide one or more urls."
     if len(urls) == 1:
@@ -192,11 +207,11 @@ def _wiki_search_db(query: str, max_results: int) -> list[str]:
         seeds = [h["filename"] for h in top[:WIKI_LINK_SEEDS]]
         shown = {h["filename"] for h in top}
         linked = [
-            l
-            for l in wiki_engine.linked_pages(seeds, limit=WIKI_LINK_MAX)
-            if l["filename"] not in shown
+            page
+            for page in wiki_engine.linked_pages(seeds, limit=WIKI_LINK_MAX)
+            if page["filename"] not in shown
         ]
-        parts.extend(_format_wiki_link(i, l) for i, l in enumerate(linked, 1))
+        parts.extend(_format_wiki_link(i, page) for i, page in enumerate(linked, 1))
     return parts
 
 
@@ -222,15 +237,16 @@ def _wiki_search_one(query: str, max_results: int) -> str:
     return "\n".join(parts)
 
 
-def _wiki_search_impl(query=None, queries=None, max_results: int = 8) -> str:
-    qs = queries if queries else ([query] if query else [])
-    qs = [q for q in qs if q]
+def _wiki_search_impl(
+    query: str | None = None, queries: list[str] | None = None, max_results: int = 8
+) -> str:
+    qs = _query_list(query, queries)
     if not qs:
         return "Error: provide `query` or `queries`."
     if len(qs) == 1:
         return _wiki_search_one(qs[0], max_results)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(_with_active_db(lambda q: _wiki_search_one(q, max_results)), qs))
+        outs = list(ex.map(_with_active_db(partial(_wiki_search_one, max_results=max_results)), qs))
     return "\n\n".join(outs)
 
 
@@ -243,10 +259,8 @@ def _wiki_read_one(filename: str) -> str:
     return f"## Wiki page: {filename}\n{body}"
 
 
-def _wiki_read_impl(filenames) -> str:
-    if isinstance(filenames, str):
-        filenames = [filenames]
-    filenames = [f for f in (filenames or []) if f]
+def _wiki_read_impl(filenames: str | list[str] | None) -> str:
+    filenames = _names(filenames)
     if not filenames:
         return "Error: provide one or more wiki filenames."
     if len(filenames) == 1:
@@ -263,7 +277,7 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
     has no embedding index (see src/retrieval.py)."""
     hits = retrieval.search(query, top_k=max_results, scope="raw", use_rerank=True)
     mem = run_memory.current()
-    parts = []
+    parts: list[str] = []
     for i, h in enumerate(hits, 1):
         if mem is not None and "rerank_score" in h:  # Stage E: track best passage seen
             mem.note_relevance(float(h["rerank_score"]))
@@ -297,15 +311,16 @@ def _raw_search_one(query: str, max_results: int) -> str:
     return "\n".join(parts)
 
 
-def _raw_search_impl(query=None, queries=None, max_results: int = 6) -> str:
-    qs = queries if queries else ([query] if query else [])
-    qs = [q for q in qs if q]
+def _raw_search_impl(
+    query: str | None = None, queries: list[str] | None = None, max_results: int = 6
+) -> str:
+    qs = _query_list(query, queries)
     if not qs:
         return "Error: provide `query` or `queries`."
     if len(qs) == 1:
         return _raw_search_one(qs[0], max_results)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(_with_active_db(lambda q: _raw_search_one(q, max_results)), qs))
+        outs = list(ex.map(_with_active_db(partial(_raw_search_one, max_results=max_results)), qs))
     return "\n\n".join(outs)
 
 
@@ -401,26 +416,26 @@ def _read_key(base: str, canon: str, offset: int) -> str:
     return f"raw:{base}:{int(offset or 0)}"
 
 
-def _read_canons(mem, base: str) -> set[str]:
+def _read_canons(mem: run_memory.RunMemory, base: str) -> set[str]:
     """Normalized section anchors of `base` already read this run."""
     prefix = f"raw:{base}|sec="
     return {k[len(prefix) :].rsplit(":", 1)[0] for k in mem.reads if k.startswith(prefix)}
 
 
-def _read_offsets(mem, base: str) -> set[int]:
+def _read_offsets(mem: run_memory.RunMemory, base: str) -> set[int]:
     """Section-less byte offsets of `base` already read this run."""
     prefix = f"raw:{base}:"  # excludes section keys (those have '|sec=' before ':')
     out: set[int] = set()
     for k in mem.reads:
         if k.startswith(prefix):
-            try:
+            with contextlib.suppress(ValueError):
                 out.add(int(k[len(prefix) :]))
-            except ValueError:
-                pass
     return out
 
 
-def _next_unread_offset(mem, base: str, key_base: str | None = None) -> int | None:
+def _next_unread_offset(
+    mem: run_memory.RunMemory, base: str, key_base: str | None = None
+) -> int | None:
     """Smallest RAW_READ_CAP-aligned offset of `base` not yet read this run.
 
     `base` addresses the raw store (caller binds its DB); `key_base` is the name
@@ -468,16 +483,14 @@ def _raw_read_one(filename: str, offset: int = 0) -> str:
     return f"{header}\n{window}{footer}"
 
 
-def _raw_read_impl(filenames, offset: int = 0) -> str:
-    if isinstance(filenames, str):
-        filenames = [filenames]
-    filenames = [f for f in (filenames or []) if f]
+def _raw_read_impl(filenames: str | list[str] | None, offset: int = 0) -> str:
+    filenames = _names(filenames)
     if not filenames:
         return "Error: provide one or more raw filenames."
     if len(filenames) == 1:
         return _raw_read_one(filenames[0], offset=offset)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(_with_active_db(lambda f: _raw_read_one(f, offset=offset)), filenames))
+        outs = list(ex.map(_with_active_db(partial(_raw_read_one, offset=offset)), filenames))
     return "\n\n".join(outs)
 
 
@@ -632,7 +645,7 @@ def wiki_search(query: str = "", queries: list[str] | None = None, max_results: 
     if not fresh:
         return "\n\n".join(stubs)
     body = _wiki_search_impl(queries=fresh, max_results=max_results)
-    return "\n\n".join(stubs + [body]) if stubs else body
+    return "\n\n".join([*stubs, body]) if stubs else body
 
 
 @tool(description=WIKI_READ_DESCRIPTION)
@@ -665,9 +678,13 @@ def wiki_read(filenames: list[str]) -> str:
     return "\n\n".join(out)
 
 
+def _think_impl(reflection: str) -> str:
+    return reflection
+
+
 @tool(description=THINK_TOOL_DESCRIPTION)
 def think_tool(reflection: str) -> str:
-    return reflection
+    return _think_impl(reflection)
 
 
 @tool(description=SUBMIT_FINAL_DESCRIPTION)
@@ -685,7 +702,59 @@ def raw_search(query: str = "", queries: list[str] | None = None, max_results: i
     if not fresh:
         return "\n\n".join(stubs)
     body = _raw_search_impl(queries=fresh, max_results=max_results)
-    return "\n\n".join(stubs + [body]) if stubs else body
+    return "\n\n".join([*stubs, body]) if stubs else body
+
+
+def _duplicate_read_stub(mem: run_memory.RunMemory, f: str, prior: int, offset: int) -> str:
+    """The visited-memory reply for a read already done this run: names what is left."""
+    db, base, section = _split_ref(f)
+    canon = _norm_anchor(section) if section else ""
+    qbase = db_context.qualify(base, db)
+    if canon:
+        with db_context.using_db(db):
+            anchors = _section_anchors(base)
+        unread = [a for a in anchors if _norm_anchor(a) not in _read_canons(mem, qbase)]
+        menu = ", ".join(unread[:6]) if unread else "none left — pick a different file"
+        return (
+            f"## Raw file: {qbase} {section}\n"
+            f"[memory] Already read this section at step {prior}. "
+            f"Unread sections in {qbase}: {menu}. "
+            "Read one of those, pick a different file, or call think_tool."
+        )
+    with db_context.using_db(db):
+        nxt = _next_unread_offset(mem, base, qbase)
+    hint = (
+        f"Next unread window: call raw_read(['{qbase}'], offset={nxt})."
+        if nxt is not None
+        else "Whole file already read — pick a different file or call think_tool."
+    )
+    return (
+        f"## Raw file: {qbase} (offset {int(offset or 0)})\n"
+        f"[memory] Already read at step {prior} — do not re-fetch. {hint}"
+    )
+
+
+def _mark_reads(mem: run_memory.RunMemory, fresh: list[str], offset: int) -> str | None:
+    """Record fresh reads; return the stop-paginating nudge once a file hits the limit."""
+    nudge_bases: list[str] = []
+    for f in fresh:
+        db, base, section = _split_ref(f)
+        canon = _norm_anchor(section) if section else ""
+        qbase = db_context.qualify(base, db)
+        mem.mark_read(_read_key(qbase, canon, offset))
+        # Section-less (byte-offset) reads are the pagination death-spiral
+        # path: once enough windows of one file are read, tell the model to
+        # stop paginating and answer.
+        if not canon and len(_read_offsets(mem, qbase)) >= RAW_READ_NUDGE_AFTER:
+            nudge_bases.append(qbase)
+    if not nudge_bases:
+        return None
+    files = ", ".join(sorted(set(nudge_bases)))
+    return (
+        f"[memory] You have now read {RAW_READ_NUDGE_AFTER}+ windows of {files}. "
+        "Stop paginating — if you have enough to answer, call submit_chat_answer "
+        "now; otherwise raw_search a different file or call think_tool."
+    )
 
 
 @tool(description=RAW_READ_DESCRIPTION)
@@ -694,9 +763,7 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
     if mem is None:
         return _raw_read_impl(filenames, offset=offset)
     mem.tick()
-    if isinstance(filenames, str):
-        filenames = [filenames]
-    filenames = [f for f in (filenames or []) if f]
+    filenames = _names(filenames)
     if not filenames:
         return _raw_read_impl(filenames, offset=offset)
     out: list[str] = []
@@ -706,54 +773,16 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
         canon = _norm_anchor(section) if section else ""
         # Key on the qualified name: two DBs can hold same-named files, and the
         # guard must not collapse them into one visited entry.
-        qbase = db_context.qualify(base, db)
-        key = _read_key(qbase, canon, offset)
-        prior = mem.seen_read(key)
+        prior = mem.seen_read(_read_key(db_context.qualify(base, db), canon, offset))
         if prior is None:
             fresh.append(f)
-        elif canon:
-            with db_context.using_db(db):
-                anchors = _section_anchors(base)
-            unread = [a for a in anchors if _norm_anchor(a) not in _read_canons(mem, qbase)]
-            menu = ", ".join(unread[:6]) if unread else "none left — pick a different file"
-            out.append(
-                f"## Raw file: {qbase} {section}\n"
-                f"[memory] Already read this section at step {prior}. "
-                f"Unread sections in {qbase}: {menu}. "
-                "Read one of those, pick a different file, or call think_tool."
-            )
         else:
-            with db_context.using_db(db):
-                nxt = _next_unread_offset(mem, base, qbase)
-            hint = (
-                f"Next unread window: call raw_read(['{qbase}'], offset={nxt})."
-                if nxt is not None
-                else "Whole file already read — pick a different file or call think_tool."
-            )
-            out.append(
-                f"## Raw file: {qbase} (offset {int(offset or 0)})\n"
-                f"[memory] Already read at step {prior} — do not re-fetch. {hint}"
-            )
+            out.append(_duplicate_read_stub(mem, f, prior, offset))
     if fresh:
         out.append(_raw_read_impl(fresh, offset=offset))
-        nudge_bases: list[str] = []
-        for f in fresh:
-            db, base, section = _split_ref(f)
-            canon = _norm_anchor(section) if section else ""
-            qbase = db_context.qualify(base, db)
-            mem.mark_read(_read_key(qbase, canon, offset))
-            # Section-less (byte-offset) reads are the pagination death-spiral
-            # path: once enough windows of one file are read, tell the model to
-            # stop paginating and answer.
-            if not canon and len(_read_offsets(mem, qbase)) >= RAW_READ_NUDGE_AFTER:
-                nudge_bases.append(qbase)
-        if nudge_bases:
-            files = ", ".join(sorted(set(nudge_bases)))
-            out.append(
-                f"[memory] You have now read {RAW_READ_NUDGE_AFTER}+ windows of {files}. "
-                "Stop paginating — if you have enough to answer, call submit_chat_answer "
-                "now; otherwise raw_search a different file or call think_tool."
-            )
+        nudge = _mark_reads(mem, fresh, offset)
+        if nudge:
+            out.append(nudge)
     return "\n\n".join(out)
 
 
@@ -779,78 +808,74 @@ _CMP_OPS = {
 }
 
 
-def _fmt_val(v) -> str:
+def _fmt_val(v: object) -> str:
     if isinstance(v, str):
         return repr(v)
     return str(v)
 
 
-def _eval_node(node, facts: dict[str, Any], trace: list[Any]) -> bool:
+_FACT_OPS = {*_CMP_OPS, "in", "contains", "between"}
+
+
+def _eval_fact_op(o: str, node: dict[str, Any], facts: dict[str, Any]) -> tuple[bool, str]:
+    """(result, trace line) of one leaf comparison against a named fact."""
+    name = node["fact"]
+    v = facts[name]
+    if o in _CMP_OPS:
+        t = node["value"]
+        return bool(_CMP_OPS[o](v, t)), f"{name} {o} {_fmt_val(t)}  (= {_fmt_val(v)})"
+    if o == "in":
+        t = list(node["value"])
+        return v in t, f"{name} in {t}  (= {_fmt_val(v)})"
+    if o == "contains":
+        t = node["value"]
+        return str(t) in str(v), f"{name} contains {_fmt_val(t)}  (= {_fmt_val(v)})"
+    low, high = node["low"], node["high"]  # "between"
+    return low <= v <= high, (
+        f"{name} between {_fmt_val(low)} and {_fmt_val(high)}  (= {_fmt_val(v)})"
+    )
+
+
+def _eval_node(node: object, facts: dict[str, Any], trace: list[tuple[bool, str]]) -> bool:
     if not isinstance(node, dict):
         trace.append((False, f"Error: condition node not a dict: {node!r}"))
         return False
-    o = node.get("op")
+    n = cast(dict[str, Any], node)
+    o = n.get("op")
     try:
-        if o in _CMP_OPS:
-            name = node["fact"]
-            v = facts[name]
-            t = node["value"]
-            r = bool(_CMP_OPS[o](v, t))
-            trace.append((r, f"{name} {o} {_fmt_val(t)}  (= {_fmt_val(v)})"))
-            return r
-        if o == "in":
-            name = node["fact"]
-            v = facts[name]
-            t = list(node["value"])
-            r = v in t
-            trace.append((r, f"{name} in {t}  (= {_fmt_val(v)})"))
-            return r
-        if o == "contains":
-            name = node["fact"]
-            v = facts[name]
-            t = node["value"]
-            r = str(t) in str(v)
-            trace.append((r, f"{name} contains {_fmt_val(t)}  (= {_fmt_val(v)})"))
-            return r
-        if o == "between":
-            name = node["fact"]
-            v = facts[name]
-            low, high = node["low"], node["high"]
-            r = low <= v <= high
-            trace.append(
-                (r, f"{name} between {_fmt_val(low)} and {_fmt_val(high)}  (= {_fmt_val(v)})")
-            )
-            return r
-        if o == "not":
-            inner = _eval_node(node["arg"], facts, trace)
-            r = not inner
-            trace.append((r, f"NOT  → {r}"))
-            return r
-        if o in ("and", "or"):
-            results = [_eval_node(a, facts, trace) for a in node["args"]]
+        if o in _FACT_OPS:
+            r, line = _eval_fact_op(o, n, facts)
+        elif o == "not":
+            r = not _eval_node(n["arg"], facts, trace)
+            line = f"NOT  → {r}"
+        elif o in ("and", "or"):
+            results = [_eval_node(a, facts, trace) for a in n["args"]]
             r = all(results) if o == "and" else any(results)
-            trace.append((r, f"{o.upper()}  → {r}"))
-            return r
+            line = f"{o.upper()}  → {r}"
+        else:
+            trace.append((False, f"Error: unknown op {o!r}"))
+            return False
     except KeyError as exc:
         trace.append((False, f"Error: missing fact {exc}"))
         return False
     except TypeError as exc:
         trace.append((False, f"Error: type mismatch in op {o!r}: {exc}"))
         return False
-    trace.append((False, f"Error: unknown op {o!r}"))
-    return False
+    trace.append((r, line))
+    return r
 
 
-def _evaluate_condition_impl(facts: dict[str, Any], condition: dict[str, Any]) -> str:
+def _evaluate_condition_impl(facts: object, condition: object) -> str:
     if not isinstance(facts, dict) or not facts:
         return "Error: `facts` must be a non-empty dict."
     if not isinstance(condition, dict) or not condition:
         return "Error: `condition` must be a non-empty dict."
+    fact_map = cast(dict[str, Any], facts)
     lines = ["## Facts", ""]
-    for k, v in facts.items():
+    for k, v in fact_map.items():
         lines.append(f"  {k} = {_fmt_val(v)}")
     trace: list[tuple[bool, str]] = []
-    result = _eval_node(condition, facts, trace)
+    result = _eval_node(cast(dict[str, Any], condition), fact_map, trace)
     lines += ["", "## Condition trace", ""]
     for ok, text in trace:
         tag = "TRUE " if ok else "FALSE"
@@ -894,7 +919,7 @@ TOOL_FUNCTIONS = {
     "wiki_read": _wiki_read_impl,
     "tavily_search": _tavily_search_impl,
     "fetch_webpage_content": _fetch_webpage_impl,
-    "think_tool": lambda reflection: reflection,
+    "think_tool": _think_impl,
     "submit_final_answer": _submit_final_impl,
     "raw_search": _raw_search_impl,
     "raw_read": _raw_read_impl,
