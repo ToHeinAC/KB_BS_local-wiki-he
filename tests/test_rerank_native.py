@@ -142,7 +142,11 @@ def test_llama_cpp_absent_means_unavailable(monkeypatch):
         raise ImportError(name)
 
     monkeypatch.setattr(rerank.importlib, "import_module", missing)
-    assert rerank._llama_cpp() is None
+    rerank._llama_cpp.cache_clear()  # process-wide cache: another test may have filled it
+    try:
+        assert rerank._llama_cpp() is None
+    finally:
+        rerank._llama_cpp.cache_clear()
 
 
 def test_preload_cuda_loads_wheel_libraries(monkeypatch, tmp_path):
