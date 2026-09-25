@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 
@@ -38,19 +38,19 @@ def _slug(name: str) -> str:
     return _SLUG_RE.sub("-", str(name).lower()).strip("-")
 
 
-def _as_list(value) -> list[str]:
+def _as_list(value: object) -> list[str]:
     if not value:
         return []
-    if not isinstance(value, list):
-        value = [value]
-    return [str(v).strip() for v in value if str(v).strip()]
+    items = cast(list[Any], value) if isinstance(value, list) else [value]
+    return [str(v).strip() for v in items if str(v).strip()]
 
 
 # --- Description -------------------------------------------------------------
 
 
 def _key_facts_bullets(body: str) -> list[str]:
-    out, capturing = [], False
+    out: list[str] = []
+    capturing = False
     for line in body.splitlines():
         s = line.strip()
         if s.lower().startswith(_KEY_FACTS_HEADING.lower()):
@@ -111,7 +111,7 @@ def _derive_resource(meta: dict[str, Any], ptype: str) -> str | None:
     return first if _URL_RE.match(first) else f"raw/{first}"
 
 
-def _iso_timestamp(value) -> str | None:
+def _iso_timestamp(value: object) -> str | None:
     if not value:
         return None
     s = str(value)[:10]
@@ -149,7 +149,7 @@ def enrich_frontmatter(meta: dict[str, Any], body: str, *, db: str) -> dict[str,
 # --- Citations ---------------------------------------------------------------
 
 
-def render_citations(sources) -> str:
+def render_citations(sources: object) -> str:
     """Numbered `## Citations` block from a sources list; '' when empty."""
     items = _as_list(sources)
     if not items:
@@ -160,7 +160,8 @@ def render_citations(sources) -> str:
 
 def _strip_citations(body: str) -> str:
     """Remove a trailing auto-generated `## Citations` section (idempotency)."""
-    out, skip = [], False
+    out: list[str] = []
+    skip = False
     for line in body.splitlines():
         if line.strip().lower() == _CITATIONS_HEADING.lower():
             skip = True
@@ -252,7 +253,7 @@ def add_log_entry(text: str, action: str, detail: str, *, day: str, time: str) -
         insert_at = next((i for i, ln in enumerate(lines) if ln.startswith("## ")), len(lines))
         block = [heading, bullet, ""]
         if insert_at and lines[insert_at - 1].strip():
-            block = [""] + block
+            block = ["", *block]
         lines[insert_at:insert_at] = block
 
     post.content = "\n".join(lines).rstrip("\n") + "\n"
@@ -261,7 +262,9 @@ def add_log_entry(text: str, action: str, detail: str, *, day: str, time: str) -
 
 def _parse_legacy_log(body: str) -> list[tuple[str, str, str, str]]:
     """Extract (day, time, action, detail) tuples from the old flat log format."""
-    events, cur, detail = [], None, []
+    events: list[tuple[str, str, str, str]] = []
+    cur: tuple[str, str, str] | None = None
+    detail: list[str] = []
     for line in body.splitlines():
         m = _LEGACY_LOG_RE.match(line.strip())
         if m:
@@ -293,7 +296,7 @@ def reformat_log(text: str) -> str:
 # --- Validation --------------------------------------------------------------
 
 
-def okf_validate(wiki_dir) -> list[str]:
+def okf_validate(wiki_dir: str | Path) -> list[str]:
     """Return OKF conformance issues for a bundle directory; empty == conformant."""
     wiki_dir = Path(wiki_dir)
     issues: list[str] = []

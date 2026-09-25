@@ -24,6 +24,7 @@ from typing import Any
 
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit import config as st_config
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +66,7 @@ def _get_gpu_stats() -> list[dict[str, Any]]:
         )
         if result.returncode != 0:
             return []
-        gpus = []
+        gpus: list[dict[str, str]] = []
         for line in result.stdout.strip().splitlines():
             parts = [p.strip() for p in line.split(",")]
             if len(parts) == 4:
@@ -115,7 +116,7 @@ def _base_path() -> str:
     Read from config rather than hard-coded, so the route follows
     ``.streamlit/config.toml`` and the two cannot drift apart.
     """
-    base = (st.config.get_option("server.baseUrlPath") or "").strip("/")
+    base = str(st_config.get_option("server.baseUrlPath") or "").strip("/")
     return f"/{base}" if base else ""
 
 
@@ -146,7 +147,7 @@ def _inject_gpu_route() -> bool:
                 return True
 
         # Sync endpoint — Starlette runs non-async handlers in a threadpool.
-        def gpu_handler(request):
+        def gpu_handler(request: object) -> Response:
             return Response(
                 content=_build_payload(),
                 media_type="application/json",

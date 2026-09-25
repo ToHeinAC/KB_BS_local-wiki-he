@@ -16,7 +16,7 @@ import json
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from dotenv import load_dotenv
 
@@ -86,14 +86,16 @@ def _run_batch(batch: list[dict[str, Any]], temperature: float = 0.2) -> list[tu
         return []
     out: list[tuple[str, str]] = []
     valid_ids = {ch["chunk_id"] for ch in batch}
-    for entry in data:
-        if not isinstance(entry, dict):
+    for item in cast(list[Any], data):
+        if not isinstance(item, dict):
             continue
+        entry = cast(dict[str, Any], item)
         cid = str(entry.get("chunk_id", "")).strip()
         if cid not in valid_ids:
             continue
-        for q in entry.get("questions", []) or []:
-            q = str(q).strip()
+        questions: list[Any] = entry.get("questions", []) or []
+        for raw_q in questions:
+            q = str(raw_q).strip()
             if q:
                 out.append((cid, q))
     return out
@@ -194,7 +196,8 @@ def delete_source_entries(source_name: str) -> int:
     """Remove all QA entries for a source. Returns number of rows deleted."""
     if not _qa_path().exists():
         return 0
-    kept, removed = [], 0
+    kept: list[str] = []
+    removed = 0
     for line in _qa_path().read_text().splitlines():
         if not line.strip():
             continue

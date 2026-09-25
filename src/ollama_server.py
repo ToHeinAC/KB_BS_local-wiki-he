@@ -68,7 +68,7 @@ _MODEL_ENV = {
 
 _lock = threading.Lock()
 _state: dict[str, Any] | None = None
-_proc: subprocess.Popen | None = None
+_proc: subprocess.Popen[bytes] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -156,7 +156,8 @@ def required_gib(source_host: str) -> float:
     """
     tags = _get_json(f"{source_host}/api/tags") or {}
     sizes: dict[str, float] = {}
-    for model in tags.get("models", []) or []:
+    models: list[dict[str, Any]] = tags.get("models", []) or []
+    for model in models:
         name, size = model.get("name"), model.get("size")
         if not isinstance(name, str) or not isinstance(size, (int, float)):
             continue
@@ -173,7 +174,7 @@ def _serving(base: str) -> bool:
     return _get_json(f"{base}/api/tags", timeout=1.0) is not None
 
 
-def _spawn(port: int, gpu_index: int) -> subprocess.Popen | None:
+def _spawn(port: int, gpu_index: int) -> subprocess.Popen[bytes] | None:
     binary = shutil.which("ollama")
     if not binary:
         return None
@@ -204,7 +205,7 @@ def _spawn(port: int, gpu_index: int) -> subprocess.Popen | None:
         return None
 
 
-def _wait_until_serving(proc: subprocess.Popen, base: str, timeout_s: float) -> bool:
+def _wait_until_serving(proc: subprocess.Popen[bytes], base: str, timeout_s: float) -> bool:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         if proc.poll() is not None:
@@ -247,7 +248,7 @@ def _resolve() -> dict[str, Any]:
         return unpinned(f"OLLAMA_HOST is remote ({fallback}) — left untouched")
 
     placement = gpu_placement.plan(required_gib(fallback), mode)
-    if not placement.is_pinned:
+    if placement.index is None:  # not pinned
         return unpinned(placement.reason)
 
     port = _pinned_port()

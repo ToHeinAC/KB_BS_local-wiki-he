@@ -77,6 +77,8 @@ extend-exclude = ["src/vendor"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "UP", "SIM", "C90", "PT", "RUF"]
+# Deliberate typography in prose, UI text and LLM prompts (en dash, multiplication and minus sign).
+allowed-confusables = ["–", "×", "−"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

@@ -31,9 +31,11 @@ break search (idea.md §5.4: "fail open, always").
 
 from __future__ import annotations
 
+import contextlib
 import ctypes
 import functools
 import glob
+import importlib
 import os
 import threading
 from pathlib import Path
@@ -62,7 +64,7 @@ def candidates() -> int:
 def _preload_cuda() -> None:
     """Load the CUDA runtime libs from the `nvidia-*-cu12` pip wheels with RTLD_GLOBAL so
     a CUDA build of llama-cpp-python resolves `libcudart`/`libcublas` **without** a system
-    CUDA toolkit or `LD_LIBRARY_PATH`. The reranker GGUF then runs on the GPU (~30× faster
+    CUDA toolkit or `LD_LIBRARY_PATH`. The reranker GGUF then runs on the GPU (~30x faster
     than the CPU-only build: ~11 ms/pair vs ~350 ms). No-op and harmless when the wheels
     aren't installed (CPU-only setup) — search stays correct, just slower. Load order is
     dependency order (cudart before cublas)."""
@@ -71,26 +73,27 @@ def _preload_cuda() -> None:
     # before the runtime loads — see gpu_placement's module docstring.
     os.environ.setdefault("CUDA_DEVICE_ORDER", "PCI_BUS_ID")
     try:
-        import nvidia  # pyright: ignore[reportMissingTypeStubs]  # namespace pkg of the nvidia-*-cu12 wheels
+        # Imported dynamically: the nvidia-*-cu12 wheels (a namespace package) are optional.
+        nvidia = importlib.import_module("nvidia")
     except Exception:
         return
     for pkg in ("cuda_runtime", "cuda_nvrtc", "cublas"):
         for base in list(getattr(nvidia, "__path__", [])):
             for so in sorted(glob.glob(os.path.join(base, pkg, "lib", "*.so*"))):
-                try:
+                with contextlib.suppress(OSError):
                     ctypes.CDLL(so, mode=ctypes.RTLD_GLOBAL)
-                except OSError:
-                    pass
 
 
 @functools.lru_cache(maxsize=1)
-def _llama_cpp():
-    """The llama_cpp module, or None when it isn't installed (optional extra)."""
+def _llama_cpp() -> Any:
+    """The llama_cpp module, or None when it isn't installed (optional extra).
+
+    Imported dynamically so the module (and its type check) needs no extra installed;
+    everything read from it is ctypes bindings, typed `Any` here.
+    """
     try:
         _preload_cuda()
-        import llama_cpp
-
-        return llama_cpp
+        return importlib.import_module("llama_cpp")
     except Exception:
         return None
 
@@ -102,7 +105,7 @@ def available() -> bool:
     return _llama_cpp() is not None and _model_path().exists()
 
 
-def _model_params(L):
+def _model_params(L: Any) -> Any:
     """Model params with a single-GPU pin when one card can hold the reranker.
 
     llama.cpp defaults to `split_mode = LAYER`, which spreads even this ~0.6 GiB
@@ -135,7 +138,7 @@ def _load() -> dict[str, Any] | None:
         return None
     try:
         L.llama_backend_init()
-        L.llama_log_set(ctypes.cast(None, L.llama_log_callback), None)
+        L.llama_log_set(ctypes.cast(None, L.llama_log_callback), None)  # pyright: ignore[reportArgumentType]  # NULL = silence
         model = L.llama_model_load_from_file(str(_model_path()).encode(), _model_params(L))
         if not model:
             return None
@@ -164,13 +167,14 @@ def _tokenize(st: dict[str, Any], text: str) -> list[int]:
 def _score_one(st: dict[str, Any], q_toks: list[int], doc: str) -> float:
     """One cross-encoder forward pass over [BOS] q [EOS] [SEP] doc [EOS]."""
     L, vocab = st["L"], st["vocab"]
-    toks = (
-        [L.llama_vocab_bos(vocab)]
-        + q_toks
-        + [L.llama_vocab_eos(vocab), L.llama_vocab_sep(vocab)]
-        + _tokenize(st, doc[:_MAX_DOC_CHARS])
-        + [L.llama_vocab_eos(vocab)]
-    )
+    toks = [
+        L.llama_vocab_bos(vocab),
+        *q_toks,
+        L.llama_vocab_eos(vocab),
+        L.llama_vocab_sep(vocab),
+        *_tokenize(st, doc[:_MAX_DOC_CHARS]),
+        L.llama_vocab_eos(vocab),
+    ]
     toks = toks[:_N_CTX]
     batch = L.llama_batch_init(len(toks), 0, 1)
     try:
@@ -248,8 +252,8 @@ def rerank(query: str, hits: list[dict[str, Any]], top_k: int) -> list[dict[str,
         return hits[:top_k]  # fail open — a down reranker never breaks search
     fused_n = _normalize([h.get("score", 0.0) for h in window])
     rerank_n = _normalize(logits)
-    scored = []
-    for rank, (h, f, r, raw) in enumerate(zip(window, fused_n, rerank_n, logits)):
+    scored: list[tuple[float, int, dict[str, Any]]] = []
+    for rank, (h, f, r, raw) in enumerate(zip(window, fused_n, rerank_n, logits, strict=True)):
         w = _blend_weight(rank)
         out = dict(h)
         out["rerank_score"] = round(raw, 4)

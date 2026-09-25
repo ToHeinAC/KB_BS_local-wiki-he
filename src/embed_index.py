@@ -28,6 +28,7 @@ from __future__ import annotations
 import functools
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,8 @@ _EMBED_BATCH = 64
 # text only — the chunk text returned to the UI and citations is never touched.
 _MAX_EMBED_CHARS = 8000
 
+
+Progress = Callable[[int, int], None]  # (done, total)
 
 def model_name() -> str:
     return os.getenv("EMBED_MODEL", "bge-m3").strip()
@@ -170,7 +173,7 @@ def _row_meta(ch: dict[str, Any]) -> dict[str, Any]:
 
 
 def _embed_chunks(
-    chunks: list[dict[str, Any]], *, progress=None
+    chunks: list[dict[str, Any]], *, progress: Progress | None = None
 ) -> tuple[np.ndarray, list[dict[str, Any]]]:
     """Embed chunks (dedup by chunk_id) → (float16 matrix, aligned row metadata).
 
@@ -191,7 +194,9 @@ def _embed_chunks(
     return np.vstack(mats).astype(np.float16), rows
 
 
-def build(chunks: list[dict[str, Any]] | None = None, *, progress=None) -> dict[str, Any]:
+def build(
+    chunks: list[dict[str, Any]] | None = None, *, progress: Progress | None = None
+) -> dict[str, Any]:
     """Full (re)build of the semantic index over all chunks. Returns a summary.
 
     Embeds raw source chunks (scope='raw') + wiki page pseudo-chunks (scope='wiki').
@@ -296,6 +301,36 @@ def available() -> bool:
     return bool(meta.get("rows")) and meta.get("model") == model_name()
 
 
+def _row_text(row: dict[str, Any], cache: dict[str, dict[str, str]]) -> str:
+    """Chunk text for a vector row: inline for wiki rows, else from the chunk store."""
+    if "text" in row:
+        return row["text"]
+    source = row.get("source", "")
+    if source not in cache:
+        cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
+    return cache[source].get(row["chunk_id"], "")
+
+
+def _to_hit(row: dict[str, Any], score: float, text: str) -> dict[str, Any]:
+    preview = text.replace("\n", " ").strip()
+    if len(preview) > 320:
+        preview = preview[:320] + "…"
+    return {
+        "chunk_id": row["chunk_id"],
+        "score": round(score, 4),
+        "source": row.get("source", ""),
+        "scope": row.get("scope", "raw"),
+        "anchor": row.get("anchor", ""),
+        "heading_path": row.get("heading_path", []),
+        "char_start": row.get("char_start", 0),
+        "char_end": row.get("char_end", 0),
+        "lang": row.get("lang", ""),
+        "text": text,
+        "preview": preview,
+        "matched_terms": [],  # dense arm has no lexical term overlap
+    }
+
+
 def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, Any]]:
     """Cosine search over the vector matrix. Same hit-dict shape as lex_index.query.
 
@@ -315,43 +350,13 @@ def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, A
 
     sims = matrix.astype(np.float32) @ qv.astype(np.float32)
     rows = meta["rows"]
-    order = np.argsort(-sims)
-
     text_cache: dict[str, dict[str, str]] = {}
-
-    def _text_for(row: dict[str, Any]) -> str:
-        if "text" in row:
-            return row["text"]
-        source = row.get("source", "")
-        if source not in text_cache:
-            text_cache[source] = {c["chunk_id"]: c["text"] for c in chunker.load_chunks(source)}
-        return text_cache[source].get(row["chunk_id"], "")
-
     out: list[dict[str, Any]] = []
-    for i in order:
+    for i in np.argsort(-sims):
         row = rows[int(i)]
         if scope is not None and row.get("scope", "raw") != scope:
             continue
-        text = _text_for(row)
-        preview = text.replace("\n", " ").strip()
-        if len(preview) > 320:
-            preview = preview[:320] + "…"
-        out.append(
-            {
-                "chunk_id": row["chunk_id"],
-                "score": round(float(sims[int(i)]), 4),
-                "source": row.get("source", ""),
-                "scope": row.get("scope", "raw"),
-                "anchor": row.get("anchor", ""),
-                "heading_path": row.get("heading_path", []),
-                "char_start": row.get("char_start", 0),
-                "char_end": row.get("char_end", 0),
-                "lang": row.get("lang", ""),
-                "text": text,
-                "preview": preview,
-                "matched_terms": [],  # dense arm has no lexical term overlap
-            }
-        )
+        out.append(_to_hit(row, float(sims[int(i)]), _row_text(row, text_cache)))
         if len(out) >= top_k:
             break
     return out

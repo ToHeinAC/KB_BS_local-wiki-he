@@ -93,10 +93,10 @@ _STRINGS = {
 }
 
 
-_COMPONENT = None
+_declared: Any = None  # the component, declared on first render (see _component)
 
 
-def _component():
+def _component() -> Any:
     """Declare once per process, lazily.
 
     `declare_component` only registers the `<base>/component/…` route when it
@@ -104,10 +104,10 @@ def _component():
     iframe on a 404). Declaring here rather than at import time guarantees that
     context, since this is only ever reached from a script run.
     """
-    global _COMPONENT
-    if _COMPONENT is None:
-        _COMPONENT = components.declare_component("wiki_graph", path=str(_ASSETS))
-    return _COMPONENT
+    global _declared
+    if _declared is None:
+        _declared = components.declare_component("wiki_graph", path=str(_ASSETS))
+    return _declared
 
 
 def _bundle_signature() -> str:
