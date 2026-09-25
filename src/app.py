@@ -1,13 +1,17 @@
 """LocalWiki — Streamlit UI."""
 
+import contextlib
 import gc
+import json
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -101,7 +105,7 @@ def _show_node_details(node_id: str, graph: dict[str, Any]) -> None:
     else:
         st.caption(f"Raw source document: `{node['label']}`")
     st.markdown("### Connections")
-    rows = []
+    rows: list[str] = []
     for e in graph["edges"]:
         if e["from"] == node_id:
             other = nodes_by_id.get(e["to"], {}).get("label", e["to"])
@@ -117,56 +121,47 @@ def _show_node_details(node_id: str, graph: dict[str, Any]) -> None:
         st.caption("No connections.")
 
 
-def _render_legacy_graph() -> None:
-    """The original vis.js typed graph (GRAPH_RENDERER=legacy).
+def _legacy_graph_data(
+    graph: dict[str, Any], show_names: bool, show_sources: bool
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """vis.js node and edge records for the typed graph, filtered by the toggles."""
 
-    Kept as the default until the neural renderer has parity; unchanged apart
-    from being lifted out of the page body so the feature flag can pick one.
-    """
-    try:
-        import json as _json
+    def _abbrev(text: str, n: int = 5) -> str:
+        return " ".join(str(text).replace("-", " ").split()[:n])
 
-        graph = wiki_engine.build_typed_graph()
-        tcol1, tcol2 = st.columns(2)
-        show_names = tcol1.toggle("Node names", value=True)
-        show_sources = tcol2.toggle("Source nodes", value=True)
+    nodes_data: list[dict[str, Any]] = []
+    keep_ids: set[str] = set()
+    for node in graph["nodes"]:
+        if node["type"] == "source" and not show_sources:
+            continue
+        keep_ids.add(node["id"])
+        label = node["label"]
+        shown = _abbrev(label) if node["type"] == "page" else label
+        nodes_data.append(
+            {
+                "id": node["id"],
+                "group": node["type"],
+                "label": shown if show_names else "",
+                "title": label,
+            }
+        )
+    edges_data = [
+        {
+            "from": edge["from"],
+            "to": edge["to"],
+            "group": edge["type"],
+            "dashes": edge["type"] == "derived-from",
+            "color": "#d97a3a" if edge["type"] == "derived-from" else "#aaa",
+            "arrows": "to" if edge["type"] == "derived-from" else "",
+        }
+        for edge in graph["edges"]
+        if edge["from"] in keep_ids and edge["to"] in keep_ids
+    ]
+    return nodes_data, edges_data
 
-        def _abbrev(text: str, n: int = 5) -> str:
-            return " ".join(str(text).replace("-", " ").split()[:n])
 
-        nodes_data: list[dict[str, Any]] = []
-        edges_data: list[dict[str, Any]] = []
-        keep_ids: set[str] = set()
-        for node in graph["nodes"]:
-            if node["type"] == "source" and not show_sources:
-                continue
-            keep_ids.add(node["id"])
-            label = node["label"]
-            nodes_data.append(
-                {
-                    "id": node["id"],
-                    "group": node["type"],
-                    "label": (_abbrev(label) if node["type"] == "page" else label)
-                    if show_names
-                    else "",
-                    "title": label,
-                }
-            )
-        for edge in graph["edges"]:
-            if edge["from"] not in keep_ids or edge["to"] not in keep_ids:
-                continue
-            edges_data.append(
-                {
-                    "from": edge["from"],
-                    "to": edge["to"],
-                    "group": edge["type"],
-                    "dashes": edge["type"] == "derived-from",
-                    "color": "#d97a3a" if edge["type"] == "derived-from" else "#aaa",
-                    "arrows": "to" if edge["type"] == "derived-from" else "",
-                }
-            )
-
-        html = f"""<!DOCTYPE html><html><head>
+# vis.js page for the legacy graph; filled by str.format (JS braces are doubled).
+_LEGACY_GRAPH_HTML = """<!DOCTYPE html><html><head>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js"
   integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -175,8 +170,8 @@ def _render_legacy_graph() -> None:
 <div id="g"></div>
 <script>
 var net=new vis.Network(document.getElementById('g'),
-  {{nodes:new vis.DataSet({_json.dumps(nodes_data)}),
-    edges:new vis.DataSet({_json.dumps(edges_data)})}},
+  {{nodes:new vis.DataSet({nodes}),
+    edges:new vis.DataSet({edges})}},
   {{groups:{{
       page:{{shape:"dot",size:18,color:{{background:"#97c2fc",border:"#2B7CE9"}}}},
       source:{{shape:"diamond",size:22,color:{{background:"#f3b27a",border:"#d97a3a"}}}}
@@ -187,34 +182,139 @@ var net=new vis.Network(document.getElementById('g'),
     physics:{{barnesHut:{{gravitationalConstant:-5000,springLength:120,springConstant:0.04}},
               stabilization:{{fit:true,iterations:300}}}}}});
 </script></body></html>"""
-        st.components.v1.html(html, height=620, scrolling=True)
-        st.caption(
-            "**Legend:** blue dot = concept/entity, orange diamond = source document. "
-            "Solid grey = `related-to` (concept ↔ concept, incl. shared-source clique). "
-            "Dashed orange → = `derived-from` (concept → source)."
-        )
-        orphans = wiki_engine.find_orphans()
-        if orphans:
-            st.caption(
-                f"**{len(orphans)} orphan(s)** (no in-links): "
-                + ", ".join(f"`{o}`" for o in orphans[:20])
-            )
 
-        st.markdown("### Inspect a node")
-        node_options = {n["label"]: n["id"] for n in graph["nodes"]}
-        picked_label = st.selectbox(
-            "Open details for a node",
-            options=["—"] + sorted(node_options.keys()),
-            key="explorer_inspect_pick",
-            label_visibility="collapsed",
+
+def _legacy_graph_footer(graph: dict[str, Any]) -> None:
+    """Legend, orphan list and the node inspector under the legacy graph."""
+    st.caption(
+        "**Legend:** blue dot = concept/entity, orange diamond = source document. "
+        "Solid grey = `related-to` (concept ↔ concept, incl. shared-source clique). "
+        "Dashed orange → = `derived-from` (concept → source)."
+    )
+    orphans = wiki_engine.find_orphans()
+    if orphans:
+        st.caption(
+            f"**{len(orphans)} orphan(s)** (no in-links): "
+            + ", ".join(f"`{o}`" for o in orphans[:20])
         )
-        if picked_label and picked_label != "—":
-            _show_node_details(node_options[picked_label], graph)
+
+    st.markdown("### Inspect a node")
+    node_options = {n["label"]: n["id"] for n in graph["nodes"]}
+    picked_label = st.selectbox(
+        "Open details for a node",
+        options=["—", *sorted(node_options.keys())],
+        key="explorer_inspect_pick",
+        label_visibility="collapsed",
+    )
+    if picked_label and picked_label != "—":
+        _show_node_details(node_options[picked_label], graph)
+
+
+def _render_legacy_graph() -> None:
+    """The original vis.js typed graph (GRAPH_RENDERER=legacy).
+
+    Kept as the default until the neural renderer has parity; unchanged apart
+    from being lifted out of the page body so the feature flag can pick one.
+    """
+    try:
+        graph = wiki_engine.build_typed_graph()
+        tcol1, tcol2 = st.columns(2)
+        show_names = tcol1.toggle("Node names", value=True)
+        show_sources = tcol2.toggle("Source nodes", value=True)
+        nodes_data, edges_data = _legacy_graph_data(graph, show_names, show_sources)
+        html = _LEGACY_GRAPH_HTML.format(nodes=json.dumps(nodes_data), edges=json.dumps(edges_data))
+        components.html(html, height=620, scrolling=True)
+        _legacy_graph_footer(graph)
     except Exception as exc:
         st.error(f"Graph render failed: {exc}")
 
 
 _GRAPH_LAYOUTS = {"Galaxy": "galaxy", "Ranked": "arc", "Clusters": "radial"}
+
+
+_OVERLAY_LABELS = {
+    "Hubs": "hubs",
+    "Bridges": "bridges",
+    "Orphans": "orphans",
+    "Stale": "stale",
+    "Low confidence": "confidence",
+}
+_OVERLAY_HELP = (
+    "Highlights only — no node is added or hidden.\n\n"
+    "- **Hubs** — pages in the top 10% by PageRank (most central): "
+    "wider glow.\n"
+    "- **Bridges** — pages in the top 10% by betweenness (they connect "
+    "otherwise separate clusters): light ring.\n"
+    "- **Orphans** — pages with no links at all, in or out: grey dot.\n"
+    "- **Stale** — pages past their freshness window "
+    "(`updated` + `expires_after_days`): pulsing amber ring.\n"
+    "- **Low confidence** — pages with `confidence: low` in their "
+    "frontmatter: dimmed dot."
+)
+
+
+def _neural_graph_controls() -> tuple[bool, list[str]]:
+    """(size by degree?, picked overlay labels) from the collapsed Advanced block.
+
+    The metric and the overlays refine what is already drawn, so they live behind a
+    collapsed disclosure rather than competing with the layout switch. Both still
+    instantiate every run (an expander renders its body whether open or shut), so
+    their session-state persistence is unchanged.
+    """
+    with st.expander("Advanced", expanded=False, key="graph_advanced"):
+        acol1, acol2 = st.columns([1, 2])
+    by_degree = acol1.toggle(
+        "Connections",
+        key="graph_by_degree",
+        help="Off: dots and the ranked chart show PageRank. On: number of connections.",
+    )
+    picked = acol2.multiselect(
+        "Style Options",
+        list(_OVERLAY_LABELS),
+        default=["Hubs"],
+        key="graph_overlays",
+        placeholder="Style Options",
+        help=_OVERLAY_HELP,
+    )
+    return by_degree, picked
+
+
+def _handle_graph_click(clicked: dict[str, Any] | None, panel_open: bool) -> None:
+    """Open a double-clicked page in the side panel; a source only gets a toast.
+
+    `n` is a click counter: without it, clicking the same node twice would send an
+    identical value and Streamlit would not rerun. Handled between the two columns so
+    the panel renders the page that was just opened — unless the panel was
+    collapsed, where the column widths for this run are already fixed and only a
+    rerun can widen it.
+    """
+    if not clicked or clicked.get("n") == st.session_state.get("graph_click_n"):
+        return
+    st.session_state["graph_click_n"] = clicked["n"]
+    if clicked.get("kind") == "page":
+        st.session_state["explorer_selected_page"] = clicked["node"]
+        if not panel_open:
+            st.session_state["explorer_panel_open"] = True
+            st.rerun()
+    else:
+        # A toast, not a panel message: the collapsed rail is too narrow to read
+        # one, and this needs no space of its own.
+        st.toast(
+            f"{clicked['node'].removeprefix('source::')} is an original document, not a wiki page."
+        )
+
+
+def _render_graph_panel(panel_open: bool) -> None:
+    """The side panel column: a one-button rail when collapsed, else its content."""
+    if not panel_open:
+        if st.button("«", key="explorer_panel_expand", help="Details"):
+            st.session_state["explorer_panel_open"] = True
+            st.rerun()
+        return
+    if st.button("»", key="explorer_panel_collapse", help="Collapse the side panel"):
+        st.session_state["explorer_panel_open"] = False
+        st.rerun()
+    _render_explorer_panel()
 
 
 def _render_neural_graph(layout: str) -> None:
@@ -238,43 +338,7 @@ def _render_neural_graph(layout: str) -> None:
     The controls stay above the split so the panel column never nests columns
     twice.
     """
-    overlay_labels = {
-        "Hubs": "hubs",
-        "Bridges": "bridges",
-        "Orphans": "orphans",
-        "Stale": "stale",
-        "Low confidence": "confidence",
-    }
-    # The metric and the overlays refine what is already drawn, so they live
-    # behind a collapsed disclosure rather than competing with the layout switch.
-    # Both still instantiate every run (an expander renders its body whether open
-    # or shut), so their session-state persistence is unchanged.
-    with st.expander("Advanced", expanded=False, key="graph_advanced"):
-        acol1, acol2 = st.columns([1, 2])
-    by_degree = acol1.toggle(
-        "Connections",
-        key="graph_by_degree",
-        help="Off: dots and the ranked chart show PageRank. On: number of connections.",
-    )
-    picked = acol2.multiselect(
-        "Style Options",
-        list(overlay_labels),
-        default=["Hubs"],
-        key="graph_overlays",
-        placeholder="Style Options",
-        help=(
-            "Highlights only — no node is added or hidden.\n\n"
-            "- **Hubs** — pages in the top 10% by PageRank (most central): "
-            "wider glow.\n"
-            "- **Bridges** — pages in the top 10% by betweenness (they connect "
-            "otherwise separate clusters): light ring.\n"
-            "- **Orphans** — pages with no links at all, in or out: grey dot.\n"
-            "- **Stale** — pages past their freshness window "
-            "(`updated` + `expires_after_days`): pulsing amber ring.\n"
-            "- **Low confidence** — pages with `confidence: low` in their "
-            "frontmatter: dimmed dot."
-        ),
-    )
+    by_degree, picked = _neural_graph_controls()
     panel_open = st.session_state.get("explorer_panel_open", False)
     graph_col, panel_col = st.columns(
         [2, 1] if panel_open else [30, 1], gap="medium" if panel_open else "small"
@@ -282,7 +346,7 @@ def _render_neural_graph(layout: str) -> None:
     with graph_col:
         try:
             clicked = graph_widget.render_graph(
-                overlays=[overlay_labels[p] for p in picked],
+                overlays=[_OVERLAY_LABELS[p] for p in picked],
                 size_by="degree" if by_degree else "pagerank",
                 layout=layout,
                 # Newspaper skin draws the same graph as an engraved plate; the
@@ -292,44 +356,15 @@ def _render_neural_graph(layout: str) -> None:
         except Exception as exc:
             st.error(f"Graph render failed: {exc}")
             return
-
         stats = graph_widget.graph_stats()
         st.caption(
             f"{len(stats['nodes'])} nodes · {len(stats['edges'])} edges · "
             f"{stats['communities']} clusters. Hover for the 2-hop neighbourhood, "
             "click a node for its properties, double-click to open the page."
         )
-
-    # `n` is a click counter: without it, clicking the same node twice would
-    # send an identical value and Streamlit would not rerun. Handled between the
-    # two columns so the panel below renders the page that was just opened —
-    # unless the panel was collapsed, where the column widths for this run are
-    # already fixed and only a rerun can widen it.
-    if clicked and clicked.get("n") != st.session_state.get("graph_click_n"):
-        st.session_state["graph_click_n"] = clicked["n"]
-        if clicked.get("kind") == "page":
-            st.session_state["explorer_selected_page"] = clicked["node"]
-            if not panel_open:
-                st.session_state["explorer_panel_open"] = True
-                st.rerun()
-        else:
-            # A toast, not a panel message: the collapsed rail is too narrow to
-            # read one, and this needs no space of its own.
-            st.toast(
-                f"{clicked['node'].removeprefix('source::')} is an original "
-                "document, not a wiki page."
-            )
-
+    _handle_graph_click(clicked, panel_open)
     with panel_col:
-        if not panel_open:
-            if st.button("«", key="explorer_panel_expand", help="Details"):
-                st.session_state["explorer_panel_open"] = True
-                st.rerun()
-            return
-        if st.button("»", key="explorer_panel_collapse", help="Collapse the side panel"):
-            st.session_state["explorer_panel_open"] = False
-            st.rerun()
-        _render_explorer_panel()
+        _render_graph_panel(panel_open)
 
 
 def _render_explorer_panel() -> None:
@@ -437,6 +472,70 @@ def _warn_if_no_lex_index() -> bool:
     return True
 
 
+def _render_search_hit(key_prefix: str, r: dict[str, Any], max_score: float) -> str | None:
+    """One search result: title button, score bar, plain excerpt, matched terms.
+    Returns the filename when its button was clicked."""
+    selected = None
+    if st.button(r["title"], key=f"{key_prefix}_hit_{r['filename']}", use_container_width=True):
+        st.session_state[f"{key_prefix}_selected_page"] = r["filename"]
+        selected = r["filename"]
+    if max_score > 0:
+        st.progress(min(r.get("score", 0.0) / max_score, 1.0))
+    if r.get("excerpt"):
+        # Strip markdown markers so a preview starting with "## …" renders
+        # as small plain caption text, not a giant heading.
+        plain = re.sub(r"[#*_`>]+", "", r["excerpt"])
+        plain = re.sub(r"\s+", " ", plain).strip().lstrip("-* ")
+        if plain:
+            st.caption(plain)
+    terms: list[str] = r.get("matched_terms") or []
+    if terms:
+        st.caption("matched: " + " ".join(f"`{t}`" for t in terms))
+    return selected
+
+
+def _render_search_results(key_prefix: str, search: str) -> str | None:
+    results = wiki_engine.search_wiki(search)
+    if not results and _warn_if_no_lex_index():
+        return None
+    st.caption(f"{len(results)} result(s)")
+    max_score = max((r.get("score", 0.0) for r in results), default=0.0)
+    selected = None
+    for i, r in enumerate(results):
+        selected = _render_search_hit(key_prefix, r, max_score) or selected
+        if i < len(results) - 1:
+            st.markdown("---")
+    return selected
+
+
+_NAV_GROUPS = {
+    "concept": "Concepts",
+    "entity": "Entities",
+    "source-summary": "Source Summaries",
+    "comparison": "Comparisons",
+    "insight": "Insights",
+    "other": "Other",
+}
+
+
+def _render_nav_tree(key_prefix: str) -> str | None:
+    tree = wiki_engine.get_wiki_tree()
+    selected = None
+    for grp, group_label in _NAV_GROUPS.items():
+        group = tree.get(grp)
+        if not group:
+            continue
+        with st.expander(f"{group_label} ({len(group)})", expanded=(grp == "concept")):
+            for p in group:
+                title = ("⚠️ " if p.get("stale") else "") + p.get("title", p["filename"])
+                if st.button(
+                    title, key=f"{key_prefix}_nav_{p['filename']}", use_container_width=True
+                ):
+                    st.session_state[f"{key_prefix}_selected_page"] = p["filename"]
+                    selected = p["filename"]
+    return selected
+
+
 def _render_wiki_nav(key_prefix: str) -> str | None:
     """Render wiki navigation tree in a narrow column. Returns clicked filename or None."""
     search = st.text_input(
@@ -445,56 +544,9 @@ def _render_wiki_nav(key_prefix: str) -> str | None:
         key=f"{key_prefix}_nav_search",
         label_visibility="collapsed",
     ).strip()
-    selected: str | None = None
     if search:
-        results = wiki_engine.search_wiki(search)
-        if not results and _warn_if_no_lex_index():
-            return None
-        st.caption(f"{len(results)} result(s)")
-        max_score = max((r.get("score", 0.0) for r in results), default=0.0)
-        for _i, r in enumerate(results):
-            if st.button(
-                r["title"], key=f"{key_prefix}_hit_{r['filename']}", use_container_width=True
-            ):
-                st.session_state[f"{key_prefix}_selected_page"] = r["filename"]
-                selected = r["filename"]
-            if max_score > 0:
-                st.progress(min(r.get("score", 0.0) / max_score, 1.0))
-            if r.get("excerpt"):
-                # Strip markdown markers so a preview starting with "## …" renders
-                # as small plain caption text, not a giant heading.
-                plain = re.sub(r"[#*_`>]+", "", r["excerpt"])
-                plain = re.sub(r"\s+", " ", plain).strip().lstrip("-* ")
-                if plain:
-                    st.caption(plain)
-            terms = r.get("matched_terms") or []
-            if terms:
-                st.caption("matched: " + " ".join(f"`{t}`" for t in terms))
-            if _i < len(results) - 1:
-                st.markdown("---")
-    else:
-        tree = wiki_engine.get_wiki_tree()
-        group_labels = {
-            "concept": "Concepts",
-            "entity": "Entities",
-            "source-summary": "Source Summaries",
-            "comparison": "Comparisons",
-            "insight": "Insights",
-            "other": "Other",
-        }
-        for grp in ["concept", "entity", "source-summary", "comparison", "insight", "other"]:
-            group = tree.get(grp)
-            if not group:
-                continue
-            with st.expander(f"{group_labels[grp]} ({len(group)})", expanded=(grp == "concept")):
-                for p in group:
-                    title = ("⚠️ " if p.get("stale") else "") + p.get("title", p["filename"])
-                    if st.button(
-                        title, key=f"{key_prefix}_nav_{p['filename']}", use_container_width=True
-                    ):
-                        st.session_state[f"{key_prefix}_selected_page"] = p["filename"]
-                        selected = p["filename"]
-    return selected
+        return _render_search_results(key_prefix, search)
+    return _render_nav_tree(key_prefix)
 
 
 def _render_chat_sources_panel() -> None:
@@ -528,14 +580,14 @@ def _render_research_sources_panel() -> None:
     Both modes append `{tool, query}` entries; Deep mode additionally appends
     `{url, title}` entries as web_search results stream in.
     """
-    sources = st.session_state.get("research_sources", [])
+    sources: list[dict[str, Any]] = st.session_state.get("research_sources", [])
     if not sources:
         st.caption("Sources appear here during research.")
         return
     for i, src in enumerate(sources):
         if src.get("url"):
             st.markdown(f"[{src.get('title') or src['url']}]({src['url']})")
-            st.caption(urlparse(src["url"]).netloc)
+            st.caption(urlparse(str(src["url"])).netloc)
         else:
             st.markdown(f"**{src['tool']}**")
             st.caption(src["query"])
@@ -545,12 +597,38 @@ def _render_research_sources_panel() -> None:
 
 def _record_research_urls(step: dict[str, Any]) -> None:
     """Append newly-seen web citations from a Deep-mode step, de-duped by URL."""
-    panel = st.session_state.setdefault("research_sources", [])
+    panel: list[dict[str, Any]] = st.session_state.setdefault("research_sources", [])
     known = {s["url"] for s in panel if s.get("url")}
-    for src in step.get("sources") or []:
+    new_sources: list[dict[str, str]] = step.get("sources") or []
+    for src in new_sources:
         if src["url"] not in known:
             known.add(src["url"])
             panel.append(src)
+
+
+def _render_tool_call(step: dict[str, Any]) -> None:
+    args: dict[str, Any] = step.get("args") or {}
+    # `ResearchComplete` is a zero-field sentinel — rendering `— {}` for it
+    # reads as a failed call. Show the name alone and explain it instead.
+    if step.get("terminal"):
+        st.success(f"**{step['name']}** — research phase finished")
+    elif args:
+        st.info(f"**{step['name']}** — `{str(args)[:300]}`")
+    else:
+        st.info(f"**{step['name']}**")
+    if step.get("note"):
+        st.caption(step["note"])
+
+
+def _render_tool_result(step: dict[str, Any]) -> None:
+    sources: list[dict[str, str]] = step.get("sources") or []
+    label = f"Result: {step['name']}" + (f" — {len(sources)} source(s)" if sources else "")
+    with st.expander(label, expanded=False):
+        if step.get("note"):
+            st.caption(step["note"])
+        for src in sources:
+            st.markdown(f"- [{src['title'] or src['url']}]({src['url']})")
+        st.text(step["result"][:2000])
 
 
 def _render_research_step(step: dict[str, Any]) -> None:
@@ -569,26 +647,9 @@ def _render_research_step(step: dict[str, Any]) -> None:
         # continues into Quick mode after this step.
         st.warning(step["content"])
     elif stype == "tool_call":
-        args = step.get("args") or {}
-        # `ResearchComplete` is a zero-field sentinel — rendering `— {}` for it
-        # reads as a failed call. Show the name alone and explain it instead.
-        if step.get("terminal"):
-            st.success(f"**{step['name']}** — research phase finished")
-        elif args:
-            st.info(f"**{step['name']}** — `{str(args)[:300]}`")
-        else:
-            st.info(f"**{step['name']}**")
-        if step.get("note"):
-            st.caption(step["note"])
+        _render_tool_call(step)
     elif stype == "tool_result":
-        n = len(step.get("sources") or [])
-        label = f"Result: {step['name']}" + (f" — {n} source(s)" if n else "")
-        with st.expander(label, expanded=False):
-            if step.get("note"):
-                st.caption(step["note"])
-            for src in step.get("sources") or []:
-                st.markdown(f"- [{src['title'] or src['url']}]({src['url']})")
-            st.text(step["result"][:2000])
+        _render_tool_result(step)
     elif stype == "error":
         st.error(step["content"])
 
@@ -598,13 +659,16 @@ def _render_research_metrics(metrics: dict[str, Any] | None) -> None:
     would just repeat the search count (per the spec: only show it if it differs)."""
     if not metrics:
         return
-    tiles = [("Sub-tasks", metrics.get("tasks", 0)), ("Web searches", metrics.get("searches", 0))]
+    tiles: list[tuple[str, Any]] = [
+        ("Sub-tasks", metrics.get("tasks", 0)),
+        ("Web searches", metrics.get("searches", 0)),
+    ]
     checked = metrics.get("sources_checked", 0)
     if checked != metrics.get("searches", 0):
         tiles.append(("Sources checked", checked))
     tiles.append(("Sources cited", metrics.get("sources_cited", 0)))
     cols = st.columns(len(tiles))
-    for col, (label, value) in zip(cols, tiles):
+    for col, (label, value) in zip(cols, tiles, strict=True):
         col.metric(label, value)
 
 
@@ -618,81 +682,94 @@ def _render_research_trace(steps: list[dict[str, Any]] | None) -> None:
         _render_research_step(step)
 
 
+def _reset_research_state(question_to_run: str, display_q: str) -> str | None:
+    """Clear the previous run's results; return the interpreted question, if any."""
+    fresh: dict[str, Any] = {
+        "research_sources": [],
+        "last_research_answer": "",
+        "last_research_error": "",
+        "last_research_q": display_q,
+        "last_research_audit": None,
+        "last_research_steps": [],
+        "last_research_metrics": None,
+    }
+    for key, value in fresh.items():
+        st.session_state[key] = value
+    st.session_state.pop("research_saved", None)
+    st.session_state.pop("research_saved_note", None)
+    interpreted = question_to_run if question_to_run.strip() != display_q.strip() else None
+    st.session_state["last_research_interpreted"] = interpreted
+    return interpreted
+
+
+def _record_research_step(step: dict[str, Any]) -> None:
+    """Persist and render one intermediate step (the trace survives st.rerun())."""
+    stype = step["type"]
+    st.session_state["last_research_steps"].append(step)
+    if stype in ("thought", "notice", "tool_call", "tool_result", "error"):
+        _render_research_step(step)
+    if stype == "tool_call":
+        st.session_state.setdefault("research_sources", []).append(
+            {"tool": step["name"], "query": str(step["args"])[:80]}
+        )
+    elif stype == "tool_result":
+        _record_research_urls(step)
+    elif stype == "error":
+        st.session_state["last_research_error"] = step["content"]
+
+
+def _report_ref(report_path: str) -> str:
+    return "comparisons/" + report_path.split("comparisons/")[-1]
+
+
+def _finish_research(step: dict[str, Any], display_q: str, interpreted: str | None) -> None:
+    """Store the final answer. The agent already handed us the report text; the file
+    is only a nicer-formatted copy, so a read-back problem never loses the answer."""
+    _record_research_urls(step)
+    st.session_state["last_research_metrics"] = step.get("metrics")
+    st.success("Research complete.")
+    answer = step.get("content", "")
+    if step.get("report_path"):
+        st.session_state["last_report"] = step["report_path"]
+        try:
+            answer = (
+                wiki_engine.read_page_parsed(_report_ref(step["report_path"]))["content"] or answer
+            )
+        except Exception as exc:
+            st.warning(
+                f"Saved report could not be re-read ({type(exc).__name__}); "
+                "showing the result as produced."
+            )
+    st.session_state["last_research_answer"] = answer
+    if not answer.strip():
+        st.warning("Agent completed but produced no answer text.")
+        st.session_state["last_research_error"] = (
+            "The agent finished but produced no answer text. "
+            "Try rephrasing the question, or click 🆕 New research."
+        )
+    report = step.get("report_path")
+    st.session_state.setdefault("research_history", []).append(
+        {
+            "q": display_q,
+            "a": answer,
+            "interpreted": interpreted,
+            "report": _report_ref(report) if report else None,
+        }
+    )
+
+
 def _run_research_stream(
     question_to_run: str, display_q: str, wiki_context: str, deep: bool = False
 ) -> None:
-    st.session_state["research_sources"] = []
-    st.session_state["last_research_answer"] = ""
-    st.session_state["last_research_error"] = ""
-    st.session_state["last_research_q"] = display_q
-    st.session_state["last_research_audit"] = None
-    st.session_state["last_research_steps"] = []
-    st.session_state["last_research_metrics"] = None
-    st.session_state.pop("research_saved", None)
-    st.session_state.pop("research_saved_note", None)
-    _interpreted = question_to_run if question_to_run.strip() != display_q.strip() else None
-    st.session_state["last_research_interpreted"] = _interpreted
+    interpreted = _reset_research_state(question_to_run, display_q)
     st.markdown(f"**Research question:** {display_q}")
-    steps_container = st.container()
-    _runner = deep_research_agent.run_deep_research if deep else research_agent.run_research_agent
-    _trace = st.session_state["last_research_steps"]
-    with steps_container:
-        for step in _runner(question_to_run, wiki_context):
-            stype = step["type"]
-            # Persist every step so the trace survives the caller's st.rerun().
-            if stype != "final_answer":
-                _trace.append(step)
-            if stype in ("thought", "notice", "tool_call", "tool_result", "error"):
-                _render_research_step(step)
-            if stype == "tool_call":
-                st.session_state.setdefault("research_sources", []).append(
-                    {"tool": step["name"], "query": str(step["args"])[:80]}
-                )
-            elif stype == "tool_result":
-                _record_research_urls(step)
-            elif stype == "error":
-                st.session_state["last_research_error"] = step["content"]
-
-            if stype == "final_answer":
-                _record_research_urls(step)
-                st.session_state["last_research_metrics"] = step.get("metrics")
-                st.success("Research complete.")
-                # The agent already handed us the report text; the file is only
-                # a nicer-formatted copy. Never let a read-back problem lose the
-                # answer — fall back to what is in memory and say so.
-                _inline = step.get("content", "")
-                if step.get("report_path"):
-                    st.session_state["last_report"] = step["report_path"]
-                    try:
-                        _rel = "comparisons/" + step["report_path"].split("comparisons/")[-1]
-                        _saved = wiki_engine.read_page_parsed(_rel)["content"]
-                    except Exception as _exc:
-                        _saved = ""
-                        st.warning(
-                            f"Saved report could not be re-read ({type(_exc).__name__}); "
-                            "showing the result as produced."
-                        )
-                    st.session_state["last_research_answer"] = _saved or _inline
-                else:
-                    st.session_state["last_research_answer"] = _inline
-                if not st.session_state["last_research_answer"].strip():
-                    st.warning("Agent completed but produced no answer text.")
-                    st.session_state["last_research_error"] = (
-                        "The agent finished but produced no answer text. "
-                        "Try rephrasing the question, or click 🆕 New research."
-                    )
-                st.session_state.setdefault("research_history", []).append(
-                    {
-                        "q": display_q,
-                        "a": st.session_state.get("last_research_answer", ""),
-                        "interpreted": _interpreted,
-                        "report": (
-                            ("comparisons/" + step["report_path"].split("comparisons/")[-1])
-                            if step.get("report_path")
-                            else None
-                        ),
-                    }
-                )
+    runner = deep_research_agent.run_deep_research if deep else research_agent.run_research_agent
+    with st.container():
+        for step in runner(question_to_run, wiki_context):
+            if step["type"] == "final_answer":
+                _finish_research(step, display_q, interpreted)
+            else:
+                _record_research_step(step)
     # Safety net: the result block renders on `last_research_answer`, and the
     # error block on `last_research_error`. If a run somehow sets neither
     # (e.g. the generator ends without a terminal step), the page would come
@@ -733,7 +810,11 @@ def _page_header(title: str, subtitle: str = "") -> None:
     st.markdown("---")
 
 
-def _render_chat_sources(sources: list[str], raw_sources: list[str], key_prefix: str) -> None:
+# Unused since the chat moved its sources into a side panel; kept pending a decision
+# (see docs/openissues.md).
+def _render_chat_sources(  # pyright: ignore[reportUnusedFunction]
+    sources: list[str], raw_sources: list[str], key_prefix: str
+) -> None:
     if not (sources or raw_sources):
         return
     with st.expander("Sources", expanded=False):
@@ -755,9 +836,9 @@ def _render_why_sources(audit: dict[str, Any] | None) -> None:
     reranker), so a fusion-only DB shows no empty panel."""
     if not audit:
         return
-    kept = audit.get("kept") or []
-    below = audit.get("below_tau") or []
-    over = audit.get("over_cap") or []
+    kept: list[tuple[str, float | None]] = audit.get("kept") or []
+    below: list[tuple[str, float | None]] = audit.get("below_tau") or []
+    over: list[tuple[str, float | None]] = audit.get("over_cap") or []
     if not (kept or below or over):
         return
     tau = audit.get("tau")
@@ -778,17 +859,27 @@ def _render_why_sources(audit: dict[str, Any] | None) -> None:
 # --- sidebar ---
 
 
+def _convert_progress(
+    prog: Any, name: str, index: int, count: int
+) -> Callable[[int, int, str], None]:
+    """Progress callback for converting file ``index`` of ``count`` in a batch."""
+
+    def _cb(done: int, total: int, label: str) -> None:
+        frac = (index + (done / total if total else 1.0)) / count
+        prog.progress(min(frac, 1.0), text=f"{name}: {label}")
+
+    return _cb
+
+
 def _safe_reset() -> None:
     import requests as _req
 
-    try:
+    with contextlib.suppress(Exception):
         _req.post(
             f"{ollama_client.host()}/api/generate",
             json={"model": os.getenv("OLLAMA_MODEL", "gemma4:e4b"), "keep_alive": 0},
             timeout=5,
         )
-    except Exception:
-        pass
     gc.collect()
     for key in list(st.session_state.keys()):
         del st.session_state[key]
@@ -922,6 +1013,7 @@ if _NEWSPAPER:
         sources=_s["raw_files"],
         model=ollama_client.MODEL,
     )
+    assert _db_slot is not None  # created in the sidebar whenever _NEWSPAPER
     _bar_db, _bar_nav = _db_slot, st.container()
 else:
     # The nav is the page's header, so it spans the full width on its own row;
@@ -1027,7 +1119,7 @@ if page == "Upload":
             st.session_state.pop("batch_prepared", None)
             st.session_state.pop("convert_editor", None)
 
-        prepared = st.session_state.get("batch_prepared")
+        prepared: list[dict[str, Any]] | None = st.session_state.get("batch_prepared")
         if prepared is None:
             dupes = [n for n, b in raws.items() if dedup.is_duplicate(b)]
             todo = [n for n in raws if n not in dupes]
@@ -1045,13 +1137,10 @@ if page == "Upload":
                 b = raws[name]
                 convertible = md_convert.is_convertible(name)
                 if convertible:
-
-                    def _cb(done, total, label, _n=name, _i=i, _t=len(todo)):
-                        frac = (_i + (done / total if total else 1.0)) / _t
-                        prog.progress(min(frac, 1.0), text=f"{_n}: {label}")
-
                     try:
-                        text = md_convert.convert_to_markdown(b, name, _cb)
+                        text = md_convert.convert_to_markdown(
+                            b, name, _convert_progress(prog, name, i, len(todo))
+                        )
                     except (RuntimeError, ValueError) as e:
                         st.warning(f"Skipped **{name}** — conversion failed: {e}")
                         continue
@@ -1091,7 +1180,7 @@ if page == "Upload":
         st.markdown(
             "**Effective date** — auto-detected from each document; correct any before ingest."
         )
-        edited = st.data_editor(
+        edited: list[dict[str, Any]] = st.data_editor(
             [{"File": f["save_name"], "effective as of": f["detected_date"]} for f in prepared],
             key="date_editor",
             hide_index=True,
@@ -1129,14 +1218,21 @@ if page == "Upload":
 
         # --- Phase 3: ordered batch ingest (oldest-first so newer supersedes) ---
         if st.session_state.pop("batch_ingesting", False):
-            pending = st.session_state.pop("pending_batch", None)
+            pending: dict[str, Any] | None = st.session_state.pop("pending_batch", None)
             if pending:
                 # A new ingest supersedes the previous run's contradiction list.
                 st.session_state.pop("last_contradictions", None)
                 st.session_state.pop("last_contradiction_pages", None)
-                files, dates, shared = pending["files"], pending["dates"], pending["shared"]
+                files: list[dict[str, Any]] = pending["files"]
+                dates: dict[str, str] = pending["dates"]
+                shared: dict[str, str] = pending["shared"]
                 files.sort(key=lambda f: dates.get(f["save_name"]) or "")
-                agg = {"created": [], "updated": [], "contradictions": [], "failed": []}
+                agg: dict[str, list[str]] = {
+                    "created": [],
+                    "updated": [],
+                    "contradictions": [],
+                    "failed": [],
+                }
                 finalized = False
                 prog = st.progress(0.0, text="Ingesting…")
                 for i, f in enumerate(files):
@@ -1278,7 +1374,7 @@ elif page == "Wiki Explorer":
                 )
             # Clearing the control returns None; the map still has to be drawn
             # in *some* geometry.
-            graph_layout = _GRAPH_LAYOUTS.get(_picked_layout, "galaxy")
+            graph_layout = _GRAPH_LAYOUTS.get(_picked_layout or "", "galaxy")
         # Switching into Tree always lands on the database overview: both views
         # share `explorer_selected_page`, so without this a node opened in the
         # graph would silently preselect the reader instead.
@@ -1420,15 +1516,15 @@ elif page == "Wiki Chat":
                     msg["role"] == "assistant"
                     and msg.get("question")
                     and not msg["content"].startswith("Error:")
-                ):
-                    if st.button(
+                    and st.button(
                         "↪ Follow up", key=f"followup_{i}", help="Continue from this answer"
-                    ):
-                        st.session_state["chat_followup"] = {
-                            "q": msg["question"],
-                            "a": msg["content"],
-                        }
-                        st.rerun()
+                    )
+                ):
+                    st.session_state["chat_followup"] = {
+                        "q": msg["question"],
+                        "a": msg["content"],
+                    }
+                    st.rerun()
                 if msg["role"] == "assistant" and msg.get("steps"):
                     st.download_button(
                         "Download answer",
@@ -1627,7 +1723,8 @@ elif page == "Research":
         )
         with st.expander(_paste_label):
             wiki_context = st.text_area(
-                "Optional extra context. Leave blank — the agent will run wiki_search first automatically.",
+                "Optional extra context. Leave blank — the agent will run wiki_search "
+                "first automatically.",
                 height=120,
                 label_visibility="collapsed",
             )

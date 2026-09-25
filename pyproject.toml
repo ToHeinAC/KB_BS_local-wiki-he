@@ -83,6 +83,10 @@ allowed-confusables = ["–", "×", "−"]
 [tool.ruff.lint.per-file-ignores]
 # Prompt strings are model input: re-wrapping a long line changes the text the LLM sees.
 "src/prompts.py" = ["E501"]
+# Import order is the point: app.py loads .env before modules read env vars at import
+# (theme.FRONTEND, graph_widget.RENDERER); conftest disables it before any src import.
+"src/app.py" = ["E402"]
+"tests/conftest.py" = ["E402"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
