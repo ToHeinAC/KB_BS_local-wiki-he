@@ -5,7 +5,12 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import dotenv
 import pytest
+
+# The suite must not depend on the developer's .env (CI has none): every src module
+# calls load_dotenv() at import, so disable it before any of them is imported.
+dotenv.load_dotenv = lambda *_a, **_k: False
 
 # Ensure src/ is on sys.path so bare module imports work
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
