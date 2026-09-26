@@ -363,6 +363,7 @@ Every phase follows AGENTS §5.6: red test first, green, gate, `/documentation-u
   - `ontology_lookup` repeated with the same arguments → `run_memory` stub;
   - one `resolve` call per search on every path (spy) (R12).
 - **Verify:** `scripts/eval_ontology_search.py` groups (a), (b), (d) meet R14.
+- **As built** ([ontology.md](ontology.md) §Search): the view is an in-memory cache per DB (keyed on file stamps) instead of `index/ontology.json`; alias expansions are part of the restricted ontology arm instead of unrestricted extra queries (they lifted *other* laws that mention the name); the briefing carries ids, file names and dates, not document-derived names; the Search-page class chip is not built. R12's spy test counts `resolve` per search in DBs that have an ontology (without one, the stage stops before resolving).
 
 ### Phase 5 — Time
 

@@ -6,12 +6,11 @@ append-only ledger of facts about the DB's sources. Rationale:
 detection at ingest, ontology-aware search, time): [_plan-ontology.md](_plan-ontology.md).
 Phase status: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §2.
 
-**Built so far (plan Phases 1–3):** shared schema modules, per-DB binding, schema
+**Built so far (plan Phases 1–4):** shared schema modules, per-DB binding, schema
 validation, the fact ledger with projection, retraction on `delete_source`, the
 Maintenance → Ontology workbench (view, export, hand-edit, import, history, restore,
-proposals), detection at upload, and stamping of source-summary pages. Search does not
-use the ontology yet (plan Phase 4), so a DB with or without one answers searches the
-same.
+proposals), detection at upload, stamping of source-summary pages, and the ontology
+stage in every search (§Search). Validity over time is plan Phase 5.
 
 ## Storage
 
@@ -43,6 +42,8 @@ same.
   `record_change`).
 - `src/ontology_detect.py` is pure: `detect` (class, work id, aliases from a document
   head), `parse_proposal` (verifies an LLM answer), `classify_options`, `upload_rows`.
+- `src/ontology_query.py` is pure: the search `View`, `resolve` → `QueryFrame`,
+  `briefing`, `lookup`, `badge`, `audit` (§Search).
 - `src/ontology_ui.py` renders the Maintenance → Ontology section and the Upload
   review-table columns. `wiki_engine` holds the orchestration: `apply_ontology`,
   `record_source_ontology`, `finish_ontology_batch`, `decide_proposal`,
@@ -243,6 +244,56 @@ current facts and removed when a fact is gone (`ontology.stamp_meta`). An LLM re
 therefore cannot drop or invent them (finding F7). `restamp_summaries()` re-stamps all
 summary pages after an import, restore, review or ingest batch. Without an ontology,
 pages are left byte-identical.
+
+## Search (plan Phase 4)
+
+The check is enforced in code on every search path, not left to the model (plan §4.1).
+A DB without an ontology, or a question that names no work or class, gets exactly
+today's results (tested byte-for-byte).
+
+- **View** (`ontology_store.view()`): per DB, built by `ontology_query.build_view` from
+  the schema, the projected facts and the wiki pages' `sources:`; cached in memory and
+  rebuilt when the binding, ledger, modules or wiki pages change.
+- **Resolution** (`resolve`, no LLM): word-bounded, longest-first match of Work aliases
+  and class labels (labels split on "/"; root classes and classes without sources are
+  never matched). An ambiguous alias keeps all its works. Works' sources come newest
+  version first; a class covers its descendants.
+- **S1, ontology arm** (`retrieval._ontology_lists`, shared by `retrieval.search` and
+  `wiki_engine.search_wiki`): one extra ranked list for RRF (`W_ONTOLOGY = 1.0`) —
+  `lex_index.query(question + aliases, sources=<the works' sources>)`, then
+  `lex_index.query(question, sources=<the classes' sources>)`. Wiki scope maps sources to
+  the pages that cite them. Only lexical hits, so the lexical arm stays the citation
+  truth; RRF bounds the arm's influence. Reranking (Deep paths) runs after fusion.
+- **S2, briefing** (`retrieval.ontology_briefing`): before the first LLM call, Deep chat
+  and Quick research append it to the system prompt (and yield an `ontology` step);
+  Quick chat appends it to the synthesis system prompt. It holds only ids, source file
+  names, dates and the user's matched words — no document-derived names (injection
+  containment) — at most 3 works, ≤ 600 characters. Texts: `ONTOLOGY_BRIEFING_*` in
+  `prompts.py`.
+- **S3, `ontology_lookup(term)`**: works (aliases, versions, relations both ways) or
+  classes (definition, members), else the nearest aliases. Offered only when a DB in the
+  search scope has an ontology (`tools.with_ontology`); duplicates are short-circuited by
+  `run_memory` like other searches.
+- **Visible to users:** raw hits carry `ontology: class · work · date`; Explorer search
+  shows "Ontology — “StrlSchV” → `de-strlschv-2018`; n source(s) favoured"; agent traces
+  show the *Ontology frame*; *Why these sources* lists every frame of the run.
+
+**Measured** (`uv run python scripts/eval_ontology_search.py --root <scratch dir>`):
+a throwaway DB outside `data/` built from the full public texts of StrlSchG, StrlSchV,
+AtG, GG, BImSchG and TA Luft (1,179 chunks; typed by Phase 3 detection, all six
+correct), lexical + ontology arms only, 18 hand-labelled questions
+(`bench/fixture_ontology_search.json`):
+
+| Group | hit@1 off → on | MRR off → on |
+|---|---|---|
+| (a) names a law by abbreviation (10) | 80 % → 100 % | 0.86 → 1.00 |
+| (b) names a document class (4) | 50 % → 100 % | 0.63 → 1.00 |
+| (d) names nothing (4) | 75 % → 75 % (rankings identical) | 0.81 → 0.81 |
+
+Limits: the metric is "right document", not "right passage"; the set is small and was
+written by the implementer; no semantic arm or reranker in the run. Detection depends on
+the title being at the top of the text — the first eval run, with site-menu text before
+the title, typed four of six laws wrongly and found no works.
 
 ## Deletion
 
