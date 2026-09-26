@@ -6,11 +6,12 @@ append-only ledger of facts about the DB's sources. Rationale:
 detection at ingest, ontology-aware search, time): [_plan-ontology.md](_plan-ontology.md).
 Phase status: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §2.
 
-**Built so far (plan Phases 1–2):** shared schema modules, per-DB binding, schema
-validation, the fact ledger with projection, retraction on `delete_source`, and the
-Maintenance → Ontology workbench (view, export, hand-edit, import, history, restore).
-Nothing reads the ontology at ingest or search time yet, so a DB with or without one
-answers searches the same.
+**Built so far (plan Phases 1–3):** shared schema modules, per-DB binding, schema
+validation, the fact ledger with projection, retraction on `delete_source`, the
+Maintenance → Ontology workbench (view, export, hand-edit, import, history, restore,
+proposals), detection at upload, and stamping of source-summary pages. Search does not
+use the ontology yet (plan Phase 4), so a DB with or without one answers searches the
+same.
 
 ## Storage
 
@@ -40,8 +41,12 @@ answers searches the same.
   `current_revision`, `history`, `last_change`, `snapshot_text`, `export_text`), plans
   (`prepare_import`, `prepare_state`, `prepare_restore`) and writes (`apply`,
   `record_change`).
-- `src/ontology_ui.py` renders the Maintenance → Ontology section;
-  `wiki_engine.apply_ontology` applies a plan and writes the Activity-log line.
+- `src/ontology_detect.py` is pure: `detect` (class, work id, aliases from a document
+  head), `parse_proposal` (verifies an LLM answer), `classify_options`, `upload_rows`.
+- `src/ontology_ui.py` renders the Maintenance → Ontology section and the Upload
+  review-table columns. `wiki_engine` holds the orchestration: `apply_ontology`,
+  `record_source_ontology`, `finish_ontology_batch`, `decide_proposal`,
+  `restamp_summaries` (each writes its Activity-log line).
 
 ## Schema modules
 
@@ -198,6 +203,46 @@ by code), `file`, `file_sha256`, `summary` (entity counts), `local_version` and 
 T. Hein via import (ontology-KI-edited.yaml): schema +1 ~0 −0, facts +2 ~0 −0`.
 Automatic writers call `record_change(via)`, which diffs against the last snapshot. If
 the content moved without a recorded revision, the header says so.
+
+## Detection at upload (`ontology_detect`)
+
+Only for a DB with a valid ontology; otherwise the Upload page is unchanged.
+- **Class:** every cue of every non-deprecated class is matched on the first 4000
+  characters; the match that *ends* first wins, ties go to the deeper class, then the
+  lower `rank`. Title-line cues are `^`-anchored and greedy, so "ends first" separates
+  "Allgemeine Verwaltungsvorschrift zum …gesetz" from a statute.
+- **Work** (legal instruments only): German law → `de-<abbr>-<year of Ausfertigung>` from
+  the title's "(Name - ABBR)" or a standalone abbreviation line (aliases: both names);
+  EU acts → `eu-dir-<year>-<n>-<org>` / `eu-reg-<year>-<n>`. Titles with an en dash
+  ("… – TA Luft") yield no work id.
+- **Review table:** columns *Class* (select), *Work* (text) and read-only *Other versions
+  in this DB* (sources already filed under that work); the existing *effective as of*
+  column becomes the `version_date` fact.
+- **At ingest** (`record_source_ontology`, before `ingest_begin` so the summary page is
+  stamped at creation): a value equal to the detected one is a `rule` fact with the
+  matched line as evidence; a corrected one a `user` fact; invalid values are skipped
+  with a warning. With no class, one small LLM call (`ONTOLOGY_CLASSIFY_PROMPT`,
+  `FAST_MODEL`, leaf classes only) may add a **proposal**, kept only if its quote occurs
+  verbatim in the head. After the batch, `finish_ontology_batch` records one `ingest`
+  revision.
+- **Proposals** appear under Ontology → *Proposals* (and as a count in the header).
+  Confirm turns one into a `user` fact (revision `via: review`); reject only withdraws it.
+
+**Measured** (`uv run python scripts/bench_ontology_detect.py`, gold set
+`bench/fixture_ontology_detect.json`): class precision 8/8, work id 8/8 on the heads of
+StrlSchG, StrlSchV, AtG, GG, BImSchG, TA Luft, Directive 2013/59/Euratom and Regulation
+(EU) 2016/679; 0 of the 18 KI documents got a legal class. The set has no permits,
+guidelines, technical rules or internal procedures yet. A live run of the LLM proposal
+with gemma4:e4b on 6 KI documents gave 5 verified proposals (about 5 s each).
+
+## Stamping
+
+`wiki_engine._okf_apply` (every page write) calls `_ontology_stamp`: on a
+`source-summary` page, the keys `class`, `work`, `version_date` are set from the source's
+current facts and removed when a fact is gone (`ontology.stamp_meta`). An LLM rewrite
+therefore cannot drop or invent them (finding F7). `restamp_summaries()` re-stamps all
+summary pages after an import, restore, review or ingest batch. Without an ontology,
+pages are left byte-identical.
 
 ## Deletion
 

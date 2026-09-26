@@ -339,15 +339,15 @@ Every phase follows AGENTS §5.6: red test first, green, gate, `/documentation-u
 
 (Report §10 Phase 1, rest.)
 - `ontology.detect(text, filename, schema)` (cues on title/head, first 4 KB only), Work-id and date formulas (report §6.3, §7.3). `ONTOLOGY_CLASSIFY_PROMPT` in `prompts.py`; the LLM call in `wiki_engine`; evidence verified verbatim in code (report §7.4).
-- Upload review table (app.py:1183) gains *Class*, *Work*, *Version date*, *Supersedes*, prefilled; edits become `by: user` rows.
-- `ontology.stamp` called from `_okf_apply` (report §4.4); `index/ontology.json` via `build()`.
+- Upload review table (app.py:1183) gains *Class*, *Work*, *Version date*, *Supersedes*, prefilled; edits become `by: user` rows. (Built: *Class*, *Work* and a read-only *Other versions*; the existing `effective as of` column is the version date; supersession itself is Phase 5.)
+- `ontology.stamp` called from `_okf_apply` (report §4.4). (`index/ontology.json` moved to Phase 4, its first consumer.)
 - Each ingest batch writes **one** `via: ingest` change row (only when the hash changed).
 - Proposal review panel (inside Ontology → `Proposals`).
 - **Tests:** cue precision on the gold file (agreed threshold); F7: `resolve_contradiction` rewrite keeps ontology keys; fabricated quote rejected; ingest of a DB without an ontology is byte-identical to today.
 
 ### Phase 4 — Ontology-aware search (S1, S2, S3; §4)
 
-- `ontology.build()` adds the alias/label table and the page→Works map to `index/ontology.json`.
+- `ontology.build()` writes `index/ontology.json` (works, versions, classes per source) with the alias/label table and the page→Works map.
 - `ontology_query.py`: `resolve(q, view, today) -> QueryFrame | None`, `arm(frame, …) -> list[hit]`, `briefing(frame) -> str`, `audit(frame, hits) -> dict`.
 - `lex_index.query(…, sources=None)` filter; the ontology arm in `retrieval.search` and `search_wiki` through one shared helper.
 - Briefing injected in `run_chat_agent`, `run_research_agent`, `query_with_sources`; prompt constants in `prompts.py`.
