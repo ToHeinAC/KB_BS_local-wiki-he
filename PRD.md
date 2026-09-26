@@ -89,6 +89,21 @@ correct, cited, deduplicated pages that answer later questions with traceable so
   every check and every auto-fixer.
 - **Dependencies:** M1–M4.
 
+### M6 — Ontology
+- **Deliverable:** per-DB ontology (shared schema modules in `ontology/*.yaml`, an append-only
+  fact ledger per DB, code-stamped projections), a Maintenance → Ontology workbench (view,
+  export, hand-edit, import, change history), and a mandatory ontology stage in every search.
+  Plan and phases: [docs/_plan-ontology.md](docs/_plan-ontology.md); rationale:
+  [docs/_idea-onthology.md](docs/_idea-onthology.md).
+- **Acceptance criteria:** schema changes are validated before they are stored; every applied
+  change is logged with who, when and what, and re-importing an unchanged file is not a change;
+  user decisions survive re-classification; every search path runs the ontology stage in code;
+  relevance with the stage is never worse than without it on the `bench/` gold set.
+- **Edge cases:** a DB without an ontology, or with a broken one, behaves exactly as before; an
+  import based on an older export does not undo newer changes; `delete_source` retracts the
+  source's ledger rows.
+- **Dependencies:** M2, M3, M4.
+
 ## 5. Open risks & assumptions
 
 - Small-model output drifts in format → keep every structural decision in code, and add a

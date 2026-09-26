@@ -34,6 +34,7 @@ author: Tobias Hein
 | Image handling (OCR path) | `pillow` | 10.0 |
 | DOCX extraction | `python-docx` | 1.1 |
 | YAML frontmatter | `python-frontmatter` | 1.1 |
+| YAML (ontology modules) | `pyyaml` | 6.0 |
 | Env variables | `python-dotenv` | 1.0 |
 | Web UI | `streamlit` | 1.35 |
 | Optional graph view | `pyvis` | 0.3 |

@@ -32,6 +32,7 @@ One row per PRD milestone. Status: `planned`, `in progress`, `done`.
 | 3 | M3: Research and chat agents | done | `test_agent`, `test_chat_agent`, `test_tools`, `test_deep_research_agent` |
 | 4 | M4: Web UI | done | `test_app` |
 | 5 | M5: Quality gate (claude-dev-schema) | done | `uv run pre-commit run --all-files` green (3.11, 3.13) |
+| 6 | M6: Ontology ([plan](docs/_plan-ontology.md) phases 1–8) | in progress (plan phase 1 done) | `test_ontology`, `test_ontology_store`, `test_delete_source` |
 | – | Extensions beyond the original spec (no PRD milestone): hybrid retrieval stages A–F, multi-DB + auth, OKF bundle, language pinning, GPU pinning | done | `test_lex_index`, `test_embed_index`, `test_rerank`, `test_calibrate`, `test_multi_db`, `test_auth`, `test_lang`, `test_page_language`, `test_gpu_placement` |
 
 ## 3. Module map
@@ -49,6 +50,7 @@ Full responsibilities per module: [docs/architecture.md](docs/architecture.md) �
 | `agent.py`, `chat_agent.py`, `tools.py`, `run_memory.py` | LangGraph agents (Quick research, Deep chat), their tools and loop guard |
 | `deep_research_agent.py`, `vendor/` | Web-only Deep research over vendored `open_deep_research` ([docs/deep_research.md](docs/deep_research.md)) |
 | `okf.py`, `lang.py`, `page_lang.py`, `graph_export.py` | OKF stamping, language pinning, graph analytics |
+| `ontology.py`, `ontology_store.py`, `ontology/*.yaml` | Ontology schema modules, validation, per-DB fact ledger ([docs/ontology.md](docs/ontology.md)) |
 | `db_context.py`, `auth.py` | Per-DB paths and search scope; users, bcrypt, DB allowlists |
 | `prompts.py`, `schema_loader.py` | All prompt strings; `SCHEMA.md` / `SCHEMA_QUERY.md` injection |
 | `tests/test_code_rules.py`, `tests/test_docs.py` | Gate rules: functions ≤ 50 lines; doc size limits and local links |
@@ -84,6 +86,7 @@ Tracked in [docs/openissues.md](docs/openissues.md).
 | UI design, pages and Streamlit chrome facts | [docs/ui.md](docs/ui.md) |
 | Wiki, SCHEMA and storage | [docs/wiki.md](docs/wiki.md) |
 | Open Knowledge Format (OKF v0.1) | [docs/okf.md](docs/okf.md) |
+| Ontology (schema, ledger); plan and rationale | [docs/ontology.md](docs/ontology.md), [plan](docs/_plan-ontology.md), [concept](docs/_idea-onthology.md) |
 | Testing strategy | [docs/tests.md](docs/tests.md) |
 | Dated change log | [docs/changelog.md](docs/changelog.md), archives [2](docs/changelog-archive-2.md), [1](docs/changelog-archive.md) |
 | Original PRD (archived) | [docs/_bup_PRD.md](docs/_bup_PRD.md) |
