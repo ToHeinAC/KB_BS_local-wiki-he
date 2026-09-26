@@ -175,6 +175,7 @@ def export(today: date | None = None) -> dict[str, Any]:
         for node in group
     }
     outdated = set(wiki_engine.outdated_pages(today))
+    ranks = wiki_engine.source_ranks()
     cuts = {
         "hub_cut": _quantile_threshold(list(pagerank.values()), _HUB_QUANTILE),
         "bridge_cut": _quantile_threshold(list(betweenness.values()), _BRIDGE_QUANTILE),
@@ -195,6 +196,9 @@ def export(today: date | None = None) -> dict[str, Any]:
         )
         for node in sorted(typed["nodes"], key=lambda n: n["id"])
     ]
+    for n in nodes:  # the pyramid layout's rows; only nodes whose class has a rank
+        if n["id"] in ranks:
+            n["rank"] = ranks[n["id"]]
     return {
         "nodes": nodes,
         "edges": _edges(typed),

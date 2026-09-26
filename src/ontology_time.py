@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 VALID, SUPERSEDED, NOT_YET, UNKNOWN = "valid", "superseded", "not-yet", "unknown"
 LABELS = {VALID: "in force", SUPERSEDED: "superseded", NOT_YET: "not yet in force"}
 
-_MONTHS = {
+MONTHS = {
     m: i
     for i, m in enumerate(
         [
@@ -48,7 +48,7 @@ _MONTHS = {
 }
 _ISO_RE = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 _DMY_RE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
-_DMONTH_RE = re.compile(rf"\b(\d{{1,2}})\.\s*({'|'.join(_MONTHS)})\s+(\d{{4}})\b", re.IGNORECASE)
+_DMONTH_RE = re.compile(rf"\b(\d{{1,2}})\.\s*({'|'.join(MONTHS)})\s+(\d{{4}})\b", re.IGNORECASE)
 _YEAR_CUE_RE = re.compile(
     r"\b(im\s+jahre?|jahr|in|bis|ab|seit|nach|vor|stand|as\s+of|year|until|since|after|before)"
     r"\s+((?:19|20)\d{2})\b(?![/.\d-])",
@@ -82,7 +82,7 @@ def _named_date(q: str) -> date | None:
             return found
     m = _DMONTH_RE.search(q)
     if m:
-        return _date(m[3], _MONTHS[m[2].lower()], m[1])
+        return _date(m[3], MONTHS[m[2].lower()], m[1])
     m = _YEAR_CUE_RE.search(q)
     if m:
         year = int(m[2]) - (1 if m[1].lower() in ("vor", "before") else 0)

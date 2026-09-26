@@ -231,7 +231,7 @@ def _render_legacy_graph() -> None:
         st.error(f"Graph render failed: {exc}")
 
 
-_GRAPH_LAYOUTS = {"Galaxy": "galaxy", "Ranked": "arc", "Clusters": "radial"}
+_GRAPH_LAYOUTS = {"Galaxy": "galaxy", "Ranked": "arc", "Clusters": "radial", "Pyramid": "pyramid"}
 
 
 _OVERLAY_LABELS = {

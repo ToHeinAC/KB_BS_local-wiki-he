@@ -472,6 +472,7 @@ def decide_proposal(row_id: str, *, accept: bool, user: str) -> dict[str, Any] |
                     user=user,
                     evidence=str(row.get("evidence") or ""),
                     negated=bool(row.get("negated")),
+                    attributes=row.get("attributes"),
                 ),
             )
         _append_rows_unlocked(rows)

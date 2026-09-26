@@ -147,6 +147,8 @@ def render_graph(
       edges. Stable between visits, which a force layout can never be.
     * `radial`  — every page on a ring grouped by Louvain community, edges
       bundled through the community centroids (hierarchical edge bundling).
+    * `pyramid` — documents in rows by the rank of their ontology class (legal
+      pyramid), relation edges drawn with arrowheads; pages hidden.
     """
     payload = _payload(_bundle_signature())
     strings = _STRINGS.get(payload["lang"], _STRINGS["en"])

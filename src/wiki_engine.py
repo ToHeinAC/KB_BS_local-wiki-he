@@ -26,6 +26,8 @@ import ollama_client
 import ontology
 import ontology_bundle
 import ontology_detect
+import ontology_graph
+import ontology_query
 import ontology_store
 import ontology_time
 import page_lang
@@ -1610,6 +1612,7 @@ def record_source_ontology(
     if schema is None:
         return []
     rows, warnings = ontology_detect.upload_rows(source, review, detected, schema, user=user)
+    rows += _relation_rows(text, source, ontology_detect.review_values(source, review, schema)[0])
     if not (review.get("class") or "").strip():
         proposal = _propose_class(text, schema)
         if proposal:
@@ -1621,6 +1624,39 @@ def record_source_ontology(
             )
     ontology_store.append_rows(rows)
     return warnings
+
+
+def _relation_rows(text: str, source: str, values: dict[str, str]) -> list[dict[str, Any]]:
+    """Relations the document states (transposition, Eingangsformel → facts; repeals,
+    standards → proposals). The subject is its work, else the file itself."""
+    view = ontology_store.view()
+    if view is None:
+        return []
+    work = values.get("work") or None
+    findings = ontology_detect.detect_relations(
+        text, view, self_work=work, cls=values.get("class") or None
+    )
+    subject = f"work:{work}" if work else f"src:{source}"
+    return ontology_detect.relation_rows(subject, findings)
+
+
+def ontology_lint() -> list[dict[str, str]]:
+    """Deterministic ontology findings ([] without an ontology), see ontology_graph.lint."""
+    view = ontology_store.view()
+    return ontology_graph.lint(view) if view is not None else []
+
+
+def source_ranks() -> dict[str, int]:
+    """Graph node id ("source::<file>") → rank of the document's class (for the pyramid)."""
+    view = ontology_store.view()
+    if view is None:
+        return {}
+    ranks = view.ranks or {}
+    return {
+        f"source::{s}": rank
+        for s, f in view.sources.items()
+        if (rank := ranks.get(str(f.get("class")))) is not None
+    }
 
 
 def finish_ontology_batch(user: str) -> None:
@@ -1976,6 +2012,36 @@ def query_with_sources(question: str) -> dict[str, Any]:
     return {"answer": answer, **result}
 
 
+def _lint_blocks() -> list[str]:
+    """The code-computed Lint sections (orphans, stale, outdated, ontology consistency)."""
+    prog_blocks: list[str] = []
+    orphans = find_orphans()
+    if orphans:
+        prog_blocks.append(
+            "**Orphans (no in-links from `related` frontmatter):**\n"
+            + "\n".join(f"- {o}" for o in orphans)
+        )
+    stale = stale_pages()
+    if stale:
+        prog_blocks.append(
+            f"**Possibly stale (past freshness window as of {_date()}):**\n"
+            + "\n".join(f"- {s}" for s in stale)
+        )
+    outdated = outdated_pages()
+    if outdated:
+        prog_blocks.append(
+            f"**Built on superseded versions (as of {_date()}):**\n"
+            + "\n".join(f"- {s}" for s in outdated)
+        )
+    findings = ontology_lint()
+    if findings:
+        prog_blocks.append(
+            "**Ontology consistency:**\n"
+            + "\n".join(f"- [{f['level']}] {f['message']}" for f in findings)
+        )
+    return prog_blocks
+
+
 def lint() -> str:
     """Run wiki health check. Returns the lint report."""
     system = schema_loader.get_system_prompt(mode="query")
@@ -1997,25 +2063,7 @@ def lint() -> str:
         model_id=ollama_client.FAST_MODEL,
     )
 
-    prog_blocks: list[str] = []
-    orphans = find_orphans()
-    if orphans:
-        prog_blocks.append(
-            "**Orphans (no in-links from `related` frontmatter):**\n"
-            + "\n".join(f"- {o}" for o in orphans)
-        )
-    stale = stale_pages()
-    if stale:
-        prog_blocks.append(
-            f"**Possibly stale (past freshness window as of {_date()}):**\n"
-            + "\n".join(f"- {s}" for s in stale)
-        )
-    outdated = outdated_pages()
-    if outdated:
-        prog_blocks.append(
-            f"**Built on superseded versions (as of {_date()}):**\n"
-            + "\n".join(f"- {s}" for s in outdated)
-        )
+    prog_blocks = _lint_blocks()
     if prog_blocks:
         report = "## Programmatic checks\n\n" + "\n\n".join(prog_blocks) + "\n\n---\n\n" + report
 
@@ -2511,9 +2559,31 @@ def build_typed_graph() -> dict[str, Any]:
             g.relate(page_id, related)
         g.derive(page_id, sources, is_page)
 
+    _ontology_edges(g)
     for s in g.sources:
         g.nodes[f"source::{s}"] = {"id": f"source::{s}", "type": "source", "label": s}
     return {"nodes": list(g.nodes.values()), "edges": g.edges}
+
+
+def _anchor(view: ontology_query.View, node: str) -> str | None:
+    """The raw source that stands for a relation node: the file itself, or the version of
+    the work in force today (else its newest version)."""
+    if node.startswith("src:"):
+        return node[4:] if node[4:] in view.sources else None
+    sources: list[str] = view.works.get(node, {}).get("sources", [])
+    current = ontology_time.current_expression(view, node, date.today())
+    return current or (sources[0] if sources else None)
+
+
+def _ontology_edges(g: _TypedGraph) -> None:
+    """Directed relation edges (based_on, transposes, …) between source nodes."""
+    view = ontology_store.view()
+    for e in view.edges if view is not None else ():
+        a, b = _anchor(view, e["from"]), _anchor(view, e["to"])  # type: ignore[arg-type]
+        edge = {"from": f"source::{a}", "to": f"source::{b}", "type": e["rel"]}
+        if a and b and a != b and edge not in g.edges:
+            g.sources.update((a, b))
+            g.edges.append(edge)
 
 
 def find_orphans() -> list[str]:

@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 import ontology
 import ontology_bundle
+import ontology_query
+import ontology_time
 
 HEAD_CHARS = 4000
 LEGAL_ROOT = "legal-instrument"
@@ -184,7 +186,7 @@ def detected_dict(found: Detection, version_date: str) -> dict[str, Any]:
     }
 
 
-def _review_values(
+def review_values(
     source: str, review: dict[str, str], schema: ontology.Schema
 ) -> tuple[dict[str, str], list[str]]:
     """The review's class / work / version_date, blanked (with a warning) when invalid."""
@@ -213,7 +215,7 @@ def upload_rows(
 ) -> tuple[list[dict[str, Any]], list[str]]:
     """Ledger rows for one uploaded source: a value equal to what code detected is a
     `rule` fact (with the matched line as evidence), a corrected one a `user` fact."""
-    values, warnings = _review_values(source, review, schema)
+    values, warnings = review_values(source, review, schema)
     by = {k: "rule" if v == detected.get(k) else "user" for k, v in values.items()}
 
     def row(subject: str, pred: str, obj: str, actor: str) -> dict[str, Any]:
@@ -231,3 +233,173 @@ def upload_rows(
             for a in ontology_bundle.as_list(detected.get("aliases"))
         ]
     return rows, warnings
+
+
+# --- relations between documents (plan Phase 6) ---------------------------------------
+
+RELATION_CHARS = 20000  # where Eingangsformel and transposition clauses appear
+MAX_REFERENCES = 25  # standards per document (one proposal per referenced standard)
+_MONTH_NUM = ontology_time.MONTHS
+
+_TRANSPOSE_RE = re.compile(
+    r"der\s+Umsetzung\s+(?:der|von)\s+(Richtlinie[^.;:]{0,40}?\d{4}/\d{1,4}"
+    r"(?:/(?:Euratom|EWG|EU|EG)\b)?)",
+    re.IGNORECASE,
+)
+_EINGANG_RE = re.compile(r"Auf\s+Grund\s+(?:des|der|von)\b[\s\S]{0,1500}?\bverordne[nt]\b")
+_REPEAL_RE = re.compile(r"außer\s+Kraft|(?:wird|werden)\s+aufgehoben", re.IGNORECASE)
+_STANDARD_RE = re.compile(
+    r"\b(DIN|KTA)(?:\s+(EN))?(?:\s+(ISO))?\s+(\d{2,6})(?:(?:-|\s+Teil\s+)(\d{1,3}))?"
+    r"(?::(\d{4}(?:-\d{2})?))?"
+)
+_AUSGABE_RE = re.compile(r"^\s*,?\s*\(?\s*Ausgabe\s+([A-Za-zäöü]+)\s+(\d{4})")
+_PRESUMPTION_RE = re.compile(r"gel(?:ten|t)\s+als\s+erfüllt|vermute", re.IGNORECASE)
+_MANDATORY_RE = re.compile(
+    r"\b(?:einzuhalten|zu\s+beachten|muss|müssen|(?:ist|sind)\s+\w+\s+anzuwenden)\b",
+    re.IGNORECASE,
+)
+_DYNAMIC_RE = re.compile(r"jeweils\s+(?:geltenden|gültigen)\s+Fassung", re.IGNORECASE)
+
+
+@dataclass(frozen=True)
+class RelationFinding:
+    rel: str
+    target: str  # a work id (possibly not in this database yet)
+    evidence: str  # the sentence or clause, verbatim
+    status: str  # "confirmed" (formula matched verbatim) | "proposed" (needs review)
+    attributes: dict[str, str] = field(default_factory=lambda: {})
+
+
+_ABBREVIATIONS = ("Nr", "Abs", "Art", "S", "bzw", "vgl", "ggf", "z", "B", "Bek", "BGBl", "Ges")
+
+
+def _is_stop(text: str, i: int) -> bool:
+    """A "." at ``i`` ends a sentence unless it follows a number ("5. Dezember") or a
+    common abbreviation ("Nr.", "Abs.", "BGBl. I S.")."""
+    word = re.findall(r"(\w+)$", text[max(0, i - 12) : i])
+    return not word or not (word[0].isdigit() or word[0] in _ABBREVIATIONS)
+
+
+def _sentence(text: str, start: int, end: int) -> str:
+    left = text.rfind("\n", 0, start) + 1
+    for i in range(start - 1, left - 1, -1):
+        if text[i] == "." and _is_stop(text, i):
+            left = i + 1
+            break
+    right = text.find("\n", end)
+    right = len(text) if right < 0 else right
+    stop = next((i for i in range(end, right) if text[i] == "." and _is_stop(text, i)), right)
+    return " ".join(text[left : stop + 1].split())[:MAX_QUOTE]
+
+
+def _named_works(text: str, view: ontology_query.View, self_work: str | None) -> list[str]:
+    frame = ontology_query.resolve(text, view)
+    return [w for w in frame.works if w != self_work] if frame else []
+
+
+def _allowed(view: ontology_query.View, rel: str, cls: str | None) -> bool:
+    domain = (view.domains or {}).get(rel, ())
+    return any(ontology_query.in_class(view, cls, d) for d in domain)
+
+
+def _transposes(text: str) -> list[RelationFinding]:
+    out: list[RelationFinding] = []
+    for m in _TRANSPOSE_RE.finditer(text[:RELATION_CHARS]):
+        target, _ = _eu_work(m[1])
+        if target:
+            out.append(
+                RelationFinding("transposes", target, _sentence(text, *m.span()), "confirmed")
+            )
+    return out
+
+
+def _based_on(text: str, view: ontology_query.View, self_work: str | None) -> list[RelationFinding]:
+    m = _EINGANG_RE.search(text[:RELATION_CHARS])
+    if m is None:
+        return []
+    clause = " ".join(m[0].split())
+    return [
+        RelationFinding("based_on", w, clause[:MAX_QUOTE], "confirmed")
+        for w in _named_works(clause, view, self_work)
+    ]
+
+
+def _repeals(text: str, view: ontology_query.View, self_work: str | None) -> list[RelationFinding]:
+    out: list[RelationFinding] = []
+    for m in _REPEAL_RE.finditer(text):
+        sentence = _sentence(text, *m.span())
+        out += [
+            RelationFinding("repeals", w, sentence, "proposed")
+            for w in _named_works(sentence, view, self_work)
+        ]
+    return out
+
+
+def _standard(m: re.Match[str], text: str) -> RelationFinding:
+    org, en, iso, number, part, edition = m.groups()
+    target = "-".join(p for p in (org.lower(), en and "en", iso and "iso", number, part) if p)
+    if not edition and (after := _AUSGABE_RE.match(text[m.end() : m.end() + 60])):
+        month = _MONTH_NUM.get(after[1].lower())
+        edition = f"{after[2]}-{month:02d}" if month else after[2]
+    sentence = _sentence(text, *m.span())
+    attrs: dict[str, str] = {}
+    if edition:
+        attrs.update(mode="static", edition=edition)
+    elif _DYNAMIC_RE.search(sentence):
+        attrs["mode"] = "dynamic"
+    if _PRESUMPTION_RE.search(sentence):
+        attrs["effect"] = "presumption"
+    elif _MANDATORY_RE.search(sentence):
+        attrs["effect"] = "mandatory"
+    return RelationFinding("incorporates", target, sentence, "proposed", attrs)
+
+
+def _incorporates(text: str) -> list[RelationFinding]:
+    found: dict[str, RelationFinding] = {}
+    for m in _STANDARD_RE.finditer(text):
+        ref = _standard(m, text)
+        found.setdefault(ref.target, ref)
+        if len(found) >= MAX_REFERENCES:
+            break
+    return list(found.values())
+
+
+def detect_relations(
+    text: str, view: ontology_query.View, *, self_work: str | None, cls: str | None
+) -> list[RelationFinding]:
+    """Relations a document states in its own words (report §7.2): transposition clause and
+    Eingangsformel → confirmed; repeals (a named known work) and references to standards →
+    proposed. Only relations whose domain covers the document's class, one per target."""
+    found = [
+        *_transposes(text),
+        *_based_on(text, view, self_work),
+        *_repeals(text, view, self_work),
+        *_incorporates(text),
+    ]
+    unique: dict[tuple[str, str], RelationFinding] = {}
+    for f in found:
+        if _allowed(view, f.rel, cls):
+            unique.setdefault((f.rel, f.target), f)
+    return list(unique.values())
+
+
+def relation_rows(subject: str, findings: list[RelationFinding]) -> list[dict[str, Any]]:
+    """Ledger rows for relation findings (code is the actor; proposals need review)."""
+    return [
+        ontology.assertion(
+            subject,
+            f.rel,
+            f.target,
+            by="rule",
+            status=f.status,
+            evidence=f.evidence,
+            attributes=f.attributes or None,
+        )
+        for f in findings
+    ]
+
+
+def standard_id(text: str) -> str | None:
+    """The work id of the first standard named in ``text`` ("DIN 6812" → "din-6812")."""
+    m = _STANDARD_RE.search(text)
+    return _standard(m, text).target if m else None

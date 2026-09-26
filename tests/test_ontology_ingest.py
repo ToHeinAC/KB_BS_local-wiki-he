@@ -69,7 +69,11 @@ def test_accepted_detection_is_stored_as_rule_facts(legal: Path) -> None:
         "version_date": "2024-10-23",
     }
     work = _facts()["works"]["de-strlschv-2018"]
-    assert work == {"class": "ordinance", "aliases": ["Strahlenschutzverordnung", "StrlSchV"]}
+    assert work == {
+        "class": "ordinance",
+        "aliases": ["Strahlenschutzverordnung", "StrlSchV"],
+        "transposes": ["eu-dir-2013-59-euratom"],  # the head's transposition clause (Phase 6)
+    }
 
 
 def test_corrections_in_the_review_table_are_user_facts(legal: Path) -> None:

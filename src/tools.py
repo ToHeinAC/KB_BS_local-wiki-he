@@ -24,6 +24,7 @@ import calibrate
 import chunker
 import db_context
 import okf
+import ontology_graph
 import ontology_query
 import ontology_store
 import ontology_time
@@ -733,11 +734,10 @@ def _ontology_lookup_impl(term: str | None = None, as_of: str = "") -> str:
     for db in scope:
         with db_context.using_db(db):
             view = ontology_store.view()
-            text = (
-                ontology_query.lookup(term, view, when)
-                if view
-                else "(no ontology in this database)"
-            )
+            text = "(no ontology in this database)"
+            if view is not None:
+                extra = ontology_graph.describe(view, term, when or date.today())
+                text = "\n".join(p for p in (ontology_query.lookup(term, view, when), extra) if p)
         parts.append(f"### Database: {db}\n{text}" if len(scope) > 1 else text)
     return "\n".join(parts)
 

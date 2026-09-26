@@ -529,15 +529,17 @@ def assertion(
     valid_from: str | None = None,
     valid_until: str | None = None,
     module: str | None = None,
+    attributes: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """A new ledger row (without `id`/`recorded_at`, which the store assigns)."""
+    """A new ledger row (without `id`/`recorded_at`, which the store assigns).
+    ``attributes`` qualify a relation member (e.g. incorporates: mode, effect, edition)."""
     if by not in _PRECEDENCE:
         raise ValueError(f"unknown actor {by!r}; expected one of {tuple(_PRECEDENCE)}")
     if not subject.startswith(SUBJECT_PREFIXES):
         raise ValueError(f"subject {subject!r} must start with one of {SUBJECT_PREFIXES}")
     if status not in STATUSES:
         raise ValueError(f"unknown status {status!r}; expected one of {STATUSES}")
-    return {
+    row: dict[str, Any] = {
         "subject": subject,
         "predicate": predicate,
         "object": obj,
@@ -551,6 +553,9 @@ def assertion(
         "ontology": module,
         "retracts": None,
     }
+    if attributes:
+        row["attributes"] = dict(attributes)
+    return row
 
 
 def retraction(
@@ -596,21 +601,37 @@ def project(rows: list[dict[str, Any]], multi: set[str]) -> dict[str, dict[str, 
     Per fact the highest-precedence actor wins (user > rule > llm), the later row among
     equals. A user row with object None unsets a single-valued fact; a user row with
     `negated` removes one member of a multi-valued fact. Both stay sticky against later
-    rule/llm rows.
+    rule/llm rows. A member with attributes is `{"to": object, **attributes}`.
     """
     out: dict[str, dict[str, Any]] = {}
     for key, r in _winners(rows, multi).items():
         subject, pred = key[0], key[1]
         if pred in multi:
             if not r.get("negated") and r.get("object") is not None:
-                out.setdefault(subject, {}).setdefault(pred, []).append(r["object"])
+                out.setdefault(subject, {}).setdefault(pred, []).append(_member(r))
         elif r.get("object") is not None:
             out.setdefault(subject, {})[pred] = r["object"]
     for facts in out.values():
         for pred, value in facts.items():
             if isinstance(value, list):
-                facts[pred] = sorted(cast("list[Any]", value), key=str)
+                facts[pred] = sorted(cast("list[Any]", value), key=member_key)
     return out
+
+
+def _member(row: dict[str, Any]) -> Any:
+    attrs = row.get("attributes")
+    return {"to": row["object"], **cast("dict[str, Any]", attrs)} if attrs else row["object"]
+
+
+def member_target(member: object) -> str:
+    """The target id of a relation member (a plain id or `{"to": id, ...}`)."""
+    if isinstance(member, dict):
+        return str(cast("dict[str, Any]", member).get("to", ""))
+    return str(member)
+
+
+def member_key(member: object) -> tuple[str, str]:
+    return member_target(member), repr(member)
 
 
 # --- page stamping (report §4.4) ---------------------------------------------------

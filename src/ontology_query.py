@@ -53,6 +53,14 @@ class View:
     class_sources: dict[str, tuple[str, ...]]  # class -> sources of it or a descendant
     classes: dict[str, str]  # class id -> definition
     pages: dict[str, tuple[str, ...]]  # raw source -> wiki pages citing it
+    # Plan Phase 6: relation edges (from a work id or "src:<file>"), class ranks/norms,
+    # relation lint rules.
+    edges: tuple[dict[str, Any], ...] = ()
+    ranks: dict[str, int | None] | None = None
+    norms: dict[str, bool | str] | None = None
+    relation_lint: dict[str, str | None] | None = None
+    domains: dict[str, tuple[str, ...]] | None = None  # relation -> domain classes
+    broader: dict[str, str | None] | None = None  # class -> broader class
 
 
 @dataclass(frozen=True)
@@ -104,7 +112,11 @@ def _works(schema: ontology.Schema, facts: dict[str, Any]) -> dict[str, dict[str
             "class": wf.get("class"),
             "aliases": [str(a) for a in _as_list(wf.get("aliases"))],
             "sources": _newest_first(members, sources),
-            "relations": {r: _as_list(wf[r]) for r in schema.relations if wf.get(r)},
+            "relations": {
+                r: [ontology.member_target(m) for m in _as_list(wf[r])]
+                for r in schema.relations
+                if wf.get(r)
+            },
             "in_force_from": wf.get("in_force_from"),
             "in_force_until": wf.get("in_force_until"),
         }
@@ -138,13 +150,38 @@ def _class_labels(schema: ontology.Schema, class_sources: dict[str, Key]) -> dic
     return labels
 
 
+def _genitives(key: Key) -> list[Key]:
+    """The alias and its German genitive ("des Strahlenschutzgesetzes"): the last word
+    takes -es/-s. Only for word-like endings, so abbreviations stay exact."""
+    last = key[-1]
+    if len(last) < 5 or not last.isalpha():
+        return [key]
+    return [key, (*key[:-1], last + "es"), (*key[:-1], last + "s")]
+
+
 def _alias_map(works: dict[str, dict[str, Any]]) -> dict[Key, tuple[str, ...]]:
     aliases: dict[Key, list[str]] = {}
     for wid, work in works.items():
         for alias in work["aliases"]:
-            if tokens(alias):
-                aliases.setdefault(tokens(alias), []).append(wid)
+            for key in _genitives(tokens(alias)) if tokens(alias) else []:
+                if wid not in aliases.setdefault(key, []):
+                    aliases[key].append(wid)
     return {k: tuple(v) for k, v in aliases.items()}
+
+
+def _edges(schema: ontology.Schema, facts: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    """Relation edges from works (by id) and from sources without a work ("src:<file>")."""
+    out: list[dict[str, Any]] = []
+    subjects = [(w, _as_map(f)) for w, f in _as_map(facts.get("works")).items()]
+    subjects += [(f"src:{s}", _as_map(f)) for s, f in _as_map(facts.get("sources")).items()]
+    for node, subject_facts in sorted(subjects, key=lambda p: p[0]):
+        for rel in sorted(schema.relations):
+            for member in _as_list(subject_facts.get(rel)):
+                attrs = {k: str(v) for k, v in _as_map(member).items() if k != "to"}
+                out.append(
+                    {"from": node, "rel": rel, "to": ontology.member_target(member), "attrs": attrs}
+                )
+    return tuple(out)
 
 
 def _page_map(pages: dict[str, list[str]]) -> dict[str, tuple[str, ...]]:
@@ -171,7 +208,24 @@ def build_view(schema: ontology.Schema, facts: dict[str, Any], pages: dict[str, 
         class_sources=class_sources,
         classes={c.id: c.definition for c in schema.classes.values()},
         pages=_page_map(pages),
+        edges=_edges(schema, facts),
+        ranks={c.id: c.rank for c in schema.classes.values()},
+        norms={c.id: c.norm for c in schema.classes.values()},
+        relation_lint={r.id: r.lint for r in schema.relations.values()},
+        domains={r.id: r.domain for r in schema.relations.values()},
+        broader={c.id: c.broader for c in schema.classes.values()},
     )
+
+
+def in_class(view: View, cid: str | None, ancestor: str) -> bool:
+    """``cid`` is ``ancestor`` or one of its narrower classes."""
+    seen: set[str] = set()
+    while cid and cid not in seen:
+        if cid == ancestor:
+            return True
+        seen.add(cid)
+        cid = (view.broader or {}).get(cid)
+    return False
 
 
 def pages_for(view: View, sources: tuple[str, ...]) -> tuple[str, ...]:

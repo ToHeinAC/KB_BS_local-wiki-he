@@ -162,6 +162,7 @@ const PALETTES = {
     },
     orphan: "#6b7280",
     derived: "#ff922b",   // the one visually distinct edge role
+    typed: "#74c0fc",     // ontology relations between documents (directed)
     label: "#e8ecff",
     bridge: "#e8ecff",
     stale: "#ffa421",
@@ -188,6 +189,7 @@ const PALETTES = {
     accent: "#7a3b2a",    // overrides the Streamlit theme colour on paper
     edge: "#3b342a",
     derived: "#7a3b2a",
+    typed: "#1f3a52",
     label: "#1c1a15",
     bridge: "#1c1a15",
     stale: "#7a3b2a",
@@ -293,11 +295,14 @@ function ingest(payload) {
 const ARC_MAX = 60;    // arc mode draws the metric's head, not its tail
 const ARC_STEP = 24;   // minimum px between rows
 const RADIAL_GAP = 2;  // empty ring slots between communities
+const PYRAMID_STEP = 64; // px between documents in a pyramid row
+const PYRAMID_ROW = 96;  // px between pyramid rows (one per class rank)
 
 function relayout() {
   S.view = { x: 0, y: 0, k: 1 };
   if (S.layout === "arc") layoutArc();
   else if (S.layout === "radial") layoutRadial();
+  else if (S.layout === "pyramid") layoutPyramid();
   else layoutGalaxy();
 }
 
@@ -355,6 +360,51 @@ function layoutArc() {
   shown.forEach((n) => { n.y -= mid; });
   S.alpha = 0;
   fitTo(y + 80);
+}
+
+// Documents in rows by the rank of their class (1 = top of the legal pyramid;
+// ranks come from the ontology), unranked documents in a last row, pages hidden.
+// Ordering and layout only: a rank never decides a legal conflict.
+function layoutPyramid() {
+  const docs = S.nodes.filter((n) => n.kind === "source");
+  S.nodes.forEach((n) => { n.vis = n.kind === "source"; });
+  const rows = new Map();
+  docs.forEach((n) => {
+    const r = n.rank == null ? 99 : n.rank;
+    if (!rows.has(r)) rows.set(r, []);
+    rows.get(r).push(n);
+  });
+  const keys = [...rows.keys()].sort((a, b) => a - b);
+  let width = 0;
+  keys.forEach((r, i) => {
+    const row = rows.get(r).sort((a, b) => a.label.localeCompare(b.label));
+    row.forEach((n, j) => {
+      n.x = (j - (row.length - 1) / 2) * PYRAMID_STEP;
+      n.y = i * PYRAMID_ROW;
+      n.vx = 0; n.vy = 0;
+    });
+    width = Math.max(width, row.length * PYRAMID_STEP);
+  });
+  const mid = ((keys.length - 1) * PYRAMID_ROW) / 2;
+  docs.forEach((n) => { n.y -= mid; });
+  S.alpha = 0;
+  fitTo(Math.max(width, keys.length * PYRAMID_ROW) + 80);
+}
+
+/** Arrowhead at the target end of a directed (ontology) edge; straight layouts only. */
+function drawArrow(e) {
+  const dx = e.t.x - e.s.x, dy = e.t.y - e.s.y;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const tip = e.t.r + 2 / S.view.k, s = 6 / S.view.k;
+  const x = e.t.x - ux * tip, y = e.t.y - uy * tip;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x - ux * s - uy * s * 0.5, y - uy * s + ux * s * 0.5);
+  ctx.lineTo(x - ux * s + uy * s * 0.5, y - uy * s - ux * s * 0.5);
+  ctx.closePath();
+  ctx.fillStyle = ctx.strokeStyle;
+  ctx.fill();
 }
 
 // Hierarchical edge bundling: pages sit on a ring grouped by Louvain
@@ -554,14 +604,17 @@ function draw() {
     const lit = !focus || (focus.has(e.s.id) && focus.has(e.t.id));
     const x1 = e.s.x, y1 = e.s.y, x2 = e.t.x, y2 = e.t.y;
     ctx.globalAlpha = lit ? (curved ? 0.5 : 0.62) : 0.05;
-    ctx.strokeStyle = e.type === "derived-from" ? P.derived : (P.edge || S.accent);
-    ctx.lineWidth = (e.type === "derived-from" ? 0.5 : 0.9) / S.view.k;
+    const typed = e.type !== "related-to" && e.type !== "derived-from";
+    ctx.strokeStyle = e.type === "derived-from" ? P.derived
+      : (typed ? P.typed : (P.edge || S.accent));
+    ctx.lineWidth = (e.type === "derived-from" ? 0.5 : (typed ? 1.2 : 0.9)) / S.view.k;
     if (e.type === "derived-from") ctx.setLineDash([3 / S.view.k, 3 / S.view.k]);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     edgePath(e);
     ctx.stroke();
     ctx.setLineDash([]);
+    if (typed && (S.layout === "galaxy" || S.layout === "pyramid")) drawArrow(e);
 
     // Synapse pulse travels along the edge; never under reduced motion, and
     // never on the curved layouts — the pulse interpolates a straight line, so

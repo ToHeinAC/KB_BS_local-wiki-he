@@ -846,3 +846,42 @@ def test_chat_sources_say_which_version_is_in_force(wiki, monkeypatch):
     at = _go(_app(), "Wiki Chat")
     at.chat_input[0].set_value("q").run()
     assert "ontology: w-doc · 2024-10-23 · in force" in _texts(_ok(at).caption)
+
+
+def test_ontology_lint_view_lists_findings(wiki):
+    import ontology
+    import ontology_store
+
+    _legal_ontology()
+    ontology_store.append_rows(
+        [
+            ontology.assertion("work:a", "based_on", "b", by="rule"),
+            ontology.assertion("work:b", "based_on", "a", by="rule"),
+        ]
+    )
+    at = _maint(_app(), "Ontology")
+    at.segmented_control(key="onto_view").set_value("Lint").run()
+    assert "cycle in based_on" in _texts(_ok(at).warning)
+
+
+def test_ontology_proposals_show_relation_attributes(wiki):
+    import ontology
+    import ontology_store
+
+    _legal_ontology()
+    ontology_store.append_rows(
+        [
+            ontology.assertion(
+                "src:doc.md",
+                "incorporates",
+                "din-6812",
+                by="rule",
+                status="proposed",
+                evidence="Die DIN 6812:2013-06 ist einzuhalten.",
+                attributes={"mode": "static", "edition": "2013-06"},
+            )
+        ]
+    )
+    at = _maint(_app(), "Ontology")
+    at.segmented_control(key="onto_view").set_value("Proposals").run()
+    assert "(edition=2013-06, mode=static)" in _texts(_ok(at).markdown)

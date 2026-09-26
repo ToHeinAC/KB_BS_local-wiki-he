@@ -93,9 +93,8 @@ def _empty(value: object) -> bool:
 
 
 def _canon_list(items: list[Any]) -> list[Any]:
+    """Every list is a set (ids, cues, labels, relation members): de-duplicated, sorted."""
     values = [v for v in (_canon(i) for i in items) if not _empty(v)]
-    if any(isinstance(v, dict | list) for v in values):
-        return values
     unique = {json.dumps(v, sort_keys=True): v for v in values}
     return [unique[k] for k in sorted(unique)]
 
@@ -383,13 +382,42 @@ def _value_error(pred: str, value: object, schema: ontology.Schema) -> str | Non
     return f"unknown predicate {pred!r}"
 
 
+_EDITION_RE = re.compile(r"^\d{4}(?:-\d{2}){0,2}$")
+EDITION = "edition"  # the pinned edition of a static reference (free, date-like)
+
+
+def _member_errors(pred: str, member: object, schema: ontology.Schema) -> list[str]:
+    """Errors of one relation member: an id, or {to: id, attribute: value, ...}."""
+    if isinstance(member, str):
+        return []
+    item = as_map(member)
+    relation = schema.relations.get(pred)
+    if not item or relation is None or not isinstance(item.get("to"), str):
+        return [f"`{pred}` members must be ids or mappings with a `to` id"]
+    errors: list[str] = []
+    for key, value in item.items():
+        allowed = relation.attributes.get(key)
+        if key == "to":
+            continue
+        if key == EDITION:
+            ok = isinstance(value, str) and _EDITION_RE.match(value)
+        else:
+            ok = allowed is not None and value in allowed
+        if not ok:
+            errors.append(f"`{pred}` attribute {key}={value!r} is not allowed")
+    return errors
+
+
 def _list_error(pred: str, value: object, schema: ontology.Schema) -> str | None:
     if pred not in schema.multi_valued():
         return None
-    items = cast("list[Any]", value) if isinstance(value, list) else None
-    if items is None or not all(isinstance(v, str) for v in items):
+    items = as_list(value)  # before narrowing: a narrowed list is list[Unknown]
+    if not isinstance(value, list):
         return f"`{pred}` must be a list of ids"
-    return None
+    if pred not in schema.relations and not all(isinstance(v, str) for v in items):
+        return f"`{pred}` must be a list of ids"
+    errors = [e for m in items for e in _member_errors(pred, m, schema)]
+    return "; ".join(errors) or None
 
 
 def _subject_issues(
@@ -401,7 +429,8 @@ def _subject_issues(
         if pred in schema.multi_valued():
             err = _list_error(pred, value, schema)
             if err is None and pred in schema.relations:
-                missing = [w for w in cast("list[str]", value) if w not in works]
+                targets = [ontology.member_target(m) for m in as_list(value)]
+                missing = [w for w in targets if w not in works]
                 warnings += [f"{where}: `{pred}` target {w!r} is not a known work" for w in missing]
         else:
             err = _value_error(pred, value, schema)
@@ -532,22 +561,41 @@ def fact_rows(old: object, new: object, *, user: str, evidence: str) -> list[dic
     return rows
 
 
+def _members(value: object) -> dict[str, Any]:
+    return {json.dumps(m, sort_keys=True): m for m in as_list(value)}
+
+
 def _pred_rows(
     subject: str, pred: str, old: object, new: object, user: str, evidence: str
 ) -> list[dict[str, Any]]:
-    def row(obj: object, negated: bool = False) -> dict[str, Any]:
+    def row(member: object, negated: bool = False) -> dict[str, Any]:
+        item = as_map(member)
+        attrs = {k: str(v) for k, v in item.items() if k != "to"} or None
+        obj = ontology.member_target(member) if item else member
         return ontology.assertion(
-            subject, pred, obj, by="user", user=user, evidence=evidence, negated=negated
+            subject,
+            pred,
+            obj,
+            by="user",
+            user=user,
+            evidence=evidence,
+            negated=negated,
+            attributes=None if negated else attrs,
         )
 
     if old == new:
         return []
-    if isinstance(old, list) or isinstance(new, list):
-        before = set(cast("list[Any]", old or []))
-        after = set(cast("list[Any]", new or []))
-        added = [row(v) for v in sorted(after - before, key=str)]
-        return added + [row(v, negated=True) for v in sorted(before - after, key=str)]
-    return [row(new)]
+    before, after = _members(old), _members(new)
+    if not (isinstance(old, list) or isinstance(new, list)):
+        return [row(new)]
+    added = [after[k] for k in sorted(after.keys() - before.keys())]
+    kept = {ontology.member_target(m) for m in after.values()}
+    gone = [
+        before[k]
+        for k in sorted(before.keys() - after.keys())
+        if ontology.member_target(before[k]) not in kept  # re-added with other attributes
+    ]
+    return [row(m) for m in added] + [row(m, negated=True) for m in gone]
 
 
 def summary_text(summary: dict[str, dict[str, int]]) -> str:

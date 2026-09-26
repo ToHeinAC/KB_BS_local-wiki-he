@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -22,7 +23,7 @@ import ontology_query
 import ontology_store
 import wiki_engine
 
-VIEWS = ["Overview", "Classes", "Facts", "Proposals", "History", "Import"]
+VIEWS = ["Overview", "Classes", "Facts", "Proposals", "Lint", "History", "Import"]
 
 
 def render(user: str, can_maintain: bool) -> None:
@@ -45,18 +46,15 @@ def render(user: str, can_maintain: bool) -> None:
     view = st.segmented_control(
         "Ontology view", VIEWS, key="onto_view", required=True, label_visibility="collapsed"
     )
-    if view == "Overview":
-        _render_overview(schema)
-    elif view == "Classes":
-        _render_classes(schema)
-    elif view == "Facts":
-        _render_facts()
-    elif view == "Proposals":
-        _render_proposals(user, can_maintain)
-    elif view == "History":
-        _render_history(user, can_maintain)
-    else:
-        _render_import(user, can_maintain)
+    renderers: dict[str, Callable[[], None]] = {
+        "Overview": lambda: _render_overview(schema),
+        "Classes": lambda: _render_classes(schema),
+        "Facts": _render_facts,
+        "Proposals": lambda: _render_proposals(user, can_maintain),
+        "Lint": _render_lint,
+        "History": lambda: _render_history(user, can_maintain),
+    }
+    renderers.get(str(view), lambda: _render_import(user, can_maintain))()
 
 
 # --- helpers -------------------------------------------------------------------------
@@ -384,7 +382,9 @@ def _render_proposals(user: str, can_maintain: bool) -> None:
     for r in rows:
         subject = str(r["subject"]).split(":", 1)[1]
         with st.container(border=True):
-            st.markdown(f"**{subject}** · `{r['predicate']}` = `{r['object']}`")
+            attrs = ", ".join(f"{k}={v}" for k, v in bundle.as_map(r.get("attributes")).items())
+            suffix = f" ({attrs})" if attrs else ""
+            st.markdown(f"**{subject}** · `{r['predicate']}` = `{r['object']}`{suffix}")
             st.caption(f"“{r.get('evidence') or ''}”")
             if can_maintain:
                 ok, no = st.columns(2)
@@ -448,3 +448,14 @@ def source_badge(ref: str) -> str:
     with db_context.using_db(db):
         view = ontology_store.view()
     return ontology_query.badge(view, name, date.today()) if view is not None else ""
+
+
+def _render_lint() -> None:
+    """Deterministic consistency findings (docs/ontology.md §Relations)."""
+    findings = wiki_engine.ontology_lint()
+    if not findings:
+        st.success("No findings: no cycles, rank or date problems, nothing missing.")
+        return
+    st.caption("Ranks only order and warn; they never decide a legal conflict.")
+    for f in findings:
+        (st.warning if f["level"] == "warning" else st.info)(f["message"])
