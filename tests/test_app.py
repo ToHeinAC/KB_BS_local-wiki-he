@@ -885,3 +885,69 @@ def test_ontology_proposals_show_relation_attributes(wiki):
     at = _maint(_app(), "Ontology")
     at.segmented_control(key="onto_view").set_value("Proposals").run()
     assert "(edition=2013-06, mode=static)" in _texts(_ok(at).markdown)
+
+
+def _typed_db() -> None:
+    import dedup
+    import ontology
+    import ontology_store
+
+    _legal_ontology()
+    dedup.register_file(b"Interne Notiz zur Wartung", "notiz.md")
+    dedup.register_file(b"Bericht 2024", "bericht.md")
+    ontology_store.append_rows(
+        [ontology.assertion("src:bericht.md", "class", "permit", by="rule")]  # cue gone
+    )
+
+
+def test_ontology_edit_view_shows_tables_and_no_pending_change(wiki):
+    _typed_db()
+    at = _maint(_app(), "Ontology")
+    at.segmented_control(key="onto_view").set_value("Edit").run()
+    assert "nothing changed" in _texts(_ok(at).info)
+
+
+def test_ontology_cue_tester_and_reclassify(wiki):
+    import ontology_store
+
+    _typed_db()
+    at = _maint(_app(), "Ontology")
+    at.segmented_control(key="onto_view").set_value("Cues").run()
+    at.text_input(key="onto_cue").set_value(r"\bNotiz\b").run()
+    assert "Matches 1 of" in _texts(_ok(at).markdown)
+    at.button(key="onto_reclassify").click().run()
+    assert "Re-classified" in _texts(_ok(at).success)
+    assert ontology_store.history()[-1]["via"] == "reclassify"
+    assert "bericht.md" not in ontology_store.current_state()["facts"].get("sources", {})
+
+
+def test_ontology_class_suggestion_can_be_requested_and_accepted(wiki, monkeypatch):
+    import json
+
+    import ontology_store
+
+    _typed_db()
+    answer = {
+        "id": "memo",
+        "broader": "report",
+        "label_de": "Notiz",
+        "label_en": "Memo",
+        "definition": "Internal memo",
+        "cue": r"\bNotiz\b",
+    }
+    monkeypatch.setattr(ollama_client, "generate", lambda *a, **k: json.dumps(answer))
+    at = _maint(_app(), "Ontology")
+    at.segmented_control(key="onto_view").set_value("Proposals").run()
+    at.selectbox(key="onto_unclassified").set_value("notiz.md").run()
+    at.button(key="onto_suggest").click().run()
+    [proposal] = ontology_store.schema_proposals()
+    at.button(key=f"onto_sok_{proposal['id']}").click().run()
+    assert "Class added" in _texts(_ok(at).success)
+    assert ontology_store.source_facts("notiz.md") == {"class": "memo"}
+
+
+def test_ontology_overview_offers_standard_exports(wiki):
+    _typed_db()
+    at = _maint(_app(), "Ontology")
+    labels = [e.proto.label for e in at.get("download_button")]
+    assert {"Schema as SKOS (Turtle)", "Facts as JSON-LD"} <= set(labels)

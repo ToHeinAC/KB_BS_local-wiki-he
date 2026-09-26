@@ -33,6 +33,8 @@ import db_context
 import dedup
 import ontology
 import ontology_bundle as bundle
+import ontology_detect
+import ontology_evolution
 import ontology_query
 
 MODULE_DIR = Path(__file__).resolve().parents[1] / "ontology"
@@ -531,3 +533,91 @@ def view() -> ontology_query.View | None:
         built = ontology_query.build_view(schema, current_state()["facts"], _page_sources(pages))
     _VIEWS[root] = (key, built)
     return built
+
+
+# --- evolution (plan Phase 7) ---------------------------------------------------------
+
+
+def schema_proposals_path() -> Path:
+    return store_dir() / "schema_proposals.jsonl"
+
+
+def source_heads() -> dict[str, str]:
+    """The head (what detection reads) of every raw source of the active DB."""
+    heads: dict[str, str] = {}
+    for name in dedup.list_sources():
+        path = db_context.raw_dir() / name
+        try:
+            with path.open(encoding="utf-8", errors="replace") as fh:
+                heads[name] = fh.read(ontology_detect.HEAD_CHARS)
+        except OSError:
+            continue
+    return heads
+
+
+def _require_maintainer(user: str) -> None:
+    if not auth.is_maintainer(user, db_context.get_active_db()):
+        raise PermissionError(f"{user!r} does not maintain this database")
+
+
+def reclassify(
+    user: str, apply: bool = False
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    """Re-run detection over every source: (changes, revision or None). A dry run writes
+    nothing; applying retracts outdated rule facts and asserts the current ones."""
+    schema, _ = load()
+    if schema is None:
+        return [], None
+    changes = ontology_evolution.reclassify_changes(source_heads(), schema, read_rows())
+    if not apply:
+        return changes, None
+    _require_maintainer(user)
+    with _locked():
+        before = current_state()
+        _append_rows_unlocked(ontology_evolution.reclassify_rows(changes, read_rows()))
+        return changes, _record("reclassify", user, before)
+
+
+def schema_proposals() -> list[dict[str, Any]]:
+    """Open class suggestions (accepted/rejected ones are closed by a decision row)."""
+    rows = _read_jsonl(schema_proposals_path())
+    decided = {r["decides"] for r in rows if r.get("decides")}
+    return [r for r in rows if r.get("id") and r["id"] not in decided]
+
+
+def add_schema_proposal(proposal: dict[str, Any], user: str) -> dict[str, Any]:
+    _require_maintainer(user)
+    with _locked():
+        count = sum(1 for r in _read_jsonl(schema_proposals_path()) if r.get("id"))
+        row = {**proposal, "id": f"s-{count + 1:06d}", "at": _now(), "by": "llm", "asked_by": user}
+        _append_jsonl(schema_proposals_path(), [row])
+    return row
+
+
+def _close_schema_proposal(pid: str, status: str, user: str) -> None:
+    with _locked():
+        _append_jsonl(
+            schema_proposals_path(),
+            [{"decides": pid, "status": status, "user": user, "at": _now()}],
+        )
+
+
+def accept_schema_proposal(pid: str, user: str) -> bundle.ImportPlan:
+    """The plan that adds a suggested class to the local extension and types its source."""
+    _require_maintainer(user)
+    proposal = next((p for p in schema_proposals() if p["id"] == pid), None)
+    if proposal is None:
+        raise KeyError(pid)
+    state = current_state()
+    local = state["schema"].setdefault("local", {})
+    local.setdefault("classes", {})[proposal["class_id"]] = proposal["spec"]
+    sources = state["facts"].setdefault("sources", {})
+    sources.setdefault(proposal["source"], {})["class"] = proposal["class_id"]
+    return prepare_state(state)
+
+
+def close_schema_proposal(pid: str, *, accepted: bool, user: str) -> None:
+    _require_maintainer(user)
+    if not any(p["id"] == pid for p in schema_proposals()):
+        raise KeyError(pid)
+    _close_schema_proposal(pid, "accepted" if accepted else "rejected", user)

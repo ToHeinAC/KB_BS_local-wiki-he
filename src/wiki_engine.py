@@ -26,6 +26,7 @@ import ollama_client
 import ontology
 import ontology_bundle
 import ontology_detect
+import ontology_evolution
 import ontology_graph
 import ontology_query
 import ontology_store
@@ -46,6 +47,7 @@ from prompts import (
     INGEST_PROMPT,
     LINT_PROMPT,
     ONTOLOGY_CLASSIFY_PROMPT,
+    ONTOLOGY_SUGGEST_CLASS_PROMPT,
     RESOLVE_CONTRADICTION_PROMPT,
     SELECT_PROMPT,
     USER_META_PROMPT,
@@ -1638,6 +1640,60 @@ def _relation_rows(text: str, source: str, values: dict[str, str]) -> list[dict[
     )
     subject = f"work:{work}" if work else f"src:{source}"
     return ontology_detect.relation_rows(subject, findings)
+
+
+def reclassify(
+    user: str, apply: bool = False
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    """Re-derive rule facts from the current cues (dry run unless ``apply``); user
+    decisions are never changed. Logs and re-stamps pages when applied."""
+    changes, row = ontology_store.reclassify(user, apply)
+    _log_ontology_change(row)
+    if row:
+        restamp_summaries()
+    return changes, row
+
+
+def suggest_class(source: str, *, user: str) -> dict[str, Any] | str:
+    """Ask the model for a new class for an unclassified document: the stored proposal,
+    or why the suggestion was rejected by code. Never changes the schema itself."""
+    schema, _ = ontology_store.load()
+    head = ontology_store.source_heads().get(source, "")
+    if schema is None or not head:
+        return "no ontology or no such document"
+    classes = "\n".join(
+        f"- {c.id}: {c.definition}" for c in schema.classes.values() if not c.deprecated
+    )
+    prompt = ONTOLOGY_SUGGEST_CLASS_PROMPT.format(classes=classes, head=head)
+    try:
+        answer = ollama_client.generate(
+            "", prompt, temperature=0.0, model_id=ollama_client.FAST_MODEL
+        )
+    except Exception as exc:
+        return f"the model is not reachable ({exc})"
+    proposal, reason = ontology_evolution.parse_class_suggestion(answer, head, schema)
+    if proposal is None:
+        return reason
+    stored = {
+        "source": source,
+        "class_id": proposal["id"],
+        "spec": proposal["spec"],
+        "evidence": proposal["evidence"],
+    }
+    return ontology_store.add_schema_proposal(stored, user)
+
+
+def decide_schema_proposal(pid: str, *, accept: bool, user: str) -> dict[str, Any] | None:
+    """Accept (a validated, logged `review` revision) or reject a class suggestion."""
+    if not accept:
+        ontology_store.close_schema_proposal(pid, accepted=False, user=user)
+        return None
+    plan = ontology_store.accept_schema_proposal(pid, user)
+    if plan.status != "ready":
+        raise ValueError("; ".join(plan.errors) or f"nothing to apply ({plan.status})")
+    row = apply_ontology(plan, user=user, via="review")
+    ontology_store.close_schema_proposal(pid, accepted=True, user=user)
+    return row
 
 
 def ontology_lint() -> list[dict[str, str]]:

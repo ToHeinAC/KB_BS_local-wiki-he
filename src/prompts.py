@@ -278,6 +278,19 @@ ONTOLOGY_BRIEFING_RULE = "Prefer these documents when they answer the question. 
 ONTOLOGY_LOOKUP_DESCRIPTION = "Look up a document, law abbreviation or document class in this database's ontology: its versions (newest first) and which one is in force, its class, and related documents (based on, transposes, amends, ...). Use it when the question names a document and you need its versions or related documents. Args: term (e.g. 'StrlSchV'); optional as_of (a date such as '2017-06-01' or a year) for the point in time."
 ONTOLOGY_SUPERSEDED_NUDGE = "REJECTED: every document you cite is a superseded version ({cited}). The version in force is {current}. Cite it, or state explicitly that your answer describes the old version, then submit again."
 
+ONTOLOGY_SUGGEST_CLASS_PROMPT = """No class of this database's ontology fits the document below. Suggest ONE new document class.
+
+Existing classes (id: definition) — the new class must be narrower than one of them:
+{classes}
+
+Document (beginning):
+<<<
+{head}
+>>>
+
+Answer with JSON only:
+{{"id": "<lowercase-id-with-dashes>", "broader": "<one existing id>", "label_de": "<German name>", "label_en": "<English name>", "definition": "<one sentence>", "cue": "<a short regular expression copied from the document's title or first lines that identifies this kind of document>"}}"""
+
 DESCRIPTION_BUILD_PROMPT = """Write a concise high-level overview of the knowledge base "{db_name}".
 
 Wiki index (filename — description):

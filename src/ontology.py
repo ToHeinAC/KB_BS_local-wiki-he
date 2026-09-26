@@ -581,7 +581,7 @@ def live_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [r for r in rows if not r.get("retracts") and r.get("id") not in retracted]
 
 
-def _winners(rows: list[dict[str, Any]], multi: set[str]) -> dict[tuple[str, ...], dict[str, Any]]:
+def winners(rows: list[dict[str, Any]], multi: set[str]) -> dict[tuple[str, ...], dict[str, Any]]:
     won: dict[tuple[str, ...], dict[str, Any]] = {}
     for r in live_rows(rows):
         if r.get("status") != "confirmed":
@@ -604,7 +604,7 @@ def project(rows: list[dict[str, Any]], multi: set[str]) -> dict[str, dict[str, 
     rule/llm rows. A member with attributes is `{"to": object, **attributes}`.
     """
     out: dict[str, dict[str, Any]] = {}
-    for key, r in _winners(rows, multi).items():
+    for key, r in winners(rows, multi).items():
         subject, pred = key[0], key[1]
         if pred in multi:
             if not r.get("negated") and r.get("object") is not None:
