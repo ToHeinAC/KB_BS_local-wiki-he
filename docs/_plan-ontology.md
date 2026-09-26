@@ -375,6 +375,7 @@ Report §10 Phase 2: Work/Expression registry, `current_expression`, `validity`,
 ### Phase 6 — Relations, binding, lint, graph
 
 Report §10 Phase 3 unchanged. The Ontology section gains a lint panel; directed typed edges and the pyramid layout go into `build_typed_graph` / `graph_widget`; `ontology_lookup` gains binding paths.
+- **As built** ([ontology.md](ontology.md) §Relations): relation findings come from code formulas only (no LLM relation proposals); `incorporates` members carry attributes (`mode`, `effect`, `edition`) in the ledger and the exchange file; the gesetze-im-internet.de consolidated texts carry no Eingangsformel, so `based_on` is tested on a synthetic Eingangsformel in standard wording; footnote-style transposition notes ("Umsetzung der EARL 59/2013") are not recognised.
 
 ### Phase 7 — Evolution
 

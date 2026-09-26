@@ -6,11 +6,11 @@ append-only ledger of facts about the DB's sources. Rationale:
 detection at ingest, ontology-aware search, time): [_plan-ontology.md](_plan-ontology.md).
 Phase status: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §2.
 
-**Built so far (plan Phases 1–5):** shared schema modules, per-DB binding, schema
+**Built so far (plan Phases 1–6):** shared schema modules, per-DB binding, schema
 validation, the fact ledger with projection, retraction on `delete_source`, the
 Maintenance → Ontology workbench (view, export, hand-edit, import, history, restore,
 proposals), detection at upload, stamping of source-summary pages, and the ontology
-stage in every search (§Search), and valid time (§Time).
+stage in every search (§Search), valid time (§Time), and relations with binding paths and lint (§Relations).
 
 ## Storage
 
@@ -46,6 +46,8 @@ stage in every search (§Search), and valid time (§Time).
   `briefing`, `lookup`, `badge`, `audit` (§Search).
 - `src/ontology_time.py` is pure: `time_intent`, `validity`, `current_expression`,
   `outdated_pages`, `validity_order` (§Time).
+- `src/ontology_graph.py` is pure: `chain`, `binding_of`, `describe`, `lint`
+  (§Relations); relation detection is `ontology_detect.detect_relations`.
 - `src/ontology_ui.py` renders the Maintenance → Ontology section and the Upload
   review-table columns. `wiki_engine` holds the orchestration: `apply_ontology`,
   `record_source_ontology`, `finish_ontology_batch`, `decide_proposal`,
@@ -335,6 +337,54 @@ Valid time (when a version holds in the world) is never compared with transactio
 version): (c) asks about a point in time, hit@1 50 % → 100 %, MRR 0.75 → 1.00; (a) and
 (b) stay at 100 %; one control moved (rank 4 → 3) only because superseded duplicates were
 demoted.
+
+## Relations (plan Phase 6)
+
+Relations point to works (a law as such), or to `src:<file>` for a document without a work
+(e.g. a permit). A member of a relation list may carry attributes:
+`incorporates: [{to: din-6812, mode: static, edition: "2013-06", effect: mandatory}]`
+(`mode`/`effect` from the schema's `attributes`, `edition` free and date-like). In the
+ledger they sit in the row's `attributes`; confirming a proposal keeps them.
+
+**Detection at upload** (`detect_relations`, code only, one finding per relation and
+target, only for classes in the relation's domain):
+
+| Relation | Formula (verbatim in the text) | Stored as |
+|---|---|---|
+| `transposes` | "… der Umsetzung der Richtlinie 2013/59/Euratom …" (first 20,000 chars) | fact (`rule`) |
+| `based_on` | Eingangsformel "Auf Grund des … des Bundes-Immissionsschutzgesetzes … verordnet" naming a known work (genitive handled) | fact (`rule`) |
+| `repeals` | "… außer Kraft" / "… wird aufgehoben" in a sentence naming a known work | proposal |
+| `incorporates` | "DIN [EN] [ISO] n[-part]" / "KTA n", edition from ":2013-06" or "(Ausgabe März 2017)" → `static`, "in der jeweils geltenden Fassung" → `dynamic`; "gilt als erfüllt" → `presumption`, "einzuhalten/muss/…" → `mandatory`; ≤ 25 per document | proposal |
+
+Evidence is the sentence or clause, verbatim (a period after a number or an abbreviation
+does not end it). On the full texts of the eval corpus: the StrlSchV's transposition
+clause; 19 static DIN references in TA Luft; one mandatory DIN EN 15376 reference in the
+BImSchG. Limits: consolidated texts from gesetze-im-internet.de carry no Eingangsformel
+(it is in the Federal Law Gazette version), and footnote notes such as "Umsetzung der
+EARL 59/2013" are not recognised.
+
+**Binding** (`binding_of(view, work, as_of)`, report §9): a standard is binding only
+through an `incorporates` edge from a document that is itself binding — class `norm`
+`true`, `individual` (a decision: binding for its addressee) or `internal` — and in force
+at the point in time; `effect: guidance` never binds. Each path explains itself, e.g.
+`din-6812 ◄ incorporates (static, mandatory) ─ permit.md (permit); edition 2013-06 pinned —
+newer editions are not binding through this reference; binding for the addressee of this
+decision`. Without such an edge: "Not binding by any reference in this database —
+interpretive / state of the art only". `ontology_lookup` adds these paths and the
+`based_on chain` (`chain`) to its answer; "DIN 6812" is looked up as `din-6812`.
+
+**Lint** (`lint(view)`, deterministic; Ontology → *Lint*, and a section of Maintenance →
+Lint): warnings for cycles in `based_on`/`replaces`/`is_part_of`/`repeals`/`amends`, a
+`based_on` target whose class ranks lower (relation `lint: range_rank_not_lower`, e.g. an
+ordinance based on an administrative regulation), `in_force_until` before
+`in_force_from`, two versions with the same version date; infos for a pinned edition not
+in the DB and for works referenced by n documents but missing. A rank only orders and
+warns; it never decides a legal conflict.
+
+**Graph:** relation edges are directed edges between source nodes (a work is drawn by its
+version in force today), coloured apart and with arrowheads in the Galaxy and Pyramid
+layouts. *Pyramid* puts documents in rows by their class `rank` (1 = top; unranked last)
+and hides pages.
 
 ## Deletion
 
