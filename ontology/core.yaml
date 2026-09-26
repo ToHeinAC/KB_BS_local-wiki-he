@@ -1,0 +1,70 @@
+# Domain-agnostic document genres, bound by every DB that has an ontology.
+# Schema only (classes, relations); facts live in each DB's ledger.
+# Rules: docs/_plan-ontology.md. Never delete an id: set `deprecated: true` + `replaced_by`.
+# SemVer: patch = labels/definitions/cues, minor = new ids, major = re-parenting or removals.
+id: core
+version: 1.0.0
+description: Document genres every corpus has.
+
+classes:
+  document:
+    labels: {en: Document, de: Dokument}
+    definition: Any source document in the database
+    applies_to: source
+  legal-instrument:
+    broader: document
+    labels: {en: Legal instrument, de: Rechtsakt}
+    definition: A legal act such as a statute, ordinance, directive or administrative regulation
+  standard:
+    broader: document
+    labels: {en: Technical standard, de: Technische Regel/Norm}
+    definition: A technical rule or standard issued by a standards or expert body (DIN, ISO, KTA)
+  guidance:
+    broader: document
+    labels: {en: Guidance, de: Leitfaden/Empfehlung}
+    definition: A guideline, recommendation or explanatory note without binding force of its own
+  decision:
+    broader: document
+    labels: {en: Decision/permit, de: Bescheid/Genehmigung}
+    definition: An individual decision of an authority addressed to a specific party
+  procedure:
+    broader: document
+    labels: {en: Internal procedure, de: Betriebliche Regelung/SOP}
+    definition: An internal instruction, procedure or operating rule of an organisation
+  report:
+    broader: document
+    labels: {en: Report/study, de: Bericht/Studie}
+    definition: A report, study, analysis or scientific paper
+  dataset:
+    broader: document
+    labels: {en: Data/measurements, de: Daten/Messwerte}
+    definition: Measurement results, tables or other primarily numeric data
+  correspondence:
+    broader: document
+    labels: {en: Correspondence/minutes, de: Schriftverkehr/Protokoll}
+    definition: Letters, e-mails, meeting minutes or notes of conversations
+  contract:
+    broader: document
+    labels: {en: Contract, de: Vertrag}
+    definition: An agreement between parties
+
+relations:
+  is_part_of:
+    domain: document
+    range: document
+    inverse: has_part
+    target: work
+    eli: is_part_of
+    transitive: true
+  cites:
+    domain: document
+    range: document
+    inverse: cited_by
+    target: work
+    eli: cites
+  replaces:
+    domain: document
+    range: document
+    inverse: replaced_by
+    target: work
+    dct: replaces

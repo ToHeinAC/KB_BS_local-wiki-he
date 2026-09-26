@@ -6,6 +6,8 @@ import pytest
 import chunker
 import db_context
 import dedup
+import ontology
+import ontology_store
 import wiki_engine
 
 
@@ -73,6 +75,7 @@ def test_unknown_source_changes_nothing(seeded):
         "qa_rows": 0,
         "wiki_pages": [],
         "related_scrubbed": 0,
+        "ontology_rows": 0,
     }
     assert _meta(seeded / "shared.md")["sources"] == ["gone.md", "kept.md"]
 
@@ -80,3 +83,22 @@ def test_unknown_source_changes_nothing(seeded):
 def test_deletion_is_logged(seeded):
     wiki_engine.delete_source("gone.md")
     assert "Source deleted" in (seeded / "log.md").read_text()
+
+
+def test_retracts_the_sources_ontology_rows(seeded):
+    ontology_store.append_rows(
+        [
+            ontology.assertion("src:gone.md", "class", "report", by="user"),
+            ontology.assertion("src:kept.md", "class", "report", by="rule"),
+        ]
+    )
+    result = wiki_engine.delete_source("gone.md")
+    assert result["ontology_rows"] == 1
+    facts = ontology.project(ontology_store.read_rows(), multi=set())
+    assert set(facts) == {"src:kept.md"}
+    assert "Ontology rows retracted: 1" in (seeded / "log.md").read_text()
+
+
+def test_db_without_ontology_gets_no_ontology_files(seeded):
+    wiki_engine.delete_source("gone.md")
+    assert not ontology_store.store_dir().exists()

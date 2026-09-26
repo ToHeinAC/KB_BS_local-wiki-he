@@ -1,0 +1,148 @@
+# German/EU legal hierarchy (Strahlenschutz pyramid), for legal DBs such as Strahlenschutz,
+# NORM, CO2-Zertifikate_BECV and Abluftreinigung. Source: docs/_idea-onthology.md §9.
+# `rank` orders the pyramid for layout and lint heuristics only; it never decides conflicts.
+# `norm`: true = abstract legal norm, internal = binds the administration/organisation,
+# individual = concrete-individual act, false = not a legal norm.
+# Cues are provisional until measured against the gold set (plan Phase 3).
+id: legal-de
+version: 0.1.0
+requires: ["core@^1"]
+description: German and EU legal instruments, technical rules and decisions.
+
+classes:
+  eu-regulation:
+    broader: legal-instrument
+    rank: 1
+    norm: true
+    labels: {en: EU regulation, de: EU-Verordnung}
+    definition: EU/Euratom regulation; directly applicable in every member state
+    cues: ['Verordnung\s*\((EU|EG|Euratom)\)']
+  eu-directive:
+    broader: legal-instrument
+    rank: 1
+    norm: true
+    labels: {en: EU directive, de: EU-Richtlinie}
+    definition: EU/Euratom directive; binds member states, needs national transposition
+    cues: ['Richtlinie\s+\d{4}/\d+/(EU|EG|Euratom)']
+  constitution:
+    broader: legal-instrument
+    rank: 2
+    norm: true
+    labels: {en: Constitution, de: Verfassung}
+    definition: The Basic Law (Grundgesetz) or a Land constitution
+    cues: ['\bGrundgesetz\b']
+  federal-act:
+    broader: legal-instrument
+    rank: 3
+    norm: true
+    labels: {en: Federal act, de: Bundesgesetz}
+    definition: Statute passed by the Bundestag
+    cues: ['Der Bundestag hat', '^[^\n]*[Gg]esetz\b']
+  state-act:
+    broader: legal-instrument
+    rank: 3
+    norm: true
+    labels: {en: State act, de: Landesgesetz}
+    definition: Statute passed by a Land parliament
+    cues: ['\bLandesgesetz\b', 'Der Landtag hat']
+  ordinance:
+    broader: legal-instrument
+    rank: 4
+    norm: true
+    labels: {en: Ordinance, de: Rechtsverordnung}
+    definition: Rechtsverordnung issued on the basis of a statutory authorisation
+    cues: ['\bverordnet\b', '^[^\n]*Verordnung\b']
+  admin-regulation:
+    broader: legal-instrument
+    rank: 5
+    norm: internal
+    labels: {en: Administrative regulation, de: Verwaltungsvorschrift}
+    definition: Administrative regulation binding the authorities (e.g. AVV, TA Luft)
+    cues: ['Allgemeine Verwaltungsvorschrift']
+  ministerial-guideline:
+    broader: guidance
+    rank: 6
+    labels: {en: Ministerial guideline, de: Ministerielle Richtlinie}
+    definition: Guideline or announcement of a ministry (e.g. BMUV Richtlinie, Bekanntmachung)
+    cues: ['\bBekanntmachung\b', 'Richtlinie[^\n]*\(BMUV\)']
+  technical-rule:
+    broader: standard
+    rank: 6
+    labels: {en: Technical rule, de: Technische Regel}
+    definition: Technical standard such as DIN, ISO or KTA rules
+    cues: ['\bDIN\s+(EN\s+)?(ISO\s+)?\d+', '\bKTA\s+\d{4}']
+  expert-recommendation:
+    broader: guidance
+    rank: 6
+    labels: {en: Expert recommendation, de: Fachempfehlung}
+    definition: Recommendation of an expert commission (e.g. SSK)
+    cues: ['\bSSK\b', 'Empfehlung der Strahlenschutzkommission']
+  permit:
+    broader: decision
+    rank: 7
+    norm: individual
+    labels: {en: Permit, de: Genehmigung}
+    definition: Licence or permit granted by an authority to a specific party
+    cues: ['\bGenehmigung\b', 'wird[^\n]{0,80}erteilt']
+  order:
+    broader: decision
+    rank: 7
+    norm: individual
+    labels: {en: Order, de: Anordnung/Bescheid}
+    definition: Order or other administrative act addressed to a specific party
+    cues: ['\bAnordnung\b', '\bBescheid\b']
+  rp-instruction:
+    broader: procedure
+    rank: 8
+    norm: internal
+    labels: {en: Radiation protection instruction, de: Strahlenschutzanweisung}
+    definition: Internal radiation protection instruction of a licensee
+    cues: ['Strahlenschutzanweisung']
+  operational-rule:
+    broader: procedure
+    rank: 8
+    norm: internal
+    labels: {en: Operational rule, de: Betriebsanweisung}
+    definition: Internal operating instruction or house rule
+    cues: ['Betriebsanweisung', 'Betriebsordnung']
+
+relations:
+  based_on:
+    domain: legal-instrument
+    range: legal-instrument
+    inverse: basis_for
+    target: work
+    eli: based_on
+    lint: range_rank_not_lower
+  transposes:
+    domain: legal-instrument
+    range: eu-directive
+    inverse: transposed_by
+    target: work
+    eli: transposes
+  amends:
+    domain: legal-instrument
+    range: legal-instrument
+    inverse: amended_by
+    target: work
+    eli: amends
+  repeals:
+    domain: legal-instrument
+    range: legal-instrument
+    inverse: repealed_by
+    target: work
+    eli: repeals
+  applies:
+    domain: [decision, procedure]
+    range: legal-instrument
+    inverse: applied_by
+    target: work
+    eli: applies
+  incorporates:
+    domain: [legal-instrument, decision, procedure]
+    range: [standard, guidance]
+    inverse: incorporated_by
+    target: work  # the pinned expression when mode = static
+    attributes:
+      mode: [static, dynamic]
+      effect: [mandatory, presumption, guidance]

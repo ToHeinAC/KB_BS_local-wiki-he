@@ -23,6 +23,7 @@ import lang
 import lex_index
 import okf
 import ollama_client
+import ontology_store
 import page_lang
 import qa_gen
 import retrieval
@@ -1460,7 +1461,7 @@ def delete_source(source_name: str) -> dict[str, Any]:
     """Remove a source and all derived data. Wiki pages referencing it are deleted.
 
     Returns a summary dict with keys: raw, manifest, chunks, qa_rows, wiki_pages,
-    related_scrubbed.
+    related_scrubbed, ontology_rows (ledger rows retracted).
     """
     raw_file = _raw() / source_name
     chunk_file = db_context.chunks_dir() / f"{chunker.source_slug(source_name)}.jsonl"
@@ -1480,6 +1481,10 @@ def delete_source(source_name: str) -> dict[str, Any]:
     removed = _drop_source_from_pages(source_name)
     result["wiki_pages"] = sorted(removed)
     result["related_scrubbed"] = _scrub_links_to(removed)
+    # The ledger is append-only: the source's facts are retracted, never erased.
+    result["ontology_rows"] = ontology_store.retract_subject(
+        f"src:{source_name}", by="system", reason="source deleted"
+    )
 
     _unindex(source_name, removed)
     _rebuild_index()
@@ -1494,7 +1499,8 @@ def delete_source(source_name: str) -> dict[str, Any]:
         f"Chunks removed: {result['chunks']}\n"
         f"QA rows removed: {result['qa_rows']}\n"
         f"Wiki pages removed: {result['wiki_pages']}\n"
-        f"Related scrubbed: {result['related_scrubbed']}",
+        f"Related scrubbed: {result['related_scrubbed']}\n"
+        f"Ontology rows retracted: {result['ontology_rows']}",
     )
     return result
 
