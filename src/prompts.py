@@ -264,6 +264,18 @@ Document (beginning):
 Answer with JSON only, nothing else:
 {{"class": "<one id from the list, or none>", "quote": "<one short sentence copied exactly from the document that shows this class>"}}"""
 
+# Ontology briefing (plan §4.3): built by code from ids, file names, dates and the user's
+# own words only; appended to the agents' system prompt and the Quick-chat synthesis.
+ONTOLOGY_BRIEFING_HEADER = "Ontology frame (built by code from confirmed facts of this database):"
+ONTOLOGY_BRIEFING_WORK = '- "{matched}" refers to the document work {work}{cls}.'
+ONTOLOGY_BRIEFING_VERSIONS = "  Versions in this database, newest first: {versions}."
+ONTOLOGY_BRIEFING_RELATIONS = "  Related works: {relations}."
+ONTOLOGY_BRIEFING_CLASS = (
+    '- "{matched}" is the document class {cls} ({count} source(s) in this database).'
+)
+ONTOLOGY_BRIEFING_RULE = "Prefer these documents when they answer the question and say which version you cite. For versions and related documents, call ontology_lookup."
+ONTOLOGY_LOOKUP_DESCRIPTION = "Look up a document, law abbreviation or document class in this database's ontology: its versions (newest first), class, and related documents (based on, transposes, amends, ...). Use it when the question names a document and you need its versions or related documents. Arg: term (e.g. 'StrlSchV')."
+
 DESCRIPTION_BUILD_PROMPT = """Write a concise high-level overview of the knowledge base "{db_name}".
 
 Wiki index (filename — description):

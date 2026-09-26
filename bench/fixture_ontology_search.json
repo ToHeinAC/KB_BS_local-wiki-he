@@ -1,0 +1,131 @@
+{
+  "_note": "Hand-labelled questions for scripts/eval_ontology_search.py. `expected`: the law whose text should answer the question. Groups: a = names a document by abbreviation, b = names a document class, d = control (names nothing; ranking must not change).",
+  "questions": [
+    {
+      "group": "a",
+      "question": "Was regelt die StrlSchV zur Freigabe von Stoffen?",
+      "expected": [
+        "strlschv.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Welche Aufgaben hat der Strahlenschutzbeauftragte nach dem StrlSchG?",
+      "expected": [
+        "strlschg.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Welche Voraussetzungen nennt das AtG für die Genehmigung von Anlagen?",
+      "expected": [
+        "atg.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Was bestimmt das BImSchG zu genehmigungsbedürftigen Anlagen?",
+      "expected": [
+        "bimschg.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Was sagt das GG zur Unverletzlichkeit der Wohnung?",
+      "expected": [
+        "gg.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Grenzwerte der Körperdosis nach StrlSchG",
+      "expected": [
+        "strlschg.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Wie regelt die StrlSchV die Kontamination von Arbeitsplätzen?",
+      "expected": [
+        "strlschv.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Wie definiert das BImSchG schädliche Umwelteinwirkungen?",
+      "expected": [
+        "bimschg.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Welche Deckungsvorsorge verlangt das AtG?",
+      "expected": [
+        "atg.md"
+      ]
+    },
+    {
+      "group": "a",
+      "question": "Welche Anforderungen stellt die StrlSchV an die Fachkunde im Strahlenschutz?",
+      "expected": [
+        "strlschv.md"
+      ]
+    },
+    {
+      "group": "b",
+      "question": "Welche Verwaltungsvorschrift legt Emissionswerte für Staub fest?",
+      "expected": [
+        "ta_luft.md"
+      ]
+    },
+    {
+      "group": "b",
+      "question": "Welche Rechtsverordnung regelt die Freigabe radioaktiver Stoffe?",
+      "expected": [
+        "strlschv.md"
+      ]
+    },
+    {
+      "group": "b",
+      "question": "Welches Bundesgesetz regelt die Haftung für Kernanlagen?",
+      "expected": [
+        "atg.md"
+      ]
+    },
+    {
+      "group": "b",
+      "question": "Was sagt die Verfassung zur Würde des Menschen?",
+      "expected": [
+        "gg.md"
+      ]
+    },
+    {
+      "group": "d",
+      "question": "Wie hoch ist der Grenzwert der effektiven Dosis für Einzelpersonen der Bevölkerung?",
+      "expected": [
+        "strlschg.md"
+      ]
+    },
+    {
+      "group": "d",
+      "question": "Was ist der Stand der Technik?",
+      "expected": [
+        "bimschg.md"
+      ]
+    },
+    {
+      "group": "d",
+      "question": "Unverletzlichkeit der Wohnung",
+      "expected": [
+        "gg.md"
+      ]
+    },
+    {
+      "group": "d",
+      "question": "Emissionswerte für Gesamtstaub",
+      "expected": [
+        "ta_luft.md"
+      ]
+    }
+  ]
+}

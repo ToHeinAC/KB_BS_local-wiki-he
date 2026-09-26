@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import contextvars
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -27,6 +28,8 @@ class RunMemory:
     # Search-ladder audit (idea.md §6.9.1): best rerank_score seen per source, so the
     # answer surface can show a "Why these sources" record (kept vs below-τ).
     relevance_by_source: dict[str, float] = field(default_factory=dict[str, float])
+    # Ontology stage (docs/ontology.md §Search): one record per distinct frame this run.
+    ontology: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
 
     def tick(self) -> int:
         self.step += 1
@@ -40,6 +43,10 @@ class RunMemory:
         prev = self.relevance_by_source.get(source)
         if prev is None or score > prev:
             self.relevance_by_source[source] = score
+
+    def note_ontology(self, record: dict[str, Any]) -> None:
+        if record not in self.ontology:
+            self.ontology.append(record)
 
     def seen_read(self, key: str) -> int | None:
         return self.reads.get(key)
@@ -67,3 +74,10 @@ def begin_run() -> RunMemory:
 
 def current() -> RunMemory | None:
     return _current.get()
+
+
+def note_ontology(record: dict[str, Any]) -> None:
+    """Record an ontology frame on the current run (no-op outside a run)."""
+    mem = current()
+    if mem is not None:
+        mem.note_ontology(record)

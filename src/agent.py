@@ -42,6 +42,7 @@ from langgraph.prebuilt import ToolNode
 import db_context
 import lang
 import ollama_client
+import retrieval
 import run_memory
 import tools as tool_module
 from prompts import (
@@ -69,7 +70,7 @@ def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
         base_url=ollama_client.host(),
         temperature=0.3,
         client_kwargs={"timeout": LLM_TIMEOUT},  # ChatOllama drops a bare timeout=
-    ).bind_tools(tool_module.TOOLS)  # pyright: ignore[reportUnknownMemberType]  # bare Callable
+    ).bind_tools(tool_module.with_ontology(tool_module.TOOLS))  # pyright: ignore[reportUnknownMemberType]  # bare Callable
 
 
 def _build_graph(
@@ -104,7 +105,7 @@ def _build_graph(
     g: StateGraph[MessagesState] = StateGraph(MessagesState)
     # langgraph leaves CachePolicy/BaseCheckpointSaver generics unsolved in these signatures.
     g.add_node("agent", agent_node)  # pyright: ignore[reportUnknownMemberType]
-    g.add_node("tools", ToolNode(tool_module.TOOLS))  # pyright: ignore[reportUnknownMemberType]
+    g.add_node("tools", ToolNode(tool_module.with_ontology(tool_module.TOOLS)))  # pyright: ignore[reportUnknownMemberType]
     g.add_edge(START, "agent")
     g.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
     g.add_edge("tools", "agent")
@@ -334,9 +335,15 @@ def run_research_agent(
         yield {"type": "error", "content": f"Agent init failed: {exc}"}
         return
 
+    brief, frames = retrieval.ontology_briefing(question)
+    for frame in frames:
+        run_memory.note_ontology(frame)
+    if brief:
+        yield {"type": "ontology", "content": brief}
+    system = _system_prompt(wiki_context, directive) + (f"\n\n{brief}" if brief else "")
     init: MessagesState = {
         "messages": [
-            SystemMessage(content=_system_prompt(wiki_context, directive)),
+            SystemMessage(content=system),
             HumanMessage(content=question),
         ]
     }

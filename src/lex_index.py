@@ -28,6 +28,7 @@ import json
 import re
 import sqlite3
 import unicodedata
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -477,18 +478,21 @@ def index_health() -> dict[str, Any]:
     return {"raw": int(counts.get("raw", 0)), "wiki": int(counts.get("wiki", 0))}
 
 
-def query(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, Any]]:
+def query(
+    q: str, top_k: int = 10, scope: str | None = None, sources: Sequence[str] | None = None
+) -> list[dict[str, Any]]:
     """BM25 over the FTS5 chunk index. Returns up to top_k hits (empty if no index).
 
     `scope` filters by chunk scope: "raw" (source chunks), "wiki" (wiki page
-    bodies), or None (both).
+    bodies), or None (both). `sources` restricts hits to those source files / wiki
+    pages (the ontology arm, docs/ontology.md §Search); an empty list matches nothing.
 
     Each hit: {chunk_id, score, source, scope, anchor, heading_path, char_start,
                char_end, text, preview, lang, matched_terms}.
     """
-    if not _fts5_path().exists():
+    if not _fts5_path().exists() or (sources is not None and not sources):
         return []
-    return _query_fts5(q, top_k, scope)
+    return _query_fts5(q, top_k, scope, sources)
 
 
 def _expand_query(q: str) -> list[str]:
@@ -501,7 +505,9 @@ def _expand_query(q: str) -> list[str]:
     return expanded
 
 
-def _fts5_rows(expanded: list[str], scope: str | None, top_k: int) -> list[tuple[Any, ...]]:
+def _fts5_rows(
+    expanded: list[str], scope: str | None, top_k: int, sources: Sequence[str] | None = None
+) -> list[tuple[Any, ...]]:
     """Best-first FTS5 rows matching any expanded token; [] on a SQLite error."""
     match = " OR ".join(f'"{v}"' for v in expanded)
     sql = (
@@ -513,6 +519,9 @@ def _fts5_rows(expanded: list[str], scope: str | None, top_k: int) -> list[tuple
     if scope is not None:
         sql += " AND scope = ?"
         params.append(scope)
+    if sources is not None:
+        sql += f" AND source IN ({', '.join('?' * len(sources))})"
+        params.extend(sources)
     sql += " ORDER BY score LIMIT ?"
     params.append(top_k * 2 + 8)  # over-fetch; dedup by chunk_id then trim to top_k
 
@@ -555,7 +564,9 @@ def _fts5_hit(row: tuple[Any, ...], text: str, expanded: set[str]) -> dict[str, 
     }
 
 
-def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[str, Any]]:
+def _query_fts5(
+    q: str, top_k: int = 10, scope: str | None = None, sources: Sequence[str] | None = None
+) -> list[dict[str, Any]]:
     """BM25 over the FTS5 index.
 
     Query tokens are expanded to the same `variants()` forms the index stored, so
@@ -572,7 +583,7 @@ def _query_fts5(q: str, top_k: int = 10, scope: str | None = None) -> list[dict[
     text_cache: dict[str, dict[str, str]] = {}
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for row in _fts5_rows(expanded, scope, top_k):
+    for row in _fts5_rows(expanded, scope, top_k, sources):
         cid, source, inline = row[0], row[1], row[8]
         if cid in seen:
             continue

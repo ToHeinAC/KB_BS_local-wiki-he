@@ -24,6 +24,8 @@ import calibrate
 import chunker
 import db_context
 import okf
+import ontology_query
+import ontology_store
 import retrieval
 import run_memory
 import wiki_engine
@@ -31,6 +33,7 @@ from prompts import (
     EVALUATE_CONDITION_DESCRIPTION,
     FETCH_WEBPAGE_DESCRIPTION,
     LOW_CONFIDENCE_NUDGE,
+    ONTOLOGY_LOOKUP_DESCRIPTION,
     RAW_READ_DESCRIPTION,
     RAW_SEARCH_DESCRIPTION,
     SUBMIT_CHAT_DESCRIPTION,
@@ -277,6 +280,7 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
     has no embedding index (see src/retrieval.py)."""
     hits = retrieval.search(query, top_k=max_results, scope="raw", use_rerank=True)
     mem = run_memory.current()
+    view = ontology_store.view()
     parts: list[str] = []
     for i, h in enumerate(hits, 1):
         if mem is not None and "rerank_score" in h:  # Stage E: track best passage seen
@@ -284,11 +288,13 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
             mem.note_source_relevance(db_context.qualify(h["source"]), float(h["rerank_score"]))
         anchor = h.get("anchor") or ""
         cite_suffix = f" {anchor}" if anchor else ""
+        badge = ontology_query.badge(view, h["source"]) if view is not None else ""
         parts.append(
             f"[Raw hit {i}]\n"
             f"file: {db_context.qualify(h['source'])}{cite_suffix}\n"
             f"chunk_id: {h['chunk_id']}\n"
-            f"score: {h['score']}  matched: {', '.join(h['matched_terms'])}\n"
+            + (f"{badge}\n" if badge else "")
+            + f"score: {h['score']}  matched: {', '.join(h['matched_terms'])}\n"
             f"excerpt: {h['preview']}\n---"
         )
     return parts
@@ -524,9 +530,10 @@ def current_run_audit(db: str | None = None) -> dict[str, Any] | None:
     run scored no source (e.g. wiki/web-only), so the caller can skip the audit panel.
     """
     mem = run_memory.current()
-    if mem is None or not mem.relevance_by_source:
+    if mem is None or not (mem.relevance_by_source or mem.ontology):
         return None
-    return calibrate.justify(list(mem.relevance_by_source.items()), calibrate.threshold(db))
+    record = calibrate.justify(list(mem.relevance_by_source.items()), calibrate.threshold(db))
+    return {**record, "ontology": list(mem.ontology)} if mem.ontology else record
 
 
 def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
@@ -676,6 +683,36 @@ def wiki_read(filenames: list[str]) -> str:
         for f in fresh:
             mem.mark_read(f"wiki:{f.strip()}")
     return "\n\n".join(out)
+
+
+def _ontology_lookup_impl(term: str | None = None) -> str:
+    term = (term or "").strip()
+    if not term:
+        return "Error: provide `term`."
+    scope = db_context.search_scope()
+    parts = [f"## Ontology lookup: {term}"]
+    for db in scope:
+        with db_context.using_db(db):
+            view = ontology_store.view()
+            text = ontology_query.lookup(term, view) if view else "(no ontology in this database)"
+        parts.append(f"### Database: {db}\n{text}" if len(scope) > 1 else text)
+    return "\n".join(parts)
+
+
+@tool(description=ONTOLOGY_LOOKUP_DESCRIPTION)
+def ontology_lookup(term: str) -> str:
+    fresh, stubs = _dedup_search("ontology_lookup", [term])
+    return _ontology_lookup_impl(term) if fresh else stubs[0]
+
+
+def with_ontology(base: list[Any]) -> list[Any]:
+    """``base`` plus `ontology_lookup` when a DB in the search scope has an ontology, so
+    agents over DBs without one see exactly the tools they saw before."""
+    for db in db_context.search_scope():
+        with db_context.using_db(db):
+            if ontology_store.exists():
+                return [*base, ontology_lookup]
+    return base
 
 
 def _think_impl(reflection: str) -> str:
@@ -925,4 +962,5 @@ TOOL_FUNCTIONS: dict[str, Callable[..., str]] = {
     "raw_read": _raw_read_impl,
     "submit_chat_answer": _submit_chat_impl,
     "evaluate_condition": _evaluate_condition_impl,
+    "ontology_lookup": _ontology_lookup_impl,
 }

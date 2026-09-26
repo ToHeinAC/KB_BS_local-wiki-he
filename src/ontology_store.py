@@ -26,11 +26,14 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
 
+import frontmatter  # pyright: ignore[reportMissingTypeStubs]
+
 import auth
 import db_context
 import dedup
 import ontology
 import ontology_bundle as bundle
+import ontology_query
 
 MODULE_DIR = Path(__file__).resolve().parents[1] / "ontology"
 HUMAN_VIA = ("create", "import", "editor", "restore", "review")
@@ -473,3 +476,57 @@ def decide_proposal(row_id: str, *, accept: bool, user: str) -> dict[str, Any] |
             )
         _append_rows_unlocked(rows)
         return _record("review", user, before)
+
+
+# --- search view (plan Phase 4) ------------------------------------------------------
+
+_SYSTEM_PAGES = ("index.md", "log.md", "DESCRIPTION.md")
+_VIEWS: dict[str, tuple[tuple[Any, ...], ontology_query.View | None]] = {}
+
+
+def _stamp(path: Path) -> tuple[int, int]:
+    try:
+        st = path.stat()
+    except OSError:
+        return (0, 0)
+    return (st.st_mtime_ns, st.st_size)
+
+
+def _wiki_pages() -> list[Path]:
+    wiki = db_context.wiki_dir()
+    pages = sorted(wiki.glob("*.md")) if wiki.is_dir() else []
+    return [p for p in pages if p.name not in _SYSTEM_PAGES]
+
+
+def _view_key(pages: list[Path]) -> tuple[Any, ...]:
+    modules = tuple(_stamp(p) for p in available_modules().values())
+    return (_stamp(binding_path()), _stamp(ledger_path()), modules, tuple(map(_stamp, pages)))
+
+
+def _page_sources(pages: list[Path]) -> dict[str, list[str]]:
+    out: dict[str, list[str]] = {}
+    for path in pages:
+        try:
+            meta = frontmatter.load(str(path)).metadata
+        except Exception:
+            continue
+        out[path.name] = [str(s) for s in bundle.as_list(meta.get("sources"))]
+    return out
+
+
+def view() -> ontology_query.View | None:
+    """The active DB's search view; None without a (valid) ontology. Cached per DB and
+    rebuilt when the binding, ledger, modules or wiki pages change (a derived cache)."""
+    if not exists():
+        return None
+    pages = _wiki_pages()
+    root, key = str(db_context.data_root()), _view_key(pages)
+    cached = _VIEWS.get(root)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    schema, _ = load()
+    built = None
+    if schema is not None:
+        built = ontology_query.build_view(schema, current_state()["facts"], _page_sources(pages))
+    _VIEWS[root] = (key, built)
+    return built

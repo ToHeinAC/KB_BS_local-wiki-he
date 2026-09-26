@@ -16,11 +16,16 @@ when a chunk is found by both arms (it carries `matched_terms` and inline text).
 
 from __future__ import annotations
 
+from contextvars import ContextVar
 from typing import Any
 
+import db_context
 import embed_index
 import lex_index
+import ontology_query
+import ontology_store
 import rerank
+import run_memory
 
 RRF_K = 60
 _CANDIDATES = 40  # per-arm depth fed into fusion (idea.md: fuse deep, return shallow)
@@ -33,6 +38,13 @@ _CANDIDATES = 40  # per-arm depth fed into fusion (idea.md: fuse deep, return sh
 # English and German, with zero regression to the exact/topical controls.
 W_LEXICAL = 1.0
 W_SEMANTIC = 2.0
+# The ontology arm (docs/ontology.md §Search) is one more ranked list: lexical hits
+# restricted to the sources of the works/classes a question names. RRF bounds its
+# influence, so a wrong resolution can move a hit but never swamp the other arms.
+W_ONTOLOGY = 1.0
+
+Ranked = list[dict[str, Any]]
+_last_frame: ContextVar[dict[str, Any] | None] = ContextVar("ontology_frame", default=None)
 
 
 def _arm_contribution(rank: int) -> float:
@@ -46,8 +58,11 @@ def _arm_contribution(rank: int) -> float:
 
 
 def _rrf_fuse(
-    lex_hits: list[dict[str, Any]], sem_hits: list[dict[str, Any]], top_k: int
-) -> list[dict[str, Any]]:
+    lex_hits: Ranked,
+    sem_hits: Ranked,
+    top_k: int,
+    extra: list[tuple[Ranked, float]] | None = None,
+) -> Ranked:
     """Weighted Reciprocal Rank Fusion of two ranked lists, keyed on chunk_id.
 
     score(d) = Σ_arms w_arm · (1/(k + rank) + top-rank bonus) (idea.md C.2). The
@@ -55,7 +70,7 @@ def _rrf_fuse(
     """
     score: dict[str, float] = {}
     hit: dict[str, dict[str, Any]] = {}
-    for hits, w in ((lex_hits, W_LEXICAL), (sem_hits, W_SEMANTIC)):
+    for hits, w in ((lex_hits, W_LEXICAL), (sem_hits, W_SEMANTIC), *(extra or [])):
         for rank, h in enumerate(hits):
             cid = h["chunk_id"]
             score[cid] = score.get(cid, 0.0) + w * _arm_contribution(rank)
@@ -69,8 +84,83 @@ def _rrf_fuse(
     return out
 
 
+def _scoped(view: ontology_query.View, sources: tuple[str, ...], scope: str | None) -> list[str]:
+    """Index `source` values for raw files: themselves (raw), the pages citing them (wiki)."""
+    pages = list(ontology_query.pages_for(view, sources))
+    if scope == "raw":
+        return list(sources)
+    return pages if scope == "wiki" else [*sources, *pages]
+
+
+def _ontology_arm(
+    q: str, frame: ontology_query.QueryFrame, view: ontology_query.View, scope: str | None
+) -> Ranked:
+    """Lexical hits within the named works' sources (query + their aliases), then within
+    the named classes' sources. Only lexical hits: the lexical arm stays the citation truth."""
+    works = _scoped(view, frame.sources, scope)
+    classes = [s for s in _scoped(view, frame.class_sources, scope) if s not in works]
+    hits = lex_index.query(" ".join([q, *frame.terms]), _CANDIDATES, scope, works) if works else []
+    seen = {h["chunk_id"] for h in hits}
+    if classes:
+        hits += [
+            h for h in lex_index.query(q, _CANDIDATES, scope, classes) if h["chunk_id"] not in seen
+        ]
+    return hits
+
+
+def _note_frame(frame: ontology_query.QueryFrame | None) -> None:
+    record = ontology_query.audit(frame) or None
+    _last_frame.set(record)
+    mem = run_memory.current()
+    if mem is not None and record:
+        mem.note_ontology({"db": db_context.get_active_db(), **record})
+
+
+def _ontology_lists(q: str, scope: str | None) -> list[tuple[Ranked, float]]:
+    """The ontology stage (S1): [(arm, weight)] or [] — [] without an ontology or when the
+    question names no work or class, so such searches are byte-identical to before."""
+    view = ontology_store.view()
+    frame = ontology_query.resolve(q, view) if view is not None else None
+    _note_frame(frame)
+    if view is None or frame is None:
+        return []
+    arm = _ontology_arm(q, frame, view, scope)
+    return [(arm, W_ONTOLOGY)] if arm else []
+
+
+def last_frame() -> dict[str, Any] | None:
+    """Audit record of the last search's ontology stage in this context (None: no match)."""
+    return _last_frame.get()
+
+
+def ontology_rerank(q: str, hits: Ranked, scope: str | None, top_k: int) -> Ranked:
+    """Run the ontology stage on an already-ranked lexical list (the Explorer's wiki search)."""
+    extra = _ontology_lists(q, scope)
+    return _rrf_fuse(hits, [], top_k, extra) if extra else hits
+
+
+def ontology_briefing(question: str) -> tuple[str, list[dict[str, Any]]]:
+    """S2: system-prompt block for a question over the search scope, plus audit records."""
+    scope = db_context.search_scope()
+    blocks: list[str] = []
+    records: list[dict[str, Any]] = []
+    for db in scope:
+        with db_context.using_db(db):
+            view = ontology_store.view()
+            frame = ontology_query.resolve(question, view) if view is not None else None
+        text = ontology_query.briefing(frame, view) if view is not None else ""
+        if text:
+            blocks.append(text if len(scope) == 1 else f"Database {db}:\n{text}")
+            records.append({"db": db, **ontology_query.audit(frame)})
+    return "\n\n".join(blocks), records
+
+
 def search(
-    q: str, top_k: int = 10, scope: str | None = None, use_rerank: bool = False
+    q: str,
+    top_k: int = 10,
+    scope: str | None = None,
+    use_rerank: bool = False,
+    use_ontology: bool = True,
 ) -> list[dict[str, Any]]:
     """Hybrid lexical+semantic retrieval. Falls back to pure lexical when the
     semantic arm is unavailable (identical to `lex_index.query`).
@@ -79,13 +169,14 @@ def search(
     per idea.md §6.9.2: the Fast path (browsing, per-keystroke) stays fusion-only,
     while the Deep answer paths — which commit to a citation — pay for precision.
     Unavailable reranker ⇒ plain fused order, so this can never break search.
+    `use_ontology=False` skips the ontology stage (benchmark comparison only).
     """
     reranking = use_rerank and rerank.available()
     depth = max(top_k, rerank.candidates()) if reranking else top_k
     lex_hits = lex_index.query(q, top_k=_CANDIDATES, scope=scope)
-    if not embed_index.available():
-        fused = lex_hits[:depth]
-    else:
-        sem_hits = embed_index.query(q, top_k=_CANDIDATES, scope=scope)
-        fused = lex_hits[:depth] if not sem_hits else _rrf_fuse(lex_hits, sem_hits, depth)
+    extra = _ontology_lists(q, scope) if use_ontology else []
+    sem_hits = (
+        embed_index.query(q, top_k=_CANDIDATES, scope=scope) if embed_index.available() else []
+    )
+    fused = _rrf_fuse(lex_hits, sem_hits, depth, extra) if sem_hits or extra else lex_hits[:depth]
     return rerank.rerank(q, fused, top_k) if reranking else fused[:top_k]

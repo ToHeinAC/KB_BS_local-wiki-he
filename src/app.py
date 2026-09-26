@@ -31,6 +31,7 @@ import metadata_extract
 import ollama_client
 import ollama_server
 import ontology_ui
+import retrieval
 import theme
 import tools
 import wiki_engine
@@ -500,6 +501,9 @@ def _render_search_results(key_prefix: str, search: str) -> str | None:
     if not results and _warn_if_no_lex_index():
         return None
     st.caption(f"{len(results)} result(s)")
+    frame = retrieval.last_frame()
+    if frame:
+        st.caption(_ontology_line(frame))
     max_score = max((r.get("score", 0.0) for r in results), default=0.0)
     selected = None
     for i, r in enumerate(results):
@@ -651,6 +655,9 @@ def _render_research_step(step: dict[str, Any]) -> None:
         _render_tool_call(step)
     elif stype == "tool_result":
         _render_tool_result(step)
+    elif stype == "ontology":
+        with st.expander("Ontology frame", expanded=False):
+            st.code(step["content"], language=None)
     elif stype == "error":
         st.error(step["content"])
 
@@ -840,7 +847,8 @@ def _render_why_sources(audit: dict[str, Any] | None) -> None:
     kept: list[tuple[str, float | None]] = audit.get("kept") or []
     below: list[tuple[str, float | None]] = audit.get("below_tau") or []
     over: list[tuple[str, float | None]] = audit.get("over_cap") or []
-    if not (kept or below or over):
+    frames: list[dict[str, Any]] = audit.get("ontology") or []
+    if not (kept or below or over or frames):
         return
     tau = audit.get("tau")
 
@@ -855,6 +863,17 @@ def _render_why_sources(audit: dict[str, Any] | None) -> None:
             st.markdown(f"✗ `{name}` — {_fmt(s)} (below τ)")
         for name, s in over:
             st.markdown(f"✗ `{name}` — {_fmt(s)} (over cap)")
+        for frame in frames:
+            st.markdown(_ontology_line(frame))
+
+
+def _ontology_line(frame: dict[str, Any]) -> str:
+    """One line saying what the ontology stage matched and which sources it favoured."""
+    named = ", ".join(f"“{m}”" for m in frame.get("matched", []))
+    targets = ", ".join(f"`{t}`" for t in [*frame.get("works", []), *frame.get("classes", [])])
+    favoured = len(frame.get("sources", []))
+    db = f"{frame['db']}: " if frame.get("db") else ""
+    return f"Ontology — {db}{named} → {targets}; {favoured} source(s) favoured"
 
 
 # --- sidebar ---
@@ -1676,6 +1695,9 @@ elif page == "Wiki Chat":
                     elif stype == "tool_result":
                         with st.expander(f"Result: {step['name']}", expanded=False):
                             st.text(step["result"][:800])
+                    elif stype == "ontology":
+                        with st.expander("Ontology frame", expanded=False):
+                            st.code(step["content"], language=None)
                     elif stype == "final_answer":
                         answer = step["content"]
                         raw_sources = step.get("sources", []) or []

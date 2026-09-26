@@ -1891,10 +1891,12 @@ def query_with_sources(question: str) -> dict[str, Any]:
     scope = db_context.search_scope()
     budget = max(_QUERY_SYNTH_MAX_CHARS // len(scope), _QUERY_MIN_DB_SYNTH_CHARS)
     g = _gather_scope(question, system, scope, budget)
+    brief, frames = retrieval.ontology_briefing(question)
+    audit = {**g.audit, "ontology": frames} if frames else g.audit
     result: dict[str, Any] = {
         "sources": g.used_sources,
         "raw_sources": sorted(g.raw_sources),
-        "audit": g.audit,
+        "audit": audit,
     }
     if g.abstain_all and g.best_page:  # calibrated no-confident-answer → skip the LLM synth
         answer = lang.abstain_message(question, g.best_db, g.best_page, g.best_rel)
@@ -1905,6 +1907,7 @@ def query_with_sources(question: str) -> dict[str, Any]:
         question=question,
         language_directive=lang.response_directive(question),
     )
+    system = f"{system}\n\n{brief}" if brief else system
     answer = ollama_client.generate(system, answer_prompt, temperature=0.7)
     return {"answer": answer, **result}
 
@@ -2122,6 +2125,7 @@ def search_wiki(query: str) -> list[dict[str, Any]]:
         hits = lex_index.query(q, top_k=30, scope="wiki")
     except Exception:
         hits = []
+    hits = retrieval.ontology_rerank(q, hits, "wiki", top_k=30)
     titles = {p["filename"]: str(p.get("title", p["filename"])) for p in list_pages()}
     results: list[dict[str, Any]] = []
     seen: set[str] = set()

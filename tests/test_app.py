@@ -21,6 +21,7 @@ import graph_widget
 import ollama_client
 import ollama_server
 import theme
+import tools
 import wiki_engine
 
 APP = str(Path(__file__).resolve().parents[1] / "src" / "app.py")
@@ -787,3 +788,43 @@ def test_ontology_proposals_can_be_confirmed(wiki):
     at.button(key=f"onto_ok_{row['id']}").click().run()
     assert ontology_store.source_facts("note.md") == {"class": "report"}
     assert "Confirmed — revision 2." in _texts(_ok(at).success)
+
+
+def test_explorer_search_names_the_ontology_match(wiki):
+    import ontology
+    import ontology_store
+
+    _legal_ontology()
+    ontology_store.append_rows(
+        [
+            ontology.assertion("src:doc.md", "work", "w-alpha", by="rule"),
+            ontology.assertion("work:w-alpha", "aliases", "Alpha", by="rule"),
+        ]
+    )
+    at = _go(_app(), "Wiki Explorer")
+    at.segmented_control(key="explorer_view").set_value("Tree").run()
+    at.text_input(key="explorer_nav_search").set_value("Alpha").run()
+    assert "Ontology — “Alpha” → `w-alpha`" in _texts(_ok(at).caption)
+
+
+def test_explorer_search_without_ontology_has_no_ontology_line(wiki):
+    at = _go(_app(), "Wiki Explorer")
+    at.segmented_control(key="explorer_view").set_value("Tree").run()
+    at.text_input(key="explorer_nav_search").set_value("Alpha").run()
+    assert "Ontology —" not in _texts(_ok(at).caption)
+
+
+def test_deep_chat_shows_the_ontology_frame_and_why_line(wiki, monkeypatch):
+    frame = {"matched": ["StrlSchV"], "works": ["w"], "classes": [], "sources": ["doc.md"]}
+    steps = [
+        {"type": "ontology", "content": "Ontology frame (built by code …)"},
+        {"type": "final_answer", "content": "Deep answer", "sources": ["doc.md"]},
+    ]
+    monkeypatch.setattr(chat_agent, "run_chat_agent", lambda q: iter(steps))
+    audit = {"tau": None, "kept": [], "below_tau": [], "over_cap": [], "ontology": [frame]}
+    monkeypatch.setattr(tools, "current_run_audit", lambda db=None: audit)
+    at = _go(_app(), "Wiki Chat")
+    at.segmented_control(key="chat_mode").set_value("Deep").run()
+    at.chat_input[0].set_value("deep q").run()
+    assert "Ontology — “StrlSchV” → `w`; 1 source(s) favoured" in _texts(_ok(at).markdown)
+    assert any(e.label == "Ontology frame" for e in at.expander)
