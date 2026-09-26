@@ -380,6 +380,7 @@ Report §10 Phase 3 unchanged. The Ontology section gains a lint panel; directed
 ### Phase 7 — Evolution
 
 Report §10 Phase 4, adapted: an in-GUI editor (`st.data_editor` for local classes and facts) that feeds the same import pipeline; cue tester ("matches 14 of 19 sources"); re-classify dry-run/apply (writes `via: reclassify`); agent schema proposals queue; `scripts/export_ontology.py` for SKOS Turtle / JSON-LD.
+- **As built** ([ontology.md](ontology.md) §Evolution): class suggestions are asked for on demand per unclassified document (not at ingest, so ingest keeps at most one extra LLM call); re-classify covers `class` and `work`, not relations; the editor covers local classes and document facts (relations and aliases via export/import); the exports also have download buttons in the Overview.
 
 ### Phase 8 — Optional
 

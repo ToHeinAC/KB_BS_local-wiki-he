@@ -12,6 +12,7 @@ Rules: [AGENTS.md](AGENTS.md). Design: [docs/architecture.md](docs/architecture.
 | Tests (fast loop) | `uv run pytest` or `uv run pytest tests/test_wiki_engine.py` |
 | Full gate | `uv run pre-commit run --all-files` |
 | Ontology detection bench | `uv run python scripts/bench_ontology_detect.py` (see [docs/ontology.md](docs/ontology.md)) |
+| Ontology export (SKOS / JSON-LD) | `uv run python scripts/export_ontology.py --db <DB> --out <dir>` |
 | Ontology search eval | `uv run python scripts/eval_ontology_search.py --root <scratch dir>` (downloads public law texts; never writes `data/`) |
 | Optional reranker | `uv sync --inexact --extra rerank` (see [docs/retrieval.md](docs/retrieval.md)) |
 
@@ -34,7 +35,7 @@ One row per PRD milestone. Status: `planned`, `in progress`, `done`.
 | 3 | M3: Research and chat agents | done | `test_agent`, `test_chat_agent`, `test_tools`, `test_deep_research_agent` |
 | 4 | M4: Web UI | done | `test_app` |
 | 5 | M5: Quality gate (claude-dev-schema) | done | `uv run pre-commit run --all-files` green (3.11, 3.13) |
-| 6 | M6: Ontology ([plan](docs/_plan-ontology.md) phases 1–8) | in progress (plan phases 1–6 done) | `test_ontology`, `test_ontology_store`, `test_ontology_bundle`, `test_ontology_detect`, `test_ontology_ingest`, `test_ontology_query`, `test_ontology_search`, `test_ontology_time`, `test_ontology_time_search`, `test_ontology_merge`, `test_ontology_outdated`, `test_ontology_relations`, `test_ontology_relations_flow`, `test_delete_source`, `test_app`; `scripts/bench_ontology_detect.py`, `scripts/eval_ontology_search.py` |
+| 6 | M6: Ontology ([plan](docs/_plan-ontology.md) phases 1–8) | in progress (plan phases 1–7 done) | `test_ontology`, `test_ontology_store`, `test_ontology_bundle`, `test_ontology_detect`, `test_ontology_ingest`, `test_ontology_query`, `test_ontology_search`, `test_ontology_time`, `test_ontology_time_search`, `test_ontology_merge`, `test_ontology_outdated`, `test_ontology_relations`, `test_ontology_relations_flow`, `test_ontology_evolution`, `test_ontology_evolution_flow`, `test_ontology_export`, `test_delete_source`, `test_app`; `scripts/bench_ontology_detect.py`, `scripts/eval_ontology_search.py` |
 | – | Extensions beyond the original spec (no PRD milestone): hybrid retrieval stages A–F, multi-DB + auth, OKF bundle, language pinning, GPU pinning | done | `test_lex_index`, `test_embed_index`, `test_rerank`, `test_calibrate`, `test_multi_db`, `test_auth`, `test_lang`, `test_page_language`, `test_gpu_placement` |
 
 ## 3. Module map
@@ -52,7 +53,7 @@ Full responsibilities per module: [docs/architecture.md](docs/architecture.md) �
 | `agent.py`, `chat_agent.py`, `tools.py`, `run_memory.py` | LangGraph agents (Quick research, Deep chat), their tools and loop guard |
 | `deep_research_agent.py`, `vendor/` | Web-only Deep research over vendored `open_deep_research` ([docs/deep_research.md](docs/deep_research.md)) |
 | `okf.py`, `lang.py`, `page_lang.py`, `graph_export.py` | OKF stamping, language pinning, graph analytics |
-| `ontology.py`, `ontology_bundle.py`, `ontology_store.py`, `ontology_detect.py`, `ontology_query.py`, `ontology_time.py`, `ontology_graph.py`, `ontology_ui.py`, `ontology/*.yaml` | Ontology schema modules, validation, per-DB fact ledger, export/import with revisions, detection at upload, page stamping, the ontology stage in every search, valid time, relations/binding/lint, Maintenance → Ontology ([docs/ontology.md](docs/ontology.md)) |
+| `ontology.py`, `ontology_bundle.py`, `ontology_store.py`, `ontology_detect.py`, `ontology_query.py`, `ontology_time.py`, `ontology_graph.py`, `ontology_evolution.py`, `ontology_export.py`, `ontology_ui.py`, `ontology/*.yaml` | Ontology schema modules, validation, per-DB fact ledger, export/import with revisions, detection at upload, page stamping, the ontology stage in every search, valid time, relations/binding/lint, editor/cue tester/re-classify/suggestions, SKOS/JSON-LD export, Maintenance → Ontology ([docs/ontology.md](docs/ontology.md)) |
 | `db_context.py`, `auth.py` | Per-DB paths and search scope; users, bcrypt, DB allowlists |
 | `prompts.py`, `schema_loader.py` | All prompt strings; `SCHEMA.md` / `SCHEMA_QUERY.md` injection |
 | `tests/test_code_rules.py`, `tests/test_docs.py` | Gate rules: functions ≤ 50 lines; doc size limits and local links |

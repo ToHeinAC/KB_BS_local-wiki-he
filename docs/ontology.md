@@ -6,11 +6,11 @@ append-only ledger of facts about the DB's sources. Rationale:
 detection at ingest, ontology-aware search, time): [_plan-ontology.md](_plan-ontology.md).
 Phase status: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §2.
 
-**Built so far (plan Phases 1–6):** shared schema modules, per-DB binding, schema
+**Built so far (plan Phases 1–7):** shared schema modules, per-DB binding, schema
 validation, the fact ledger with projection, retraction on `delete_source`, the
 Maintenance → Ontology workbench (view, export, hand-edit, import, history, restore,
 proposals), detection at upload, stamping of source-summary pages, and the ontology
-stage in every search (§Search), valid time (§Time), and relations with binding paths and lint (§Relations).
+stage in every search (§Search), valid time (§Time), relations with binding paths and lint (§Relations), and the tools to evolve it (§Evolution).
 
 ## Storage
 
@@ -48,6 +48,9 @@ stage in every search (§Search), valid time (§Time), and relations with bindin
   `outdated_pages`, `validity_order` (§Time).
 - `src/ontology_graph.py` is pure: `chain`, `binding_of`, `describe`, `lint`
   (§Relations); relation detection is `ontology_detect.detect_relations`.
+- `src/ontology_evolution.py` is pure: `editor_tables` / `state_from_tables`,
+  `cue_matches`, `reclassify_changes` / `reclassify_rows`, `parse_class_suggestion`;
+  `src/ontology_export.py` is pure: `skos_turtle`, `facts_jsonld` (§Evolution).
 - `src/ontology_ui.py` renders the Maintenance → Ontology section and the Upload
   review-table columns. `wiki_engine` holds the orchestration: `apply_ontology`,
   `record_source_ontology`, `finish_ontology_batch`, `decide_proposal`,
@@ -385,6 +388,41 @@ warns; it never decides a legal conflict.
 version in force today), coloured apart and with arrowheads in the Galaxy and Pyramid
 layouts. *Pyramid* puts documents in rows by their class `rank` (1 = top; unranked last)
 and hides pages.
+
+## Evolution (plan Phase 7)
+
+Every change below goes through the one write path (`prepare_*` → preview → `apply`:
+validated, maintainer-checked, revisioned, logged).
+
+- **Editor** (Ontology → *Edit*): two tables — local classes (id, broader, labels, one-line
+  definition, cues separated by ` || `, deprecated, replaced_by) and one row per document
+  (class, work, version date). Fields the table does not show (rank, norm, notes,
+  relations, aliases) are kept. The preview is the import preview; *Apply changes*
+  records a `via: editor` revision. Deprecating a used class with a `replaced_by` moves
+  its facts to the replacement.
+- **Cue tester** (Ontology → *Cues*): "Matches n of m documents" with the matching line,
+  on the same 4000-character heads detection reads; invalid or empty-matching patterns
+  are refused.
+- **Re-classify** (same view): a dry-run table of what the current cues would change —
+  `update` / `withdraw` for facts code made, `kept-user` for decisions a person made,
+  which are never touched. *Apply re-classify* retracts the outdated rule rows, asserts
+  the new ones and records a `via: reclassify` revision. Covers `class` and `work`.
+- **Class suggestions** (Ontology → *Proposals*): for an unclassified document a
+  maintainer can ask the model (`ONTOLOGY_SUGGEST_CLASS_PROMPT`, one call) for a new class.
+  Code rejects it unless the id is new and well-formed, the broader class exists, the
+  definition is one line, both labels are given, and the cue compiles and matches the
+  document. Valid suggestions wait in `data/<DB>/ontology/schema_proposals.jsonl`
+  (append-only); *Accept* adds the class to the local extension and types the document
+  (a `via: review` revision), *Reject* only closes it. A live run with gemma4:e4b on a KI
+  document produced a valid but broad cue (`YouTube|World's Fair`) — test cues before
+  accepting.
+- **Standard exports** (Overview buttons, or
+  `uv run python scripts/export_ontology.py --db <DB> --out <dir>`): the schema as a SKOS
+  concept scheme in Turtle (`skos:broader`, de/en `skos:prefLabel`, `owl:deprecated` +
+  `dct:isReplacedBy`, relations as `owl:ObjectProperty` mapped to ELI), the facts as
+  JSON-LD with schema.org `Legislation` terms (`legislationTransposes`,
+  `legislationDateVersion`, `exampleOfWork`, `legislationLegalForce`) and `eli:based_on`.
+  Relation attributes are not exported. Both parse with rdflib (tested).
 
 ## Deletion
 
