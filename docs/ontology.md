@@ -6,11 +6,11 @@ append-only ledger of facts about the DB's sources. Rationale:
 detection at ingest, ontology-aware search, time): [_plan-ontology.md](_plan-ontology.md).
 Phase status: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §2.
 
-**Built so far (plan Phases 1–7):** shared schema modules, per-DB binding, schema
+**Built so far (plan Phases 1–8):** shared schema modules, per-DB binding, schema
 validation, the fact ledger with projection, retraction on `delete_source`, the
 Maintenance → Ontology workbench (view, export, hand-edit, import, history, restore,
 proposals), detection at upload, stamping of source-summary pages, and the ontology
-stage in every search (§Search), valid time (§Time), relations with binding paths and lint (§Relations), and the tools to evolve it (§Evolution).
+stage in every search (§Search), valid time (§Time), relations with binding paths and lint (§Relations), the tools to evolve it (§Evolution), and classes for wiki concept pages plus an `ai-tech` module for the KI database (§Pages). §-level validity is not built.
 
 ## Storage
 
@@ -58,7 +58,11 @@ stage in every search (§Search), valid time (§Time), relations with binding pa
 
 ## Schema modules
 
-Shipped: `core` (domain-agnostic genres: `document` and its children `legal-instrument`,
+Shipped: `ai-tech` (plan Phase 8: AI/technology genres `research-paper`,
+`research-report`, `talk-transcript`, `technical-guide`, `buying-advice`,
+`organisation-profile` with cues, and page classes under `topic` — `ai-model`,
+`technique`, `organisation`, `product`, `person`, `phenomenon` — with `applies_to: page`
+and no cues; bound to KI only), `core` (domain-agnostic genres: `document` and its children `legal-instrument`,
 `standard`, `guidance`, `decision`, `procedure`, `report`, `dataset`, `correspondence`,
 `contract`; relations `is_part_of`, `cites`, `replaces`) and `legal-de` (the German/EU legal
 hierarchy, requires `core@^1`; classes with `rank`, `norm` and provisional `cues`; relations
@@ -423,6 +427,29 @@ validated, maintainer-checked, revisioned, logged).
   JSON-LD with schema.org `Legislation` terms (`legislationTransposes`,
   `legislationDateVersion`, `exampleOfWork`, `legislationLegalForce`) and `eli:based_on`.
   Relation attributes are not exported. Both parse with rdflib (tested).
+
+## Pages (plan Phase 8)
+
+Classes with `applies_to: page` describe what a wiki concept/entity page is about; classes
+with `applies_to: source` (the default) describe documents. Detection cues and the
+document classification prompt only ever use document classes.
+- **Proposals only:** Ontology → *Proposals* → *Classify concept pages* asks the model for
+  up to 10 unclassified concept/entity pages (one call each, `ONTOLOGY_CLASSIFY_PROMPT`
+  with the page classes). An answer is kept only as a proposal with a quote found
+  verbatim in the page; pages with a class or an open proposal are skipped.
+- **Facts** live under `page:<file>` (exchange file: `facts.pages`). A confirmed class is
+  stamped as `class:` on the page (`_ontology_stamp` knows the file name at ingest and in
+  `restamp_summaries`, which now covers every page).
+- **Search:** a class word ("Verfahren", "KI-Modell") also lifts the pages of that class
+  in wiki scope (the ontology arm), lexical hits only.
+
+**KI (the only database this phase touched):** `ai-tech` bound (revision 3), re-classify
+applied (revision 4: 14 rule facts; 3 earlier manual facts kept as user decisions), and
+7 page-class proposals from 10 pages asked (gemma4:e4b, ~52 s) waiting for review.
+Detection on KI's 18 documents (`bench/fixture_ontology_detect_KI.json`, names only —
+texts stay in `data/KI`): precision 16/16, coverage 16/18 (two architecture explainers
+have no genre words in their head) — **in-sample**, since the cues were written after
+reading these documents.
 
 ## Deletion
 

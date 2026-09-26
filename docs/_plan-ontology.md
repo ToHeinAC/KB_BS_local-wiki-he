@@ -385,6 +385,7 @@ Report §10 Phase 4, adapted: an in-GUI editor (`st.data_editor` for local class
 ### Phase 8 — Optional
 
 Classes for concept pages, §-level validity, modules for other DBs (report §10 Phase 5).
+- **As built** ([ontology.md](ontology.md) §Pages and the ai-tech module), scoped to the KI database at the user's request (2026-09-26): an `ai-tech` module bound to KI only, concept-page classes as reviewed proposals, a KI gold set. §-level validity was not built: KI holds no statutes, so there is nothing in it to build or check it on. No other database was touched.
 
 ---
 
