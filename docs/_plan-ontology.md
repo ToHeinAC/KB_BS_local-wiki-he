@@ -117,19 +117,17 @@ schema:
     relations: {}
 facts:
   works:
-    attention-2017: {class: report, aliases: [Transformer paper]}
+    attention-2017: {class: report, aliases: [Transformer paper], cites: [seq2seq-2014]}
   sources:
     NIPS-2017-attention-is-all-you-need-Paper.md: {class: report, work: attention-2017,
                                                   version_date: 2017-06-12}
-  relations:
-    - {from: attention-2017, rel: cites, to: seq2seq-2014}
-reference:                       # read-only: resolved shared modules, for orientation
-  core@1.0.0: {classes: {...}, relations: {...}}
+reference:                       # read-only: the bound shared modules, for orientation
+  core: {id: core, version: 1.0.0, classes: {...}, relations: {...}}
 ```
 
-**Canonical form** (the basis for "actual change", D8): parse with `yaml.safe_load`; keep only `schema.modules`, `schema.local.{classes,relations}`, `facts`; drop `format`, `db`, `revision`, `base_revision`, `exported_*`, `reference`, `schema.local.version`; strip strings; dates as ISO strings; set-like lists (`modules`, `aliases`, `cues`, `labels`) sorted and de-duplicated; `facts.relations` sorted by `(from, rel, to)`; empty maps and `null` values removed; sorted-key compact JSON. **Revision hash** = first 12 hex chars of SHA-256 over that JSON. Two files are "the same ontology" exactly when their hashes match.
+**Canonical form** (the basis for "actual change", D8): parse with `yaml.safe_load`; keep only `schema.modules`, `schema.local.{classes,relations}`, `facts`; drop `format`, `db`, `revision`, `base_revision`, `exported_*`, `reference`, `schema.local.version`; strip strings; dates as ISO strings; every list of scalars is a set (sorted, de-duplicated); empty maps, empty strings, `null` and `false` removed; sorted-key compact JSON. **Revision hash** = first 12 hex chars of SHA-256 over that JSON. Two files are "the same ontology" exactly when their hashes match.
 
-`facts` in the file is the **projection** (current confirmed values). Proposals are not exported; they stay in the GUI review panel (Phase 3+).
+`facts` in the file is the **projection** (current confirmed values); relations are list-valued keys on their subject, like `aliases`. As built: [ontology.md](ontology.md) §Workbench. Proposals are not exported; they stay in the GUI review panel (Phase 3+).
 
 ### 3.3 Import pipeline
 
