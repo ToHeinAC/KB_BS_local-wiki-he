@@ -3,9 +3,10 @@
 # `rank` orders the pyramid for layout and lint heuristics only; it never decides conflicts.
 # `norm`: true = abstract legal norm, internal = binds the administration/organisation,
 # individual = concrete-individual act, false = not a legal norm.
-# Cues are provisional until measured against the gold set (plan Phase 3).
+# Cues are matched on the first 4000 characters; the match that ends first wins
+# (src/ontology_detect.py). Measured with scripts/bench_ontology_detect.py.
 id: legal-de
-version: 0.1.0
+version: 0.1.1
 requires: ["core@^1"]
 description: German and EU legal instruments, technical rules and decisions.
 
@@ -16,14 +17,14 @@ classes:
     norm: true
     labels: {en: EU regulation, de: EU-Verordnung}
     definition: EU/Euratom regulation; directly applicable in every member state
-    cues: ['Verordnung\s*\((EU|EG|Euratom)\)']
+    cues: ['(?i)verordnung\s*\((eu|eg|euratom)\)']
   eu-directive:
     broader: legal-instrument
     rank: 1
     norm: true
     labels: {en: EU directive, de: EU-Richtlinie}
     definition: EU/Euratom directive; binds member states, needs national transposition
-    cues: ['Richtlinie\s+\d{4}/\d+/(EU|EG|Euratom)']
+    cues: ['(?i)richtlinie\s+\d{4}/\d+/(eu|eg|ewg|euratom)\b']
   constitution:
     broader: legal-instrument
     rank: 2
@@ -37,7 +38,7 @@ classes:
     norm: true
     labels: {en: Federal act, de: Bundesgesetz}
     definition: Statute passed by the Bundestag
-    cues: ['Der Bundestag hat', '^[^\n]*[Gg]esetz\b']
+    cues: ['Der Bundestag hat', '^(?![^\n]*Grundgesetz)[^\n]*[Gg]esetz\b']
   state-act:
     broader: legal-instrument
     rank: 3
@@ -51,14 +52,14 @@ classes:
     norm: true
     labels: {en: Ordinance, de: Rechtsverordnung}
     definition: Rechtsverordnung issued on the basis of a statutory authorisation
-    cues: ['\bverordnet\b', '^[^\n]*Verordnung\b']
+    cues: ['\bverordnet\b', '^(?![^\n]*\((EU|EG|EWG|Euratom)\))[^\n]*Verordnung\b']
   admin-regulation:
     broader: legal-instrument
     rank: 5
     norm: internal
     labels: {en: Administrative regulation, de: Verwaltungsvorschrift}
     definition: Administrative regulation binding the authorities (e.g. AVV, TA Luft)
-    cues: ['Allgemeine Verwaltungsvorschrift']
+    cues: ['Allgemeinen?\s+Verwaltungsvorschrift']
   ministerial-guideline:
     broader: guidance
     rank: 6

@@ -1,0 +1,38 @@
+{
+  "_note": "Heads (first ~3 KB) of public legal texts. German federal law: gesetze-im-internet.de, fetched 2026-09-26 (amtliche Werke, §5 UrhG). TA Luft: verwaltungsvorschriften-im-internet.de. EU acts: title blocks reconstructed from the Official Journal (EUR-Lex blocks scripted access). negatives_db: every raw file of that database must get no legal class.",
+  "files": {
+    "strlschg.md": {
+      "class": "federal-act",
+      "work": "de-strlschg-2017"
+    },
+    "strlschv_2018.md": {
+      "class": "ordinance",
+      "work": "de-strlschv-2018"
+    },
+    "atg.md": {
+      "class": "federal-act",
+      "work": "de-atg-1959"
+    },
+    "gg.md": {
+      "class": "constitution",
+      "work": "de-gg-1949"
+    },
+    "bimschg.md": {
+      "class": "federal-act",
+      "work": "de-bimschg-1974"
+    },
+    "ta_luft.md": {
+      "class": "admin-regulation",
+      "work": null
+    },
+    "eu_dir_2013_59.md": {
+      "class": "eu-directive",
+      "work": "eu-dir-2013-59-euratom"
+    },
+    "eu_reg_2016_679.md": {
+      "class": "eu-regulation",
+      "work": "eu-reg-2016-679"
+    }
+  },
+  "negatives_db": "KI"
+}

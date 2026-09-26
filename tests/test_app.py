@@ -740,3 +740,50 @@ def test_ontology_views_render_and_restore_makes_a_new_revision(wiki):
     assert [r["via"] for r in ontology_store.history()] == ["create", "import", "restore"]
     assert ontology_store.current_state()["facts"] == {}
     assert "Applied revision 3" in _texts(_ok(at).success)
+
+
+def _legal_ontology() -> None:
+    import ontology_store
+
+    plan = ontology_store.prepare_state({"schema": {"modules": ["core", "legal-de"]}})
+    wiki_engine.apply_ontology(plan, user=ADMIN, via="create")
+
+
+def test_upload_into_an_ontology_db_records_detected_facts(wiki, ingest_stub):
+    import ontology_store
+
+    _legal_ontology()
+    head = (Path(APP).parents[1] / "bench" / "ontology_detect" / "strlschv_2018.md").read_bytes()
+    at = _app().run()
+    at.file_uploader[0].set_value(("strlschv.md", head, "text/markdown")).run()
+    assert "Class and work are detected" in _texts(_ok(at).caption)
+    _click_label(at, "Ingest 1 file(s)")
+    facts = ontology_store.source_facts("strlschv.md")
+    assert (facts["class"], facts["work"]) == ("ordinance", "de-strlschv-2018")
+    assert [r["via"] for r in ontology_store.history()] == ["create", "ingest"]
+
+
+def test_upload_without_ontology_shows_no_ontology_columns(wiki, ingest_stub):
+    at = _app().run()
+    at.file_uploader[0].set_value(("notes.md", b"# Notes", "text/markdown")).run()
+    assert "Class and work are detected" not in _texts(_ok(at).caption)
+
+
+def test_ontology_proposals_can_be_confirmed(wiki):
+    import dedup
+    import ontology
+    import ontology_store
+
+    _legal_ontology()
+    dedup.register_file(b"note", "note.md")
+    proposal = ontology.assertion(
+        "src:note.md", "class", "report", by="llm", status="proposed", evidence="A quote."
+    )
+    ontology_store.append_rows([proposal])
+    at = _maint(_app(), "Ontology")
+    assert "1 open proposal(s)" in _texts(at.markdown)
+    at.segmented_control(key="onto_view").set_value("Proposals").run()
+    [row] = ontology_store.proposals()
+    at.button(key=f"onto_ok_{row['id']}").click().run()
+    assert ontology_store.source_facts("note.md") == {"class": "report"}
+    assert "Confirmed — revision 2." in _texts(_ok(at).success)

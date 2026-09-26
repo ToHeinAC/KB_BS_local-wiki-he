@@ -33,7 +33,7 @@ import ontology
 import ontology_bundle as bundle
 
 MODULE_DIR = Path(__file__).resolve().parents[1] / "ontology"
-HUMAN_VIA = ("create", "import", "editor", "restore")
+HUMAN_VIA = ("create", "import", "editor", "restore", "review")
 MAX_DIFF_ROWS = 200
 
 _ROW_ID_RE = re.compile(r"^a-(\d+)$")
@@ -428,3 +428,48 @@ def record_change(via: str, user: str | None = None) -> dict[str, Any] | None:
         rows = history()
         before = _snapshot_state(f"{rows[-1]['seq']:04d}-*.yaml") if rows else None
         return _record(via, user, before or {"schema": {}, "facts": {}})
+
+
+# --- per-source facts and proposals (plan Phase 3) --------------------------------------
+
+
+def source_facts(source: str) -> dict[str, Any]:
+    """Current confirmed facts about one raw source ({} without an ontology)."""
+    if not exists():
+        return {}
+    multi = _multi_valued(shared_modules(), _binding_data())
+    return ontology.project(read_rows(), multi).get(f"src:{source}", {})
+
+
+def proposals() -> list[dict[str, Any]]:
+    """Live `proposed` rows (e.g. an LLM class with its verified quote), oldest first."""
+    return [r for r in ontology.live_rows(read_rows()) if r.get("status") == "proposed"]
+
+
+def decide_proposal(row_id: str, *, accept: bool, user: str) -> dict[str, Any] | None:
+    """Confirm (as a `user` fact) or reject a proposal; either way it is withdrawn.
+    Returns the revision a confirmation records (None for a rejection)."""
+    if not auth.is_maintainer(user, db_context.get_active_db()):
+        raise PermissionError(f"{user!r} does not maintain this database")
+    with _locked():
+        row = next((r for r in proposals() if r["id"] == row_id), None)
+        if row is None:
+            raise KeyError(row_id)
+        before = current_state()
+        reason = "confirmed" if accept else "rejected"
+        rows = [ontology.retraction(row, by="user", reason=reason, user=user)]
+        if accept:
+            rows.insert(
+                0,
+                ontology.assertion(
+                    row["subject"],
+                    row["predicate"],
+                    row["object"],
+                    by="user",
+                    user=user,
+                    evidence=str(row.get("evidence") or ""),
+                    negated=bool(row.get("negated")),
+                ),
+            )
+        _append_rows_unlocked(rows)
+        return _record("review", user, before)

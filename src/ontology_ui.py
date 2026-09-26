@@ -16,10 +16,11 @@ import streamlit as st
 import db_context
 import ontology
 import ontology_bundle as bundle
+import ontology_detect
 import ontology_store
 import wiki_engine
 
-VIEWS = ["Overview", "Classes", "Facts", "History", "Import"]
+VIEWS = ["Overview", "Classes", "Facts", "Proposals", "History", "Import"]
 
 
 def render(user: str, can_maintain: bool) -> None:
@@ -48,6 +49,8 @@ def render(user: str, can_maintain: bool) -> None:
         _render_classes(schema)
     elif view == "Facts":
         _render_facts()
+    elif view == "Proposals":
+        _render_proposals(user, can_maintain)
     elif view == "History":
         _render_history(user, can_maintain)
     else:
@@ -136,6 +139,9 @@ def _render_header(user: str) -> None:
     rows = ontology_store.history()
     unrecorded = bool(rows) and rows[-1]["hash"] != rev
     note = " · *changed since the last recorded revision*" if unrecorded else ""
+    open_proposals = len(ontology_store.proposals())
+    if open_proposals:
+        note += f" · **{open_proposals} open proposal(s)**"
     st.markdown(f"**Revision {seq}** · `{rev}`{note}")
     st.markdown(_change_line("Last change", ontology_store.last_change(human=True)))
     st.markdown(_change_line("Last automatic change", ontology_store.last_change(human=False)))
@@ -347,3 +353,86 @@ def _render_import(user: str, can_maintain: bool) -> None:
     elif st.button("Apply import", key="onto_apply", type="primary"):
         sha = hashlib.sha256(data).hexdigest()
         _apply(plan, user, "import", upload.name, sha)
+
+
+# --- proposals (plan Phase 3) ----------------------------------------------------------
+
+
+def _decide(row_id: str, accept: bool, user: str) -> None:
+    try:
+        row = wiki_engine.decide_proposal(row_id, accept=accept, user=user)
+    except (KeyError, PermissionError, ontology_store.StaleRevisionError) as exc:
+        st.error(str(exc))
+        return
+    st.session_state["onto_notice"] = (
+        f"Confirmed — revision {row['seq']}." if row else "Proposal rejected."
+    )
+    st.rerun()
+
+
+def _render_proposals(user: str, can_maintain: bool) -> None:
+    rows = ontology_store.proposals()
+    if not rows:
+        st.info("No open proposals.")
+        return
+    st.caption(
+        "Suggested by the model when no cue matched. Each quote was checked to occur "
+        "verbatim in the document. Confirm to make it a fact, or reject it."
+    )
+    for r in rows:
+        subject = str(r["subject"]).split(":", 1)[1]
+        with st.container(border=True):
+            st.markdown(f"**{subject}** · `{r['predicate']}` = `{r['object']}`")
+            st.caption(f"“{r.get('evidence') or ''}”")
+            if can_maintain:
+                ok, no = st.columns(2)
+                if ok.button("Confirm", key=f"onto_ok_{r['id']}"):
+                    _decide(r["id"], True, user)
+                if no.button("Reject", key=f"onto_no_{r['id']}"):
+                    _decide(r["id"], False, user)
+
+
+# --- upload review table (plan Phase 3) --------------------------------------------------
+
+
+def upload_schema() -> ontology.Schema | None:
+    """The active DB's schema when it has a valid ontology, else None (no extra columns)."""
+    if not ontology_store.exists():
+        return None
+    schema, _ = ontology_store.load()
+    return schema
+
+
+def detected(text: str, version_date: str, schema: ontology.Schema) -> dict[str, Any]:
+    return ontology_detect.detected_dict(ontology_detect.detect(text, schema), version_date)
+
+
+def review_rows(rows: list[dict[str, Any]], prepared: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The date rows plus prefilled Class / Work and the sources already filed under
+    that work (read-only)."""
+    by_work: dict[str, list[str]] = {}
+    for source, facts in ontology_store.current_state()["facts"].get("sources", {}).items():
+        if facts.get("work"):
+            by_work.setdefault(str(facts["work"]), []).append(source)
+    out: list[dict[str, Any]] = []
+    for row, f in zip(rows, prepared, strict=True):
+        det = bundle.as_map(f.get("ontology"))
+        others = ", ".join(sorted(by_work.get(det.get("work", ""), [])))
+        out.append(
+            {
+                **row,
+                "Class": det.get("class", ""),
+                "Work": det.get("work", ""),
+                "Other versions": others,
+            }
+        )
+    return out
+
+
+def review_column_config(schema: ontology.Schema) -> dict[str, Any]:
+    options = ["", *sorted(cid for cid, c in schema.classes.items() if not c.deprecated)]
+    return {
+        "Class": st.column_config.SelectboxColumn("Class", options=options),
+        "Work": st.column_config.TextColumn("Work id"),
+        "Other versions": st.column_config.TextColumn("Other versions in this DB"),
+    }

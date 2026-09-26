@@ -611,3 +611,16 @@ def project(rows: list[dict[str, Any]], multi: set[str]) -> dict[str, dict[str, 
             if isinstance(value, list):
                 facts[pred] = sorted(cast("list[Any]", value), key=str)
     return out
+
+
+# --- page stamping (report §4.4) ---------------------------------------------------
+
+STAMP_KEYS = ("class", "work", "version_date")
+
+
+def stamp_meta(meta: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
+    """Frontmatter with the code-owned ontology keys set from ``facts`` (a source's
+    projection) and removed where the fact is absent. Other keys are untouched."""
+    out = {k: v for k, v in meta.items() if k not in STAMP_KEYS}
+    out.update({k: facts[k] for k in STAMP_KEYS if facts.get(k) is not None})
+    return out

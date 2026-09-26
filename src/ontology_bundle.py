@@ -44,7 +44,7 @@ _TOP_KEYS = {
     "reference",
 }
 _STRUCTURAL = {"broader", "domain", "range", "inverse", "target", "transitive", "deprecated"}
-_WORK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
+WORK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _MISSING = object()
 _HEADER = """\
@@ -357,7 +357,7 @@ def schema_for(state: object, shared: dict[str, Any]) -> tuple[ontology.Schema |
     return ontology.build_schema([shared[i] for i in ids] + ([local] if local else []))
 
 
-def _is_date(value: object) -> bool:
+def is_date(value: object) -> bool:
     if not (isinstance(value, str) and _DATE_RE.match(value)):
         return False
     try:
@@ -372,10 +372,10 @@ def _value_error(pred: str, value: object, schema: ontology.Schema) -> str | Non
     if pred == "class":
         return None if value in schema.classes else f"unknown class {value!r}"
     if pred == "work":
-        ok = isinstance(value, str) and _WORK_ID_RE.match(value)
+        ok = isinstance(value, str) and WORK_ID_RE.match(value)
         return None if ok else f"`work` must be a lowercase work id, got {value!r}"
     if pred in DATES:
-        return None if _is_date(value) else f"`{pred}` must be a date YYYY-MM-DD, got {value!r}"
+        return None if is_date(value) else f"`{pred}` must be a date YYYY-MM-DD, got {value!r}"
     if pred == "in_force":
         return None if value in IN_FORCE else f"`in_force` must be one of {IN_FORCE}"
     if pred in TEXTS:
@@ -423,7 +423,7 @@ def validate_facts(
             where = f"facts > {section} > {key}"
             if section == "sources" and key not in known_sources:
                 errors.append(f"{where}: unknown source (not in this database)")
-            elif section == "works" and not _WORK_ID_RE.match(key):
+            elif section == "works" and not WORK_ID_RE.match(key):
                 errors.append(f"{where}: invalid work id")
             errs, warns = _subject_issues(where, as_map(subject_facts), schema, works)
             errors += errs
@@ -465,9 +465,12 @@ def _removed_errors(current: object, merged: object, referenced: set[str]) -> li
 
 
 def _validate(
-    merged: dict[str, Any], current: object, shared: dict[str, Any], known: set[str],
+    merged: dict[str, Any],
+    current: object,
+    shared: dict[str, Any],
+    known: set[str],
     referenced: set[str],
-) -> tuple[dict[str, Any], list[str], list[str]]:  # fmt: skip
+) -> tuple[dict[str, Any], list[str], list[str]]:
     schema, errors = schema_for(merged, shared)
     if schema is None:
         return merged, errors, []

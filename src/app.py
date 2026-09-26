@@ -1120,6 +1120,7 @@ if page == "Upload":
             st.session_state.pop("batch_prepared", None)
             st.session_state.pop("convert_editor", None)
 
+        _onto_schema = ontology_ui.upload_schema()  # None: no ontology columns, no detection
         prepared: list[dict[str, Any]] | None = st.session_state.get("batch_prepared")
         if prepared is None:
             dupes = [n for n, b in raws.items() if dedup.is_duplicate(b)]
@@ -1162,6 +1163,10 @@ if page == "Upload":
                         "detected_date": metadata_extract.extract_effective_date(text) or "",
                     }
                 )
+                if _onto_schema is not None:
+                    prepared[-1]["ontology"] = ontology_ui.detected(
+                        text, prepared[-1]["detected_date"], _onto_schema
+                    )
             prog.empty()
             if not prepared:
                 st.stop()
@@ -1181,16 +1186,24 @@ if page == "Upload":
         st.markdown(
             "**Effective date** — auto-detected from each document; correct any before ingest."
         )
+        _review = [
+            {"File": f["save_name"], "effective as of": f["detected_date"]} for f in prepared
+        ]
+        _columns: dict[str, Any] = {
+            "File": st.column_config.TextColumn("File"),
+            "effective as of": st.column_config.TextColumn("effective as of (YYYY-MM-DD)"),
+        }
+        if _onto_schema is not None:  # ontology columns only for DBs that have one
+            st.caption("Class and work are detected from each document's head; correct any.")
+            _review = ontology_ui.review_rows(_review, prepared)
+            _columns.update(ontology_ui.review_column_config(_onto_schema))
         edited: list[dict[str, Any]] = st.data_editor(
-            [{"File": f["save_name"], "effective as of": f["detected_date"]} for f in prepared],
+            _review,
             key="date_editor",
             hide_index=True,
             use_container_width=True,
-            disabled=["File"],
-            column_config={
-                "File": st.column_config.TextColumn("File"),
-                "effective as of": st.column_config.TextColumn("effective as of (YYYY-MM-DD)"),
-            },
+            disabled=["File", "Other versions"],
+            column_config=_columns,
         )
         with st.expander("Optional shared metadata (applied to all files)"):
             shared_part = st.text_input("part of", key="batch_part_of")
@@ -1213,6 +1226,12 @@ if page == "Upload":
                 "files": files,
                 "dates": {r["File"]: str(r.get("effective as of") or "").strip() for r in edited},
                 "shared": {"part of": shared_part.strip(), "description": shared_desc.strip()},
+                "ontology": None
+                if _onto_schema is None
+                else {
+                    r["File"]: {"class": r.get("Class") or "", "work": r.get("Work") or ""}
+                    for r in edited
+                },
             }
             st.session_state["batch_ingesting"] = True
             st.rerun()
@@ -1233,6 +1252,7 @@ if page == "Upload":
                     "updated": [],
                     "contradictions": [],
                     "failed": [],
+                    "ontology": [],
                 }
                 finalized = False
                 prog = st.progress(0.0, text="Ingesting…")
@@ -1243,6 +1263,18 @@ if page == "Upload":
                             saved = dedup.register_file(
                                 f["raw"], f["save_name"], content=f["content_bytes"]
                             )
+                            if pending.get("ontology") is not None:
+                                review = {
+                                    **pending["ontology"].get(f["save_name"], {}),
+                                    "version_date": dates.get(f["save_name"], ""),
+                                }
+                                agg["ontology"] += wiki_engine.record_source_ontology(
+                                    f["text"],
+                                    saved.name,
+                                    review,
+                                    f.get("ontology") or {},
+                                    user=_user,
+                                )
                             chunks = file_processor.chunk_text(f["text"])
                             per_meta = {
                                 k: v
@@ -1266,6 +1298,8 @@ if page == "Upload":
                     prog.progress((i + 1) / len(files))
                 if not finalized and (agg["created"] or agg["updated"]):
                     wiki_engine.rebuild_lex_index()  # last file failed before finalize
+                if pending.get("ontology") is not None:
+                    wiki_engine.finish_ontology_batch(_user)
                 st.session_state.pop("batch_prepared", None)
                 st.session_state.pop("batch_key", None)
                 st.success("Ingest complete.")
@@ -1280,6 +1314,10 @@ if page == "Upload":
                     )
                 if agg["failed"]:
                     st.error("Failed:\n" + "\n".join(f"- {x}" for x in agg["failed"]))
+                if agg["ontology"]:
+                    st.warning(
+                        "Ontology values ignored:\n" + "\n".join(f"- {x}" for x in agg["ontology"])
+                    )
                 if agg["contradictions"]:
                     st.warning(
                         "Contradictions found:\n"

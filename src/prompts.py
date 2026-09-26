@@ -251,6 +251,19 @@ Rewrite it into clean, non-repetitive encyclopaedic prose. STRICT RULES:
 Page:
 {page}"""
 
+ONTOLOGY_CLASSIFY_PROMPT = """Classify the document below into exactly one class from this list.
+
+Classes (id: definition):
+{options}
+
+Document (beginning):
+<<<
+{head}
+>>>
+
+Answer with JSON only, nothing else:
+{{"class": "<one id from the list, or none>", "quote": "<one short sentence copied exactly from the document that shows this class>"}}"""
+
 DESCRIPTION_BUILD_PROMPT = """Write a concise high-level overview of the knowledge base "{db_name}".
 
 Wiki index (filename — description):

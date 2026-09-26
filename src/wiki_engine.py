@@ -23,7 +23,9 @@ import lang
 import lex_index
 import okf
 import ollama_client
+import ontology
 import ontology_bundle
+import ontology_detect
 import ontology_store
 import page_lang
 import qa_gen
@@ -40,6 +42,7 @@ from prompts import (
     INGEST_LANGUAGE_DIRECTIVE,
     INGEST_PROMPT,
     LINT_PROMPT,
+    ONTOLOGY_CLASSIFY_PROMPT,
     RESOLVE_CONTRADICTION_PROMPT,
     SELECT_PROMPT,
     USER_META_PROMPT,
@@ -850,7 +853,45 @@ def _okf_apply(content: str) -> str:
             content = _set_meta(content, lang=page_lang.page_lang(content))
     except Exception:
         pass
+    content = _ontology_stamp(content)
     return okf.apply_to_page(content, db=db_context.get_active_db())
+
+
+_SOURCE_SECTION_RE = re.compile(r"\s+[§#].*$")
+
+
+def _ontology_stamp(content: str) -> str:
+    """Re-stamp a source-summary's ontology keys from the ledger (never LLM-written)."""
+    if not ontology_store.exists():
+        return content
+    try:
+        post = frontmatter.loads(content)
+    except Exception:
+        return content
+    sources = ontology_bundle.as_list(post.metadata.get("sources"))
+    if post.metadata.get("type") != "source-summary":
+        return content
+    source = _SOURCE_SECTION_RE.sub("", str(sources[0])) if sources else ""
+    facts = ontology_store.source_facts(source) if source else {}
+    meta = ontology.stamp_meta(dict(post.metadata), facts)
+    if meta == post.metadata:
+        return content
+    post.metadata = meta
+    return frontmatter.dumps(post) + "\n"
+
+
+def restamp_summaries() -> int:
+    """Re-stamp every source-summary page after ontology facts changed; returns the count."""
+    if not ontology_store.exists():
+        return 0
+    changed = 0
+    for path in sorted(_wiki().glob("summary-*.md")):
+        content = path.read_text()
+        stamped = _ontology_stamp(content)
+        if stamped != content:
+            path.write_text(stamped)
+            changed += 1
+    return changed
 
 
 def _clean_refs(content: str) -> str:
@@ -1474,6 +1515,64 @@ def apply_ontology(
     """Apply an ontology plan (see `ontology_store.apply`) and log it in `log.md`."""
     row = ontology_store.apply(plan, user=user, via=via, file_name=file_name, file_sha=file_sha)
     _log_ontology_change(row)
+    restamp_summaries()
+    return row
+
+
+def _propose_class(text: str, schema: ontology.Schema) -> tuple[str, str] | None:
+    """One small LLM call; kept only with a verbatim quote (fail open on any error)."""
+    options = ontology_detect.classify_options(schema)
+    head = text[: ontology_detect.HEAD_CHARS]
+    listing = "\n".join(f"- {cid}: {definition}" for cid, definition in options.items())
+    prompt = ONTOLOGY_CLASSIFY_PROMPT.format(options=listing, head=head)
+    try:
+        answer = ollama_client.generate(
+            "", prompt, temperature=0.0, model_id=ollama_client.FAST_MODEL
+        )
+    except Exception:
+        return None
+    return ontology_detect.parse_proposal(answer, head, set(options))
+
+
+def record_source_ontology(
+    text: str, source: str, review: dict[str, str], detected: dict[str, Any], *, user: str
+) -> list[str]:
+    """Store an uploaded source's reviewed ontology facts (call before `ingest_begin`, so
+    its summary page is stamped at creation). Without a class, the LLM may *propose* one.
+    Returns warnings about review values that were ignored. No-op without an ontology."""
+    if not ontology_store.exists():
+        return []
+    schema, _ = ontology_store.load()
+    if schema is None:
+        return []
+    rows, warnings = ontology_detect.upload_rows(source, review, detected, schema, user=user)
+    if not (review.get("class") or "").strip():
+        proposal = _propose_class(text, schema)
+        if proposal:
+            cls, quote = proposal
+            rows.append(
+                ontology.assertion(
+                    f"src:{source}", "class", cls, by="llm", status="proposed", evidence=quote
+                )
+            )
+    ontology_store.append_rows(rows)
+    return warnings
+
+
+def finish_ontology_batch(user: str) -> None:
+    """After an upload batch: one `ingest` revision, its log line, fresh page stamps."""
+    row = ontology_store.record_change("ingest", user)
+    _log_ontology_change(row)
+    if row:
+        restamp_summaries()
+
+
+def decide_proposal(row_id: str, *, accept: bool, user: str) -> dict[str, Any] | None:
+    """Confirm or reject an ontology proposal (see `ontology_store.decide_proposal`)."""
+    row = ontology_store.decide_proposal(row_id, accept=accept, user=user)
+    _log_ontology_change(row)
+    if row:
+        restamp_summaries()
     return row
 
 
