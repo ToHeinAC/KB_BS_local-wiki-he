@@ -662,3 +662,81 @@ def test_maintenance_admin_creates_database_and_user(wiki):
     at.button(key="usave_newbie").click().run()
     at.button(key="udel_newbie").click().run()
     assert "newbie" not in [u["username"] for u in auth.list_users()]
+
+
+# --- Maintenance → Ontology ------------------------------------------------------------
+
+
+def test_ontology_section_without_ontology_offers_create(wiki):
+    import ontology_store
+
+    at = _maint(_app(), "Ontology")
+    assert "No ontology for this database." in _texts(at.info)
+    at.button(key="onto_create").click().run()
+    assert ontology_store.exists()
+    assert "Revision 1" in _texts(_ok(at).markdown)
+
+
+def _uploaded(at: AppTest, text: str, name: str = "edited.yaml") -> AppTest:
+    at.segmented_control(key="onto_view").set_value("Import").run()
+    at.file_uploader[0].set_value((name, text.encode(), "application/x-yaml")).run()
+    return _ok(at)
+
+
+def test_ontology_reimport_of_unchanged_file_changes_nothing(wiki):
+    import ontology_store
+
+    at = _maint(_app(), "Ontology")
+    at.button(key="onto_create").click().run()
+    at = _uploaded(at, ontology_store.export_text(ADMIN))
+    assert "nothing changed" in _texts(at.info)
+    assert len(ontology_store.history()) == 1
+
+
+def test_ontology_import_preview_and_apply(wiki):
+    import yaml
+
+    import dedup
+    import ontology_store
+
+    dedup.register_file(b"typed", "typed.md")
+    at = _maint(_app(), "Ontology")
+    at.button(key="onto_create").click().run()
+    doc = yaml.safe_load(ontology_store.export_text(ADMIN))
+    doc["facts"] = {"sources": {"typed.md": {"class": "report"}}}
+    at = _uploaded(at, yaml.safe_dump(doc))
+    assert not at.error, [e.value for e in at.error]
+    at.button(key="onto_apply").click().run()
+    assert [r["seq"] for r in ontology_store.history()] == [1, 2]
+    assert "Applied revision 2" in _texts(_ok(at).success)
+    at.segmented_control(key="onto_view").set_value("Overview").run()
+    assert "edited.yaml" in _texts(_ok(at).markdown)
+
+
+def test_ontology_views_render_and_restore_makes_a_new_revision(wiki):
+    import yaml
+
+    import dedup
+    import ontology_store
+
+    dedup.register_file(b"typed", "typed.md")
+    at = _maint(_app(), "Ontology")
+    at.button(key="onto_create").click().run()
+    doc = yaml.safe_load(ontology_store.export_text(ADMIN))
+    doc["facts"] = {
+        "sources": {"typed.md": {"class": "report", "work": "w-typed"}},
+        "works": {"w-typed": {"class": "report", "aliases": ["Typed"]}},
+    }
+    at = _uploaded(at, yaml.safe_dump(doc))
+    at.button(key="onto_apply").click().run()
+    for view in ("Overview", "Facts", "Classes"):
+        at.segmented_control(key="onto_view").set_value(view).run()
+        _ok(at)
+    assert "`report` · 2 fact(s)" in _texts(at.markdown)
+    at.segmented_control(key="onto_view").set_value("History").run()
+    at.selectbox(key="onto_hist_rev").set_value(1).run()
+    at.checkbox(key="onto_restore_ok").check().run()
+    at.button(key="onto_restore").click().run()
+    assert [r["via"] for r in ontology_store.history()] == ["create", "import", "restore"]
+    assert ontology_store.current_state()["facts"] == {}
+    assert "Applied revision 3" in _texts(_ok(at).success)

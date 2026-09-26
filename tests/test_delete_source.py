@@ -102,3 +102,12 @@ def test_retracts_the_sources_ontology_rows(seeded):
 def test_db_without_ontology_gets_no_ontology_files(seeded):
     wiki_engine.delete_source("gone.md")
     assert not ontology_store.store_dir().exists()
+
+
+def test_ontology_db_records_the_retraction_as_a_revision(seeded):
+    ontology_store.binding_path().write_text("modules: [core]\n")
+    ontology_store.append_rows([ontology.assertion("src:gone.md", "class", "report", by="user")])
+    wiki_engine.delete_source("gone.md")
+    [row] = ontology_store.history()
+    assert row["via"] == "delete_source"
+    assert "via delete_source" in (seeded / "log.md").read_text()

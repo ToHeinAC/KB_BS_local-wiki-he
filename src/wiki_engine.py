@@ -23,6 +23,7 @@ import lang
 import lex_index
 import okf
 import ollama_client
+import ontology_bundle
 import ontology_store
 import page_lang
 import qa_gen
@@ -1457,6 +1458,25 @@ def _unindex(source_name: str, removed: set[str]) -> None:
         pass  # semantic arm is best-effort; the vectors are a rebuildable cache
 
 
+def _log_ontology_change(row: dict[str, Any] | None) -> None:
+    if row is not None:
+        _append_log("Ontology changed", ontology_bundle.log_line(row))
+
+
+def apply_ontology(
+    plan: ontology_bundle.ImportPlan,
+    *,
+    user: str,
+    via: str,
+    file_name: str | None = None,
+    file_sha: str | None = None,
+) -> dict[str, Any] | None:
+    """Apply an ontology plan (see `ontology_store.apply`) and log it in `log.md`."""
+    row = ontology_store.apply(plan, user=user, via=via, file_name=file_name, file_sha=file_sha)
+    _log_ontology_change(row)
+    return row
+
+
 def delete_source(source_name: str) -> dict[str, Any]:
     """Remove a source and all derived data. Wiki pages referencing it are deleted.
 
@@ -1485,6 +1505,7 @@ def delete_source(source_name: str) -> dict[str, Any]:
     result["ontology_rows"] = ontology_store.retract_subject(
         f"src:{source_name}", by="system", reason="source deleted"
     )
+    _log_ontology_change(ontology_store.record_change("delete_source"))
 
     _unindex(source_name, removed)
     _rebuild_index()

@@ -30,6 +30,7 @@ import md_convert
 import metadata_extract
 import ollama_client
 import ollama_server
+import ontology_ui
 import theme
 import tools
 import wiki_engine
@@ -1866,6 +1867,7 @@ elif page == "Maintenance":
         "Link graph health",
         "Lint",
         "Page language",
+        "Ontology",
         "Activity log",
     ]
     if auth.is_admin(_user):
@@ -1994,6 +1996,9 @@ elif page == "Maintenance":
                     st.success(f"Updated {len(_done)} pages.")
             else:
                 st.info("Only maintainers of this database can normalize pages.")
+
+    elif _maint_view == "Ontology":
+        ontology_ui.render(_user, _can_maintain)
 
     elif _maint_view == "Activity log":
         st.code(wiki_engine.read_log(), language=None)
