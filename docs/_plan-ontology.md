@@ -370,6 +370,7 @@ Every phase follows AGENTS §5.6: red test first, green, gate, `/documentation-u
 Report §10 Phase 2: Work/Expression registry, `current_expression`, `validity`, the `_is_newer` fix (F2 regression test), succession-aware change notes, `outdated` overlay. In the search stage: time-intent detection in `resolve` (dates, years, "damals", "alte Fassung", "as of"), the validity-order step (§4.2), the S4 gate and badges (§4.5).
 - **Tests:** `as_of=2017-06-01` resolves StrlSchV 2001; a change between two Stände is not flagged as a contradiction; S4 rejects a superseded-only answer once and accepts the second submit; S4 is silent for a past `as_of`; a DB without an ontology returns byte-identical results.
 - **Verify:** eval group (c) hit@1 = 100 %.
+- **As built** ([ontology.md](ontology.md) §Time): validity is derived at query time from version dates and work intervals (no interval-closing ledger rows); a year counts as a date only after a cue word; the eval's older StrlSchV version is synthetic (the public site serves only the current one).
 
 ### Phase 6 — Relations, binding, lint, graph
 

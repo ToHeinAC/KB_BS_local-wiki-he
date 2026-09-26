@@ -6,11 +6,11 @@ append-only ledger of facts about the DB's sources. Rationale:
 detection at ingest, ontology-aware search, time): [_plan-ontology.md](_plan-ontology.md).
 Phase status: [IMPLEMENTATION.md](../IMPLEMENTATION.md) §2.
 
-**Built so far (plan Phases 1–4):** shared schema modules, per-DB binding, schema
+**Built so far (plan Phases 1–5):** shared schema modules, per-DB binding, schema
 validation, the fact ledger with projection, retraction on `delete_source`, the
 Maintenance → Ontology workbench (view, export, hand-edit, import, history, restore,
 proposals), detection at upload, stamping of source-summary pages, and the ontology
-stage in every search (§Search). Validity over time is plan Phase 5.
+stage in every search (§Search), and valid time (§Time).
 
 ## Storage
 
@@ -44,6 +44,8 @@ stage in every search (§Search). Validity over time is plan Phase 5.
   head), `parse_proposal` (verifies an LLM answer), `classify_options`, `upload_rows`.
 - `src/ontology_query.py` is pure: the search `View`, `resolve` → `QueryFrame`,
   `briefing`, `lookup`, `badge`, `audit` (§Search).
+- `src/ontology_time.py` is pure: `time_intent`, `validity`, `current_expression`,
+  `outdated_pages`, `validity_order` (§Time).
 - `src/ontology_ui.py` renders the Maintenance → Ontology section and the Upload
   review-table columns. `wiki_engine` holds the orchestration: `apply_ontology`,
   `record_source_ontology`, `finish_ontology_batch`, `decide_proposal`,
@@ -294,6 +296,45 @@ Limits: the metric is "right document", not "right passage"; the set is small an
 written by the implementer; no semantic arm or reranker in the run. Detection depends on
 the title being at the top of the text — the first eval run, with site-menu text before
 the title, typed four of six laws wrongly and found no works.
+
+## Time (plan Phase 5)
+
+Valid time (when a version holds in the world) is never compared with transaction time
+(when the wiki wrote a page).
+- **Validity is derived, not stored:** a *work* may carry `in_force_from` /
+  `in_force_until`; each version (raw source) holds from its `version_date` until the
+  next version's date within the work, bounded by the work's interval (a source's own
+  `in_force_until` wins). `validity(view, source, as_of)` → `valid` / `superseded` /
+  `not-yet` / `unknown`; unknown never demotes anything.
+- **Point in time** (`time_intent`, code only): an explicit date (`2017-06-01`,
+  `01.06.2017`, `1. Juni 2017`), or a year after a cue word (`im Jahr 2017`, `Stand
+  2019`, `vor 2018` → end of the previous year); else today. "damals" / "alte Fassung" /
+  "vor der Novelle" mean *past without a date*: nothing is reordered or rejected. A bare
+  year is ignored (`Richtlinie 2013/59/Euratom` is not a date). Agents keep the
+  question's point in time for their sub-queries (`run_memory.as_of`).
+- **Resolution:** an alias naming several works keeps the one in force at the point in
+  time ("StrlSchV" in 2017 → StrlSchV 2001; today → StrlSchV 2018).
+- **Search:** after fusion and rerank, hits from versions not in force are moved to the
+  end (never dropped, D3); in wiki scope, *outdated* pages are. Raw-hit badges, chat
+  source captions, the briefing and `ontology_lookup(term, as_of)` say `in force` /
+  `superseded` / `not yet in force`.
+- **S4 answer check** (`tools._superseded_nudge`): a Deep-chat answer whose dated raw
+  citations are all superseded, while the version in force is in the DB, is rejected
+  once with the current file named; the second submit passes. Silent for questions about
+  the past and without an ontology.
+- **Merges** (finding F2): `_is_newer` compares only legal dates — the sources' version
+  dates, else `effective as of` — and never `updated`/`created`; unknown means
+  unresolved. When both sides are dated versions of the same work, a changed number is a
+  *change note* under `## Changes` and confidence is not lowered; across works it stays a
+  contradiction.
+- **Outdated:** a page is *outdated* when its dated sources are all superseded
+  (`wiki_engine.outdated_pages`) — separate from *stale* (not re-checked lately). It is a
+  graph overlay (dashed ring), a health-panel list and a Lint section.
+
+**Measured** (same eval as §Search, plus group (c) on a synthetic older StrlSchV
+version): (c) asks about a point in time, hit@1 50 % → 100 %, MRR 0.75 → 1.00; (a) and
+(b) stay at 100 %; one control moved (rank 4 → 3) only because superseded duplicates were
+demoted.
 
 ## Deletion
 
