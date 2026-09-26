@@ -14,6 +14,7 @@ import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 import numpy as np
 from dotenv import load_dotenv
 
+import auth
 import calibrate
 import chunker
 import db_context
@@ -914,34 +915,47 @@ def _ensure_source_in_frontmatter(content: str, source_name: str) -> str:
     return frontmatter.dumps(post) + "\n"
 
 
-def _okf_apply(content: str) -> str:
+def _okf_apply(content: str, page: str | None = None) -> str:
     """Stamp `lang` (when missing) + OKF fields + `## Citations` (deterministic, no LLM)."""
     try:
         if not frontmatter.loads(content).metadata.get("lang"):
             content = _set_meta(content, lang=page_lang.page_lang(content))
     except Exception:
         pass
-    content = _ontology_stamp(content)
+    content = _ontology_stamp(content, page)
     return okf.apply_to_page(content, db=db_context.get_active_db())
 
 
 _SOURCE_SECTION_RE = re.compile(r"\s+[§#].*$")
 
 
-def _ontology_stamp(content: str) -> str:
-    """Re-stamp a source-summary's ontology keys from the ledger (never LLM-written)."""
+def _stamp_facts(
+    meta: dict[str, Any], page: str | None
+) -> tuple[dict[str, Any], tuple[str, ...]] | None:
+    """(facts, keys) to stamp: a source-summary's source facts, or a concept/entity page's
+    own class (only when its file name is known); None for any other page."""
+    ptype = meta.get("type")
+    if ptype == "source-summary":
+        sources = ontology_bundle.as_list(meta.get("sources"))
+        source = _SOURCE_SECTION_RE.sub("", str(sources[0])) if sources else ""
+        return (ontology_store.source_facts(source) if source else {}), ontology.STAMP_KEYS
+    if ptype in ("concept", "entity") and page:
+        return ontology_store.page_facts(page), ("class",)
+    return None
+
+
+def _ontology_stamp(content: str, page: str | None = None) -> str:
+    """Re-stamp a page's code-owned ontology keys from the ledger (never LLM-written)."""
     if not ontology_store.exists():
         return content
     try:
         post = frontmatter.loads(content)
     except Exception:
         return content
-    sources = ontology_bundle.as_list(post.metadata.get("sources"))
-    if post.metadata.get("type") != "source-summary":
+    found = _stamp_facts(dict(post.metadata), page)
+    if found is None:
         return content
-    source = _SOURCE_SECTION_RE.sub("", str(sources[0])) if sources else ""
-    facts = ontology_store.source_facts(source) if source else {}
-    meta = ontology.stamp_meta(dict(post.metadata), facts)
+    meta = ontology.stamp_meta(dict(post.metadata), *found)
     if meta == post.metadata:
         return content
     post.metadata = meta
@@ -949,13 +963,16 @@ def _ontology_stamp(content: str) -> str:
 
 
 def restamp_summaries() -> int:
-    """Re-stamp every source-summary page after ontology facts changed; returns the count."""
+    """Re-stamp every page (source summaries, classified concept/entity pages) after
+    ontology facts changed; returns the count."""
     if not ontology_store.exists():
         return 0
     changed = 0
-    for path in sorted(_wiki().glob("summary-*.md")):
+    for path in sorted(_wiki().glob("*.md")):
+        if path.name in _SYSTEM_PAGES:
+            continue
         content = path.read_text()
-        stamped = _ontology_stamp(content)
+        stamped = _ontology_stamp(content, path.name)
         if stamped != content:
             path.write_text(stamped)
             changed += 1
@@ -1098,7 +1115,7 @@ def _write_piece_page(ctx: dict[str, Any], page: dict[str, Any]) -> None:
         content = _set_meta(content, lang=_content_lang(content, ctx["lang"]))
         if target not in ctx["created"]:
             ctx["created"].append(target)
-    content = _okf_apply(content)  # OKF frontmatter + citations (deterministic)
+    content = _okf_apply(content, target)  # OKF frontmatter + citations (deterministic)
     dest.write_text(content)
     ctx["existing_filenames"].add(target)
     _registry_add(ctx["registry"], target, content)
@@ -1713,6 +1730,60 @@ def source_ranks() -> dict[str, int]:
         for s, f in view.sources.items()
         if (rank := ranks.get(str(f.get("class")))) is not None
     }
+
+
+def _page_class_answer(body: str, options: dict[str, str]) -> tuple[str, str] | None:
+    listing = "\n".join(f"- {cid}: {definition}" for cid, definition in options.items())
+    prompt = ONTOLOGY_CLASSIFY_PROMPT.format(options=listing, head=body)
+    try:
+        answer = ollama_client.generate(
+            "", prompt, temperature=0.0, model_id=ollama_client.FAST_MODEL
+        )
+    except Exception:
+        return None
+    return ontology_detect.parse_proposal(answer, body, set(options))
+
+
+def _unclassified_pages() -> list[tuple[str, str]]:
+    """(file name, body head) of concept/entity pages with no class and no open proposal."""
+    done = {s[5:] for s in ontology_store.current_state()["facts"].get("pages", {})}
+    done |= {
+        str(r["subject"])[5:]
+        for r in ontology_store.proposals()
+        if str(r["subject"]).startswith("page:")
+    }
+    out: list[tuple[str, str]] = []
+    for p in list_pages():
+        if p.get("type") in ("concept", "entity") and p["filename"] not in done:
+            body = frontmatter.load(str(_wiki() / p["filename"])).content
+            out.append((p["filename"], body[: ontology_detect.HEAD_CHARS]))
+    return out
+
+
+def propose_page_classes(user: str, limit: int = 10) -> int:
+    """Ask the model to classify up to ``limit`` unclassified concept/entity pages; each
+    answer is kept only as a *proposal* with a quote verified verbatim in the page.
+    Returns how many proposals were made. Maintainers only."""
+    if not auth.is_maintainer(user, db_context.get_active_db()):
+        raise PermissionError(f"{user!r} does not maintain this database")
+    schema, _ = ontology_store.load()
+    options = ontology_detect.page_class_options(schema) if schema else {}
+    rows: list[dict[str, Any]] = []
+    for name, body in _unclassified_pages()[:limit] if options else []:
+        found = _page_class_answer(body, options)
+        if found:
+            rows.append(
+                ontology.assertion(
+                    f"page:{name}",
+                    "class",
+                    found[0],
+                    by="llm",
+                    status="proposed",
+                    evidence=found[1],
+                )
+            )
+    ontology_store.append_rows(rows)
+    return len(rows)
 
 
 def finish_ontology_batch(user: str) -> None:
@@ -2669,7 +2740,7 @@ def _write_resolved_pages(
         if page_lang.clearly_other(frontmatter.loads(content).content, plang):
             skipped.append(fname)
             continue
-        dest.write_text(_okf_apply(_set_meta(content, lang=plang)))
+        dest.write_text(_okf_apply(_set_meta(content, lang=plang), fname))
         updated.append(fname)
     return updated, skipped
 

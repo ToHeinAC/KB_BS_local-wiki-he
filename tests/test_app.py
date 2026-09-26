@@ -951,3 +951,23 @@ def test_ontology_overview_offers_standard_exports(wiki):
     at = _maint(_app(), "Ontology")
     labels = [e.proto.label for e in at.get("download_button")]
     assert {"Schema as SKOS (Turtle)", "Facts as JSON-LD"} <= set(labels)
+
+
+def test_ontology_pages_can_be_sent_for_classification(wiki, monkeypatch):
+    import json
+
+    import ontology_store
+
+    plan = ontology_store.prepare_state({"schema": {"modules": ["core", "ai-tech"]}})
+    wiki_engine.apply_ontology(plan, user=ADMIN, via="create")
+
+    def answer(system: str, prompt: str, **_k: object) -> str:
+        title = "Alpha" if "# Alpha" in prompt else "Beta"  # a quote of >= 12 chars, verbatim
+        return json.dumps({"class": "technique", "quote": f"{title} Body text."})
+
+    monkeypatch.setattr(ollama_client, "generate", answer)
+    at = _maint(_app(), "Ontology")
+    at.segmented_control(key="onto_view").set_value("Proposals").run()
+    at.button(key="onto_classify_pages").click().run()
+    assert "2 page class proposal(s)" in _texts(_ok(at).success)
+    assert {r["subject"] for r in ontology_store.proposals()} == {"page:alpha.md", "page:beta.md"}

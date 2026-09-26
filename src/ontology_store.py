@@ -446,6 +446,13 @@ def source_facts(source: str) -> dict[str, Any]:
     return ontology.project(read_rows(), multi).get(f"src:{source}", {})
 
 
+def page_facts(page: str) -> dict[str, Any]:
+    """Current confirmed facts about one wiki page ({} without an ontology)."""
+    if not exists():
+        return {}
+    return ontology.project(read_rows(), {"aliases"}).get(f"page:{page}", {})
+
+
 def proposals() -> list[dict[str, Any]]:
     """Live `proposed` rows (e.g. an LLM class with its verified quote), oldest first."""
     return [r for r in ontology.live_rows(read_rows()) if r.get("status") == "proposed"]

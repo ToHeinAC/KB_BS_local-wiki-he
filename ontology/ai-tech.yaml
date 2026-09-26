@@ -1,0 +1,79 @@
+# AI / technology corpus (e.g. the KI database): document genres plus classes for wiki
+# concept pages. Rules: docs/_plan-ontology.md; how it is used: docs/ontology.md.
+# Document classes (applies_to: source) carry cues; the earliest-ending cue match on the
+# first 4000 characters wins (src/ontology_detect.py). Page classes (applies_to: page)
+# have no cues: pages are only ever classified by reviewed model proposals.
+# Cues were written after reading the KI documents, so the KI gold set measures them
+# in-sample (scripts/bench_ontology_detect.py --gold bench/fixture_ontology_detect_KI.json).
+id: ai-tech
+version: 0.1.0
+requires: ["core@^1"]
+description: Genres of AI/technology documents and kinds of concept pages.
+
+classes:
+  research-paper:
+    broader: report
+    labels: {en: Research paper, de: Wissenschaftliche Veröffentlichung}
+    definition: Peer-reviewed or preprint scientific paper with authors and an abstract
+    cues: ['(?m)^#*\s*Abstract\s*$', '\barXiv:\d{4}\.\d{4,5}']
+  research-report:
+    broader: report
+    labels: {en: Research report, de: Recherchebericht}
+    definition: Deep-dive analysis or landscape report that synthesises many sources
+    cues: ['Executive Summary', '(?i)\bdeep[- ]dive\b', '(?i)\bresearch report\b', '(?m)^type:\s*deep-research\b']
+  talk-transcript:
+    broader: report
+    labels: {en: Talk transcript, de: Vortragsmitschrift}
+    definition: Transcript or write-up of a talk, podcast or video
+    cues: ['(?i)\btranscript\b', '\*\*Speaker:\*\*', '(?i)\btech talk\b']
+  technical-guide:
+    broader: guidance
+    labels: {en: Technical guide, de: Technischer Leitfaden}
+    definition: Explainer, tutorial or blueprint describing how a technology or system works
+    cues: ['(?i)\bcomprehensive (?:technical )?(?:guide|summary)\b', '(?i)\bblueprint\b']
+  buying-advice:
+    broader: guidance
+    labels: {en: Buying advice, de: Kaufberatung}
+    definition: Recommendation or comparison of products to buy for a purpose
+    cues: ['(?i)\bwhat is the best\b', '(?i)\bbest overall\b', '(?i)\bbuying guide\b']
+  organisation-profile:
+    broader: document
+    labels: {en: Organisation profile, de: Organisationsprofil}
+    definition: Description of a company, institute or public body and what it does
+    cues: ['(?m)^#\s*(?:Beschreibung|About us|Über uns|Company profile|Unternehmensprofil)\s*$']
+
+  # --- classes for wiki concept pages (no cues) ---
+  topic:
+    applies_to: page
+    labels: {en: Topic, de: Thema}
+    definition: Anything a wiki concept or entity page is about
+  ai-model:
+    broader: topic
+    applies_to: page
+    labels: {en: AI model, de: KI-Modell}
+    definition: A specific AI model or model family (e.g. a named LLM)
+  technique:
+    broader: topic
+    applies_to: page
+    labels: {en: Technique, de: Verfahren}
+    definition: A method, architecture, algorithm or engineering practice
+  organisation:
+    broader: topic
+    applies_to: page
+    labels: {en: Organisation, de: Organisation}
+    definition: A company, research lab, institute or public body
+  product:
+    broader: topic
+    applies_to: page
+    labels: {en: Product or tool, de: Produkt oder Werkzeug}
+    definition: A software tool, framework, service or hardware product
+  person:
+    broader: topic
+    applies_to: page
+    labels: {en: Person, de: Person}
+    definition: A named person
+  phenomenon:
+    broader: topic
+    applies_to: page
+    labels: {en: Phenomenon or trend, de: Phänomen oder Trend}
+    definition: A trend, effect, risk or market development

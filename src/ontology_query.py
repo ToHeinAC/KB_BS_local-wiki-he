@@ -61,6 +61,7 @@ class View:
     relation_lint: dict[str, str | None] | None = None
     domains: dict[str, tuple[str, ...]] | None = None  # relation -> domain classes
     broader: dict[str, str | None] | None = None  # class -> broader class
+    class_pages: dict[str, tuple[str, ...]] | None = None  # class -> pages of it (Phase 8)
 
 
 @dataclass(frozen=True)
@@ -75,6 +76,7 @@ class QueryFrame:
     as_of: str = ""  # ISO date the question is about (today unless it names one)
     explicit: bool = False  # the question named a date or year
     past: bool = False  # the question asks about an earlier state
+    class_pages: tuple[str, ...] = ()  # wiki pages whose own class was named
 
 
 def tokens(text: str) -> Key:
@@ -137,11 +139,26 @@ def _class_sources(
     return out
 
 
-def _class_labels(schema: ontology.Schema, class_sources: dict[str, Key]) -> dict[Key, str]:
-    """Label tokens of every non-root, non-deprecated class that has sources."""
+def _class_pages(schema: ontology.Schema, facts: dict[str, Any]) -> dict[str, Key]:
+    """Pages (by file name) whose own class is the class or one of its narrower ones."""
+    pages = {p: str(_as_map(f).get("class") or "") for p, f in _as_map(facts.get("pages")).items()}
+    return {
+        cid: tuple(
+            sorted(
+                p
+                for p, c in pages.items()
+                if c in schema.classes and ontology_detect.is_a(schema, c, cid)
+            )
+        )
+        for cid in schema.classes
+    }
+
+
+def _class_labels(schema: ontology.Schema, members: dict[str, Key]) -> dict[Key, str]:
+    """Label tokens of every non-root, non-deprecated class that has sources or pages."""
     labels: dict[Key, str] = {}
     for c in sorted(schema.classes.values(), key=lambda c: c.id):
-        if c.broader is None or c.deprecated or not class_sources.get(c.id):
+        if c.broader is None or c.deprecated or not members.get(c.id):
             continue
         for label in c.labels.values():
             for part in label.split("/"):
@@ -197,8 +214,10 @@ def build_view(schema: ontology.Schema, facts: dict[str, Any], pages: dict[str, 
     sources = {s: _as_map(f) for s, f in _as_map(facts.get("sources")).items()}
     works = _works(schema, facts)
     class_sources = _class_sources(schema, sources)
+    class_pages = _class_pages(schema, facts)
     aliases = _alias_map(works)
-    labels = _class_labels(schema, class_sources)
+    members = {c: class_sources.get(c, ()) + class_pages.get(c, ()) for c in schema.classes}
+    labels = _class_labels(schema, members)
     return View(
         aliases=aliases,
         class_labels=labels,
@@ -214,6 +233,7 @@ def build_view(schema: ontology.Schema, facts: dict[str, Any], pages: dict[str, 
         relation_lint={r.id: r.lint for r in schema.relations.values()},
         domains={r.id: r.domain for r in schema.relations.values()},
         broader={c.id: c.broader for c in schema.classes.values()},
+        class_pages=class_pages,
     )
 
 
@@ -300,6 +320,7 @@ def resolve(q: str, view: View, today: date | None = None) -> QueryFrame | None:
         as_of=intent.as_of.isoformat(),
         explicit=intent.explicit,
         past=intent.past,
+        class_pages=_unique([p for c in classes for p in (view.class_pages or {}).get(c, ())]),
     )
 
 

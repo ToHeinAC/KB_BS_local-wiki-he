@@ -80,7 +80,7 @@ def _best_class(head: str, schema: ontology.Schema) -> tuple[str, int] | None:
     """(class id, match start) of the winning cue, or None."""
     best: tuple[int, int, int, str, int] | None = None
     for c in schema.classes.values():
-        if c.deprecated:
+        if c.deprecated or c.applies_to != "source":
             continue
         for cue in c.cues:
             m = re.search(cue, head)
@@ -138,14 +138,20 @@ def detect(text: str, schema: ontology.Schema) -> Detection:
 # --- LLM proposals -------------------------------------------------------------------
 
 
-def classify_options(schema: ontology.Schema) -> dict[str, str]:
-    """Leaf classes (no narrower class) with their one-line definitions, for the prompt."""
+def classify_options(schema: ontology.Schema, applies_to: str = "source") -> dict[str, str]:
+    """Leaf classes (no narrower class) for documents (or pages), with their one-line
+    definitions, for the prompt."""
     parents = {c.broader for c in schema.classes.values() if not c.deprecated}
     return {
         c.id: c.definition
         for c in sorted(schema.classes.values(), key=lambda c: c.id)
-        if not c.deprecated and c.id not in parents
+        if not c.deprecated and c.id not in parents and c.applies_to == applies_to
     }
+
+
+def page_class_options(schema: ontology.Schema) -> dict[str, str]:
+    """Leaf classes for wiki concept/entity pages (plan Phase 8)."""
+    return classify_options(schema, applies_to="page")
 
 
 def _norm(text: str) -> str:

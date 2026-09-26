@@ -101,6 +101,8 @@ def _ontology_arm(
     the named classes' sources. Only lexical hits: the lexical arm stays the citation truth."""
     works = _scoped(view, frame.sources, scope)
     classes = [s for s in _scoped(view, frame.class_sources, scope) if s not in works]
+    if scope != "raw":  # pages classified themselves (plan Phase 8)
+        classes += [p for p in frame.class_pages if p not in works and p not in classes]
     hits = lex_index.query(" ".join([q, *frame.terms]), _CANDIDATES, scope, works) if works else []
     seen = {h["chunk_id"] for h in hits}
     if classes:

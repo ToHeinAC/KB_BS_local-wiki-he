@@ -626,7 +626,21 @@ def _render_suggestion(p: dict[str, Any], user: str, can_maintain: bool) -> None
                 _decide_schema(p["id"], False, user)
 
 
+def _render_page_classes(user: str, can_maintain: bool) -> None:
+    """Ask the model to classify concept/entity pages (proposals only, plan Phase 8)."""
+    schema, _ = ontology_store.load()
+    if not can_maintain or schema is None or not ontology_detect.page_class_options(schema):
+        return
+    st.markdown("**Concept pages**")
+    st.caption("Asks the model for a class for up to 10 unclassified concept/entity pages.")
+    if st.button("Classify concept pages", key="onto_classify_pages"):
+        made = wiki_engine.propose_page_classes(user, limit=10)
+        st.session_state["onto_notice"] = f"{made} page class proposal(s) added for review."
+        st.rerun()
+
+
 def _render_suggestions(user: str, can_maintain: bool) -> None:
+    _render_page_classes(user, can_maintain)
     st.markdown("**New class suggestions**")
     for p in ontology_store.schema_proposals():
         _render_suggestion(p, user, can_maintain)

@@ -639,9 +639,11 @@ def member_key(member: object) -> tuple[str, str]:
 STAMP_KEYS = ("class", "work", "version_date")
 
 
-def stamp_meta(meta: dict[str, Any], facts: dict[str, Any]) -> dict[str, Any]:
-    """Frontmatter with the code-owned ontology keys set from ``facts`` (a source's
-    projection) and removed where the fact is absent. Other keys are untouched."""
-    out = {k: v for k, v in meta.items() if k not in STAMP_KEYS}
-    out.update({k: facts[k] for k in STAMP_KEYS if facts.get(k) is not None})
+def stamp_meta(
+    meta: dict[str, Any], facts: dict[str, Any], keys: tuple[str, ...] = STAMP_KEYS
+) -> dict[str, Any]:
+    """Frontmatter with the code-owned ontology ``keys`` set from ``facts`` (a source's or
+    a page's projection) and removed where the fact is absent. Other keys are untouched."""
+    out = {k: v for k, v in meta.items() if k not in keys}
+    out.update({k: facts[k] for k in keys if facts.get(k) is not None})
     return out

@@ -1,0 +1,82 @@
+{
+  "_note": "Hand labels for the KI database's 18 documents (names only; the texts stay in data/KI and are read at run time). The ai-tech cues were written after reading these documents, so this set measures them in-sample. Ambiguous: the Karpathy deep dive calls itself a technical guide; labelled research-report.",
+  "modules": [
+    "core",
+    "ai-tech"
+  ],
+  "db": "KI",
+  "files": {
+    "AI Compute Data Centers in Orbit Deep Analysis.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "Anatomy of .claude folder.md": {
+      "class": "technical-guide",
+      "work": null
+    },
+    "ClaudeCode Architecture.md": {
+      "class": "technical-guide",
+      "work": null
+    },
+    "claude_dev_schema_report.md": {
+      "class": "technical-guide",
+      "work": null
+    },
+    "Dense & MoE LLMs Architecture, Trends, and the Edge Computing Frontier.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "From LLM to AGI ASI_Chips, Energy, Cost, and Monetization.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "Harness Engineering für kontrollierbare KI-Agenten.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "JEN_KOINNO.md": {
+      "class": "organisation-profile",
+      "work": null
+    },
+    "Jev Entscheidungsmodelle als programmierbare Judgment Layer.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "Karpathy's LLM Wiki — Deep Dive & GitHub Implementation Comparison.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "LLM & Agent Technology Landscape  Present State and 1–3 Year Trajectory.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "Local AI Deep Dive July 2026.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "NIPS-2017-attention-is-all-you-need-Paper.md": {
+      "class": "research-paper",
+      "work": null
+    },
+    "OpenClaw & Hermes Agent — Deep Dive, Comparison & Cost Analysis.md": {
+      "class": "research-report",
+      "work": null
+    },
+    "Prometheus-KI-Engineering-Report.md": {
+      "class": "talk-transcript",
+      "work": null
+    },
+    "TechnicalFoundationsAI.md": {
+      "class": "technical-guide",
+      "work": null
+    },
+    "what is the best mac for fully local AI usage (cod.md": {
+      "class": "buying-advice",
+      "work": null
+    },
+    "Why Agentic Systems Need Ontologies.md": {
+      "class": "talk-transcript",
+      "work": null
+    }
+  }
+}
