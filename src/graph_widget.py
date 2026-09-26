@@ -30,6 +30,7 @@ import streamlit.components.v1 as components
 
 import db_context
 import graph_export
+import ontology_store
 
 _ASSETS = Path(__file__).parent / "assets" / "graph"
 
@@ -114,7 +115,9 @@ def _bundle_signature() -> str:
     """Cheap change detector for the wiki bundle: count + newest mtime."""
     wiki = db_context.wiki_dir()
     files = list(wiki.rglob("*.md")) if wiki.exists() else []
-    newest = max((f.stat().st_mtime_ns for f in files), default=0)
+    # The ontology binding and ledger decide the `outdated` flags (docs/ontology.md §Time).
+    onto = [p for p in (ontology_store.binding_path(), ontology_store.ledger_path()) if p.exists()]
+    newest = max((f.stat().st_mtime_ns for f in [*files, *onto]), default=0)
     return f"{db_context.get_active_db()}:{len(files)}:{newest}"
 
 

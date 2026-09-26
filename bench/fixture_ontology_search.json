@@ -1,5 +1,5 @@
 {
-  "_note": "Hand-labelled questions for scripts/eval_ontology_search.py. `expected`: the law whose text should answer the question. Groups: a = names a document by abbreviation, b = names a document class, d = control (names nothing; ranking must not change).",
+  "_note": "Hand-labelled questions for scripts/eval_ontology_search.py. `expected`: the law whose text should answer the question. Groups: a = names a document by abbreviation, b = names a document class, d = control (names nothing; ranking must not change). c = asks about a point in time (strlschv_2019.md is a synthetic older version, see the script).",
   "questions": [
     {
       "group": "a",
@@ -97,6 +97,34 @@
       "question": "Was sagt die Verfassung zur Würde des Menschen?",
       "expected": [
         "gg.md"
+      ]
+    },
+    {
+      "group": "c",
+      "question": "Was galt im Jahr 2020 nach der StrlSchV zur Freigabe von Stoffen?",
+      "expected": [
+        "strlschv_2019.md"
+      ]
+    },
+    {
+      "group": "c",
+      "question": "Welche Anforderungen an die Fachkunde galten im Jahr 2020 nach StrlSchV?",
+      "expected": [
+        "strlschv_2019.md"
+      ]
+    },
+    {
+      "group": "c",
+      "question": "Was regelte die StrlSchV am 01.06.2021 zur Kontamination von Arbeitsplätzen?",
+      "expected": [
+        "strlschv_2019.md"
+      ]
+    },
+    {
+      "group": "c",
+      "question": "Was regelt die StrlSchV heute zur Freigabe von Stoffen?",
+      "expected": [
+        "strlschv.md"
       ]
     },
     {

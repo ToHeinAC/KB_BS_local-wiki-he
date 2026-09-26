@@ -239,6 +239,7 @@ _OVERLAY_LABELS = {
     "Bridges": "bridges",
     "Orphans": "orphans",
     "Stale": "stale",
+    "Outdated": "outdated",
     "Low confidence": "confidence",
 }
 _OVERLAY_HELP = (
@@ -250,6 +251,8 @@ _OVERLAY_HELP = (
     "- **Orphans** — pages with no links at all, in or out: grey dot.\n"
     "- **Stale** — pages past their freshness window "
     "(`updated` + `expires_after_days`): pulsing amber ring.\n"
+    "- **Outdated** — pages built only on superseded versions of a law "
+    "(ontology, valid time): dashed ring.\n"
     "- **Low confidence** — pages with `confidence: low` in their "
     "frontmatter: dimmed dot."
 )
@@ -428,6 +431,7 @@ def _render_graph_health() -> None:
     for label, ids in (
         ("Orphaned", health["orphans"]),
         ("Stale", health["stale"]),
+        ("Outdated", health.get("outdated", [])),
         ("Low confidence", health["low_confidence"]),
     ):
         if not ids:
@@ -577,6 +581,9 @@ def _render_chat_sources_panel() -> None:
         st.markdown("**Documents**")
         for r in raw_sources:
             _raw_source_button(r, f"cpanel_raw_{r}")
+            badge = ontology_ui.source_badge(r)
+            if badge:
+                st.caption(badge)
 
 
 def _render_research_sources_panel() -> None:

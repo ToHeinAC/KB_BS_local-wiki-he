@@ -8,7 +8,13 @@ hand-labelled questions in bench/fixture_ontology_search.json with the ontology 
 and on. Lexical + ontology arms only (no embeddings, no reranker).
 
 Groups: (a) the question names a document by abbreviation, (b) by a class word,
-(d) controls that name nothing — their rankings must not change.
+(c) it asks about a point in time, (d) controls that name nothing — their rankings may
+change only by superseded versions moving down.
+
+For (c) the database also holds `strlschv_2019.md`: a synthetic older version of the
+StrlSchV (the current text with a marker per section, version date 2019-12-01; the
+public site only serves the current version). It measures the validity order, not
+content differences.
 
 Usage:
     uv run python scripts/eval_ontology_search.py --root /tmp/ontology-eval
@@ -33,8 +39,10 @@ import db_context
 import dedup
 import lex_index
 import metadata_extract
+import ontology
 import ontology_detect
 import ontology_store
+import ontology_time
 import retrieval
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -52,6 +60,8 @@ TA_LUFT = (
     "https://www.verwaltungsvorschriften-im-internet.de/bsvwvbund_18082021_IGI25025005.htm",
 )
 TOP_K = 10
+OLD_STAND = ("strlschv_2019.md", "2019-12-01")
+CURRENT_STAND = ("strlschv.md", "2024-10-23")
 
 
 def _fetch(url: str) -> str:
@@ -107,11 +117,37 @@ def build() -> None:
     name, url = TA_LUFT
     page = _text(_fetch(url))
     _register(name, page[page.find("Allgemeinen Verwaltungsvorschrift") :])
+    _add_old_stand()
     print(f"  indexed {lex_index.build()['chunks']} chunks")
+
+
+def _add_old_stand() -> None:
+    """A synthetic older version of the StrlSchV for group (c) (see module docstring)."""
+    current = (db_context.raw_dir() / CURRENT_STAND[0]).read_text(encoding="utf-8")
+    old = re.sub(r"(## [^\n]+\n)", r"\1[Fassung vom 01.12.2019] ", current)
+    _register(OLD_STAND[0], old)
+    ontology_store.append_rows(
+        [
+            ontology.assertion(f"src:{name}", "version_date", when, by="user", user="eval")
+            for name, when in (OLD_STAND, CURRENT_STAND)
+        ]
+    )
 
 
 def _rank(hits: list[dict[str, Any]], expected: set[str]) -> int | None:
     return next((i for i, h in enumerate(hits) if h["source"] in expected), None)
+
+
+def _current(hits: list[dict[str, Any]]) -> list[str]:
+    """Chunk ids of hits that are not superseded today (controls may only demote those)."""
+    view = ontology_store.view()
+    assert view is not None
+    today = ontology_time.date.today()
+    return [
+        h["chunk_id"]
+        for h in hits
+        if ontology_time.validity(view, h["source"], today) != ontology_time.SUPERSEDED
+    ]
 
 
 def evaluate() -> dict[str, dict[str, float]]:
@@ -129,8 +165,8 @@ def evaluate() -> dict[str, dict[str, float]]:
             s["hit1"] += rank == 0
             s["hit5"] += rank is not None and rank < 5
             s["mrr"] += 0 if rank is None else 1 / (rank + 1)
-        if q["group"] == "d" and runs["on"] != runs["off"]:
-            print(f"  CONTROL CHANGED: {q['question']}")
+        if q["group"] == "d" and _current(runs["on"]) != _current(runs["off"]):
+            print(f"  CONTROL CHANGED beyond superseded versions: {q['question']}")
         off, on = (_rank(runs[m], set(q["expected"])) for m in ("off", "on"))
         print(f"  ({q['group']}) off={off!s:4} on={on!s:4} {q['question']}")
     return stats

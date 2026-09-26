@@ -1,5 +1,6 @@
 """The ontology stage in every search path (plan Phase 4: S1 retrieval, S2 briefing, S3 tool)."""
 
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -138,9 +139,9 @@ def test_every_search_path_resolves_exactly_once(
     calls: list[str] = []
     real = ontology_query.resolve
 
-    def spy(q: str, view: ontology_query.View) -> ontology_query.QueryFrame | None:
+    def spy(q: str, *args: Any) -> ontology_query.QueryFrame | None:
         calls.append(q)
-        return real(q, view)
+        return real(q, *args)
 
     monkeypatch.setattr(ontology_query, "resolve", spy)
     retrieval.search(QUESTION, scope="raw")
@@ -151,7 +152,10 @@ def test_every_search_path_resolves_exactly_once(
 
 def test_wiki_search_lifts_pages_citing_the_work(onto: Path) -> None:
     assert wiki_engine.search_wiki(QUESTION)[0]["filename"] == "ueberwachung.md"
-    assert retrieval.last_frame() == {
+    frame = retrieval.last_frame()
+    assert frame is not None
+    assert frame.pop("as_of") == date.today().isoformat()
+    assert frame == {
         "matched": ["StrlSchV"],
         "works": ["de-strlschv-2018"],
         "classes": [],

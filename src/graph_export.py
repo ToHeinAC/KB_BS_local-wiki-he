@@ -138,6 +138,7 @@ def _node_payload(
         "updated": _iso_or_none(fm.get("updated")),
         "tags": [str(t) for t in tags],
         "stale": bool(fm) and wiki_engine.is_page_stale(fm, today),
+        "outdated": bool(scores.get("outdated")),
         "orphan": degree == 0,
         "hub": bool(pr) and pr >= scores["hub_cut"],
         "bridgeHub": bool(bridge) and bridge >= scores["bridge_cut"],
@@ -173,6 +174,7 @@ def export(today: date | None = None) -> dict[str, Any]:
         for i, group in enumerate(sorted(communities, key=lambda c: min(c)))
         for node in group
     }
+    outdated = set(wiki_engine.outdated_pages(today))
     cuts = {
         "hub_cut": _quantile_threshold(list(pagerank.values()), _HUB_QUANTILE),
         "bridge_cut": _quantile_threshold(list(betweenness.values()), _BRIDGE_QUANTILE),
@@ -187,6 +189,7 @@ def export(today: date | None = None) -> dict[str, Any]:
                 "pr": pagerank.get(node["id"], 0.0),
                 "bridge": betweenness.get(node["id"], 0.0),
                 "comm": community_of.get(node["id"], 0),
+                "outdated": float(node["id"] in outdated),
             },
             today,
         )
@@ -229,6 +232,7 @@ def health(payload: dict[str, Any], today: date | None = None) -> dict[str, Any]
         "sources": len(payload["nodes"]) - len(pages),
         "orphans": sorted(n["id"] for n in pages if n["orphan"]),
         "stale": sorted(n["id"] for n in pages if n["stale"]),
+        "outdated": sorted(n["id"] for n in pages if n.get("outdated")),
         "low_confidence": sorted(n["id"] for n in pages if n["confidence"] == "low"),
         # Growth first, then size: the panel answers "which clusters are moving".
         "clusters": sorted(

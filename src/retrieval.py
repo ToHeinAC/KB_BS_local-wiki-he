@@ -17,6 +17,7 @@ when a chunk is found by both arms (it carries `matched_terms` and inline text).
 from __future__ import annotations
 
 from contextvars import ContextVar
+from datetime import date
 from typing import Any
 
 import db_context
@@ -24,6 +25,7 @@ import embed_index
 import lex_index
 import ontology_query
 import ontology_store
+import ontology_time
 import rerank
 import run_memory
 
@@ -116,11 +118,44 @@ def _note_frame(frame: ontology_query.QueryFrame | None) -> None:
         mem.note_ontology({"db": db_context.get_active_db(), **record})
 
 
-def _ontology_lists(q: str, scope: str | None) -> list[tuple[Ranked, float]]:
+def point_in_time(q: str) -> date | None:
+    """The date to judge versions at: one the query names, else the run question's, else
+    today — None when the question asks about the past without a date (don't reorder)."""
+    today = date.today()
+    intent = ontology_time.time_intent(q, today)
+    mem = run_memory.current()
+    if intent.explicit:
+        return intent.as_of
+    if mem is not None and mem.as_of:
+        return ontology_time.parse(mem.as_of)
+    if intent.past or (mem is not None and mem.time_past):
+        return None
+    return today
+
+
+def _validity_step(
+    q: str, hits: Ranked, view: ontology_query.View | None, scope: str | None
+) -> Ranked:
+    """Demote (never drop) hits from versions not in force, and wiki pages built only on
+    superseded versions (D3). No-op without an ontology or dated versions."""
+    as_of = point_in_time(q) if view is not None else None
+    if view is None or as_of is None:
+        return hits
+    hits = ontology_time.validity_order(hits, view, as_of) if scope != "wiki" else hits
+    if scope == "raw":
+        return hits
+    outdated = set(ontology_time.outdated_pages(view, as_of))
+    return [h for h in hits if h["source"] not in outdated] + [
+        h for h in hits if h["source"] in outdated
+    ]
+
+
+def _ontology_lists(
+    q: str, scope: str | None, view: ontology_query.View | None
+) -> list[tuple[Ranked, float]]:
     """The ontology stage (S1): [(arm, weight)] or [] — [] without an ontology or when the
     question names no work or class, so such searches are byte-identical to before."""
-    view = ontology_store.view()
-    frame = ontology_query.resolve(q, view) if view is not None else None
+    frame = ontology_query.resolve(q, view, point_in_time(q)) if view is not None else None
     _note_frame(frame)
     if view is None or frame is None:
         return []
@@ -135,13 +170,16 @@ def last_frame() -> dict[str, Any] | None:
 
 def ontology_rerank(q: str, hits: Ranked, scope: str | None, top_k: int) -> Ranked:
     """Run the ontology stage on an already-ranked lexical list (the Explorer's wiki search)."""
-    extra = _ontology_lists(q, scope)
-    return _rrf_fuse(hits, [], top_k, extra) if extra else hits
+    view = ontology_store.view()
+    extra = _ontology_lists(q, scope, view)
+    return _validity_step(q, _rrf_fuse(hits, [], top_k, extra) if extra else hits, view, scope)
 
 
 def ontology_briefing(question: str) -> tuple[str, list[dict[str, Any]]]:
     """S2: system-prompt block for a question over the search scope, plus audit records."""
     scope = db_context.search_scope()
+    intent = ontology_time.time_intent(question, date.today())
+    run_memory.note_time(intent.as_of.isoformat() if intent.explicit else None, intent.past)
     blocks: list[str] = []
     records: list[dict[str, Any]] = []
     for db in scope:
@@ -174,9 +212,11 @@ def search(
     reranking = use_rerank and rerank.available()
     depth = max(top_k, rerank.candidates()) if reranking else top_k
     lex_hits = lex_index.query(q, top_k=_CANDIDATES, scope=scope)
-    extra = _ontology_lists(q, scope) if use_ontology else []
+    view = ontology_store.view() if use_ontology else None
+    extra = _ontology_lists(q, scope, view)
     sem_hits = (
         embed_index.query(q, top_k=_CANDIDATES, scope=scope) if embed_index.available() else []
     )
     fused = _rrf_fuse(lex_hits, sem_hits, depth, extra) if sem_hits or extra else lex_hits[:depth]
-    return rerank.rerank(q, fused, top_k) if reranking else fused[:top_k]
+    ranked = rerank.rerank(q, fused, top_k) if reranking else fused[:top_k]
+    return _validity_step(q, ranked, view, scope)

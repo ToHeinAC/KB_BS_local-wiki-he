@@ -8,7 +8,8 @@ not `st.tabs`, for the reason in docs/ui.md. See docs/ontology.md §Workbench.
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime
+import re
+from datetime import UTC, date, datetime
 from typing import Any
 
 import streamlit as st
@@ -17,6 +18,7 @@ import db_context
 import ontology
 import ontology_bundle as bundle
 import ontology_detect
+import ontology_query
 import ontology_store
 import wiki_engine
 
@@ -436,3 +438,13 @@ def review_column_config(schema: ontology.Schema) -> dict[str, Any]:
         "Work": st.column_config.TextColumn("Work id"),
         "Other versions": st.column_config.TextColumn("Other versions in this DB"),
     }
+
+
+def source_badge(ref: str) -> str:
+    """Version/validity line for a cited document (e.g. under chat answers); "" without
+    an ontology or facts. Judged at today, as the answer is read now."""
+    db, name = db_context.split_ref(ref)
+    name = re.sub(r"\s*[§#].*$", "", name)  # "doc.md §1" cites a section of doc.md
+    with db_context.using_db(db):
+        view = ontology_store.view()
+    return ontology_query.badge(view, name, date.today()) if view is not None else ""

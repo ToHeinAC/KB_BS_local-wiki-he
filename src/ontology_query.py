@@ -16,15 +16,18 @@ from __future__ import annotations
 import difflib
 import re
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, cast
 
 import ontology
 import ontology_detect
+import ontology_time
 from prompts import (
     ONTOLOGY_BRIEFING_CLASS,
     ONTOLOGY_BRIEFING_HEADER,
     ONTOLOGY_BRIEFING_RELATIONS,
     ONTOLOGY_BRIEFING_RULE,
+    ONTOLOGY_BRIEFING_TIME,
     ONTOLOGY_BRIEFING_VERSIONS,
     ONTOLOGY_BRIEFING_WORK,
 )
@@ -61,6 +64,9 @@ class QueryFrame:
     sources: tuple[str, ...]  # of the resolved works, newest version first
     class_sources: tuple[str, ...]
     terms: tuple[str, ...]  # aliases of the resolved works, for the lexical arm
+    as_of: str = ""  # ISO date the question is about (today unless it names one)
+    explicit: bool = False  # the question named a date or year
+    past: bool = False  # the question asks about an earlier state
 
 
 def tokens(text: str) -> Key:
@@ -99,6 +105,8 @@ def _works(schema: ontology.Schema, facts: dict[str, Any]) -> dict[str, dict[str
             "aliases": [str(a) for a in _as_list(wf.get("aliases"))],
             "sources": _newest_first(members, sources),
             "relations": {r: _as_list(wf[r]) for r in schema.relations if wf.get(r)},
+            "in_force_from": wf.get("in_force_from"),
+            "in_force_until": wf.get("in_force_until"),
         }
     return out
 
@@ -206,9 +214,23 @@ def _unique(items: list[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(items))
 
 
-def resolve(q: str, view: View) -> QueryFrame | None:
-    """The works and classes ``q`` names; None when it names none."""
-    hits = _scan(q, view)
+def _in_force_only(hits: list[tuple[str, str]], view: View, as_of: date) -> list[tuple[str, str]]:
+    """For an alias naming several works, keep those in force at ``as_of`` (if any is)."""
+    out: list[tuple[str, str]] = []
+    for surface in dict.fromkeys(s for s, _ in hits):
+        group = [t for s, t in hits if s == surface]
+        works = [t for t in group if t.startswith("work:")]
+        live = [t for t in works if ontology_time.work_in_force(view, t[5:], as_of)]
+        keep = live if len(works) > 1 and live else works
+        out += [(surface, t) for t in group if not t.startswith("work:") or t in keep]
+    return out
+
+
+def resolve(q: str, view: View, today: date | None = None) -> QueryFrame | None:
+    """The works and classes ``q`` names, at the point in time it asks about;
+    None when it names none."""
+    intent = ontology_time.time_intent(q, today or date.today())
+    hits = _in_force_only(_scan(q, view), view, intent.as_of)
     if not hits:
         return None
     works = _unique([t[5:] for _, t in hits if t.startswith("work:")])
@@ -221,6 +243,9 @@ def resolve(q: str, view: View) -> QueryFrame | None:
         sources=_unique([s for w in works for s in view.works[w]["sources"]]),
         class_sources=_unique([s for c in classes for s in view.class_sources.get(c, ())]),
         terms=_unique([a for w in works for a in view.works[w]["aliases"]])[:MAX_TERMS],
+        as_of=intent.as_of.isoformat(),
+        explicit=intent.explicit,
+        past=intent.past,
     )
 
 
@@ -233,25 +258,30 @@ def audit(frame: QueryFrame | None) -> dict[str, Any]:
         "works": list(frame.works),
         "classes": list(frame.classes),
         "sources": list(frame.sources) + [s for s in frame.class_sources if s not in frame.sources],
+        "as_of": frame.as_of,
     }
 
 
 # --- briefing (S2) -------------------------------------------------------------------
 
 
-def _versions(work: dict[str, Any], view: View) -> str:
-    return ", ".join(
-        f"{s} ({view.sources[s]['version_date']})" if view.sources[s].get("version_date") else s
-        for s in work["sources"]
-    )
+def _version(source: str, view: View, as_of: date) -> str:
+    parts = [str(view.sources[source].get("version_date") or "")]
+    parts.append(ontology_time.LABELS.get(ontology_time.validity(view, source, as_of), ""))
+    shown = ", ".join(p for p in parts if p)
+    return f"{source} ({shown})" if shown else source
 
 
-def _work_lines(surface: str, wid: str, view: View) -> list[str]:
+def _versions(work: dict[str, Any], view: View, as_of: date) -> str:
+    return ", ".join(_version(s, view, as_of) for s in work["sources"])
+
+
+def _work_lines(surface: str, wid: str, view: View, as_of: date) -> list[str]:
     work = view.works[wid]
     cls = f", class {work['class']}" if work.get("class") else ""
     lines = [ONTOLOGY_BRIEFING_WORK.format(matched=surface, work=wid, cls=cls)]
     if work["sources"]:
-        lines.append(ONTOLOGY_BRIEFING_VERSIONS.format(versions=_versions(work, view)))
+        lines.append(ONTOLOGY_BRIEFING_VERSIONS.format(versions=_versions(work, view, as_of)))
     relations = "; ".join(f"{r}: {', '.join(map(str, t))}" for r, t in work["relations"].items())
     if relations:
         lines.append(ONTOLOGY_BRIEFING_RELATIONS.format(relations=relations))
@@ -262,20 +292,24 @@ def briefing(frame: QueryFrame | None, view: View) -> str:
     """System-prompt block for a frame (≤ BRIEFING_MAX_CHARS); "" without a frame."""
     if frame is None:
         return ""
-    body: list[str] = []
+    as_of = ontology_time.parse(frame.as_of) or date.today()
+    origin = "from the question" if frame.explicit else "today"
+    if frame.past and not frame.explicit:
+        origin = "the question asks about an earlier version; no date given"
+    body = [ONTOLOGY_BRIEFING_TIME.format(as_of=frame.as_of, origin=origin)]
     works_done = 0
     for surface, target in frame.hits:
         kind, _, ident = target.partition(":")
         if kind == "work" and works_done < MAX_BRIEF_WORKS:
-            body += _work_lines(surface, ident, view)
+            body += _work_lines(surface, ident, view, as_of)
             works_done += 1
         elif kind == "class":
             count = len(view.class_sources.get(ident, ()))
             body.append(ONTOLOGY_BRIEFING_CLASS.format(matched=surface, cls=ident, count=count))
     head, tail = ONTOLOGY_BRIEFING_HEADER, ONTOLOGY_BRIEFING_RULE
-    while body and len("\n".join([head, *body, tail])) > BRIEFING_MAX_CHARS:
+    while len(body) > 1 and len("\n".join([head, *body, tail])) > BRIEFING_MAX_CHARS:
         body.pop()
-    return "\n".join([head, *body, tail]) if body else ""
+    return "\n".join([head, *body, tail]) if len(body) > 1 else ""
 
 
 # --- lookup (S3) ---------------------------------------------------------------------
@@ -290,12 +324,13 @@ def _incoming(wid: str, view: View) -> list[str]:
     ]
 
 
-def _lookup_work(wid: str, view: View) -> str:
+def _lookup_work(wid: str, view: View, as_of: date) -> str:
     work = view.works[wid]
     lines = [f"Work {wid}" + (f" (class {work['class']})" if work.get("class") else "")]
     if work["aliases"]:
         lines.append("  aliases: " + ", ".join(work["aliases"]))
-    lines.append("  versions (newest first): " + (_versions(work, view) or "none in this DB"))
+    versions = _versions(work, view, as_of) or "none in this DB"
+    lines.append(f"  versions (newest first, validity at {as_of.isoformat()}): {versions}")
     outgoing = [f"{r} → {t}" for r, ts in work["relations"].items() for t in ts]
     related = outgoing + _incoming(wid, view)
     if related:
@@ -311,21 +346,26 @@ def _lookup_class(cid: str, view: View) -> str:
     return f"Class {cid}: {view.classes.get(cid, '')}\n  works/sources: {shown}"
 
 
-def lookup(term: str, view: View) -> str:
-    """Tool answer for ``term``: its works (versions, relations) and/or classes."""
-    frame = resolve(term, view)
+def lookup(term: str, view: View, today: date | None = None) -> str:
+    """Tool answer for ``term``: its works (versions, relations) and/or classes; a date in
+    ``term`` ("StrlSchV 2017") sets the point in time for validity."""
+    frame = resolve(term, view, today)
     if frame is None:
         names = sorted({a for w in view.works.values() for a in w["aliases"]})
         near = difflib.get_close_matches(term, names, n=3, cutoff=0.6)
         hint = f" Did you mean: {', '.join(near)}?" if near else ""
         return f"No ontology entry for {term!r}.{hint}"
-    parts = [_lookup_work(w, view) for w in frame.works]
+    as_of = ontology_time.parse(frame.as_of) or date.today()
+    parts = [_lookup_work(w, view, as_of) for w in frame.works]
     parts += [_lookup_class(c, view) for c in frame.classes]
     return "\n".join(parts)
 
 
-def badge(view: View, source: str) -> str:
-    """One line for a search hit from ``source``: "ontology: class · work · date" or ""."""
+def badge(view: View, source: str, as_of: date | None = None) -> str:
+    """One line for a search hit: "ontology: class · work · date · validity" or ""."""
     facts = view.sources.get(source, {})
     parts = [str(facts[k]) for k in ("class", "work", "version_date") if facts.get(k)]
+    if parts and as_of is not None:
+        state = ontology_time.LABELS.get(ontology_time.validity(view, source, as_of))
+        parts += [state] if state else []
     return "ontology: " + " · ".join(parts) if parts else ""

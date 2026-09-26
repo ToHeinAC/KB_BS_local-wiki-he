@@ -65,7 +65,9 @@ def view(schema: ontology.Schema) -> oq.View:
 def test_an_abbreviation_resolves_to_its_works_with_newest_version_first(view: oq.View) -> None:
     frame = oq.resolve("Welcher Grenzwert gilt nach StrlSchV?", view)
     assert frame is not None
-    assert set(frame.works) == {"de-strlschv-2018", "de-strlschv-2001"}  # ambiguous: keep both
+    # Ambiguous alias: the work in force today wins (2001 has no version here);
+    # with no work in force, all are kept (test_ontology_time).
+    assert frame.works == ("de-strlschv-2018",)
     assert frame.sources == ("StrlSchV_B.md", "StrlSchV_A.md")
     assert frame.matched == ("StrlSchV",)
     assert set(frame.terms) == {"StrlSchV", "Strahlenschutzverordnung"}
@@ -122,7 +124,7 @@ def test_briefing_names_ids_versions_and_relations(view: oq.View) -> None:
     text = oq.briefing(frame, view)
     assert '"StrlSchV"' in text
     assert "de-strlschv-2018" in text
-    assert "StrlSchV_B.md (2024-10-23)" in text
+    assert "StrlSchV_B.md (2024-10-23, in force)" in text
     assert text.index("StrlSchV_B.md") < text.index("StrlSchV_A.md")
     assert "based_on: de-strlschg-2017" in text
     assert "ordinance" in text
@@ -148,8 +150,8 @@ def test_no_frame_no_briefing(view: oq.View) -> None:
 def test_lookup_of_a_work_lists_versions_and_relations_both_ways(view: oq.View) -> None:
     text = oq.lookup("StrlSchV", view)
     assert "de-strlschv-2018" in text
-    assert "de-strlschv-2001" in text
-    assert "StrlSchV_B.md (2024-10-23)" in text
+    assert "StrlSchV_B.md (2024-10-23, in force)" in text
+    assert "StrlSchV_A.md (2020-01-01, superseded)" in text
     assert "based_on → de-strlschg-2017" in text
     incoming = oq.lookup("StrlSchG", view)
     assert "based_on ← de-strlschv-2018" in incoming

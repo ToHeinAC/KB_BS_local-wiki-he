@@ -39,7 +39,7 @@ _MIN_WORDS = 4  # shorter lines carry too little signal to classify
 _JUDGE_WORDS = 8  # a whole reply shorter than this is not judged at all
 _LEAD_LINES = 3  # the creator's lines — merges append below them
 # Sections whose text is code-generated or deliberately original: never translated.
-_EXEMPT_HEADINGS = ("## citations", "## contradictions", "## original (")
+_EXEMPT_HEADINGS = ("## citations", "## contradictions", "## changes", "## original (")
 
 
 def other(code: str) -> str:

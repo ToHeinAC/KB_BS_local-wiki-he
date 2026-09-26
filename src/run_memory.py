@@ -30,6 +30,11 @@ class RunMemory:
     relevance_by_source: dict[str, float] = field(default_factory=dict[str, float])
     # Ontology stage (docs/ontology.md §Search): one record per distinct frame this run.
     ontology: list[dict[str, Any]] = field(default_factory=list[dict[str, Any]])
+    # Point in time of the run's question (docs/ontology.md §Time): an ISO date when it
+    # named one, `time_past` when it asked about an earlier state without a date.
+    as_of: str | None = None
+    time_past: bool = False
+    validity_nudged: bool = False  # the S4 superseded-citation check fired once
 
     def tick(self) -> int:
         self.step += 1
@@ -81,3 +86,10 @@ def note_ontology(record: dict[str, Any]) -> None:
     mem = current()
     if mem is not None:
         mem.note_ontology(record)
+
+
+def note_time(as_of: str | None, past: bool) -> None:
+    """Record the question's point in time on the current run (no-op outside a run)."""
+    mem = current()
+    if mem is not None:
+        mem.as_of, mem.time_past = as_of, past

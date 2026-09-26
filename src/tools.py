@@ -12,7 +12,7 @@ import os
 import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from functools import partial
 from typing import Any, ParamSpec, TypeVar, cast
 
@@ -26,6 +26,7 @@ import db_context
 import okf
 import ontology_query
 import ontology_store
+import ontology_time
 import retrieval
 import run_memory
 import wiki_engine
@@ -34,6 +35,7 @@ from prompts import (
     FETCH_WEBPAGE_DESCRIPTION,
     LOW_CONFIDENCE_NUDGE,
     ONTOLOGY_LOOKUP_DESCRIPTION,
+    ONTOLOGY_SUPERSEDED_NUDGE,
     RAW_READ_DESCRIPTION,
     RAW_SEARCH_DESCRIPTION,
     SUBMIT_CHAT_DESCRIPTION,
@@ -281,6 +283,7 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
     hits = retrieval.search(query, top_k=max_results, scope="raw", use_rerank=True)
     mem = run_memory.current()
     view = ontology_store.view()
+    as_of = retrieval.point_in_time(query)
     parts: list[str] = []
     for i, h in enumerate(hits, 1):
         if mem is not None and "rerank_score" in h:  # Stage E: track best passage seen
@@ -288,7 +291,7 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
             mem.note_source_relevance(db_context.qualify(h["source"]), float(h["rerank_score"]))
         anchor = h.get("anchor") or ""
         cite_suffix = f" {anchor}" if anchor else ""
-        badge = ontology_query.badge(view, h["source"]) if view is not None else ""
+        badge = ontology_query.badge(view, h["source"], as_of) if view is not None else ""
         parts.append(
             f"[Raw hit {i}]\n"
             f"file: {db_context.qualify(h['source'])}{cite_suffix}\n"
@@ -536,6 +539,41 @@ def current_run_audit(db: str | None = None) -> dict[str, Any] | None:
     return {**record, "ontology": list(mem.ontology)} if mem.ontology else record
 
 
+_CITE_SECTION_RE = re.compile(r"\s*[§#].*$")
+
+
+def _supersession(ref: str, as_of: date) -> tuple[str, str | None]:
+    """(validity of a cited raw source, the version in force of its work) at ``as_of``."""
+    db, name = db_context.split_ref(_CITE_SECTION_RE.sub("", ref))
+    with db_context.using_db(db):
+        view = ontology_store.view()
+        if view is None:
+            return ontology_time.UNKNOWN, None
+        state = ontology_time.validity(view, name, as_of)
+        work = str(view.sources.get(name, {}).get("work") or "")
+        current = ontology_time.current_expression(view, work, as_of) if work else None
+    return state, db_context.qualify(current, db) if current else None
+
+
+def _superseded_nudge(cited: set[str]) -> str | None:
+    """S4 (docs/ontology.md §Time): reject once when every dated cited source is a
+    superseded version and the version in force is in the DB. Silent for questions about
+    the past, without an ontology, and after it fired once (a weak model cannot loop)."""
+    mem = run_memory.current()
+    if mem is None or mem.validity_nudged or mem.time_past or not cited:
+        return None
+    as_of = ontology_time.parse(mem.as_of) if mem.as_of else date.today()
+    found = [_supersession(ref, as_of or date.today()) for ref in sorted(cited)]
+    states = [s for s, _ in found if s != ontology_time.UNKNOWN]
+    current = sorted({c for s, c in found if s == ontology_time.SUPERSEDED and c})
+    if not states or any(s != ontology_time.SUPERSEDED for s in states) or not current:
+        return None
+    mem.validity_nudged = True
+    return ONTOLOGY_SUPERSEDED_NUDGE.format(
+        cited=", ".join(sorted(cited)), current=", ".join(current)
+    )
+
+
 def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     words = len(re.findall(r"\w+", answer or ""))
     cited = set(_RAW_CITE_RE.findall(answer or ""))
@@ -556,7 +594,7 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
             f"data/raw/), minimum is {CHAT_MIN_SOURCES} including at least one "
             "[Source: ...] document. Run more raw_search/raw_read and cite additional files."
         )
-    nudge = _low_confidence_nudge()
+    nudge = _low_confidence_nudge() or _superseded_nudge(raw_unique)
     if nudge:
         return nudge
     return f"ACCEPTED: {words} words, {len(unique)} sources cited."
@@ -685,24 +723,29 @@ def wiki_read(filenames: list[str]) -> str:
     return "\n\n".join(out)
 
 
-def _ontology_lookup_impl(term: str | None = None) -> str:
+def _ontology_lookup_impl(term: str | None = None, as_of: str = "") -> str:
     term = (term or "").strip()
     if not term:
         return "Error: provide `term`."
+    when = ontology_time.time_intent(f"as of {as_of}", date.today()).as_of if as_of else None
     scope = db_context.search_scope()
     parts = [f"## Ontology lookup: {term}"]
     for db in scope:
         with db_context.using_db(db):
             view = ontology_store.view()
-            text = ontology_query.lookup(term, view) if view else "(no ontology in this database)"
+            text = (
+                ontology_query.lookup(term, view, when)
+                if view
+                else "(no ontology in this database)"
+            )
         parts.append(f"### Database: {db}\n{text}" if len(scope) > 1 else text)
     return "\n".join(parts)
 
 
 @tool(description=ONTOLOGY_LOOKUP_DESCRIPTION)
-def ontology_lookup(term: str) -> str:
-    fresh, stubs = _dedup_search("ontology_lookup", [term])
-    return _ontology_lookup_impl(term) if fresh else stubs[0]
+def ontology_lookup(term: str, as_of: str = "") -> str:
+    fresh, stubs = _dedup_search("ontology_lookup", [f"{term.strip()}|{as_of.strip()}"])
+    return _ontology_lookup_impl(term, as_of) if fresh else stubs[0]
 
 
 def with_ontology(base: list[Any]) -> list[Any]:

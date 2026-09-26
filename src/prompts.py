@@ -267,14 +267,16 @@ Answer with JSON only, nothing else:
 # Ontology briefing (plan §4.3): built by code from ids, file names, dates and the user's
 # own words only; appended to the agents' system prompt and the Quick-chat synthesis.
 ONTOLOGY_BRIEFING_HEADER = "Ontology frame (built by code from confirmed facts of this database):"
+ONTOLOGY_BRIEFING_TIME = "- Point in time: {as_of} ({origin})."
 ONTOLOGY_BRIEFING_WORK = '- "{matched}" refers to the document work {work}{cls}.'
 ONTOLOGY_BRIEFING_VERSIONS = "  Versions in this database, newest first: {versions}."
 ONTOLOGY_BRIEFING_RELATIONS = "  Related works: {relations}."
 ONTOLOGY_BRIEFING_CLASS = (
     '- "{matched}" is the document class {cls} ({count} source(s) in this database).'
 )
-ONTOLOGY_BRIEFING_RULE = "Prefer these documents when they answer the question and say which version you cite. For versions and related documents, call ontology_lookup."
-ONTOLOGY_LOOKUP_DESCRIPTION = "Look up a document, law abbreviation or document class in this database's ontology: its versions (newest first), class, and related documents (based on, transposes, amends, ...). Use it when the question names a document and you need its versions or related documents. Arg: term (e.g. 'StrlSchV')."
+ONTOLOGY_BRIEFING_RULE = "Prefer these documents when they answer the question. Prefer the version in force at the point in time; if you cite a superseded version, say so. For versions and related documents, call ontology_lookup."
+ONTOLOGY_LOOKUP_DESCRIPTION = "Look up a document, law abbreviation or document class in this database's ontology: its versions (newest first) and which one is in force, its class, and related documents (based on, transposes, amends, ...). Use it when the question names a document and you need its versions or related documents. Args: term (e.g. 'StrlSchV'); optional as_of (a date such as '2017-06-01' or a year) for the point in time."
+ONTOLOGY_SUPERSEDED_NUDGE = "REJECTED: every document you cite is a superseded version ({cited}). The version in force is {current}. Cite it, or state explicitly that your answer describes the old version, then submit again."
 
 DESCRIPTION_BUILD_PROMPT = """Write a concise high-level overview of the knowledge base "{db_name}".
 

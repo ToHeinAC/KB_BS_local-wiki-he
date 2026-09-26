@@ -165,12 +165,14 @@ def test_merge_flags_numeric_contradiction_when_unresolved():
 
 
 def test_merge_resolves_contradiction_with_date_signal():
+    # Legal dates (`effective as of`) resolve; write dates (`updated`) never do (F2,
+    # docs/ontology.md §Time).
     existing = (
-        '---\ntitle: "Dose"\ntype: concept\nupdated: "2020-01-01"\n---\n'
+        '---\ntitle: "Dose"\ntype: concept\neffective as of: "2020-01-01"\n---\n'
         "## Limits\n- annual limit is 20 mSv\n"
     )
     new = (
-        '---\ntitle: "Dose"\ntype: concept\nupdated: "2026-01-01"\n---\n'
+        '---\ntitle: "Dose"\ntype: concept\neffective as of: "2026-01-01"\n---\n'
         "## Limits\n- annual limit is 50 mSv\n"
     )
     merged = w._merge_pages(existing, new, "n.md")

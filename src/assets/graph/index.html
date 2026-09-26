@@ -580,6 +580,7 @@ function draw() {
   const showHubs = S.overlays.includes("hubs");
   const showBridges = S.overlays.includes("bridges");
   const showStale = S.overlays.includes("stale");
+  const showOutdated = S.overlays.includes("outdated");
   const showLowConf = S.overlays.includes("confidence");
 
   S.nodes.forEach((n) => {
@@ -637,6 +638,17 @@ function draw() {
       ctx.beginPath();
       ctx.arc(x, y, n.r + 6, 0, 7);
       ctx.stroke();
+    }
+    if (showOutdated && n.outdated) {
+      // Built only on superseded versions: a dashed ring, steady (it is a fact, not a warning).
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.strokeStyle = P.stale;
+      ctx.lineWidth = 1.4 / S.view.k;
+      ctx.setLineDash([3 / S.view.k, 3 / S.view.k]);
+      ctx.beginPath();
+      ctx.arc(x, y, n.r + 9, 0, 7);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
     if (n.id === S.selected) {
       ctx.globalAlpha = 1;

@@ -27,6 +27,7 @@ import ontology
 import ontology_bundle
 import ontology_detect
 import ontology_store
+import ontology_time
 import page_lang
 import qa_gen
 import retrieval
@@ -160,6 +161,13 @@ def is_page_stale(meta: dict[str, Any], today: date | None = None) -> bool:
         return False
     today = today or datetime.now(UTC).date()
     return (today - updated).days > ttl
+
+
+def outdated_pages(today: date | None = None) -> list[str]:
+    """Pages built only on superseded versions (ontology, valid time); [] without one.
+    *Stale* means "not re-checked lately"; *outdated* means "rests on superseded law"."""
+    view = ontology_store.view()
+    return ontology_time.outdated_pages(view, today or date.today()) if view else []
 
 
 def stale_pages() -> list[str]:
@@ -475,10 +483,36 @@ def _union_list(a: object, b: object) -> list[Any]:
     return merged
 
 
+def _source_facts(sources: object) -> list[dict[str, Any]]:
+    """Ontology facts of a page's sources (section suffixes stripped); [] without one."""
+    if not ontology_store.exists():
+        return []
+    names = [_SOURCE_SECTION_RE.sub("", str(s)) for s in _as_items(sources)]
+    return [ontology_store.source_facts(n) for n in names if n]
+
+
+def _legal_date(meta: dict[str, Any]) -> date | None:
+    """The newest *legal* date behind a page: its sources' version dates (ontology), else
+    its `effective as of`. Write dates (`updated`, `created`) never count (finding F2)."""
+    dates = [
+        _parse_date(f.get("version_date") or f.get("in_force_from"))
+        for f in _source_facts(meta.get("sources"))
+    ]
+    dates.append(_parse_date(meta.get("effective as of")))
+    known = [d for d in dates if d]
+    return max(known) if known else None
+
+
 def _is_newer(nmeta: dict[str, Any], emeta: dict[str, Any]) -> bool:
-    nd = _parse_date(nmeta.get("effective as of") or nmeta.get("updated") or nmeta.get("created"))
-    ed = _parse_date(emeta.get("effective as of") or emeta.get("updated") or emeta.get("created"))
+    """True only when both sides have a legal date and the new one is later."""
+    nd, ed = _legal_date(nmeta), _legal_date(emeta)
     return bool(nd and ed and nd > ed)
+
+
+def _same_work(new_source: str, existing_sources: object) -> bool:
+    """The new source and one of the page's sources are versions of the same work."""
+    new = {f.get("work") for f in _source_facts([new_source])} - {None}
+    return bool(new & {f.get("work") for f in _source_facts(existing_sources)})
 
 
 def _extract_facts(text: str) -> dict[str, set[str]]:
@@ -505,12 +539,41 @@ _CONTRADICTION_NOTES = {
 }
 
 
+# Two versions of one work: a value that changed is a change, not a contradiction.
+_CHANGE_NOTES = {
+    "en": (
+        "{term}: {new} in the newer version; previously {old}",
+        "{term}: {new} in an older version; now {old}",
+    ),
+    "de": (
+        "{term}: {new} in der neueren Fassung; zuvor {old}",
+        "{term}: {new} in einer älteren Fassung; jetzt {old}",
+    ),
+}
+
+
+def _succession(emeta: dict[str, Any], nmeta: dict[str, Any], same_work: bool) -> str | None:
+    """ "newer" / "older" when both sides are dated versions of one work, else None."""
+    nd, ed = _legal_date(nmeta), _legal_date(emeta)
+    if not (same_work and nd and ed and nd != ed):
+        return None
+    return "newer" if nd > ed else "older"
+
+
 def _contradiction_check(
-    existing: str, new: str, emeta: dict[str, Any], nmeta: dict[str, Any], page_lang: str = "en"
+    existing: str,
+    new: str,
+    emeta: dict[str, Any],
+    nmeta: dict[str, Any],
+    page_lang: str = "en",
+    same_work: bool = False,
 ) -> list[str]:
-    """Flag same-term/same-unit numeric conflicts. Resolves only on a date signal."""
+    """Flag same-term/same-unit numeric conflicts. Resolves only on a legal-date signal;
+    between two dated versions of one work the notes are change notes instead."""
     ef, nf = _extract_facts(existing), _extract_facts(new)
     newer = _is_newer(nmeta, emeta)
+    succession = _succession(emeta, nmeta, same_work)
+    notes = _CHANGE_NOTES if succession else _CONTRADICTION_NOTES
     out: list[str] = []
     for key, nvals in nf.items():
         evals = ef.get(key)
@@ -518,7 +581,7 @@ def _contradiction_check(
             continue
         term = key.split("|")[0]
         old, newv = ", ".join(sorted(evals)), ", ".join(sorted(nvals))
-        resolved, unresolved = _CONTRADICTION_NOTES.get(page_lang, _CONTRADICTION_NOTES["en"])
+        resolved, unresolved = notes.get(page_lang, notes["en"])
         out.append((resolved if newer else unresolved).format(term=term, new=newv, old=old))
     return out
 
@@ -540,16 +603,17 @@ def _merge_pages(existing: str, new: str, source: str) -> str:
         meta["created"] = np_.metadata.get("created")
     meta["updated"] = _date()
     body = _merge_bodies(ep.content, np_.content)
+    nmeta = {**np_.metadata, "sources": _union_list(np_.metadata.get("sources"), [source])}
+    same_work = _same_work(source, ep.metadata.get("sources"))
     contradictions = _contradiction_check(
-        ep.content, np_.content, ep.metadata, np_.metadata, page_lang.page_lang(existing)
+        ep.content, np_.content, ep.metadata, nmeta, page_lang.page_lang(existing), same_work
     )
+    changes = bool(contradictions) and _succession(ep.metadata, nmeta, same_work) is not None
     if contradictions:
-        body = (
-            body.rstrip()
-            + "\n\n## Contradictions\n"
-            + "\n".join(f"- {c}" for c in contradictions)
-            + "\n"
-        )
+        heading = "## Changes" if changes else "## Contradictions"
+        body = body.rstrip() + f"\n\n{heading}\n" + "\n".join(f"- {c}" for c in contradictions)
+        body += "\n"
+    if contradictions and not changes:
         meta["confidence"] = "low"
     merged = frontmatter.Post(body)
     merged.metadata.update(meta)
@@ -1945,6 +2009,12 @@ def lint() -> str:
         prog_blocks.append(
             f"**Possibly stale (past freshness window as of {_date()}):**\n"
             + "\n".join(f"- {s}" for s in stale)
+        )
+    outdated = outdated_pages()
+    if outdated:
+        prog_blocks.append(
+            f"**Built on superseded versions (as of {_date()}):**\n"
+            + "\n".join(f"- {s}" for s in outdated)
         )
     if prog_blocks:
         report = "## Programmatic checks\n\n" + "\n\n".join(prog_blocks) + "\n\n---\n\n" + report

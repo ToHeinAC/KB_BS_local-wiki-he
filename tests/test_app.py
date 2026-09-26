@@ -828,3 +828,21 @@ def test_deep_chat_shows_the_ontology_frame_and_why_line(wiki, monkeypatch):
     at.chat_input[0].set_value("deep q").run()
     assert "Ontology — “StrlSchV” → `w`; 1 source(s) favoured" in _texts(_ok(at).markdown)
     assert any(e.label == "Ontology frame" for e in at.expander)
+
+
+def test_chat_sources_say_which_version_is_in_force(wiki, monkeypatch):
+    import ontology
+    import ontology_store
+
+    _legal_ontology()
+    ontology_store.append_rows(
+        [
+            ontology.assertion("src:doc.md", "work", "w-doc", by="rule"),
+            ontology.assertion("src:doc.md", "version_date", "2024-10-23", by="rule"),
+        ]
+    )
+    answer = {"answer": "A", "sources": [], "raw_sources": ["doc.md §1"], "audit": None}
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: answer)
+    at = _go(_app(), "Wiki Chat")
+    at.chat_input[0].set_value("q").run()
+    assert "ontology: w-doc · 2024-10-23 · in force" in _texts(_ok(at).caption)
