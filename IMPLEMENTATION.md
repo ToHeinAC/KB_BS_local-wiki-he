@@ -36,6 +36,7 @@ One row per PRD milestone. Status: `planned`, `in progress`, `done`.
 | 4 | M4: Web UI | done | `test_app` |
 | 5 | M5: Quality gate (claude-dev-schema) | done | `uv run pre-commit run --all-files` green (3.11, 3.13) |
 | 6 | M6: Ontology ([plan](docs/_plan-ontology.md) phases 1–8) | done (plan phases 1–8; §-level validity not built) | `test_ontology`, `test_ontology_store`, `test_ontology_bundle`, `test_ontology_detect`, `test_ontology_ingest`, `test_ontology_query`, `test_ontology_search`, `test_ontology_time`, `test_ontology_time_search`, `test_ontology_merge`, `test_ontology_outdated`, `test_ontology_relations`, `test_ontology_relations_flow`, `test_ontology_evolution`, `test_ontology_evolution_flow`, `test_ontology_export`, `test_ontology_pages`, `test_delete_source`, `test_app`; `scripts/bench_ontology_detect.py`, `scripts/eval_ontology_search.py` |
+| 7 | M7: Classification ([design](docs/security.md)) | in progress | `test_classification_gate`, `test_classification_leaks`, `test_security_rules` (planned) |
 | – | Extensions beyond the original spec (no PRD milestone): hybrid retrieval stages A–F, multi-DB + auth, OKF bundle, language pinning, GPU pinning | done | `test_lex_index`, `test_embed_index`, `test_rerank`, `test_calibrate`, `test_multi_db`, `test_auth`, `test_lang`, `test_page_language`, `test_gpu_placement` |
 
 ## 3. Module map
@@ -90,6 +91,7 @@ Tracked in [docs/openissues.md](docs/openissues.md).
 | Wiki, SCHEMA and storage | [docs/wiki.md](docs/wiki.md) |
 | Open Knowledge Format (OKF v0.1) | [docs/okf.md](docs/okf.md) |
 | Ontology (schema, ledger); plan and rationale | [docs/ontology.md](docs/ontology.md), [plan](docs/_plan-ontology.md), [concept](docs/_idea-onthology.md) |
+| Security: classification levels, access gate, threat model | [docs/security.md](docs/security.md) |
 | Testing strategy | [docs/tests.md](docs/tests.md) |
 | Dated change log | [docs/changelog.md](docs/changelog.md), archives [2](docs/changelog-archive-2.md), [1](docs/changelog-archive.md) |
 | Original PRD (archived) | [docs/_bup_PRD.md](docs/_bup_PRD.md) |

@@ -104,6 +104,32 @@ correct, cited, deduplicated pages that answer later questions with traceable so
   source's ledger rows.
 - **Dependencies:** M2, M3, M4.
 
+### M7 — Classification
+- **Deliverable:** three classification levels per DB (normal < confidential < strictly
+  confidential), each a physically separate sub-store (raw, chunks, index, wiki, ontology
+  ledger); one access gate in `db_context` that every data path resolves through; per-user,
+  per-DB hierarchical clearance set by admins; a mandatory classification at upload; moving a
+  source between levels; a security audit log. Design and threat model:
+  [docs/security.md](docs/security.md).
+- **Acceptance criteria:**
+  - G1: no data path into a level above the user's clearance resolves.
+  - G2: nothing derived from a level is written to a lower one; saved answers and reports go to
+    the highest level they read from.
+  - G3: a denied name looks exactly like a missing one.
+  - G4: no classified content reaches the web unless the user opts in explicitly.
+  - Only maintainers with clearance for the target level save answers to the wiki.
+  - A canary leak suite passes: canary tokens planted in higher levels appear in no output and no
+    LLM prompt of any Explorer, Chat or Research entry point for a user without clearance, and
+    are found by a user with it.
+- **Edge cases:** existing data is the normal level, with no migration; an unclassified upload
+  is not ingested; clearance revoked mid-session takes effect at the next rerun; moving a source
+  up purges its traces from the lower level (merged pages rebuilt from their other sources,
+  ledger rows removed as a documented exception to append-only); duplicate checks only look at
+  levels the uploader can see.
+- **Non-goals:** OS-level file access, encryption at rest, backups, Ollama server-side logs,
+  covert channels, content that authorised users copy out.
+- **Dependencies:** M2, M3, M4, M6.
+
 ## 5. Open risks & assumptions
 
 - Small-model output drifts in format → keep every structural decision in code, and add a
