@@ -40,6 +40,7 @@ author: Tobias Hein
 7. **`ollama_client.py`** — `is_available()` behaviour, error raised on failure, temperature defaults.
 8. **`wiki_engine.py`** — ingest parses LLM output and writes files; query loads relevant pages; lint produces a report; helpers (`get_wiki_stats`, `search_wiki`, etc.).
 9. **`auth.py`** — maintainer layer: `is_maintainer` true only for an assigned DB (admin is not implicit), `grant_maintainer` adds to both `dbs` + `maintains`, `backfill_maintainers` is idempotent and backfills admins only.
+9b. **Classification layer** — the gate fails closed, and a canary leak suite checks that no token of a higher level reaches any output or LLM prompt. Each probe has a cleared-user twin, plus a gate-bypass meta-test and AST rules that are fed violating inputs. Suite table: [security.md](security.md) §Tests.
 10. **Critical error handling** — Ollama down, model missing, `TAVILY_API_KEY` missing, malformed LLM output, extractor/qa-gen failures must never break ingest.
 
 ## What to avoid

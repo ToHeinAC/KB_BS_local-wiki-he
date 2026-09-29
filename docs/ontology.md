@@ -25,6 +25,11 @@ stage in every search (§Search), valid time (§Time), relations with binding pa
 
 - A DB has an ontology exactly when `data/<DB>/ontology.yaml` exists
   (`ontology_store.exists()`). Reading never creates files.
+- **Classification levels** ([security.md](security.md)): the binding is shared by every level
+  of a DB and is only written at the normal level (`_write_binding` refuses above it); each level
+  has its own `ontology/` ledger, changes and history under `data/<DB>/_levels/<level>/`. The
+  ledger is append-only with one exception: when a source moves to a higher level,
+  `purge_mentions` erases its rows below, redacts change rows and deletes snapshots naming it.
 - `data/` has no backup (AGENTS.md §5.5); `data/<DB>/ontology/` must be in any future backup.
 
 ## Modules

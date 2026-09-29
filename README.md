@@ -8,6 +8,8 @@ The generated `wiki/` folder is a conformant **[Open Knowledge Format (OKF v0.1)
 
 Language is preserved deterministically too: `src/lang.py` detects the source language at ingest and the query language at chat/research time, then pins the wiki page or answer to that language (German ↔ English) — citations, numbers and original terms stay verbatim. **Each wiki page keeps the language it was created in** (`src/page_lang.py`): when a source in the other language adds to it, only the new lines are translated, with original terms kept in parentheses, and code checks that no number, § reference or citation was lost (otherwise the text is kept as a labelled original quote). Maintenance → *Page language* fixes existing pages. Detection is code-side, never left to the model, so it holds on `gemma4:e4b`.
 
+Access is layered: users sign in, see only the databases they are allowed, and within each database see only the **classification levels** (Normal / Confidential / Strictly confidential) an admin cleared them for. Every upload is classified, each level is stored separately, and one gate in code decides which level a session can reach — in Explorer, Chat and Research, including everything the LLM is shown. See [docs/security.md](docs/security.md).
+
 ## Documentation
 
 - [`PRD.md`](PRD.md) — what and why: problem, non-goals, milestones (original spec archived in
@@ -96,6 +98,7 @@ uv run pre-commit run --all-files                # full gate
 | Tests, branch coverage ≥ 85 %, suite ≤ 60 s | | yes | yes | yes |
 | Functions ≤ 50 lines; doc size limits and links | | yes | yes | yes |
 | No `.env` files, no private keys | | yes | yes | yes |
+| Classification gate: AST rules and the canary leak suite | | yes | yes | yes |
 | Secret scan of staged changes (gitleaks) | | | yes | |
 
 The Stop hook runs only when `.py` files changed. `src/vendor/` and `data/` are outside every check.

@@ -71,7 +71,7 @@ Wiki Chat can search several databases at once. Two separate concepts:
 | **Active DB** (`_active`) | one name | top-bar selectbox | every path getter; all writes (upload, ingest, `file_answer`) |
 | **Search scope** (`_scope`) | list of names | Wiki Chat "Search in" multiselect | read-only retrieval fan-out |
 
-Scope defaults to `(active_db,)`, so every non-chat page and every single-DB caller is unaffected. Only `app.py`'s Wiki Chat block ever sets it.
+Scope defaults to `(active_db,)`, so every single-DB caller is unaffected. The app resets it every rerun; Wiki Chat sets it from "Search in", Research to the reachable classification levels on opt-in, and Explorer/Maintenance to the one level they show. Entries are shard ids (`KI`, `KI@strict`), each checked by the classification gate ([security.md](security.md)).
 
 Fan-out binds **one DB at a time** — path state is never merged:
 

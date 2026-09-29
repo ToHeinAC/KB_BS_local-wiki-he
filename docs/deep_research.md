@@ -133,6 +133,9 @@ All `DEEP_RESEARCH_*` vars are registered in [configuration.md](configuration.md
 
 ## Integration seams
 
+- **Classified scope.** With a classified level in the search scope, `run_deep_research` yields
+  one `error` step and stops: it is web-only, and nothing may leave the machine then. The Research
+  page disables Deep mode in that case ([security.md](security.md) §Writes).
 - **Step-dict contract.** `run_deep_research(question, wiki_context="") -> Generator[dict]`
   emits the same shapes as `src/agent.py:3-9`, plus `{"type": "notice"}` for the
   mode-level fallback. Additive keys the Quick path does not set, all optional so the
