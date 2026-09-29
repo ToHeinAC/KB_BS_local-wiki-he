@@ -53,6 +53,8 @@ tmp/
 
 # Data folder
 data/
+# ...except the vendored ui-ux-pro-max skill's search data (not a user database)
+!.claude/skills/ui-ux-pro-max/data/
 
 # Local model weights (GGUF reranker, Stage D)
 models/

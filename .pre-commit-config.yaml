@@ -1,8 +1,8 @@
 # The single quality gate. Runs on `git commit`, in the Claude Code Stop hook and in CI.
 # Manual run: uv run pre-commit run --all-files
-# data/ holds user databases (AGENTS.md §5.5) and src/vendor/ is never hand-edited: no hook
-# may touch either.
-exclude: ^(data|src/vendor)/
+# data/ holds user databases (AGENTS.md §5.5); src/vendor/ and the vendored skills under
+# .claude/skills/ are never hand-edited: no hook may touch them.
+exclude: ^(data|src/vendor|\.claude/skills/(frontend-design|ui-ux-pro-max))/
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

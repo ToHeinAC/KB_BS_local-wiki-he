@@ -32,3 +32,12 @@ This product includes the following third-party asset:
   renderer. NASA imagery is public domain; ESA/Hubble material is released
   under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), which this
   attribution satisfies.
+
+This product includes the following Claude Code skills under .claude/skills/:
+
+  frontend-design (https://github.com/anthropics/skills)
+  Copyright Anthropic PBC. Licensed under the Apache License, Version 2.0.
+
+  ui-ux-pro-max (https://github.com/nextlevelbuilder/ui-ux-pro-max-skill)
+  Copyright (c) 2024 Next Level Builder. Licensed under the MIT License.
+  SKILL.md script paths adapted for a project install; see THIRD_PARTY_NOTICES.md.
