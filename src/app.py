@@ -933,6 +933,37 @@ def _purge_if_downgraded(grants: dict[str, int]) -> None:
             st.session_state.pop(key, None)
 
 
+def _level_name(shard: str) -> str:
+    return classification.level_label(classification.parse_shard(shard)[1])
+
+
+def _level_picker(key: str) -> str:
+    """Bind one reachable classification level of the active DB for the rest of this rerun.
+
+    The control appears only when the user can reach more than one level. Pages of
+    different levels are never mixed on screen: every view below reads one shard.
+    """
+    shards = db_context.reachable_shards(st.session_state["active_db"])
+    if st.session_state.get(key) not in shards:  # written before the widget exists
+        st.session_state[key] = shards[0]
+    if len(shards) > 1:
+        st.segmented_control(
+            "Level",
+            shards,
+            format_func=_level_name,
+            required=True,
+            key=key,
+            label_visibility="collapsed",
+        )
+    shard: str = st.session_state[key]
+    if st.session_state.get(f"{key}_bound") != shard:
+        st.session_state[f"{key}_bound"] = shard
+        st.session_state.pop("explorer_selected_page", None)
+    db_context.set_active_db(shard)
+    db_context.set_search_scope([shard])
+    return shard
+
+
 def _safe_reset() -> None:
     import requests as _req
 
@@ -997,8 +1028,11 @@ _purge_if_downgraded(_grants)
 if st.session_state.get("active_db") not in _allowed_dbs:
     st.session_state["active_db"] = _allowed_dbs[0]
 
-# Apply the active DB to the ContextVar BEFORE any page handler reads paths.
+# Apply the active DB to the ContextVar BEFORE any page handler reads paths. The
+# scope is reset too: ContextVars outlive a rerun in the session's script thread,
+# so a page that widens the scope (Chat) must not widen it for the next page.
 db_context.set_active_db(st.session_state["active_db"])
+db_context.set_search_scope([])
 _can_maintain = auth.is_maintainer(_user, st.session_state["active_db"])
 wiki_engine.init_wiki()
 
@@ -1422,6 +1456,7 @@ if page == "Upload":
 
 
 elif page == "Wiki Explorer":
+    _level_picker("explorer_level")
     pages = wiki_engine.list_pages()
     if not pages:
         st.info("No wiki pages yet. Upload a document to get started.")
@@ -1529,11 +1564,14 @@ elif page == "Wiki Chat":
     # Bind the search scope before anything renders: the sources panel resolves
     # DB-qualified refs through it. Written before the widget is instantiated, so
     # an empty selection self-heals to the active DB on the next run.
+    # Options are shards: every classification level the user can reach, per DB.
+    _reachable = [s for d in _allowed_dbs for s in db_context.reachable_shards(d)]
+    _default_scope = list(db_context.reachable_shards(st.session_state["active_db"]))
     if "chat_scope" not in st.session_state:
-        st.session_state["chat_scope"] = [st.session_state["active_db"]]
+        st.session_state["chat_scope"] = _default_scope
     st.session_state["chat_scope"] = [
-        d for d in st.session_state["chat_scope"] if d in _allowed_dbs
-    ] or [st.session_state["active_db"]]
+        d for d in st.session_state["chat_scope"] if d in _reachable
+    ] or _default_scope
     db_context.set_search_scope(st.session_state["chat_scope"])
 
     main_col, nav_col = st.columns([3, 1])
@@ -1559,11 +1597,12 @@ elif page == "Wiki Chat":
         with st.expander("Advanced", expanded=False, key="chat_advanced"):
             st.multiselect(
                 "Search in",
-                options=_allowed_dbs,
+                options=_reachable,
+                format_func=classification.label,
                 key="chat_scope",
-                help="Databases this chat searches. Answers cite cross-database results "
-                "as `Database::file.md`. Uploads and 'Save answer to wiki' still go "
-                "to the active database in the sidebar.",
+                help="Databases and classification levels this chat searches. Answers "
+                "cite cross-database results as `Database::file.md`. 'Save answer to "
+                "wiki' goes to the active database, at the highest level searched.",
             )
             if st.button("🆕 New chat", key="new_chat"):
                 st.session_state.pop("messages", None)
@@ -1575,7 +1614,7 @@ elif page == "Wiki Chat":
         if len(st.session_state["chat_scope"]) > 1:
             st.caption(
                 f"🔎 Searching {len(st.session_state['chat_scope'])} databases: "
-                + ", ".join(st.session_state["chat_scope"])
+                + ", ".join(map(classification.label, st.session_state["chat_scope"]))
             )
 
         st.markdown("---")

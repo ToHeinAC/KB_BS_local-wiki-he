@@ -705,6 +705,71 @@ def test_an_unchanged_clearance_keeps_the_session(wiki):
     assert _ok(at).session_state["messages"] == [{"role": "user", "content": "hi"}]
 
 
+# --- classification levels -------------------------------------------------------
+
+
+STRICT_CANARY = "okapiflint4402"
+
+
+@pytest.fixture
+def strict_level(wiki):
+    """A strictly confidential page in the default DB, next to the normal wiki."""
+    shard = f"{DB}@strict"
+    with db_context.clearance({DB: 2}):
+        db_context.ensure_shard(shard)
+        with db_context.using_db(shard):
+            wiki_engine.init_wiki()
+            _page("secret.md", f"Secret {STRICT_CANARY}", body=f"Bunker reference {STRICT_CANARY}.")
+            (db_context.raw_dir() / "secret-plan.md").write_text(f"# Plan\n\n{STRICT_CANARY}")
+            wiki_engine.rebuild_lex_index()
+    auth.add_user("reader", "pw", [DB])
+    auth.add_user("cleared", "pw", [DB], clearance={DB: "strict"})
+    return shard
+
+
+def _dump(node) -> str:
+    """Every proto in the rendered element tree, as text (labels, values, HTML)."""
+    parts = [str(getattr(node, "proto", ""))]
+    for child in getattr(node, "children", {}).values():
+        parts.append(_dump(child))
+    return "\n".join(parts)
+
+
+def _explorer_tree(at: AppTest) -> AppTest:
+    at = _go(at, "Wiki Explorer")
+    at.segmented_control(key="explorer_view").set_value("Tree").run()
+    return _ok(at)
+
+
+def test_explorer_never_shows_a_level_above_clearance(strict_level):
+    at = _explorer_tree(_app("reader"))
+    assert "explorer_level" not in [c.key for c in at.segmented_control]
+    assert STRICT_CANARY not in _dump(at._tree)
+
+
+def test_explorer_offers_a_cleared_user_each_level_in_turn(strict_level):
+    at = _explorer_tree(_app("cleared"))
+    assert STRICT_CANARY not in _dump(at._tree)  # normal level first
+    at.segmented_control(key="explorer_level").set_value(strict_level).run()
+    at.button(key="explorer_nav_secret.md").click().run()
+    assert STRICT_CANARY in _dump(_ok(at)._tree)
+
+
+def test_switching_level_drops_the_selected_page(strict_level):
+    at = _explorer_tree(_app("cleared"))
+    at.segmented_control(key="explorer_level").set_value(strict_level).run()
+    at.button(key="explorer_nav_secret.md").click().run()
+    at.segmented_control(key="explorer_level").set_value(DB).run()
+    assert "explorer_selected_page" not in _ok(at).session_state
+
+
+def test_chat_scope_lists_only_reachable_levels(strict_level):
+    reader = _go(_app("reader"), "Wiki Chat")
+    assert _ok(reader).multiselect(key="chat_scope").options == [DB]
+    cleared = _go(_app("cleared"), "Wiki Chat")
+    assert _ok(cleared).multiselect(key="chat_scope").value == [DB, strict_level]
+
+
 # --- Maintenance → Ontology ------------------------------------------------------------
 
 

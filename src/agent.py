@@ -12,6 +12,7 @@ step dicts, emitting the same step-dict shape the Streamlit Research page expect
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -112,7 +113,10 @@ def _build_graph(
     return g.compile()  # pyright: ignore[reportUnknownMemberType]
 
 
-def _load_wiki_index() -> str:
+_INDEX_LINK_RE = re.compile(r"\]\(([^)\s]+\.md)\)")
+
+
+def _load_wiki_index_one() -> str:
     index = db_context.wiki_dir() / "index.md"
     if not index.exists():
         return ""
@@ -120,6 +124,25 @@ def _load_wiki_index() -> str:
         return index.read_text()
     except Exception:
         return ""
+
+
+def _load_wiki_index() -> str:
+    """`index.md` of every DB in the search scope; links DB-qualified when needed.
+
+    Under a multi-DB scope (several DBs, or several classification levels of one)
+    each page link becomes `DB::page.md` — the form wiki_read expects back.
+    """
+    scope = db_context.search_scope()
+    if len(scope) == 1:
+        return _load_wiki_index_one()
+    blocks: list[str] = []
+    for db in scope:
+        with db_context.using_db(db):
+            text = _load_wiki_index_one()
+        if text.strip():
+            linked = _INDEX_LINK_RE.sub(f"]({db}{db_context.SCOPE_SEP}" + r"\1)", text)
+            blocks.append(f"Database {db}:\n{linked}")
+    return "\n\n".join(blocks)
 
 
 def _system_prompt(wiki_context: str, directive: str = "") -> str:
