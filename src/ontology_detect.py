@@ -32,7 +32,9 @@ MAX_EVIDENCE = 200
 
 _TITLE_ABBR_RE = re.compile(r"\(([^()\n]{3,120}?)\s+-\s+([^()\s]{2,20})\)")
 _TITLE_NAME_RE = re.compile(r"\(([^()\n\s]{4,60})\)\s*$")
-_ABBR_LINE_RE = re.compile(r"^\s*([A-ZÄÖÜ][A-Za-zÄÖÜäöü0-9-]{0,19})\s*$", re.MULTILINE)
+_ABBR_LINE_RE = re.compile(
+    r"^\s*(?:\*\*)?([A-ZÄÖÜ][A-Za-zÄÖÜäöü0-9-]{0,19})(?:\*\*)?\s*$", re.MULTILINE
+)
 _AUSF_RE = re.compile(r"Ausfertigungsdatum:\s*\d{1,2}\.\d{1,2}\.(\d{4})")
 _MONTHS = "Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember"
 _VOM_RE = re.compile(rf"\bvom\s+\d{{1,2}}\.\s*(?:{_MONTHS})\s+(\d{{4}})")
@@ -44,6 +46,12 @@ _EU_RE = re.compile(
 _ORG = {"eu": "EU", "eg": "EG", "ewg": "EWG", "euratom": "Euratom"}
 _UMLAUTS = str.maketrans({"ä": "ae", "ö": "oe", "ü": "ue", "ß": "ss"})
 _JSON_RE = re.compile(r"\{.*?\}", re.DOTALL)
+# PDF exports of gesetze-im-internet.de, converted to Markdown: a service banner and a page
+# marker above the title (the title as "# …", the abbreviation line in bold).
+_BANNER_RE = re.compile(
+    r"\A\s*Ein Service des[^\n]*(?:\n[^\n]*)?gesetze-im-internet\.de[^\n]*\n"
+    r"(?:\s*-\s*Seite\s+\d+\s+von\s+\d+\s*-[ \t]*\n)?"
+)
 
 
 @dataclass(frozen=True)
@@ -91,14 +99,22 @@ def _best_class(head: str, schema: ontology.Schema) -> tuple[str, int] | None:
     return (best[3], best[4]) if best else None
 
 
+def clean_head(text: str) -> str:
+    """The head as detection reads it: without a leading gesetze-im-internet.de service
+    banner and page marker, so title cues anchored at ``^`` see the title. Idempotent."""
+    return _BANNER_RE.sub("", text, count=1).lstrip("\n")
+
+
 def _slug(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", text.lower().translate(_UMLAUTS)).strip("-")
 
 
 def _german_work(head: str) -> tuple[str | None, tuple[str, ...]]:
-    title = next((ln.strip() for ln in head.splitlines() if ln.strip()), "")
+    lines = [ln.strip().lstrip("#").strip() for ln in head.splitlines() if ln.strip()]
+    title = lines[0] if lines else ""
     names: list[str] = []
-    m = _TITLE_ABBR_RE.search(title)
+    # A title wrapped onto a second line: "Verordnung über …\n(Name - ABBR)"
+    m = _TITLE_ABBR_RE.search(title) or _TITLE_ABBR_RE.search(" ".join(lines[:2]))
     if m:
         names = [m[2], m[1].strip()]
     else:
@@ -124,7 +140,7 @@ def _eu_work(head: str) -> tuple[str | None, tuple[str, ...]]:
 
 def detect(text: str, schema: ontology.Schema) -> Detection:
     """Class (by cue) and, for legal instruments, Work id + aliases of a document."""
-    head = text[:HEAD_CHARS]
+    head = clean_head(text[:HEAD_CHARS])
     found = _best_class(head, schema)
     if found is None:
         return Detection()

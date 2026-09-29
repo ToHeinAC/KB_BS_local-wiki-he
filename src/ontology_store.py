@@ -556,7 +556,7 @@ def source_heads() -> dict[str, str]:
         path = db_context.raw_dir() / name
         try:
             with path.open(encoding="utf-8", errors="replace") as fh:
-                heads[name] = fh.read(ontology_detect.HEAD_CHARS)
+                heads[name] = ontology_detect.clean_head(fh.read(ontology_detect.HEAD_CHARS))
         except OSError:
             continue
     return heads

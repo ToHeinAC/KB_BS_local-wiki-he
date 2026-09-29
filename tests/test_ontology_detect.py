@@ -71,6 +71,65 @@ def test_legal_heads_get_class_and_work(
     assert found.evidence in text
 
 
+BANNER = """\
+Ein Service des Bundesministeriums der Justiz sowie des Bundesamts für
+Justiz \u2012 www.gesetze-im-internet.de
+- Seite 1 von 24 -
+
+"""
+# PDF exports of gesetze-im-internet.de converted to Markdown: a service banner and page
+# marker above the title, the title as a (possibly two-line) heading, the abbreviation bold.
+PDF_ORDINANCE = (
+    BANNER
+    + """\
+# Verordnung über die Deckungsvorsorge nach dem Atomgesetz
+(Atomrechtliche Deckungsvorsorge-Verordnung - AtDeckV)
+
+**AtDeckV**
+
+Ausfertigungsdatum: 25.01.1977
+
+**Vollzitat:**
+"Atomrechtliche Deckungsvorsorge-Verordnung in der Fassung der Bekanntmachung vom 21. Januar 2022"
+"""
+)
+PDF_SPLIT_TITLE = (
+    BANNER
+    + """\
+# Verordnung zum Schutz vor der schädlichen Wirkung ionisierender
+# Strahlung (Strahlenschutzverordnung - StrlSchV)
+
+**StrlSchV**
+Ausfertigungsdatum: 29.11.2018
+
+Diese Verordnung dient der Umsetzung der Richtlinie 2013/59/Euratom des Rates vom 5. Dezember 2013
+"""
+)
+PDF_STATUTE = BANNER + "# " + ATG.replace("\nAtG\n", "\n**AtG**\n", 1)
+
+
+@pytest.mark.parametrize(
+    ("text", "cls", "work"),
+    [
+        (PDF_ORDINANCE, "ordinance", "de-atdeckv-1977"),
+        (PDF_SPLIT_TITLE, "ordinance", "de-strlschv-2018"),
+        (PDF_STATUTE, "federal-act", "de-atg-1959"),
+    ],
+)
+def test_pdf_exports_are_read_past_the_banner_and_markdown(
+    schema: ontology.Schema, text: str, cls: str, work: str
+) -> None:
+    found = od.detect(text, schema)
+    assert (found.class_id, found.work) == (cls, work)
+    assert found.evidence in text
+
+
+def test_a_banner_line_later_in_the_text_is_kept() -> None:
+    body = "Titel\n\nzitiert nach www.gesetze-im-internet.de\n"
+    assert od.clean_head(BANNER + body) == body
+    assert od.clean_head(od.clean_head(BANNER + body)) == body
+
+
 def test_a_report_gets_no_class_and_no_work(schema: ontology.Schema) -> None:
     assert od.detect(AI_REPORT, schema) == od.Detection()
 
