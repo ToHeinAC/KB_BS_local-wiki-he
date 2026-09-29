@@ -50,9 +50,9 @@ def threshold(db: str | None = None) -> float | None:
 
     None means *uncalibrated* — the caller must then NOT abstain (fail-safe).
     """
-    db = db or db_context.get_active_db()
-    path = db_context.DATA_ROOT / db / "index" / "calibration.json"
     try:
+        with db_context.using_db(db or db_context.get_active_db()):
+            path = db_context.index_dir() / "calibration.json"
         if path.exists():
             tau = json.loads(path.read_text()).get("tau")
             if tau is not None:

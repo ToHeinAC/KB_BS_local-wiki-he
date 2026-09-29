@@ -53,7 +53,7 @@ class StaleRevisionError(RuntimeError):
 
 
 def binding_path() -> Path:
-    return db_context.data_root() / "ontology.yaml"
+    return db_context.ontology_binding_path()
 
 
 def store_dir() -> Path:
@@ -408,7 +408,7 @@ def apply(
     ontology changed since the plan was computed."""
     if plan.status != "ready":
         raise ValueError(f"cannot apply a plan with status {plan.status!r}")
-    if not auth.is_maintainer(user, db_context.get_active_db()):
+    if not auth.is_maintainer(user, db_context.base_db()):
         raise PermissionError(f"{user!r} does not maintain this database")
     with _locked():
         before = current_state()
@@ -461,7 +461,7 @@ def proposals() -> list[dict[str, Any]]:
 def decide_proposal(row_id: str, *, accept: bool, user: str) -> dict[str, Any] | None:
     """Confirm (as a `user` fact) or reject a proposal; either way it is withdrawn.
     Returns the revision a confirmation records (None for a rejection)."""
-    if not auth.is_maintainer(user, db_context.get_active_db()):
+    if not auth.is_maintainer(user, db_context.base_db()):
         raise PermissionError(f"{user!r} does not maintain this database")
     with _locked():
         row = next((r for r in proposals() if r["id"] == row_id), None)
@@ -563,7 +563,7 @@ def source_heads() -> dict[str, str]:
 
 
 def _require_maintainer(user: str) -> None:
-    if not auth.is_maintainer(user, db_context.get_active_db()):
+    if not auth.is_maintainer(user, db_context.base_db()):
         raise PermissionError(f"{user!r} does not maintain this database")
 
 

@@ -939,7 +939,7 @@ def _okf_apply(content: str, page: str | None = None) -> str:
     except Exception:
         pass
     content = _ontology_stamp(content, page)
-    return okf.apply_to_page(content, db=db_context.get_active_db())
+    return okf.apply_to_page(content, db=db_context.base_db())
 
 
 _SOURCE_SECTION_RE = re.compile(r"\s+[§#].*$")
@@ -1780,7 +1780,7 @@ def propose_page_classes(user: str, limit: int = 10) -> int:
     """Ask the model to classify up to ``limit`` unclassified concept/entity pages; each
     answer is kept only as a *proposal* with a quote verified verbatim in the page.
     Returns how many proposals were made. Maintainers only."""
-    if not auth.is_maintainer(user, db_context.get_active_db()):
+    if not auth.is_maintainer(user, db_context.base_db()):
         raise PermissionError(f"{user!r} does not maintain this database")
     schema, _ = ontology_store.load()
     options = ontology_detect.page_class_options(schema) if schema else {}
@@ -2302,9 +2302,7 @@ def build_description() -> str:
     """Synthesize the database overview from the current wiki index and persist it."""
     system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else ""
-    prompt = DESCRIPTION_BUILD_PROMPT.format(
-        db_name=db_context.get_active_db(), index_text=index_text
-    )
+    prompt = DESCRIPTION_BUILD_PROMPT.format(db_name=db_context.base_db(), index_text=index_text)
     text = _cap_description(ollama_client.generate(system, prompt, temperature=0.3))
     _description_path().write_text(text)
     return text
@@ -2333,7 +2331,7 @@ def update_description(ctx: dict[str, Any]) -> None:
     system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else ""
     prompt = DESCRIPTION_UPDATE_PROMPT.format(
-        db_name=db_context.get_active_db(),
+        db_name=db_context.base_db(),
         current=current,
         change_summary=change_summary,
         index_text=index_text,
@@ -2359,7 +2357,7 @@ def refresh_description_after_delete(source_name: str, removed_pages: list[str])
     system = schema_loader.get_system_prompt(mode="query")
     index_text = _index_path().read_text() if _index_path().exists() else ""
     prompt = DESCRIPTION_DELETE_PROMPT.format(
-        db_name=db_context.get_active_db(),
+        db_name=db_context.base_db(),
         current=current,
         change_summary=change_summary,
         index_text=index_text,

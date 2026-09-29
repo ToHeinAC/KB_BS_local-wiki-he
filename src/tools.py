@@ -618,7 +618,7 @@ def _submit_final_impl(title: str, answer: str) -> str:
     # cannot load — the report is written but unreadable.
     post = frontmatter.Post(answer, title=title, type="report", created=date, sources=all_sources)
     (dest_dir / filename).write_text(
-        okf.apply_to_page(frontmatter.dumps(post), db=db_context.get_active_db())
+        okf.apply_to_page(frontmatter.dumps(post), db=db_context.base_db())
     )
     return (
         f"ACCEPTED: comparisons/{filename} ({words} words, "

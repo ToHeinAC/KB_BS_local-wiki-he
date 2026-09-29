@@ -129,7 +129,7 @@ def _okf_prefix_map() -> dict[str, str]:
     out: dict[str, str] = {}
     if not wiki.exists():
         return out
-    db = db_context.get_active_db()
+    db = db_context.base_db()
     for md in wiki.glob("*.md"):
         if md.name in lex_index.WIKI_SYSTEM_PAGES:
             continue

@@ -171,7 +171,7 @@ def _save_report(question: str, report: str, sources: list[dict[str, Any]]) -> s
             sources=sorted({s["url"] for s in sources}),
         )
         (dest_dir / filename).write_text(
-            okf.apply_to_page(frontmatter.dumps(post), db=db_context.get_active_db())
+            okf.apply_to_page(frontmatter.dumps(post), db=db_context.base_db())
         )
         return f"comparisons/{filename}"
     except Exception:
