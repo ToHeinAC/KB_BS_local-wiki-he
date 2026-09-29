@@ -86,6 +86,14 @@ Text:
 
 # --- Deep researcher (Research page, agent.py) -----------------------------
 
+# Prepended to the research system prompt when a classified level is in scope:
+# the web tools are unbound in code; this only tells the model why.
+RESEARCH_NO_WEB_DIRECTIVE = (
+    "Web search is off for this run: classified documents are in scope, so nothing may "
+    "leave this machine. tavily_search and fetch_webpage_content are unavailable — answer "
+    "from the wiki and the original documents only, and cite them."
+)
+
 RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the local wiki, then decide autonomously which further tools to use. After every tool result, explicitly track gaps versus the original query and stay on the main research line.
 
 {wiki_block}Tools available:

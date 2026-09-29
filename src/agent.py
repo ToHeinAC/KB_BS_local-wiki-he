@@ -40,6 +40,7 @@ from langgraph.graph.state import (  # pyright: ignore[reportMissingTypeStubs]
 )
 from langgraph.prebuilt import ToolNode
 
+import classification
 import db_context
 import lang
 import ollama_client
@@ -50,6 +51,7 @@ from prompts import (
     RESEARCH_BUDGET_NUDGE,
     RESEARCH_FALLBACK_PROMPT,
     RESEARCH_FALLBACK_SYSTEM,
+    RESEARCH_NO_WEB_DIRECTIVE,
     RESEARCHER_INSTRUCTIONS,
 )
 
@@ -65,13 +67,25 @@ LLM_TIMEOUT = int(os.getenv("RESEARCH_LLM_TIMEOUT", "300"))
 FALLBACK_NOTES_CAP = int(os.getenv("RESEARCH_FALLBACK_NOTES_CAP", "12000"))
 
 
+def _web_allowed() -> bool:
+    """No web egress while any classified level is in the search scope (G4)."""
+    return classification.high_water(db_context.search_scope()) == 0
+
+
+def _bound_tools() -> list[Any]:
+    base = tool_module.TOOLS
+    if not _web_allowed():
+        base = [t for t in base if t.name not in tool_module.WEB_TOOL_NAMES]
+    return tool_module.with_ontology(base)
+
+
 def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
     return ChatOllama(
         model=ollama_client.QUERY_MODEL,
         base_url=ollama_client.host(),
         temperature=0.3,
         client_kwargs={"timeout": LLM_TIMEOUT},  # ChatOllama drops a bare timeout=
-    ).bind_tools(tool_module.with_ontology(tool_module.TOOLS))  # pyright: ignore[reportUnknownMemberType]  # bare Callable
+    ).bind_tools(_bound_tools())  # pyright: ignore[reportUnknownMemberType]  # bare Callable
 
 
 def _build_graph(
@@ -106,7 +120,7 @@ def _build_graph(
     g: StateGraph[MessagesState] = StateGraph(MessagesState)
     # langgraph leaves CachePolicy/BaseCheckpointSaver generics unsolved in these signatures.
     g.add_node("agent", agent_node)  # pyright: ignore[reportUnknownMemberType]
-    g.add_node("tools", ToolNode(tool_module.with_ontology(tool_module.TOOLS)))  # pyright: ignore[reportUnknownMemberType]
+    g.add_node("tools", ToolNode(_bound_tools()))  # pyright: ignore[reportUnknownMemberType]
     g.add_edge(START, "agent")
     g.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
     g.add_edge("tools", "agent")
@@ -146,7 +160,7 @@ def _load_wiki_index() -> str:
 
 
 def _system_prompt(wiki_context: str, directive: str = "") -> str:
-    parts: list[str] = []
+    parts: list[str] = [] if _web_allowed() else [RESEARCH_NO_WEB_DIRECTIVE]
     index_text = _load_wiki_index()
     if index_text.strip():
         parts.append(

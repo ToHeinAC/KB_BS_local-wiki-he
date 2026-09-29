@@ -1,6 +1,7 @@
 """Core wiki operations: init, ingest, query, lint, list, read."""
 
 import contextlib
+import json
 import os
 import re
 import shutil
@@ -2428,9 +2429,16 @@ def read_log() -> str:
     return _log_path().read_text() if _log_path().exists() else "(no log yet)"
 
 
-def file_answer(question: str, answer: str, related: list[str] | None = None) -> str:
+def file_answer(
+    question: str,
+    answer: str,
+    related: list[str] | None = None,
+    derived_from: list[str] | None = None,
+) -> str:
     """Persist a Q&A as a wiki insight page (Karpathy filing-back mechanic).
 
+    `derived_from` names the pages and originals the answer drew on; it is what
+    lets a source's upgrade find and purge the insights built from it.
     Returns the relative filename written under data/wiki/insights/.
     """
     insights_dir = _wiki() / _INSIGHTS_DIR
@@ -2452,6 +2460,7 @@ def file_answer(question: str, answer: str, related: list[str] | None = None) ->
         f'title: "{title}"\n'
         "type: comparison\n"
         'sources: ["chat"]\n'
+        f"derived_from: {json.dumps(list(derived_from or []), ensure_ascii=False)}\n"
         f"related: {related_yaml}\n"
         f'created: "{today}"\n'
         f'updated: "{today}"\n'

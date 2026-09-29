@@ -749,9 +749,14 @@ def _finish_research(step: dict[str, Any], display_q: str, interpreted: str | No
     if step.get("report_path"):
         st.session_state["last_report"] = step["report_path"]
         try:
-            answer = (
-                wiki_engine.read_page_parsed(_report_ref(step["report_path"]))["content"] or answer
+            _target = db_context.write_target(
+                st.session_state["active_db"], db_context.search_scope()
             )
+            with db_context.using_db(_target):  # where the agent filed it (high-water)
+                answer = (
+                    wiki_engine.read_page_parsed(_report_ref(step["report_path"]))["content"]
+                    or answer
+                )
         except Exception as exc:
             st.warning(
                 f"Saved report could not be re-read ({type(exc).__name__}); "
@@ -779,6 +784,10 @@ def _run_research_stream(
     question_to_run: str, display_q: str, wiki_context: str, deep: bool = False
 ) -> None:
     interpreted = _reset_research_state(question_to_run, display_q)
+    st.session_state["research_level"] = max(
+        st.session_state.get("research_level", 0),
+        classification.high_water(db_context.search_scope()),
+    )
     st.markdown(f"**Research question:** {display_q}")
     runner = deep_research_agent.run_deep_research if deep else research_agent.run_research_agent
     with st.container():
@@ -1773,20 +1782,35 @@ elif page == "Wiki Chat":
             and last["role"] == "assistant"
             and last.get("question")
             and not last["content"].startswith("Error:")
+            and _can_maintain
         ):
-            _active = st.session_state["active_db"]
-            if st.button(
+            # High-water mark: the answer is filed at the highest level searched.
+            try:
+                _target = db_context.write_target(
+                    st.session_state["active_db"], db_context.search_scope()
+                )
+            except db_context.AccessDenied:
+                _target = None
+                st.caption(
+                    "This answer searched a level above your clearance in "
+                    f"{st.session_state['active_db']}; narrow 'Search in' to save it."
+                )
+            if _target and st.button(
                 "Save answer to wiki",
                 key="save_answer",
-                help=f"Files the answer into the active database ({_active}).",
+                help=f"Files the answer into {classification.label(_target)}.",
             ):
-                # `related:` links are intra-DB, so a cross-DB answer only carries
-                # over the pages that actually live in the DB being written to.
+                # `related:` links are intra-shard, so a cross-DB answer only carries
+                # over the pages that actually live in the shard being written to.
                 _refs = [db_context.split_ref(s) for s in last.get("sources", [])]
-                _related = [_name for _db, _name in _refs if _db == _active]
+                _related = [_name for _db, _name in _refs if _db == _target]
+                _derived = [*last.get("sources", []), *last.get("raw_sources", [])]
                 try:
-                    rel = wiki_engine.file_answer(last["question"], last["content"], _related)
-                    st.success(f"Filed as `{rel}` in **{_active}**")
+                    with db_context.using_db(_target):
+                        rel = wiki_engine.file_answer(
+                            last["question"], last["content"], _related, derived_from=_derived
+                        )
+                    st.success(f"Filed as `{rel}` in **{classification.label(_target)}**")
                 except RuntimeError as e:
                     st.error(str(e))
 
@@ -1894,6 +1918,27 @@ elif page == "Research":
     )
     tavily_key = os.getenv("TAVILY_API_KEY", "")
 
+    # Classified levels are opt-in here, and they switch the web off (G4): the
+    # agent unbinds its web tools and Deep mode — web-only — is unavailable. Once
+    # a classified run is in the history, follow-ups carry its answers, so the
+    # choice stays locked until a new research.
+    _research_shards = db_context.reachable_shards(st.session_state["active_db"])
+    _research_locked = bool(
+        st.session_state.get("research_level") and st.session_state.get("research_history")
+    )
+    _classified = len(_research_shards) > 1 and st.checkbox(
+        "Include classified levels (web search off)",
+        key="research_classified",
+        disabled=_research_locked,
+        help="Also search the confidential levels you are cleared for. Nothing leaves this "
+        "machine while they are included. Start a new research to change this again.",
+    )
+    db_context.set_search_scope(
+        list(_research_shards) if _classified else [st.session_state["active_db"]]
+    )
+    if _classified:
+        st.session_state["research_mode"] = "Quick"
+
     if not tavily_key:
         st.warning(
             "**TAVILY_API_KEY not set.** Add it to your `.env` file to enable web research.\n\n"
@@ -1916,12 +1961,14 @@ elif page == "Research":
             default="Quick",
             key="research_mode",
             label_visibility="collapsed",
+            disabled=_classified,
         )
-        _deep = research_mode == "Deep"
+        _deep = research_mode == "Deep" and not _classified
 
         if st.button("🆕 New research", key="new_research"):
             for _k in (
                 "research_history",
+                "research_level",
                 "last_research_q",
                 "last_research_answer",
                 "last_research_interpreted",
@@ -2013,13 +2060,21 @@ elif page == "Research":
             )
             if st.session_state.get("research_saved"):
                 _save_col.success(st.session_state.get("research_saved_note", "Saved to wiki."))
-            elif _save_col.button(
+            elif _can_maintain and _save_col.button(
                 "Save to wiki",
                 key="save_research_btn",
                 use_container_width=True,
-                help="Ingest this result into the wiki as new/updated pages.",
+                help="Ingest this result into the wiki as new/updated pages, at the "
+                "highest level this research searched.",
             ):
-                with st.spinner("Ingesting result into wiki…"):
+                with (
+                    st.spinner("Ingesting result into wiki…"),
+                    db_context.using_db(
+                        db_context.write_target(
+                            st.session_state["active_db"], db_context.search_scope()
+                        )
+                    ),
+                ):
                     try:
                         _title = st.session_state["last_research_q"][:60]
                         if st.session_state.get("research_save_as_source"):

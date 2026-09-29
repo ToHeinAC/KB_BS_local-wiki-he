@@ -42,6 +42,7 @@ from dotenv import load_dotenv
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 import agent as quick_agent
+import classification
 import db_context
 import lang
 import okf
@@ -160,7 +161,10 @@ def _save_report(question: str, report: str, sources: list[dict[str, Any]]) -> s
     blank result.
     """
     try:
-        dest_dir = db_context.wiki_dir() / "comparisons"
+        # High-water mark: the report lands at the highest level of the scope.
+        target = db_context.write_target(db_context.base_db(), db_context.search_scope())
+        with db_context.using_db(target):
+            dest_dir = db_context.wiki_dir() / "comparisons"
         dest_dir.mkdir(parents=True, exist_ok=True)
         filename = f"report-{_slug(question)}.md"
         post = frontmatter.Post(
@@ -377,6 +381,12 @@ def run_deep_research(
     """
     if not os.getenv("TAVILY_API_KEY"):
         yield {"type": "error", "content": "TAVILY_API_KEY not set — Deep Research is web-only."}
+        return
+    if classification.high_water(db_context.search_scope()) > 0:  # G4: no web egress
+        yield {
+            "type": "error",
+            "content": "Deep Research is web-only and is off while classified levels are in scope.",
+        }
         return
 
     # `init_chat_model("ollama:<tag>")` builds a ChatOllama with base_url=None,

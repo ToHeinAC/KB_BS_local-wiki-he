@@ -22,6 +22,7 @@ from langchain_core.tools import tool
 
 import calibrate
 import chunker
+import classification
 import db_context
 import okf
 import ontology_graph
@@ -110,9 +111,22 @@ def _names(value: str | list[str] | None) -> list[str]:
     return [v for v in ([value] if isinstance(value, str) else value or []) if v]
 
 
+WEB_TOOL_NAMES = frozenset({"tavily_search", "fetch_webpage_content"})
+_WEB_OFF = (
+    "Web search is off: classified documents are in scope, so nothing may leave this machine."
+)
+
+
+def _web_blocked() -> bool:
+    """Defence in depth for G4: the agents unbind these tools, and they refuse anyway."""
+    return classification.high_water(db_context.search_scope()) > 0
+
+
 def _tavily_search_impl(
     query: str | None = None, queries: list[str] | None = None, max_results: int = 5
 ) -> str:
+    if _web_blocked():
+        return _WEB_OFF
     qs = _query_list(query, queries)
     if not qs:
         return "Error: provide `query` or `queries`."
@@ -139,6 +153,8 @@ def _fetch_one(url: str) -> str:
 
 
 def _fetch_webpage_impl(urls: str | list[str] | None) -> str:
+    if _web_blocked():
+        return _WEB_OFF
     urls = _names(urls)
     if not urls:
         return "Error: provide one or more urls."
@@ -603,7 +619,10 @@ def _submit_final_impl(title: str, answer: str) -> str:
     nudge = _low_confidence_nudge()
     if nudge:
         return nudge
-    dest_dir = db_context.wiki_dir() / "comparisons"
+    # High-water mark: the report lands at the highest level this run could read.
+    target = db_context.write_target(db_context.base_db(), db_context.search_scope())
+    with db_context.using_db(target):
+        dest_dir = db_context.wiki_dir() / "comparisons"
     dest_dir.mkdir(parents=True, exist_ok=True)
     date = datetime.now(UTC).strftime("%Y-%m-%d")
     filename = f"report-{_slug(title)}.md"

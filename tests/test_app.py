@@ -487,7 +487,9 @@ def test_fast_chat_answers_and_files_the_answer(wiki, monkeypatch):
         },
     )
     filed = []
-    monkeypatch.setattr(wiki_engine, "file_answer", lambda q, a, rel: filed.append(rel) or "f.md")
+    monkeypatch.setattr(
+        wiki_engine, "file_answer", lambda q, a, rel, **_kw: filed.append(rel) or "f.md"
+    )
     at = _go(_app(), "Wiki Chat")
     at.chat_input[0].set_value("What is alpha?").run()
     _ok(at)
@@ -846,6 +848,64 @@ def test_chat_scope_lists_only_reachable_levels(strict_level):
     assert _ok(reader).multiselect(key="chat_scope").options == [DB]
     cleared = _go(_app("cleared"), "Wiki Chat")
     assert _ok(cleared).multiselect(key="chat_scope").value == [DB, strict_level]
+
+
+def _chat_answer(monkeypatch) -> None:
+    monkeypatch.setattr(
+        wiki_engine,
+        "query_with_sources",
+        lambda q: {"answer": "A", "sources": [f"{DB}@strict::secret.md"], "raw_sources": []},
+    )
+
+
+def test_saving_a_chat_answer_is_for_maintainers_only(strict_level, monkeypatch):
+    _chat_answer(monkeypatch)
+    at = _go(_app("reader"), "Wiki Chat")
+    at.chat_input[0].set_value("q?").run()
+    assert "save_answer" not in [b.key for b in _ok(at).button]
+
+
+def test_a_chat_answer_is_saved_at_the_highest_level_it_read(strict_level, monkeypatch):
+    _chat_answer(monkeypatch)
+    auth.set_clearance(ADMIN, DB, "strict", by=ADMIN)
+    at = _go(_app(), "Wiki Chat")
+    at.chat_input[0].set_value("What is the plan?").run()
+    at.button(key="save_answer").click().run()
+    _ok(at)
+    assert not (db_context.wiki_dir() / "insights").exists()
+    with db_context.clearance({DB: 2}), db_context.using_db(strict_level):
+        [insight] = (db_context.wiki_dir() / "insights").glob("*.md")
+        meta = frontmatter.load(str(insight)).metadata
+    assert meta["derived_from"] == [f"{DB}@strict::secret.md"]
+    assert meta["related"] == ["secret.md"]
+
+
+def test_research_includes_classified_levels_only_on_opt_in(strict_level, tavily, monkeypatch):
+    scopes: list[tuple[str, ...]] = []
+
+    def run(q, ctx):
+        scopes.append(db_context.search_scope())
+        return iter(_research_steps())
+
+    monkeypatch.setattr(agent, "run_research_agent", run)
+    at = _go(_app("cleared"), "Research")
+    at.text_input[0].set_value("q")
+    at.button(key="start_research_btn").click().run()
+    at.button(key="new_research").click().run()
+    at.checkbox(key="research_classified").check().run()
+    assert _ok(at).segmented_control(key="research_mode").disabled
+    at.text_input[0].set_value("q")
+    at.button(key="start_research_btn").click().run()
+    assert scopes == [(DB,), (DB, strict_level)]
+    assert at.checkbox(key="research_classified").disabled  # locked until a new research
+
+
+def test_research_save_is_for_maintainers_only(strict_level, tavily, monkeypatch):
+    monkeypatch.setattr(agent, "run_research_agent", lambda q, ctx: iter(_research_steps()))
+    at = _go(_app("reader"), "Research")
+    at.text_input[0].set_value("q")
+    at.button(key="start_research_btn").click().run()
+    assert "save_research_btn" not in [b.key for b in _ok(at).button]
 
 
 # --- Maintenance → Ontology ------------------------------------------------------------
