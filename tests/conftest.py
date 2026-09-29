@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import db_context
 import ollama_client
+import run_memory
 import wiki_engine
 
 
@@ -45,6 +46,15 @@ def _unsealed_clearance():
     yield
     db_context._principal.reset(principal)
     db_context._clearance.reset(token)
+
+
+@pytest.fixture(autouse=True)
+def _no_run_memory():
+    """No agent run leaks its visited-set into the next test (tools would answer
+    "Already read" instead of reading, and a leak probe could pass vacuously)."""
+    token = run_memory._current.set(None)
+    yield
+    run_memory._current.reset(token)
 
 
 def _patch_data_root(monkeypatch, tmp_path: Path, db_name: str = "test") -> Path:
