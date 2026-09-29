@@ -154,7 +154,9 @@ Facts · History · Import*. Above it: the revision (`seq` + content hash), the 
 change** (newest `create`/`import`/`editor`/`restore` row: time, user, how, file, counts),
 the **last automatic change** (newest row written by code, e.g. `delete_source`), and
 *Export current (YAML)*. A DB without an ontology shows "No ontology for this database."
-plus, for maintainers, *Create ontology* (module picker) and the import.
+plus, for maintainers, *Create ontology* (module picker) and the import. The picker
+warns when none of the selected modules has cues (`core` alone has none), since detection
+would then classify nothing (`ontology_evolution.modules_with_cues`).
 
 | Action | Reader | Maintainer |
 |---|---|---|
@@ -219,12 +221,14 @@ the content moved without a recorded revision, the header says so.
 ## Detection at upload (`ontology_detect`)
 
 Only for a DB with a valid ontology; otherwise the Upload page is unchanged.
-- **Class:** every cue of every non-deprecated class is matched on the first 4000
-  characters; the match that *ends* first wins, ties go to the deeper class, then the
+- **Head:** the first 4000 characters, without a leading gesetze-im-internet.de service
+  banner and page marker (PDF exports; `clean_head`, also used by the cue tester).
+- **Class:** every cue of every non-deprecated class is matched on the head; the match that *ends* first wins, ties go to the deeper class, then the
   lower `rank`. Title-line cues are `^`-anchored and greedy, so "ends first" separates
   "Allgemeine Verwaltungsvorschrift zum …gesetz" from a statute.
 - **Work** (legal instruments only): German law → `de-<abbr>-<year of Ausfertigung>` from
-  the title's "(Name - ABBR)" or a standalone abbreviation line (aliases: both names);
+  the title's "(Name - ABBR)" (also when wrapped onto a second line; `#` heading marks
+  ignored) or a standalone, optionally bold abbreviation line (aliases: both names);
   EU acts → `eu-dir-<year>-<n>-<org>` / `eu-reg-<year>-<n>`. Titles with an en dash
   ("… – TA Luft") yield no work id.
 - **Review table:** columns *Class* (select), *Work* (text) and read-only *Other versions
@@ -409,7 +413,9 @@ validated, maintainer-checked, revisioned, logged).
   are refused.
 - **Re-classify** (same view): a dry-run table of what the current cues would change —
   `update` / `withdraw` for facts code made, `kept-user` for decisions a person made,
-  which are never touched. *Apply re-classify* retracts the outdated rule rows, asserts
+  which are never touched. With nothing to change it says "already matches" only when every
+  document has a class; otherwise "n of m documents classified", and whether the bound
+  modules have no cues at all (`reclassify_note`). *Apply re-classify* retracts the outdated rule rows, asserts
   the new ones and records a `via: reclassify` revision. Covers `class` and `work`.
 - **Class suggestions** (Ontology → *Proposals*): for an unclassified document a
   maintainer can ask the model (`ONTOLOGY_SUGGEST_CLASS_PROMPT`, one call) for a new class.
