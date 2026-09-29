@@ -37,6 +37,14 @@ def _fast_bcrypt(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(bcrypt, "gensalt", lambda *_a, **_k: gensalt(rounds=4))
 
 
+@pytest.fixture(autouse=True)
+def _unsealed_clearance():
+    """Every test starts unsealed (level 0 of every DB), so a grant never leaks into the next."""
+    token = db_context._clearance.set(None)
+    yield
+    db_context._clearance.reset(token)
+
+
 def _patch_data_root(monkeypatch, tmp_path: Path, db_name: str = "test") -> Path:
     """Point db_context at an isolated data root + active DB. Returns the DB root."""
     monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
