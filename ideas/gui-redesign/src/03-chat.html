@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Chat mockup</title>
+<link rel="stylesheet" href="broadsheet.css">
+<style>
+  main { display: grid; grid-template-columns: 250px 640px 440px; column-gap: 56px; padding: 0 40px; }
+  .rail { padding-top: 28px; border-right: 1px solid var(--hair); padding-right: 28px; margin-right: -24px; }
+  .rail .grp { margin-bottom: 28px; }
+  .rail .hint { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+  .rail .check { display: flex; margin: 7px 0; }
+  .rail .hist { font: 400 15px/1.35 var(--serif); color: var(--ink-2); padding: 8px 0; border-bottom: 1px solid var(--hair); }
+  .rail .hist.on { color: var(--ink); font-weight: 600; }
+  .col { padding-top: 26px; display: flex; flex-direction: column; min-height: 0; }
+  .earlier { font: 400 15px/1.4 var(--serif); color: var(--muted); padding-bottom: 14px; border-bottom: 1px solid var(--hair); margin-bottom: 20px; }
+  .earlier b { font-weight: 600; color: var(--ink-2); }
+  .col .headline { margin: 0 0 10px; }
+  .col .meta { margin-bottom: 18px; }
+  .col .prose { font-size: 17.5px; line-height: 1.6; }
+  .prose ol { margin: 0.6em 0 0.6em 1.3em; }
+  .prose li { padding-left: 4px; margin-bottom: 0.35em; }
+  .prose li b { font-weight: 600; }
+  .actions { display: flex; gap: 18px; align-items: center; margin: 18px 0 16px; }
+  .ask { margin-top: 18px; display: flex; gap: 14px; align-items: end; }
+  .ask .field { flex: 1; }
+  .notes-col { padding-top: 26px; }
+  .notes-col .note { margin-bottom: 16px; }
+  .gap-a { height: 150px; }
+</style></head>
+<body>
+<header class="runhead">
+  <div class="plate">LocalWiki</div>
+  <nav class="nav"><a>Front page</a><a>Explorer</a><a class="on">Chat</a><a>Research</a><a>Upload</a></nav>
+  <div class="right">
+    <div class="edition">KI <small>edition</small> <span class="caret">▼</span></div>
+    <span class="stamp">Normal</span>
+    <span class="user">T. Hein</span>
+  </div>
+</header>
+
+<main>
+  <aside class="rail">
+    <div class="grp">
+      <div class="label">How to answer</div>
+      <div class="toggle"><span>Fast</span><span class="on">Deep</span></div>
+      <p class="hint">Deep reads the original documents and cites them by section. It takes about a minute.</p>
+    </div>
+    <div class="grp">
+      <div class="label">Search in</div>
+      <span class="check"><i class="on"></i>KI, normal level</span>
+      <span class="check"><i></i>KI, confidential level</span>
+      <p class="hint">Answers you save go to KI at the highest level searched.</p>
+    </div>
+    <div class="grp">
+      <div class="label">This conversation</div>
+      <div class="hist">What is an orbital data centre?</div>
+      <div class="hist on">What would data centres in orbit gain over terrestrial ones?</div>
+    </div>
+    <span class="btn sm">New conversation</span>
+  </aside>
+
+  <section class="col">
+    <div class="earlier"><b>Earlier:</b> What is an orbital data centre? Answered from 2 documents.</div>
+    <h1 class="headline m">What would data centres in orbit gain over terrestrial ones?</h1>
+    <div class="meta"><span>Deep answer</span><span>Read <b>3</b> documents, <b>11</b> sections</span><span>48 seconds</span></div>
+    <div class="prose">
+      <p>Fewer than the headlines suggest. The main source finds that most claimed advantages are offset by large technical and economic hurdles,<sup class="cite">1</sup> but three hold up:</p>
+      <ol>
+        <li><b>Processing where the data is made.</b> Earth-observation data can be reduced in orbit and only results sent down, which sidesteps the downlink bottleneck.<sup class="cite hl">2</sup></li>
+        <li><b>No cooling water.</b> Heat leaves by radiation instead, at the price of very large radiator surfaces.<sup class="cite">3</sup></li>
+        <li><b>Steadier solar power.</b> A suitable orbit yields more energy per year than any site at temperate latitudes.<sup class="cite">4</sup></li>
+      </ol>
+      <p>Cost cuts the other way: an hour of GPU time in orbit is estimated at about 3.7 times the terrestrial price,<sup class="cite">5</sup> so orbit is a niche for data that already lives there, not a replacement.</p>
+    </div>
+    <div class="actions"><span class="btn sm">Save to wiki</span><span class="btn text sm">Download</span><span class="btn text sm">Copy with citations</span></div>
+    <div class="fold"><div class="sum"><span class="chev">▶</span>How this answer was made<span class="aside">7 steps, 3 documents</span></div></div>
+    <div class="ask"><div class="field">Ask a follow-up about orbital data centres</div><span class="btn primary">Ask</span></div>
+  </section>
+
+  <aside class="notes-col">
+    <div class="section-label">Sources</div>
+    <div class="note"><span class="n">1</span><span class="t"><span class="file">ai-compute-in-orbit.md</span> Summary</span><span class="q">“Many supposed advantages are relativised by massive technical and economic challenges.”</span></div>
+    <div class="note hl"><span class="n">2</span><span class="t"><span class="file">ai-compute-in-orbit.md</span> §6.1</span><span class="q">“Inter-node bandwidth of tens of terabits per second far exceeds what downlinks deliver.”</span><span class="w">Also cited: §2.4</span></div>
+    <div class="note"><span class="n">3</span><span class="t"><span class="file">ai-compute-in-orbit.md</span> §2.1</span><span class="w">Radiative cooling</span></div>
+    <div class="note"><span class="n">4</span><span class="t"><span class="file">orbit-power-study.pdf</span> §3</span><span class="w">Version of 12 Mar 2026, in force. Replaces the 2025 draft.</span></div>
+    <div class="note"><span class="n">5</span><span class="t"><span class="file">ai-compute-in-orbit.md</span> §2.1</span><span class="q">“TCO per GPU-hour is about 3.7 times higher in orbit.”</span></div>
+    <div class="fold" style="margin-top:6px"><div class="sum"><span class="chev">▶</span>Why these sources</div></div>
+  </aside>
+</main>
+
+<footer class="folio">
+  <span class="ok"><i class="dot"></i>gemma4:e4b ready</span>
+  <span>RTX 4090 at 58 °C, load 41 %</span>
+  <span>Search index current</span>
+  <span class="push">Open Knowledge Format v0.1</span>
+  <span>Citations checked on every page</span>
+</footer>
+</body></html>

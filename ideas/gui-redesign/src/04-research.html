@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Research mockup</title>
+<link rel="stylesheet" href="broadsheet.css">
+<style>
+  .qbar { flex: none; display: flex; align-items: end; gap: 20px; padding: 16px 40px 16px; border-bottom: 1px solid var(--hair); }
+  .qbar .field { flex: 1; font-style: normal; color: var(--ink); font-size: 19px; }
+  .qbar .check { margin-bottom: 8px; }
+  main { display: grid; grid-template-columns: 760px 1fr; column-gap: 64px; padding: 0 40px; }
+  .report { padding-top: 26px; }
+  .report .headline { margin-bottom: 12px; }
+  .report .standfirst { margin-bottom: 14px; }
+  .report .meta { padding: 9px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); margin-bottom: 18px; }
+  .report .prose { font-size: 17.5px; line-height: 1.6; max-width: none; column-count: 2; column-gap: 36px; }
+  .report .prose h3 { break-after: avoid; }
+  .endnotes { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 36px; }
+  .endnotes .note .t { font-weight: 500; }
+  .actions { display: flex; gap: 20px; align-items: center; margin-top: 18px; }
+  .side { padding-top: 26px; }
+  .figs { background: var(--panel); padding: 14px 18px 6px; margin-bottom: 26px; }
+  .figs table td { font-size: 14px; border-bottom-color: #ddd6c6; }
+  .figs table td.num { font-weight: 700; font-size: 15px; }
+  .figs table tr:last-child td { border-bottom: 0; }
+  .wire { position: relative; }
+  .wire .row { display: grid; grid-template-columns: 70px 18px 1fr; column-gap: 8px; padding-bottom: 12px; }
+  .wire .time { font-size: 13px; color: var(--muted); padding-top: 1px; }
+  .wire .pin { position: relative; }
+  .wire .pin::before { content: ""; position: absolute; left: 8px; top: 0; bottom: -12px; width: 1px; background: var(--hair); }
+  .wire .row:last-child .pin::before { display: none; }
+  .wire .pin::after { content: ""; position: absolute; left: 4px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--paper); border: 1px solid var(--ink); }
+  .wire .row.done .pin::after { background: var(--ink); }
+  .wire .what { font-size: 14px; line-height: 1.4; }
+  .wire .what b { font-weight: 600; }
+  .wire .what .qs { font: italic 400 14px/1.45 var(--serif); color: var(--ink-2); margin-top: 3px; }
+  .wire .what .n { color: var(--muted); font-size: 13px; }
+</style></head>
+<body>
+<header class="runhead">
+  <div class="plate">LocalWiki</div>
+  <nav class="nav"><a>Front page</a><a>Explorer</a><a>Chat</a><a class="on">Research</a><a>Upload</a></nav>
+  <div class="right">
+    <div class="edition">KI <small>edition</small> <span class="caret">▼</span></div>
+    <span class="stamp">Normal</span>
+    <span class="user">T. Hein</span>
+  </div>
+</header>
+
+<div class="qbar">
+  <div style="flex:1"><div class="label">Question</div><div class="field">Who is paying to put data centres in orbit, and on what terms?</div></div>
+  <div><div class="label">Method</div><div class="toggle"><span>Quick, wiki first</span><span class="on">Deep, web only</span></div></div>
+  <span class="btn">New research</span>
+</div>
+
+<main>
+  <article class="report">
+    <div class="kicker">Deep research report</div>
+    <h1 class="headline">Orbit compute is funded by defence and launch money, not by cloud customers</h1>
+    <p class="standfirst">Four lines of inquiry and 41 web pages point the same way: the first contracts buy processing for data that is already in space, and public programmes carry most of the risk.</p>
+    <div class="meta"><span><b>14</b> web sources cited</span><span>Finished in <b>6 min 12 s</b></span><span>Not yet saved</span></div>
+    <div class="prose">
+      <p class="dropcap">The money arriving in orbital computing comes from three places, and none of them is the enterprise cloud buyer the pitch decks describe. The largest share is defence and Earth-observation budgets that pay to process imagery before it is sent down.<sup class="cite">1</sup> Launch providers come second, bundling compute payloads to fill capacity they have already sold.<sup class="cite">2</sup></p>
+      <h3>Terms favour the buyer</h3>
+      <p>Contracts published so far are milestone-based: payment follows demonstrated uptime in orbit, not delivery of hardware.<sup class="cite">3</sup> Insurers price the radiation risk to chips high enough that most operators self-insure the first units.<sup class="cite">4</sup> Public programmes in the EU and the US underwrite the rest through research grants rather than equity.</p>
+    </div>
+    <div class="endnotes">
+      <div class="note"><span class="n">1</span><span class="t">Imagery budgets move compute to the sensor<br><span class="muted">eo-market.example</span></span></div>
+      <div class="note"><span class="n">2</span><span class="t">Rideshare manifests, 2026 edition<br><span class="muted">launch-registry.example</span></span></div>
+      <div class="note"><span class="n">3</span><span class="t">Milestone contracts in commercial space<br><span class="muted">space-law-review.example</span></span></div>
+      <div class="note"><span class="n">4</span><span class="t">Underwriting single-event upsets<br><span class="muted">orbital-insurance.example</span></span></div>
+    </div>
+    <div class="actions">
+      <span class="btn primary">Save to wiki</span>
+      <span class="check"><i></i>Also register as a source document</span>
+      <span class="btn text sm" style="margin-left:auto">Download report</span>
+    </div>
+  </article>
+
+  <aside class="side">
+    <div class="figs">
+      <table class="agate">
+        <tr><td>Sub-tasks</td><td class="num">4</td></tr>
+        <tr><td>Web searches</td><td class="num">23</td></tr>
+        <tr><td>Pages read</td><td class="num">41</td></tr>
+        <tr><td>Sources cited in the report</td><td class="num">14</td></tr>
+      </table>
+    </div>
+    <div class="section-label">How the research ran</div>
+    <div class="wire">
+      <div class="row done"><span class="time">21:02:11</span><span class="pin"></span><div class="what"><b>Split the question</b> into four sub-tasks</div></div>
+      <div class="row done"><span class="time">21:02:40</span><span class="pin"></span><div class="what"><b>Who has signed contracts</b> <span class="n">7 searches</span><div class="qs">“orbital data centre contract 2026”, “in-orbit processing award defence”</div></div></div>
+      <div class="row done"><span class="time">21:03:55</span><span class="pin"></span><div class="what"><b>Launch pricing and bundling</b> <span class="n">6 searches</span></div></div>
+      <div class="row done"><span class="time">21:04:30</span><span class="pin"></span><div class="what"><b>Public funding programmes</b> <span class="n">5 searches</span></div></div>
+      <div class="row done"><span class="time">21:05:48</span><span class="pin"></span><div class="what"><b>Insurance and liability</b> <span class="n">5 searches</span></div></div>
+      <div class="row done"><span class="time">21:07:02</span><span class="pin"></span><div class="what"><b>Condensed the findings</b> from 41 pages</div></div>
+      <div class="row done"><span class="time">21:08:23</span><span class="pin"></span><div class="what"><b>Wrote the report</b> and checked 14 citations</div></div>
+    </div>
+    <div class="fold" style="margin-top:8px"><div class="sum"><span class="chev">▶</span>Ask a follow-up</div></div>
+  </aside>
+</main>
+
+<footer class="folio">
+  <span class="ok"><i class="dot"></i>gemma4:e4b ready</span>
+  <span>RTX 4090 at 49 °C, load 0 %</span>
+  <span>Web search on, no classified levels in scope</span>
+  <span class="push">Open Knowledge Format v0.1</span>
+  <span>Citations checked on every page</span>
+</footer>
+</body></html>

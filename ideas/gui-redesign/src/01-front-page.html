@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Front page mockup</title>
+<link rel="stylesheet" href="broadsheet.css">
+<style>
+  .ear { height: 40px; flex: none; display: flex; align-items: center; padding: 0 40px; font-size: 13px; color: var(--ink-2); }
+  .ear .right { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+  .plate-wrap { flex: none; margin: 0 40px; border-top: 3px solid var(--ink); border-bottom: 1px solid var(--ink); text-align: center; padding: 14px 0 12px; }
+  .nameplate { font: 900 104px/0.95 var(--display); font-optical-sizing: none; font-variation-settings: 'opsz' 11; }
+  .tagline { font: italic 400 19px var(--serif); color: var(--ink-2); margin-top: 10px; }
+  .frontnav { flex: none; margin: 0 40px; height: 48px; display: flex; justify-content: center; gap: 36px; border-bottom: 1px solid var(--ink); }
+  .frontnav a { display: flex; align-items: center; font: 500 15px var(--sans); color: var(--ink-2); border-bottom: 3px solid transparent; margin-bottom: -1px; }
+  .frontnav a.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--ink); }
+  main { display: grid; grid-template-columns: 330px 1fr 420px; margin: 0 40px; }
+  main > section { padding: 22px 28px 0; }
+  main > section:first-child { padding-left: 0; }
+  main > section:last-child { padding-right: 0; }
+  main > section + section { border-left: 1px solid var(--hair); }
+  .log .entry { padding: 10px 0 11px; border-bottom: 1px solid var(--hair); }
+  .log .when { font-size: 12.5px; color: var(--muted); margin-bottom: 3px; }
+  .log .what { font: 400 16px/1.42 var(--serif); }
+  .log .what b { font-weight: 600; }
+  .log .flag { font-size: 12.5px; color: var(--oxide); font-weight: 600; margin-top: 3px; }
+  .lead .headline { margin: 0 0 12px; }
+  .lead .standfirst { margin-bottom: 14px; }
+  .lead .meta { padding: 9px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); margin-bottom: 16px; }
+  .lead .prose { font-size: 17.5px; line-height: 1.6; column-count: 2; column-gap: 30px; max-width: none; }
+  .lead .row { display: flex; gap: 18px; align-items: center; margin-top: 18px; }
+  .more { margin-top: 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+  .more .section-label { grid-column: 1 / -1; }
+  .more article { padding: 0 20px; border-left: 1px solid var(--hair); }
+  .more article:nth-of-type(1) { padding-left: 0; border-left: 0; }
+  .more .k { font: 600 12.5px var(--sans); color: var(--muted); margin-bottom: 3px; }
+  .more p { font: 400 15px/1.45 var(--serif); color: var(--ink-2); margin-top: 5px; }
+  .ask .field { font-size: 20px; margin: 4px 0 12px; }
+  .ask .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 26px; }
+  .ask table.agate td { font-size: 14px; padding: 6px 0; }
+  .ask table.agate td.num { font-weight: 700; }
+  .ask table.agate td.warn { color: var(--oxide); }
+  .ask .clusters td .sub { color: var(--muted); font-size: 12.5px; display: block; }
+</style></head>
+<body>
+<div class="ear">
+  <span>Tuesday, 29 September 2026</span>
+  <div class="right">
+    <div class="edition">KI <small>edition</small> <span class="caret">▼</span></div>
+    <span class="stamp">Normal</span>
+    <span class="user">T. Hein</span>
+  </div>
+</div>
+<div class="plate-wrap">
+  <div class="nameplate">LocalWiki</div>
+  <div class="tagline">Your documents, compiled into a linked archive on this machine</div>
+</div>
+<nav class="frontnav"><a class="on">Front page</a><a>Explorer</a><a>Chat</a><a>Research</a><a>Upload</a></nav>
+
+<main>
+  <section class="log">
+    <div class="section-label">Since you were last here</div>
+    <div class="entry"><div class="when">Yesterday, 18:40</div><div class="what">Ingested <b>orbit-power-study.pdf</b>. 2 pages created, 3 updated.</div></div>
+    <div class="entry"><div class="when">26 September</div><div class="what">Reconciled <b>Durable execution</b> with the harness engineering summary.</div></div>
+    <div class="entry"><div class="when">24 September</div><div class="what">Ingested <b>harness-engineering.pdf</b>. 5 pages created, 4 updated.</div><div class="flag">1 contradiction waiting for review</div></div>
+    <div class="entry"><div class="when">21 September</div><div class="what">Rebuilt the search index after moving one source to the confidential level.</div></div>
+    <div style="margin-top:12px"><span class="btn text sm">Full activity log</span></div>
+  </section>
+
+  <section class="lead">
+    <div class="kicker">The most connected page in this edition</div>
+    <h1 class="headline xl">Retrieval-augmented generation</h1>
+    <p class="standfirst">Answering from your own documents instead of the model’s memory: find the passages first, then write the answer from them and cite each one.</p>
+    <div class="meta"><span>Linked to <b>11</b> pages</span><span><b>4</b> source documents</span><span>Updated <b>21 Sep</b></span></div>
+    <div class="prose">
+      <p>A retrieval step selects a handful of passages that match the question, and only those reach the model.<sup class="cite">1</sup> The answer can then point to where each claim came from, which is what makes it checkable.</p>
+      <p>Quality depends less on the model than on retrieval: how documents are cut into chunks, how keyword and meaning-based search are combined, and whether a reranker reorders the result.<sup class="cite">2</sup></p>
+    </div>
+    <div class="row"><span class="btn">Open the page</span><span class="btn text sm">Show it on the map</span></div>
+    <div class="more">
+      <div class="section-label">Recently updated</div>
+      <article><div class="k">Concept</div><h2 class="headline s">Durable execution</h2><p>Checkpoint every step so a crash costs one step, not the run.</p></article>
+      <article><div class="k">Summary</div><h2 class="headline s">Orbit power study</h2><p>A dawn–dusk orbit yields 5.6 times the solar energy of northern Germany.</p></article>
+      <article><div class="k">Entity</div><h2 class="headline s">Qwen3 reranker</h2><p>Reorders search results on this machine before Deep answers.</p></article>
+    </div>
+  </section>
+
+  <section class="ask">
+    <div class="section-label">Ask the archive</div>
+    <div class="field">What changed in the harness paper?</div>
+    <div class="row"><div class="toggle"><span class="on">Fast</span><span>Deep</span></div><span class="btn primary">Ask</span></div>
+    <div class="section-label">The archive in figures</div>
+    <table class="agate" style="margin-bottom:24px">
+      <tr><td>Pages</td><td class="num">44</td></tr>
+      <tr><td>Source documents</td><td class="num">13</td></tr>
+      <tr><td>Pages with no links</td><td class="num warn">2</td></tr>
+      <tr><td>Pages older than their sources</td><td class="num warn">3</td></tr>
+    </table>
+    <div class="section-label">Growing this month</div>
+    <table class="agate clusters">
+      <tr><td>Agents and harness<span class="sub">around Harness</span></td><td class="num">+6</td></tr>
+      <tr><td>Orbit compute<span class="sub">around Orbital data centres</span></td><td class="num">+5</td></tr>
+      <tr><td>Retrieval<span class="sub">around Retrieval-augmented generation</span></td><td class="num">+2</td></tr>
+    </table>
+  </section>
+</main>
+
+<footer class="folio">
+  <span class="ok"><i class="dot"></i>gemma4:e4b ready</span>
+  <span>RTX 4090 at 51 °C, load 3 %</span>
+  <span>Search index current</span>
+  <span class="push">Open Knowledge Format v0.1</span>
+  <span>Citations checked on every page</span>
+</footer>
+</body></html>

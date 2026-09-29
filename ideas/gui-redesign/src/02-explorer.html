@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Explorer mockup</title>
+<link rel="stylesheet" href="broadsheet.css">
+<style>
+  .bar { height: 56px; flex: none; display: flex; align-items: center; gap: 22px; padding: 0 40px; border-bottom: 1px solid var(--hair); }
+  .bar .find { width: 260px; font-size: 15px; padding: 5px 0; }
+  .bar .right { margin-left: auto; display: flex; gap: 20px; align-items: center; }
+  .bar .sep { width: 1px; height: 24px; background: var(--hair); }
+  main { display: grid; grid-template-columns: 920px 1fr; }
+  .map { padding: 14px 32px 0 40px; border-right: 1px solid var(--ink); display: flex; flex-direction: column; }
+  .legend { display: flex; gap: 18px; font-size: 12.5px; color: var(--ink-2); align-items: center; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; }
+  .legend i.sq { border-radius: 0; background: var(--paper); border: 1.3px solid var(--ink-2); }
+  .legend .push { margin-left: auto; color: var(--muted); }
+  svg.graph { display: block; margin: 4px 0 0; }
+  svg .lbl text { font: 12.5px var(--sans); paint-order: stroke; stroke: var(--paper); stroke-width: 4px; stroke-linejoin: round; }
+  .standings { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-top: 4px; }
+  .standings td { white-space: nowrap; }
+  .standings td.rk { width: 26px; color: var(--muted); font-weight: 600; }
+  .standings td.pg { font-weight: 500; }
+  .standings td.ty { color: var(--muted); font-size: 12.5px; }
+  .bar-pr { display: inline-block; height: 6px; background: var(--ink-2); vertical-align: middle; margin-right: 8px; }
+  tr.sel .bar-pr { background: var(--oxide); }
+  .reader { padding: 26px 40px 0 44px; overflow: hidden; position: relative; }
+  .reader .top { display: flex; justify-content: space-between; align-items: baseline; }
+  .reader .close { font-size: 13px; color: var(--ink-2); }
+  .reader .headline { margin: 2px 0 12px; }
+  .reader .standfirst { font-size: 18.5px; margin-bottom: 14px; }
+  .reader .meta { padding: 10px 0; border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); margin-bottom: 18px; }
+  .reader .prose { font-size: 16.5px; }
+  .linked { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 18px; }
+  .linked .label { width: 100%; }
+  .notes { display: grid; gap: 10px; }
+  .reader .actions { display: flex; gap: 14px; align-items: center; margin: 0 0 16px; }
+  .reader::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40px; background: linear-gradient(transparent, var(--paper)); }
+</style></head>
+<body>
+<header class="runhead">
+  <div class="plate">LocalWiki</div>
+  <nav class="nav"><a>Front page</a><a class="on">Explorer</a><a>Chat</a><a>Research</a><a>Upload</a></nav>
+  <div class="right">
+    <div class="edition">KI <small>edition</small> <span class="caret">▼</span></div>
+    <span class="stamp">Normal</span>
+    <span class="user">T. Hein</span>
+  </div>
+</header>
+
+<div class="bar">
+  <div class="toggle"><span class="on">Map</span><span>Index</span></div>
+  <div class="toggle"><span class="on">Galaxy</span><span>Ranked</span><span>Clusters</span></div>
+  <div class="field find">Find a page</div>
+  <div class="right">
+    <span class="muted" style="font-size:13px">Size by</span>
+    <span style="font-weight:600;border-bottom:1px solid var(--ink);padding-bottom:2px">PageRank <span class="caret">▼</span></span>
+    <span class="sep"></span>
+    <span class="check"><i class="on"></i>Hubs</span>
+    <span class="check"><i></i>Stale pages</span>
+    <span class="check"><i></i>Outdated versions</span>
+  </div>
+</div>
+
+<main>
+  <section class="map">
+    <div class="legend">
+      <span><i style="background:#1b1a17"></i>Concept</span>
+      <span><i style="background:#3f5b73"></i>Entity</span>
+      <span><i style="background:#8a7a36"></i>Summary</span>
+      <span><i class="sq"></i>Source document</span>
+      <span class="push">44 pages, 81 links, 4 clusters</span>
+    </div>
+    <svg class="graph" width="848" height="512" viewBox="0 0 900 544"><!--GRAPH-->
+<line x1="537.8" y1="240.4" x2="473.8" y2="161.4" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="633.2" y2="241.3" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="555.1" y2="168.7" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="493.1" y2="211.4" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="433.3" y2="240.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="596.8" y2="298.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="497.7" y2="292.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="663.2" y2="202.0" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="506.2" y2="334.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="594.5" y2="203.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="537.8" y1="240.4" x2="570.6" y2="263.7" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="473.8" y1="161.4" x2="555.1" y2="168.7" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="473.8" y1="161.4" x2="389.4" y2="107.1" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="633.2" y1="241.3" x2="734.2" y2="289.4" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="633.2" y1="241.3" x2="555.1" y2="168.7" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="633.2" y1="241.3" x2="594.5" y2="203.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="555.1" y1="168.7" x2="583.9" y2="90.4" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="555.1" y1="168.7" x2="594.5" y2="203.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="493.1" y1="211.4" x2="433.3" y2="240.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="493.1" y1="211.4" x2="570.6" y2="263.7" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="433.3" y1="240.2" x2="342.9" y2="284.4" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="596.8" y1="298.6" x2="497.7" y2="292.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="497.7" y1="292.2" x2="416.4" y2="343.2" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="497.7" y1="292.2" x2="570.6" y2="263.7" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="506.2" y1="334.2" x2="524.0" y2="389.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="506.2" y1="334.2" x2="416.4" y2="343.2" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="506.2" y1="334.2" x2="494.7" y2="428.1" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="506.2" y1="334.2" x2="471.5" y2="384.6" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="506.2" y1="334.2" x2="399.7" y2="372.8" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="506.2" y1="334.2" x2="586.1" y2="388.1" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="524.0" y1="389.6" x2="587.5" y2="466.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="524.0" y1="389.6" x2="416.4" y2="343.2" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="524.0" y1="389.6" x2="586.1" y2="388.1" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="416.4" y1="343.2" x2="400.0" y2="427.4" stroke="#8f2d1a" stroke-width="1.6"/>
+<line x1="416.4" y1="343.2" x2="342.9" y2="284.4" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="416.4" y1="343.2" x2="471.5" y2="384.6" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="416.4" y1="343.2" x2="399.7" y2="372.8" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="416.4" y1="343.2" x2="343.2" y2="410.1" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="400.0" y1="427.4" x2="417.6" y2="477.9" stroke="#8f2d1a" stroke-width="1.6"/>
+<line x1="400.0" y1="427.4" x2="494.7" y2="428.1" stroke="#8f2d1a" stroke-width="1.6"/>
+<line x1="400.0" y1="427.4" x2="471.5" y2="384.6" stroke="#8f2d1a" stroke-width="1.6"/>
+<line x1="400.0" y1="427.4" x2="399.7" y2="372.8" stroke="#8f2d1a" stroke-width="1.6"/>
+<line x1="400.0" y1="427.4" x2="343.2" y2="410.1" stroke="#8f2d1a" stroke-width="1.6"/>
+<line x1="400.0" y1="427.4" x2="345.4" y2="498.0" stroke="#8f2d1a" stroke-width="1.6"/>
+<line x1="417.6" y1="477.9" x2="494.7" y2="428.1" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="417.6" y1="477.9" x2="343.2" y2="410.1" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="417.6" y1="477.9" x2="345.4" y2="498.0" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="342.9" y1="284.4" x2="241.1" y2="244.8" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="471.5" y1="384.6" x2="586.1" y2="388.1" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="148.3" y1="202.6" x2="241.1" y2="244.8" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="148.3" y1="202.6" x2="46.0" y2="217.8" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="148.3" y1="202.6" x2="170.2" y2="115.9" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="148.3" y1="202.6" x2="161.7" y2="279.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="148.3" y1="202.6" x2="128.5" y2="250.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="241.1" y1="244.8" x2="235.3" y2="153.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="241.1" y1="244.8" x2="238.1" y2="190.3" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="241.1" y1="244.8" x2="161.7" y2="279.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="241.1" y1="244.8" x2="128.5" y2="250.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="170.2" y1="115.9" x2="235.3" y2="153.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="170.2" y1="115.9" x2="274.1" y2="66.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="170.2" y1="115.9" x2="183.8" y2="46.0" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="235.3" y1="153.2" x2="304.4" y2="129.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="235.3" y1="153.2" x2="320.4" y2="85.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="238.1" y1="190.3" x2="304.4" y2="129.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="274.1" y1="66.6" x2="389.4" y2="107.1" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="274.1" y1="66.6" x2="183.8" y2="46.0" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="389.4" y1="107.1" x2="304.4" y2="129.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="389.4" y1="107.1" x2="320.4" y2="85.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="304.4" y1="129.6" x2="320.4" y2="85.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="46.0" y1="217.8" x2="128.5" y2="250.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="663.2" y1="202.0" x2="756.0" y2="165.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="663.2" y1="202.0" x2="770.9" y2="230.1" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="663.2" y1="202.0" x2="699.3" y2="127.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="756.0" y1="165.2" x2="699.3" y2="127.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="756.0" y1="165.2" x2="854.0" y2="186.7" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="756.0" y1="165.2" x2="838.3" y2="124.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="854.0" y1="186.7" x2="770.9" y2="230.1" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="854.0" y1="186.7" x2="838.3" y2="124.2" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="399.7" y1="372.8" x2="343.2" y2="410.1" stroke="#45423b" stroke-width="1" stroke-opacity=".7"/>
+<line x1="161.7" y1="279.6" x2="128.5" y2="250.6" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<line x1="594.5" y1="203.6" x2="570.6" y2="263.7" stroke="#bdb5a4" stroke-width=".8" stroke-opacity=".55"/>
+<circle cx="537.8" cy="240.4" r="18.5" fill="#1b1a17" opacity="0.22"/>
+<circle cx="473.8" cy="161.4" r="11.9" fill="#1b1a17" opacity="0.22"/>
+<circle cx="633.2" cy="241.3" r="13.3" fill="#1b1a17" opacity="0.22"/>
+<circle cx="555.1" cy="168.7" r="14.3" fill="#1b1a17" opacity="0.22"/>
+<circle cx="493.1" cy="211.4" r="11.7" fill="#1b1a17" opacity="0.22"/>
+<circle cx="583.9" cy="90.4" r="9.2" fill="#1b1a17" opacity="0.22"/>
+<circle cx="433.3" cy="240.2" r="11.7" fill="#1b1a17" opacity="0.22"/>
+<circle cx="596.8" cy="298.6" r="10.4" fill="#1b1a17" opacity="0.22"/>
+<circle cx="497.7" cy="292.2" r="12.7" fill="#1b1a17" opacity="1"/>
+<circle cx="734.2" cy="289.4" r="9.3" fill="#3f5b73" opacity="0.22"/>
+<circle cx="506.2" cy="334.2" r="15.1" fill="#1b1a17" opacity="1"/>
+<circle cx="524.0" cy="389.6" r="13.0" fill="#1b1a17" opacity="1"/>
+<circle cx="416.4" cy="343.2" r="15.8" fill="#1b1a17" opacity="1"/>
+<circle cx="400.0" cy="427.4" r="21.1" fill="none" stroke="#8f2d1a" stroke-width="1.5"/>
+<circle cx="400.0" cy="427.4" r="15.1" fill="#8f2d1a"/>
+<circle cx="417.6" cy="477.9" r="12.6" fill="#1b1a17" opacity="1"/>
+<circle cx="342.9" cy="284.4" r="11.7" fill="#1b1a17" opacity="1"/>
+<circle cx="494.7" cy="428.1" r="11.4" fill="#3f5b73" opacity="1"/>
+<circle cx="587.5" cy="466.6" r="9.1" fill="#3f5b73" opacity="0.22"/>
+<circle cx="471.5" cy="384.6" r="12.5" fill="#1b1a17" opacity="1"/>
+<circle cx="148.3" cy="202.6" r="14.1" fill="#1b1a17" opacity="0.22"/>
+<circle cx="241.1" cy="244.8" r="15.0" fill="#1b1a17" opacity="0.22"/>
+<circle cx="170.2" cy="115.9" r="13.3" fill="#1b1a17" opacity="0.22"/>
+<circle cx="235.3" cy="153.2" r="13.1" fill="#1b1a17" opacity="0.22"/>
+<circle cx="238.1" cy="190.3" r="10.7" fill="#1b1a17" opacity="0.22"/>
+<circle cx="274.1" cy="66.6" r="12.2" fill="#3f5b73" opacity="0.22"/>
+<circle cx="389.4" cy="107.1" r="13.2" fill="#3f5b73" opacity="0.22"/>
+<circle cx="304.4" cy="129.6" r="13.2" fill="#3f5b73" opacity="0.22"/>
+<circle cx="46.0" cy="217.8" r="10.7" fill="#1b1a17" opacity="0.22"/>
+<circle cx="663.2" cy="202.0" r="13.6" fill="#1b1a17" opacity="0.22"/>
+<circle cx="756.0" cy="165.2" r="13.9" fill="#1b1a17" opacity="0.22"/>
+<circle cx="699.3" cy="127.2" r="11.1" fill="#3f5b73" opacity="0.22"/>
+<circle cx="854.0" cy="186.7" r="12.8" fill="#3f5b73" opacity="0.22"/>
+<circle cx="770.9" cy="230.1" r="11.2" fill="#1b1a17" opacity="0.22"/>
+<circle cx="399.7" cy="372.8" r="12.4" fill="#8a7a36" opacity="1"/>
+<circle cx="161.7" cy="279.6" r="11.9" fill="#8a7a36" opacity="0.22"/>
+<circle cx="594.5" cy="203.6" r="12.9" fill="#8a7a36" opacity="0.22"/>
+<rect x="333.8" y="400.8" width="18.6" height="18.6" fill="#f7f5ef" stroke="#45423b" stroke-width="1.3" opacity="1"/>
+<rect x="118.7" y="240.8" width="19.6" height="19.6" fill="#f7f5ef" stroke="#45423b" stroke-width="1.3" opacity="0.22"/>
+<rect x="561.1" y="254.1" width="19.2" height="19.2" fill="#f7f5ef" stroke="#45423b" stroke-width="1.3" opacity="0.22"/>
+<rect x="577.4" y="379.4" width="17.4" height="17.4" fill="#f7f5ef" stroke="#45423b" stroke-width="1.3" opacity="1"/>
+<rect x="337.7" y="490.2" width="15.5" height="15.5" fill="#f7f5ef" stroke="#45423b" stroke-width="1.3" opacity="1"/>
+<rect x="311.4" y="76.2" width="18.0" height="18.0" fill="#f7f5ef" stroke="#45423b" stroke-width="1.3" opacity="0.22"/>
+<rect x="829.9" y="115.8" width="16.9" height="16.9" fill="#f7f5ef" stroke="#45423b" stroke-width="1.3" opacity="0.22"/>
+<rect x="175.6" y="37.8" width="16.3" height="16.3" fill="#f7f5ef" stroke="#45423b" stroke-width="1.3" opacity="0.22"/>
+<g class="lbl">
+<text x="400.0" y="457.5" text-anchor="middle" font-weight="700" fill="#8f2d1a">Durable execution</text>
+<text x="437.3" y="347.2" text-anchor="start" font-weight="600" fill="#1b1a17">Harness</text>
+<text x="435.2" y="481.9" text-anchor="start" font-weight="600" fill="#1b1a17">Checkpointing</text>
+<text x="487.0" y="369.1" text-anchor="start" font-weight="600" fill="#1b1a17">Human in the loop</text>
+<text x="382.3" y="376.8" text-anchor="end" font-weight="600" fill="#1b1a17">Harness engineering (summary)</text>
+<text x="511.2" y="432.1" text-anchor="start" font-weight="600" fill="#1b1a17">LangGraph</text>
+<text x="526.3" y="338.2" text-anchor="start" font-weight="400" fill="#45423b">Agent workflow</text>
+<text x="540.1" y="414.6" text-anchor="start" font-weight="400" fill="#45423b">Tool calling</text>
+<text x="515.4" y="296.2" text-anchor="start" font-weight="400" fill="#45423b">Evaluation</text>
+<text x="359.6" y="288.4" text-anchor="start" font-weight="400" fill="#45423b">Prompt caching</text>
+<text x="261.1" y="248.8" text-anchor="start" font-weight="400" fill="#9a9383">Inference cost</text>
+</g>
+<!--/GRAPH--></svg>
+    <div class="standings">
+      <table class="agate">
+        <tr><th></th><th>Most connected</th><th>Type</th><th>PageRank</th></tr>
+        <tr><td class="rk">1</td><td class="pg">Retrieval-augmented gen.</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:80px"></span>0.061</td></tr>
+        <tr><td class="rk">2</td><td class="pg">Harness</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:54px"></span>0.041</td></tr>
+        <tr><td class="rk">3</td><td class="pg">Agent workflow</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:48px"></span>0.037</td></tr>
+        <tr class="sel"><td class="rk">4</td><td class="pg">Durable execution</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:48px"></span>0.037</td></tr>
+        <tr><td class="rk">5</td><td class="pg">Inference cost</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:47px"></span>0.036</td></tr>
+      </table>
+      <table class="agate">
+        <tr><th></th><th>&nbsp;</th><th>Type</th><th>PageRank</th></tr>
+        <tr><td class="rk">6</td><td class="pg">Hybrid search</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:41px"></span>0.032</td></tr>
+        <tr><td class="rk">7</td><td class="pg">Orbital data centres</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:40px"></span>0.031</td></tr>
+        <tr><td class="rk">8</td><td class="pg">Ontology</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:39px"></span>0.030</td></tr>
+        <tr><td class="rk">9</td><td class="pg">Knowledge graph</td><td class="ty">Concept</td><td><span class="bar-pr" style="width:36px"></span>0.028</td></tr>
+        <tr><td class="rk">10</td><td class="pg">Ollama</td><td class="ty">Entity</td><td><span class="bar-pr" style="width:34px"></span>0.026</td></tr>
+      </table>
+    </div>
+  </section>
+
+  <article class="reader">
+    <div class="top"><div class="kicker">Concept</div><div class="close">Close ✕</div></div>
+    <h1 class="headline m">Durable execution</h1>
+    <p class="standfirst">Running an agent so that a crash, a timeout or a pause for review never loses work: every step is checkpointed, and the run resumes where it stopped.</p>
+    <div class="meta"><span><b>3</b> sources</span><span>Updated <b>17 Sep 2026</b></span><span>Language <b>English</b></span><span>Confidence <b>high</b></span></div>
+    <div class="actions"><span class="btn sm">Open full page</span><span class="btn text sm">Download Markdown</span></div>
+    <div class="prose compact">
+      <p>Durable execution treats an agent run as a sequence of recorded steps rather than one long function call.<sup class="cite">1</sup> The inputs and outputs of each step are written to a checkpoint store before the next step starts, so a failure costs one step instead of the whole run.<sup class="cite">2</sup></p>
+      <p>In LangGraph the checkpointer stores graph state per thread; resuming replays nothing that already succeeded.<sup class="cite">3</sup> The same mechanism makes human review practical: a run can wait hours for approval and continue unchanged.</p>
+    </div>
+    <div class="linked">
+      <div class="label">Linked pages</div>
+      <span class="chip">Harness</span><span class="chip">Checkpointing</span><span class="chip">LangGraph</span><span class="chip">Human in the loop</span><span class="chip">Harness engineering (summary)</span>
+    </div>
+    <div class="section-label">Sources</div>
+    <div class="notes">
+      <div class="note"><span class="n">1</span><span class="t"><span class="file">harness-engineering.pdf</span> §3.2</span><span class="q">“Durability is the first duty of the control plane: work that has been done is never done twice.”</span></div>
+      <div class="note"><span class="n">2</span><span class="t"><span class="file">durable-execution-primer.md</span> §1</span></div>
+      <div class="note"><span class="n">3</span><span class="t"><span class="file">durable-execution-primer.md</span> §4 Checkpointers</span></div>
+    </div>
+  </article>
+</main>
+
+<footer class="folio">
+  <span class="ok"><i class="dot"></i>gemma4:e4b ready</span>
+  <span>RTX 4090 at 51 °C, load 3 %</span>
+  <span>Search index current</span>
+  <span class="push">Open Knowledge Format v0.1</span>
+  <span>Citations checked on every page</span>
+</footer>
+</body></html>

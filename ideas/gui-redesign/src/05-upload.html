@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Upload mockup</title>
+<link rel="stylesheet" href="broadsheet.css">
+<style>
+  main { display: grid; grid-template-columns: 930px 1fr; column-gap: 0; }
+  .desk { padding: 24px 40px 0; border-right: 1px solid var(--ink); }
+  .desk .intro { display: flex; align-items: baseline; gap: 18px; margin-bottom: 12px; }
+  .desk .intro h1 { white-space: nowrap; }
+  .desk .intro p { font-size: 13.5px; color: var(--muted); }
+  .drop { border: 1px dashed var(--ink-2); height: 58px; display: flex; align-items: center; justify-content: center; gap: 6px; font: 400 16px var(--serif); color: var(--ink-2); margin-bottom: 14px; }
+  .drop u { text-underline-offset: 3px; }
+  table.agate td { font-size: 13.5px; }
+  table.agate td .sub { display: block; font-size: 12px; color: var(--muted); }
+  .seg { display: inline-flex; border: 1px solid var(--ink-2); }
+  .seg span { padding: 3px 8px; font-size: 12px; font-weight: 500; }
+  .seg span + span { border-left: 1px solid var(--ink-2); }
+  .seg .on { background: var(--ink); color: var(--paper); font-weight: 600; }
+  .seg .on.conf { background: var(--violet); }
+  .seg.need { border-color: var(--oxide); border-style: dashed; }
+  .seg.need span + span { border-left-color: var(--oxide); }
+  tr.dup td { color: var(--muted); }
+  tr.dup td .file { color: var(--muted); text-decoration: line-through; }
+  .status-new { font-weight: 600; }
+  .status-ver { font-weight: 600; color: var(--violet); }
+  .todo { color: var(--oxide); font-weight: 600; }
+  .ingest { display: flex; align-items: center; gap: 16px; margin: 14px 0 24px; }
+  .ingest .why { font-size: 13px; color: var(--oxide); }
+  .contra .head { display: flex; align-items: baseline; justify-content: space-between; }
+  .item { padding: 14px 0 16px; border-bottom: 1px solid var(--hair); }
+  .item h4 { font: 600 17px/1.4 var(--serif); margin-bottom: 12px; max-width: 72ch; }
+  .item h4 .chev { font: 11px var(--sans); margin-right: 8px; color: var(--ink-2); }
+  .item .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .item .chip.add { border-style: dashed; color: var(--ink-2); }
+  .item .guide { font-size: 16px; margin-bottom: 14px; }
+  .item .row { display: flex; gap: 18px; align-items: center; }
+  .item.closed h4 { margin: 0; font-weight: 400; color: var(--ink-2); }
+  .preview { padding: 24px 40px 0 36px; }
+  .preview .top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .paper-sheet { background: #fbfaf6; border: 1px solid var(--hair); padding: 22px 26px; height: 452px; overflow: hidden; position: relative; }
+  .paper-sheet::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 60px; background: linear-gradient(transparent, #fbfaf6); }
+  .paper-sheet h2 { font: 600 24px/1.2 var(--serif); margin-bottom: 8px; }
+  .paper-sheet h3 { font: 700 16px var(--serif); margin: 14px 0 4px; }
+  .paper-sheet p { font: 400 15.5px/1.55 var(--serif); }
+  .paper-sheet table { margin-top: 8px; }
+  .convnote { font-size: 12.5px; color: var(--muted); margin: 10px 0 18px; }
+  .metaform { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 28px; }
+  .metaform .field { font-size: 16px; padding: 4px 0; }
+  .metaform .field.set { font-style: normal; color: var(--ink); }
+</style></head>
+<body>
+<header class="runhead">
+  <div class="plate">LocalWiki</div>
+  <nav class="nav"><a>Front page</a><a>Explorer</a><a>Chat</a><a>Research</a><a class="on">Upload</a></nav>
+  <div class="right">
+    <div class="edition">KI <small>edition</small> <span class="caret">▼</span></div>
+    <span class="stamp conf">Confidential</span>
+    <span class="user">T. Hein</span>
+  </div>
+</header>
+
+<main>
+  <section class="desk">
+    <div class="intro"><h1 class="headline s">Add documents</h1><p>Markdown, PDF, Word and images. PDFs and images are converted to Markdown on this machine before anything is stored.</p></div>
+    <div class="drop">Drop files here or <u>choose files</u></div>
+    <table class="agate">
+      <tr><th>File</th><th>Converted</th><th>Detected class</th><th>Level</th><th>Status</th></tr>
+      <tr class="sel"><td><span class="file">orbit-power-study.pdf</span><span class="sub">Work: Orbit power study</span></td><td>12 of 12 pages</td><td>Study</td><td><span class="seg"><span class="on">Normal</span><span>Confidential</span><span>Strict</span></span></td><td class="status-new">New</td></tr>
+      <tr><td><span class="file">harness-engineering-v2.pdf</span><span class="sub">Work: Harness engineering</span></td><td>31 of 31 pages</td><td>Paper</td><td><span class="seg"><span>Normal</span><span class="on conf">Confidential</span><span>Strict</span></span></td><td class="status-ver">Newer version<span class="sub">of harness-engineering.pdf</span></td></tr>
+      <tr><td><span class="file">team-notes-2026-09.docx</span><span class="sub">No work detected</span></td><td>4 of 4 pages</td><td>Notes <span class="sub">suggested, not in the ontology</span></td><td><span class="seg need"><span>Normal</span><span>Confidential</span><span>Strict</span></span></td><td class="todo">Choose a level</td></tr>
+      <tr class="dup"><td><span class="file">rag-survey-2025.pdf</span></td><td>Not needed</td><td></td><td></td><td>Already in the archive<span class="sub">since 3 Sep, will be skipped</span></td></tr>
+    </table>
+    <div class="ingest">
+      <span class="btn disabled">Ingest 3 documents</span>
+      <span class="why">Choose a level for team-notes-2026-09.docx first.</span>
+      <span class="btn text sm" style="margin-left:auto">Remove all</span>
+    </div>
+
+    <div class="contra">
+      <div class="head section-label" style="display:flex;justify-content:space-between"><span>Contradictions from the last ingest</span><span class="btn text sm" style="height:auto">Dismiss all</span></div>
+      <div class="item">
+        <h4><span class="chev">▼</span>The new summary says durable execution needs a separate workflow engine. The page Durable execution says the LangGraph checkpointer is enough.</h4>
+        <div class="label">Pages to reconcile</div>
+        <div class="chips"><span class="chip">Durable execution <span class="x">✕</span></span><span class="chip">Harness <span class="x">✕</span></span><span class="chip">Harness engineering (summary) <span class="x">✕</span></span><span class="chip add">Add a page</span></div>
+        <div class="field guide">Which claim should win, and why? For example: the 2026 paper replaces the 2025 draft.</div>
+        <div class="row"><span class="btn primary">Reconcile 3 pages</span><span class="btn text sm">Dismiss</span></div>
+      </div>
+      <div class="item closed"><h4><span class="chev">▶</span>The source treats RAG and agent workflows as complementary; the page Agent workflow calls them alternatives.</h4></div>
+    </div>
+  </section>
+
+  <aside class="preview">
+    <div class="top"><div class="toggle"><span class="on">Preview</span><span>Edit Markdown</span></div><span class="muted" style="font-size:13px">orbit-power-study.md, page 3 of 12</span></div>
+    <div class="paper-sheet">
+      <h2>Power budgets for orbital compute</h2>
+      <p>A sun-synchronous dawn–dusk orbit keeps the arrays lit for more than 99&nbsp;% of each revolution. Under these conditions a 1 m² panel delivers roughly 1,361 W at the top of the atmosphere before conversion losses.</p>
+      <h3>3.2 Annual yield compared</h3>
+      <table class="agate">
+        <tr><th>Site</th><th class="num">kWh per m² and year</th><th class="num">Factor</th></tr>
+        <tr><td>Dawn–dusk orbit</td><td class="num">3,890</td><td class="num">5.6</td></tr>
+        <tr><td>Southern Spain</td><td class="num">1,020</td><td class="num">1.5</td></tr>
+        <tr><td>Northern Germany</td><td class="num">690</td><td class="num">1.0</td></tr>
+      </table>
+      <h3>3.3 Storage</h3>
+      <p>Eclipse periods remain in most other orbits, so battery mass returns as the limiting factor for anything but dawn–dusk operation.</p>
+    </div>
+    <p class="convnote">Converted on this machine by deepseek-ocr:3b. Check tables and figures before you ingest.</p>
+    <div class="section-label">Details that help the model (optional)</div>
+    <div class="metaform">
+      <div><div class="label">Short name</div><div class="field set">Orbit power study</div></div>
+      <div><div class="label">In force since</div><div class="field set">12 Mar 2026</div></div>
+      <div><div class="label">Full title</div><div class="field">Power budgets for orbital compute</div></div>
+      <div><div class="label">Part of</div><div class="field">A series or a larger work</div></div>
+    </div>
+  </aside>
+</main>
+
+<footer class="folio">
+  <span class="ok"><i class="dot"></i>gemma4:e4b ready</span>
+  <span>RTX 4090 at 63 °C, load 72 %, converting</span>
+  <span>Search index current</span>
+  <span class="push">Open Knowledge Format v0.1</span>
+  <span>Citations checked on every page</span>
+</footer>
+</body></html>
