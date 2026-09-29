@@ -515,6 +515,17 @@ def test_chat_follow_up_is_condensed(wiki, monkeypatch):
     assert last["content"] == "standalone?"
 
 
+def test_fast_chat_shows_the_question_while_answering(wiki, monkeypatch):
+    # A non-RuntimeError aborts the run mid-answer, freezing what the user sees.
+    def halt(q):
+        raise ValueError("halt")
+
+    monkeypatch.setattr(wiki_engine, "query_with_sources", halt)
+    at = _go(_app(), "Wiki Chat")
+    at.chat_input[0].set_value("What is alpha?").run()
+    assert "**Question:** What is alpha?" in _texts(at.markdown)
+
+
 def test_fast_chat_error_is_recorded(wiki, monkeypatch):
     def boom(q):
         raise RuntimeError("ollama down")

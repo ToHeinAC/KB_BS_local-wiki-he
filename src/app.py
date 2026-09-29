@@ -1868,6 +1868,12 @@ elif page == "Wiki Chat":
             q_to_ask = prompt
         interpreted = q_to_ask if (fu and q_to_ask.strip() != prompt.strip()) else None
         st.session_state["messages"].append({"role": "user", "content": prompt})
+        # Shown live while either mode works; the rerun below renders it as history.
+        _live = st.container()
+        with _live:
+            st.markdown(f"**Question:** {prompt}")
+            if interpreted:
+                st.caption(f"🔎 Researching as: {interpreted}")
         if st.session_state.get("chat_mode", "Fast") == "Fast":
             with st.spinner("Thinking…"):
                 try:
@@ -1894,11 +1900,6 @@ elif page == "Wiki Chat":
             answer = ""
             raw_sources: list[str] = []
             wiki_pages: list[str] = []
-            _live = st.container()
-            with _live:
-                st.markdown(f"**Question:** {prompt}")
-                if interpreted:
-                    st.caption(f"🔎 Researching as: {interpreted}")
             for step in chat_agent.run_chat_agent(q_to_ask):
                 steps.append(step)
                 stype = step["type"]
