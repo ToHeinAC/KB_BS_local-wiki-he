@@ -1077,6 +1077,34 @@ def _resolve_by_shard(desc: str, refs: list[str], guidance: str) -> dict[str, li
     return out
 
 
+def _render_move_source(sources: list[str]) -> None:
+    """Maintenance: move a source of the bound level to another reachable level."""
+    here = db_context.get_active_db()
+    targets = [s for s in db_context.reachable_shards(db_context.base_db()) if s != here]
+    if not targets:
+        return
+    st.markdown("---")
+    st.markdown("**Move to another classification level**")
+    name = st.selectbox("Source to move", sources, key="move_source_pick")
+    target = st.selectbox("Target level", targets, format_func=_level_name, key="move_target_pick")
+    if classification.parse_shard(target)[1] > db_context.level():
+        st.caption(
+            "Moving up removes every trace from this level: pages it shares with other "
+            "sources are rebuilt from them, answers and reports drawn from it are deleted, "
+            "and its ontology facts and log lines are erased."
+        )
+    if not st.button("Move source", key="move_source_btn"):
+        return
+    with st.spinner("Moving…"):
+        report = wiki_engine.move_source(name, target, st.session_state["user"])
+    st.success(f"Moved **{name}** to {classification.label(target)}.")
+    if report.get("review"):
+        st.warning(
+            "Filed answers without provenance, created after this source — review them:\n"
+            + "\n".join(f"- {r}" for r in report["review"])
+        )
+
+
 def _safe_reset() -> None:
     import requests as _req
 
@@ -2131,6 +2159,9 @@ elif page == "Research":
 
 elif page == "Maintenance":
     _page_header("Maintenance")
+    # Every section below works on one classification level (stats, index, delete,
+    # lint, log, ontology); the Admin section is DB-independent.
+    _level_picker("maint_level")
     s = wiki_engine.stats()
     c1, c2, c3 = st.columns(3)
     c1.metric("Wiki pages", s["pages"])
@@ -2231,6 +2262,7 @@ elif page == "Maintenance":
                         "Index rebuilt."
                     )
                     st.rerun()
+                _render_move_source(_sources)
         else:
             st.info("Delete actions require maintainer rights for this database.")
 

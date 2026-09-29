@@ -52,23 +52,38 @@ def register_file(file_bytes: bytes, filename: str, content: bytes | None = None
     is given (e.g. Markdown converted from a PDF), it is what gets written to disk
     while the dedup key still tracks the original bytes.
     """
+    return register_digest(
+        sha256(file_bytes), filename, content if content is not None else file_bytes
+    )
+
+
+def register_digest(digest: str, filename: str, content: bytes, added_at: str = "") -> Path:
+    """Store `content` as `filename` under an already known dedup key.
+
+    Moving a source between classification levels keeps the key of the original
+    upload, so re-uploading that file is still recognised as a duplicate.
+    """
     raw = _raw_dir()
     raw.mkdir(parents=True, exist_ok=True)
-    digest = sha256(file_bytes)
     dest = raw / filename
     # Avoid name collision without changing the hash key
     if dest.exists():
         stem = Path(filename).stem
         suffix = Path(filename).suffix
         dest = raw / f"{stem}_{digest[:8]}{suffix}"
-    dest.write_bytes(content if content is not None else file_bytes)
+    dest.write_bytes(content)
     manifest = _load_manifest()
     manifest[digest] = {
         "filename": dest.name,
-        "added_at": datetime.now(UTC).isoformat(),
+        "added_at": added_at or datetime.now(UTC).isoformat(),
     }
     _save_manifest(manifest)
     return dest
+
+
+def entry_for(filename: str) -> tuple[str, dict[str, str]] | None:
+    """(dedup key, manifest entry) of a registered source, or None."""
+    return next(((k, v) for k, v in _load_manifest().items() if v["filename"] == filename), None)
 
 
 def list_sources() -> list[str]:

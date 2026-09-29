@@ -908,6 +908,45 @@ def test_research_save_is_for_maintainers_only(strict_level, tavily, monkeypatch
     assert "save_research_btn" not in [b.key for b in _ok(at).button]
 
 
+def test_maintenance_works_on_one_level_at_a_time(strict_level):
+    import dedup
+
+    with db_context.clearance({DB: 2}), db_context.using_db(strict_level):
+        dedup.register_file(b"# S", "strict-only.md")
+    auth.set_clearance(ADMIN, DB, "strict", by=ADMIN)
+    at = _maint(_app(), "Delete source")
+    assert "strict-only.md" not in [str(o) for s in at.selectbox for o in s.options]
+    at.segmented_control(key="maint_level").set_value(strict_level).run()
+    assert "strict-only.md" in [str(o) for s in _ok(at).selectbox for o in s.options]
+
+
+def test_maintenance_moves_a_source_to_another_level(strict_level, monkeypatch):
+    import dedup
+
+    moved: list[tuple[str, str, str]] = []
+    monkeypatch.setattr(
+        wiki_engine,
+        "move_source",
+        lambda n, t, u: moved.append((n, t, u)) or {"rebuilt": [], "review": ["insights/x.md"]},
+    )
+    dedup.register_file(b"# M", "mv.md")
+    auth.set_clearance(ADMIN, DB, "strict", by=ADMIN)
+    at = _maint(_app(), "Delete source")
+    at.selectbox(key="move_source_pick").set_value("mv.md")
+    at.selectbox(key="move_target_pick").set_value(strict_level)
+    at.button(key="move_source_btn").click().run()
+    assert moved == [("mv.md", strict_level, ADMIN)]
+    assert "insights/x.md" in _texts(_ok(at).warning)
+
+
+def test_maintenance_offers_no_move_without_a_second_level(wiki):
+    import dedup
+
+    dedup.register_file(b"# M", "mv.md")
+    at = _maint(_app(), "Delete source")
+    assert "move_source_btn" not in [b.key for b in at.button]
+
+
 # --- Maintenance → Ontology ------------------------------------------------------------
 
 

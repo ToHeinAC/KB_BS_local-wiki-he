@@ -15,12 +15,15 @@ import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 import numpy as np
 from dotenv import load_dotenv
 
+import audit
 import auth
 import calibrate
 import chunker
+import classification
 import db_context
 import dedup
 import embed_index
+import file_processor
 import lang
 import lex_index
 import okf
@@ -1867,6 +1870,165 @@ def delete_source(source_name: str) -> dict[str, Any]:
         f"Ontology rows retracted: {result['ontology_rows']}",
     )
     return result
+
+
+# --- classification levels: moving a source between shards -----------------
+
+_UPLOAD_META_KEYS = ("effective as of", "part of")
+_REDACTED = "- [redacted: a source moved to a higher classification level]"
+
+
+def _cites(ref: object, names: set[str]) -> bool:
+    """Whether a `sources:`/`derived_from` entry names one of `names` — plain, with a
+    section (`a.md §3`), prefixed (`src:a.md`, `wiki:p.md`) or DB-qualified (`KI::a.md`)."""
+    s = _SOURCE_SECTION_RE.sub("", str(ref).strip()).split(db_context.SCOPE_SEP, 1)[-1]
+    return s.removeprefix("src:").removeprefix("wiki:") in names
+
+
+def _source_meta(name: str) -> dict[str, str]:
+    """The upload metadata of a source, read back from its summary page."""
+    for md in _content_pages():
+        with contextlib.suppress(Exception):
+            meta = frontmatter.load(str(md)).metadata
+            if meta.get("type") == "source-summary" and any(
+                _cites(s, {name}) for s in _meta_list(meta, "sources")
+            ):
+                return {k: str(meta[k]) for k in _UPLOAD_META_KEYS if meta.get(k)}
+    return {}
+
+
+def _ingest_raw(name: str, meta: dict[str, str]) -> dict[str, Any]:
+    """(Re-)ingest a registered raw source of the bound shard through the three stages."""
+    text = (read_raw_source(name) or b"").decode("utf-8", errors="replace")
+    ctx = ingest_begin(text, name, meta or None)
+    pieces = file_processor.chunk_text(text)
+    for j, piece in enumerate(pieces):
+        ingest_piece(ctx, piece, j, len(pieces))
+    return ingest_end(ctx)
+
+
+def move_source(name: str, target: str, user: str) -> dict[str, Any]:
+    """Move one source of the bound shard to another level of the same DB.
+
+    It is ingested into `target` first and only then removed here, so a crash never
+    loses it. Moving up also purges its traces below (`purge_upgraded`); moving
+    down is a deliberate declassification and needs no purge. Requires maintainer
+    rights on the DB and clearance for both levels (enforced by the gate).
+    """
+    here = db_context.get_active_db()
+    db, level = classification.parse_shard(here)
+    to_db, to_level = classification.parse_shard(target)
+    if to_db != db or to_level == level:
+        raise ValueError(f"{target!r} is not another level of {db!r}")
+    if not auth.is_maintainer(user, db):
+        raise PermissionError(f"{user!r} does not maintain {db!r}")
+    db_context.require(target)
+    entry, data = dedup.entry_for(name), read_raw_source(name)
+    if entry is None or data is None:
+        raise ValueError(f"Unknown source: {name!r}")
+    meta, facts = _source_meta(name), ontology_store.source_rows(name)
+    db_context.ensure_shard(target)
+    with db_context.using_db(target):
+        init_wiki()
+        dedup.register_digest(entry[0], name, data, entry[1].get("added_at", ""))
+        if facts and ontology_store.exists():
+            ontology_store.append_rows(facts)
+        _ingest_raw(name, meta)
+    report = purge_upgraded(name) if to_level > level else {"deleted": delete_source(name)}
+    audit.record("source_moved", user, target=name, shard=here, to=target)
+    return report
+
+
+def _shared_pages(name: str) -> dict[str, list[str]]:
+    """Pages citing `name` next to other sources -> those other sources."""
+    out: dict[str, list[str]] = {}
+    for md in _content_pages():
+        with contextlib.suppress(Exception):
+            sources = _meta_list(frontmatter.load(str(md)).metadata, "sources")
+            others = [str(s) for s in sources if not _cites(s, {name})]
+            if others and len(others) < len(sources):
+                out[_page_ref(md)] = others
+    return out
+
+
+def _derived_pages(names: set[str]) -> set[str]:
+    """Pages anywhere in the wiki (filed answers, reports) citing one of `names`."""
+    hits: set[str] = set()
+    for md in _wiki().rglob("*.md"):
+        with contextlib.suppress(Exception):
+            meta = frontmatter.load(str(md)).metadata
+            refs = [*_meta_list(meta, "derived_from"), *_meta_list(meta, "sources")]
+            if any(_cites(r, names) for r in refs):
+                hits.add(md.relative_to(_wiki()).as_posix())
+    return hits
+
+
+def _unprovenanced_since(added_at: str) -> list[str]:
+    """Filed answers without `derived_from`, created after `added_at` — for review."""
+    day = (added_at or "")[:10]
+    out: list[str] = []
+    for md in sorted((_wiki() / _INSIGHTS_DIR).glob("*.md")):
+        with contextlib.suppress(Exception):
+            meta = frontmatter.load(str(md)).metadata
+            if "derived_from" not in meta and str(meta.get("created", "")) >= day:
+                out.append(_page_ref(md))
+    return out
+
+
+def _remove_pages(refs: set[str]) -> None:
+    for ref in refs:
+        (_wiki() / ref).unlink(missing_ok=True)
+    _unindex("", refs)
+    _scrub_links_to(refs)
+
+
+def _redact_log(terms: set[str]) -> None:
+    path = _log_path()
+    if path.exists():
+        lines = path.read_text().splitlines()
+        redacted = [_REDACTED if any(t in ln for t in terms) else ln for ln in lines]
+        path.write_text("\n".join(redacted) + "\n")
+
+
+def _rebuild_description() -> None:
+    """Drop the overview (it may quote the source), then rebuild it best-effort."""
+    _description_path().unlink(missing_ok=True)
+    with contextlib.suppress(Exception):
+        if list_pages():
+            build_description()
+
+
+def purge_upgraded(name: str) -> dict[str, Any]:
+    """Remove every trace of `name` from the bound level after it moved up.
+
+    `delete_source` removes the file and the pages only it built. Pages it shared
+    with other sources carry its lines without provenance, so they are deleted and
+    rebuilt from their other sources; filed answers and reports derived from it
+    are deleted; its ontology rows and log lines are erased (the documented
+    exception to the append-only ledger); the overview is rebuilt.
+    """
+    entry = dedup.entry_for(name)
+    shared = _shared_pages(name)
+    deleted = delete_source(name)
+    derived = _derived_pages({name, *shared, *deleted["wiki_pages"]})
+    _remove_pages(set(shared) | derived)
+    terms = {name, *shared, *derived, *deleted["wiki_pages"]}
+    ontology = ontology_store.purge_mentions(terms)
+    _redact_log(terms)
+    others = sorted({_SOURCE_SECTION_RE.sub("", s) for srcs in shared.values() for s in srcs})
+    for other in others:
+        _ingest_raw(other, _source_meta(other))
+    _rebuild_index()
+    lex_index.build()
+    _rebuild_description()
+    return {
+        "deleted": deleted,
+        "rebuilt": sorted(shared),
+        "derived_removed": sorted(derived),
+        "reingested": others,
+        "ontology": ontology,
+        "review": _unprovenanced_since(entry[1].get("added_at", "") if entry else ""),
+    }
 
 
 def reset_all_data() -> dict[str, Any]:

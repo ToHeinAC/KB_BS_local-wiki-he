@@ -16,6 +16,7 @@ See docs/ontology.md.
 
 from __future__ import annotations
 
+import contextlib
 import fcntl
 import json
 import os
@@ -225,6 +226,53 @@ def retract_subject(subject: str, *, by: str, reason: str, user: str | None = No
     return len(live)
 
 
+def source_rows(source: str) -> list[dict[str, Any]]:
+    """The live rows about one source, without their ids — to copy them elsewhere."""
+    live = [r for r in ontology.live_rows(read_rows()) if r.get("subject") == f"src:{source}"]
+    return [{k: v for k, v in r.items() if k not in ("id", "recorded_at")} for r in live]
+
+
+def purge_mentions(terms: set[str]) -> dict[str, int]:
+    """Physically remove every ledger row that mentions one of `terms`.
+
+    The single exception to the append-only ledger (docs/security.md): used only
+    when a source moves to a higher classification level, so its facts must not
+    survive below. Other JSONL stores lose such rows too; change rows are redacted
+    in place; history snapshots mentioning a term are deleted.
+    """
+    out = {"rows": 0, "changes": 0, "snapshots": 0}
+    if not terms or not store_dir().is_dir():
+        return out
+    with _locked():
+        for path in store_dir().glob("*.jsonl"):
+            key = "changes" if path == changes_path() else "rows"
+            out[key] += _purge_jsonl(path, terms, redact=path == changes_path())
+        snaps: list[Path] = sorted(history_dir().glob("*.yaml")) if history_dir().is_dir() else []
+        for snap in snaps:
+            if any(t in snap.read_text(encoding="utf-8") for t in terms):
+                snap.unlink()
+                out["snapshots"] += 1
+    return out
+
+
+def _purge_jsonl(path: Path, terms: set[str], *, redact: bool) -> int:
+    kept: list[str] = []
+    hits = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not any(t in line for t in terms):
+            kept.append(line)
+            continue
+        hits += 1
+        if redact:  # keep the revision chain, drop what it said
+            with contextlib.suppress(ValueError):
+                row = json.loads(line)
+                keep = ("seq", "hash", "parent", "at", "user", "via")
+                kept.append(json.dumps({k: row.get(k) for k in keep} | {"summary": "redacted"}))
+    if hits:
+        _atomic_write(path, "".join(f"{ln}\n" for ln in kept))
+    return hits
+
+
 def referenced_ids() -> set[str]:
     """Class and relation ids any ledger row ever used (retracted rows included)."""
     rows = read_rows()
@@ -358,6 +406,12 @@ def prepare_restore(seq: int) -> bundle.ImportPlan:
 
 
 def _write_binding(schema: dict[str, Any]) -> None:
+    # One binding serves every classification level of a DB; a class taken from a
+    # confidential document must not reach it without a decision at the normal level.
+    if db_context.level() > 0:
+        raise PermissionError(
+            "The ontology schema is shared by every level; change it at the normal level."
+        )
     _atomic_write(binding_path(), _BINDING_HEADER + bundle.dump_yaml(schema))
 
 
