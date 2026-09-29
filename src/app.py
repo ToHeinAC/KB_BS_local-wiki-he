@@ -17,8 +17,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import agent as research_agent
+import audit
 import auth
 import chat_agent
+import classification
 import db_context
 import dedup
 import deep_research_agent
@@ -898,6 +900,39 @@ def _convert_progress(
     return _cb
 
 
+# Session keys that hold document-derived content. Dropped on a DB switch and
+# whenever the user's grants shrink, so nothing read under the old grant lingers.
+_CONTENT_KEYS = (
+    "messages",
+    "chat_followup",
+    "research_history",
+    "last_research_q",
+    "last_research_answer",
+    "last_report",
+    "research_sources",
+    "last_research_steps",
+    "last_research_metrics",
+    "explorer_selected_page",
+    "last_contradictions",
+    "pending_batch",
+    "batch_ingesting",
+    "batch_prepared",
+    "batch_key",
+    "convert_editor",
+    "chat_scope",
+    "normalize_report",
+)
+
+
+def _purge_if_downgraded(grants: dict[str, int]) -> None:
+    """Drop content-bearing session state when a grant shrank since the last rerun."""
+    before: dict[str, int] | None = st.session_state.get("_grants")
+    st.session_state["_grants"] = grants
+    if before and any(grants.get(db, -1) < lvl for db, lvl in before.items()):
+        for key in _CONTENT_KEYS:
+            st.session_state.pop(key, None)
+
+
 def _safe_reset() -> None:
     import requests as _req
 
@@ -917,6 +952,8 @@ def _safe_reset() -> None:
 db_context.migrate_legacy_layout()
 auth.ensure_seeded()
 auth.backfill_maintainers()
+# Fail closed until the user's grants are known: nothing is reachable.
+db_context.seal_clearance({})
 
 # --- login gate ---
 if not st.session_state.get("user"):
@@ -949,6 +986,12 @@ if not _allowed_dbs:
         st.session_state.pop("user", None)
         st.rerun()
     st.stop()
+
+# Seal this rerun's clearance before anything resolves a data path. Re-read every
+# rerun, so an admin's revocation takes effect at the user's next interaction.
+_grants = auth.clearance_map(_user)
+db_context.seal_clearance(_grants, user=_user)
+_purge_if_downgraded(_grants)
 
 # Keep active_db consistent with the allowlist
 if st.session_state.get("active_db") not in _allowed_dbs:
@@ -1010,6 +1053,7 @@ if _rst_col.button(
 if _logout_col.button("Logout", key="logout_btn"):
     for _k in (
         "user",
+        "_grants",
         "active_db",
         "messages",
         "chat_followup",
@@ -1067,26 +1111,7 @@ if _db_choice != st.session_state["active_db"]:
     st.session_state["active_db"] = _db_choice
     db_context.set_active_db(_db_choice)
     # Clear per-DB session state to avoid cross-DB leakage.
-    for _k in (
-        "messages",
-        "chat_followup",
-        "research_history",
-        "last_research_q",
-        "last_research_answer",
-        "last_report",
-        "research_sources",
-        "last_research_steps",
-        "last_research_metrics",
-        "explorer_selected_page",
-        "last_contradictions",
-        "pending_batch",
-        "batch_ingesting",
-        "batch_prepared",
-        "batch_key",
-        "convert_editor",
-        "chat_scope",
-        "normalize_report",
-    ):
+    for _k in _CONTENT_KEYS:
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -2118,6 +2143,15 @@ elif page == "Maintenance":
                         default=[d for d in _ud["maintains"] if d in _new_dbs],
                         key=f"umaint_{_ud['username']}",
                     )
+                    _new_clr = {
+                        _db: st.selectbox(
+                            f"Clearance · {_db}",
+                            classification.LEVEL_LABELS,
+                            index=classification.level_index(auth.clearance(_ud["username"], _db)),
+                            key=f"uclr_{_ud['username']}_{_db}",
+                        )
+                        for _db in _new_dbs
+                    }
                     _new_pw = st.text_input(
                         "New password (leave blank to keep)",
                         type="password",
@@ -2129,6 +2163,11 @@ elif page == "Maintenance":
                         auth.set_user_maintains(
                             _ud["username"], [d for d in _new_maint if d in _new_dbs]
                         )
+                        for _db, _lbl in _new_clr.items():
+                            if classification.level_index(_lbl) != classification.level_index(
+                                auth.clearance(_ud["username"], _db)
+                            ):
+                                auth.set_clearance(_ud["username"], _db, _lbl, by=_user)
                         if _new_pw:
                             auth.change_password(_ud["username"], _new_pw)
                         st.success("Updated.")
@@ -2144,9 +2183,16 @@ elif page == "Maintenance":
             with st.form("add_user_form"):
                 _nu = st.text_input("Username")
                 _np = st.text_input("Password", type="password")
-                _ndbs = st.multiselect("Allowed databases", options=db_context.list_dbs())
+                _ndbs = st.multiselect(
+                    "Allowed databases", options=db_context.list_dbs(), key="new_user_dbs"
+                )
                 _nmaint = st.multiselect(
                     "Maintained databases (may upload/delete)", options=db_context.list_dbs()
+                )
+                _nclr = st.selectbox(
+                    "Clearance in the allowed databases",
+                    classification.LEVEL_LABELS,
+                    key="new_user_clearance",
                 )
                 _nadm = st.checkbox("Admin")
                 _add = st.form_submit_button("Add user")
@@ -2154,10 +2200,21 @@ elif page == "Maintenance":
                 try:
                     _maint = [d for d in _nmaint if d in _ndbs]
                     auth.add_user(_nu.strip(), _np, _ndbs, is_admin=_nadm, maintains=_maint)
+                    if classification.level_index(_nclr):
+                        for _db in _ndbs:
+                            auth.set_clearance(_nu.strip(), _db, _nclr, by=_user)
                     st.success(f"Added user `{_nu.strip()}`.")
                     st.rerun()
                 except ValueError as e:
                     st.error(str(e))
+
+            st.markdown("---")
+            st.subheader("Security audit log")
+            _audit_rows = audit.recent()
+            if _audit_rows:
+                st.dataframe(_audit_rows, use_container_width=True, hide_index=True)
+            else:
+                st.caption("No security events recorded yet.")
 
 
 if _NEWSPAPER:

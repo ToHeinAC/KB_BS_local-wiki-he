@@ -665,6 +665,46 @@ def test_maintenance_admin_creates_database_and_user(wiki):
     assert "newbie" not in [u["username"] for u in auth.list_users()]
 
 
+def test_admin_sets_a_users_clearance_per_database(wiki):
+    import audit
+
+    auth.add_user("reader", "pw", [DB])
+    at = _maint(_app(), "Admin")
+    at.selectbox(key=f"uclr_reader_{DB}").set_value("Strictly confidential").run()
+    at.button(key="usave_reader").click().run()
+    assert auth.clearance("reader", DB) == "strict"
+    assert audit.recent()[0]["action"] == "clearance_set"
+
+
+def test_new_user_form_sets_clearance_for_the_chosen_databases(wiki):
+    at = _maint(_app(), "Admin")
+    next(t for t in at.text_input if t.label == "Username").set_value("newbie")
+    next(t for t in at.text_input if t.label == "Password").set_value("pw")
+    at.multiselect(key="new_user_dbs").set_value([DB])
+    at.selectbox(key="new_user_clearance").set_value("Confidential")
+    at.button[[b.label for b in at.button].index("Add user")].click().run()
+    assert auth.clearance("newbie", DB) == "confidential"
+
+
+def test_admin_sees_the_security_audit_log(wiki):
+    import audit
+
+    audit.record("access_denied", "bob", target="KI@strict")
+    at = _maint(_app(), "Admin")
+    assert any("access_denied" in str(df.value) for df in _ok(at).dataframe)
+
+
+def test_a_shrunk_clearance_purges_content_from_the_session(wiki):
+    at = _app(messages=[{"role": "assistant", "content": "secret"}], _grants={DB: 2}).run()
+    assert "messages" not in _ok(at).session_state
+    assert at.session_state["_grants"] == {DB: 0}
+
+
+def test_an_unchanged_clearance_keeps_the_session(wiki):
+    at = _app(messages=[{"role": "user", "content": "hi"}], _grants={DB: 0}).run()
+    assert _ok(at).session_state["messages"] == [{"role": "user", "content": "hi"}]
+
+
 # --- Maintenance → Ontology ------------------------------------------------------------
 
 
