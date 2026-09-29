@@ -140,8 +140,9 @@ The project uses the following technology choices:
 - Red-green rule: a test counts only if it was seen failing against missing or wrong code, and
   passing against correct code. A repo-wide guard test also needs a test that feeds its detector
   a violating input.
-- The gate is `.pre-commit-config.yaml`; its numbers live in `pyproject.toml`. `src/vendor/` and
-  `data/` are excluded from every check and fixer.
+- The gate is `.pre-commit-config.yaml`; its numbers live in `pyproject.toml`. `src/vendor/`,
+  `data/` and the vendored skills `.claude/skills/{frontend-design,ui-ux-pro-max}/` (verbatim
+  upstream, THIRD_PARTY_NOTICES.md) are excluded from every check and fixer.
 
 | Rule | Enforced by |
 |---|---|

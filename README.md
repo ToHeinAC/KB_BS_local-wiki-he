@@ -105,7 +105,8 @@ Skills and commands: `/commit-git` (small Conventional Commits through the gate,
 without asking) and `/documentation-update` (docs in line with the code) ship in `.claude/`. New
 products or large features are shaped with the `first-principles-mindmap` → `prd-from-mindmap`
 skills (MINDMAP.md → PRD.md). Claude Code built-ins such as `/code-review`, `/security-review` and
-`/simplify` need no setup.
+`/simplify` need no setup. For UI work, the vendored skills `frontend-design` (visual direction)
+and `ui-ux-pro-max` (searchable styles, palettes, fonts, UX rules) ship in `.claude/skills/`.
 
 ## Remote access
 
