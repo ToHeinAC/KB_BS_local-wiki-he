@@ -35,6 +35,7 @@ so they only reach normal shards unless `bind_context` carries the grants in.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shutil
@@ -62,6 +63,9 @@ _active: ContextVar[str] = ContextVar("active_db", default=DEFAULT_DB)
 _scope: ContextVar[tuple[str, ...]] = ContextVar("search_scope", default=())
 #: None = unsealed (level 0 of every DB); a mapping = exactly these DBs up to these levels.
 _clearance: ContextVar[Mapping[str, int] | None] = ContextVar("clearance", default=None)
+#: The signed-in user of a sealed session — only denials in such a session are audited.
+_principal: ContextVar[str | None] = ContextVar("principal", default=None)
+_denial_listener: Callable[[str, str], None] | None = None
 _LEVELS_DIR = "_levels"
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
@@ -70,6 +74,20 @@ _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\- ]{0,40}$")
 
 class AccessDenied(PermissionError):
     """A path or shard the caller may not reach. Readers report it as "not found"."""
+
+
+def set_denial_listener(listener: Callable[[str, str], None] | None) -> None:
+    """Register the callback `(user, target)` told about each denial in a user session."""
+    global _denial_listener
+    _denial_listener = listener
+
+
+def _deny(target: str) -> AccessDenied:
+    user = _principal.get()
+    if user and target and _denial_listener is not None:
+        with contextlib.suppress(Exception):  # auditing must never turn a denial into a crash
+            _denial_listener(user, target)
+    return AccessDenied(target)
 
 
 def _granted_level(db: str) -> int | None:
@@ -84,15 +102,17 @@ def require(shard: str) -> None:
     try:
         db, level = classification.parse_shard(shard)
     except ValueError:
-        raise AccessDenied(shard) from None
+        raise _deny(shard) from None
     granted = _granted_level(db)
     if granted is None or level > granted:
-        raise AccessDenied(shard)
+        raise _deny(shard)
 
 
-def seal_clearance(grants: Mapping[str, int]) -> None:
-    """Fix the session's grants (DB -> highest level). The app calls this every rerun."""
+def seal_clearance(grants: Mapping[str, int], user: str | None = None) -> None:
+    """Fix the session's grants (DB -> highest level) and its user. The app calls this
+    on every rerun, so a revoked grant takes effect at the next interaction."""
     _clearance.set(MappingProxyType(dict(grants)))
+    _principal.set(user)
 
 
 @contextmanager
@@ -114,12 +134,13 @@ def bind_context(fn: Callable[_P, _R]) -> Callable[_P, _R]:
     binding the DB and scope is checked against it. `copy_context().run` can't
     be used: one Context object can't be entered by several workers at once.
     """
-    grants = _clearance.get()
+    grants, user = _clearance.get(), _principal.get()
     db = get_active_db()
     scope = search_scope()
 
     def _wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         _clearance.set(grants)
+        _principal.set(user)
         set_active_db(db)
         set_search_scope(scope)
         return fn(*args, **kwargs)
@@ -201,7 +222,7 @@ def confine(base: Path, name: str) -> Path:
     root = base.resolve()
     path = (root / name).resolve()
     if not name or path == root or not path.is_relative_to(root):
-        raise AccessDenied(name)
+        raise _deny(name)
     return path
 
 
@@ -276,6 +297,10 @@ def index_dir() -> Path:
 
 def users_json_path() -> Path:
     return DATA_ROOT / "users.json"
+
+
+def audit_log_path() -> Path:
+    return DATA_ROOT / "security_audit.jsonl"
 
 
 def is_valid_db_name(name: str) -> bool:

@@ -12,7 +12,16 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 VENDOR = SRC / "vendor"
 GATE_MODULE = "db_context.py"
-UNGATED = {"DATA_ROOT", "shard_path", "_active", "_scope", "_clearance", "_granted_level"}
+UNGATED = {
+    "DATA_ROOT",
+    "shard_path",
+    "_active",
+    "_scope",
+    "_clearance",
+    "_principal",
+    "_granted_level",
+    "_deny",
+}
 ONLY_IN = {"seal_clearance": {"app.py"}, "clearance": set[str]()}
 
 

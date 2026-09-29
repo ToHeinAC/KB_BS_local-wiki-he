@@ -156,3 +156,63 @@ def test_change_password(users_root):
 def test_set_user_dbs_unknown_user(users_root):
     with pytest.raises(ValueError, match="Unknown user"):
         auth.set_user_dbs("ghost", ["DB1"])
+
+
+# --- classification clearance ---
+
+
+def test_clearance_defaults_to_normal(users_root):
+    auth.add_user("r", "pw", ["DB1"])
+    assert auth.clearance("r", "DB1") == "normal"
+    assert auth.clearance_map("r") == {"DB1": 0}
+
+
+def test_set_clearance_is_per_db_and_limited_to_allowed_dbs(users_root):
+    auth.add_user("r", "pw", ["DB1", "DB2"])
+    auth.set_clearance("r", "DB1", "strict", by="adm")
+    auth.set_clearance("r", "DB3", "confidential", by="adm")  # not allowed: ignored in the map
+    assert auth.clearance("r", "DB1") == "strict"
+    assert auth.clearance_map("r") == {"DB1": 2, "DB2": 0}
+    assert _read(users_root)["users"]["r"]["clearance"]["DB1"] == "strict"
+
+
+def test_admin_has_no_implicit_clearance(users_root):
+    auth.add_user("adm", "pw", ["DB1"], is_admin=True, maintains=["DB1"])
+    assert auth.clearance_map("adm") == {"DB1": 0}
+
+
+def test_a_corrupt_clearance_value_reads_as_normal(users_root):
+    auth.add_user("r", "pw", ["DB1"])
+    data = _read(users_root)
+    data["users"]["r"]["clearance"] = {"DB1": "top-secret"}
+    (users_root / "users.json").write_text(json.dumps(data))
+    assert auth.clearance_map("r") == {"DB1": 0}
+
+
+def test_set_clearance_rejects_unknown_users_and_levels(users_root):
+    auth.add_user("r", "pw", ["DB1"])
+    with pytest.raises(ValueError, match="Unknown user"):
+        auth.set_clearance("ghost", "DB1", "strict", by="adm")
+    with pytest.raises(ValueError, match="Unknown classification level"):
+        auth.set_clearance("r", "DB1", "secret", by="adm")
+
+
+def test_list_users_reports_clearance(users_root):
+    auth.add_user("r", "pw", ["DB1"], clearance={"DB1": "confidential"})
+    [row] = auth.list_users()
+    assert row["clearance"] == {"DB1": "confidential"}
+
+
+def test_clearance_changes_are_audited(users_root):
+    import audit
+
+    auth.add_user("r", "pw", ["DB1"])
+    auth.set_clearance("r", "DB1", "strict", by="adm")
+    [row] = audit.recent()
+    assert (row["action"], row["user"], row["target"], row["level"]) == (
+        "clearance_set",
+        "adm",
+        "r",
+        "strict",
+    )
+    assert row["db"] == "DB1"

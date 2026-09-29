@@ -4,13 +4,17 @@ Schema (`data/users.json`):
     {
       "users": {
         "<username>": {"pw_hash": "...", "dbs": ["..."], "is_admin": bool,
-                        "maintains": ["..."]}
+                        "maintains": ["..."], "clearance": {"<db>": "<level>"}}
       }
     }
 
 `dbs` is the read-access allowlist; `maintains` is the subset of those DBs the
 user may *change* (upload new sources / delete data). Maintainer rights are
 explicit per DB — being an admin does not imply maintaining any DB.
+
+`clearance` is the highest classification level (`classification.LEVELS`) the
+user may read in each DB; a missing or invalid entry means `normal`. Like
+maintainer rights it is explicit — being an admin grants no clearance.
 
 On first import the file is seeded with the default admin
 (`T. Hein` / `k-wiki`, allow-listed for the `Strahlenschutz` DB).
@@ -20,10 +24,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import bcrypt
 
+import audit
+import classification
 import db_context
 
 DEFAULT_USER = "T. Hein"
@@ -98,6 +104,7 @@ def list_users() -> list[dict[str, Any]]:
             "dbs": list(meta.get("dbs", [])),
             "is_admin": bool(meta.get("is_admin", False)),
             "maintains": list(meta.get("maintains", [])),
+            "clearance": dict(meta.get("clearance", {})),
         }
         for u, meta in sorted(data.get("users", {}).items())
     ]
@@ -139,6 +146,7 @@ def add_user(
     dbs: list[str],
     is_admin: bool = False,
     maintains: list[str] | None = None,
+    clearance: dict[str, str] | None = None,
 ) -> None:
     if not username or not password:
         raise ValueError("username and password required")
@@ -150,6 +158,7 @@ def add_user(
         "dbs": list(dbs),
         "is_admin": bool(is_admin),
         "maintains": list(maintains or []),
+        "clearance": {db: lvl for db, lvl in (clearance or {}).items() if _level_or_none(lvl)},
     }
     _save(data)
 
@@ -200,3 +209,35 @@ def change_password(username: str, new_password: str) -> None:
         raise ValueError(f"Unknown user: {username!r}")
     data["users"][username]["pw_hash"] = _hash(new_password)
     _save(data)
+
+
+def _level_or_none(level: object) -> int | None:
+    try:
+        return classification.level_index(str(level))
+    except ValueError:
+        return None
+
+
+def clearance(username: str, db: str) -> str:
+    """The highest level `username` may read in `db` (`normal` when unset or invalid)."""
+    return classification.LEVELS[clearance_map(username).get(db, 0)]
+
+
+def clearance_map(username: str) -> dict[str, int]:
+    """DB -> highest readable level, for exactly the user's allowed DBs (for the gate)."""
+    meta = _load().get("users", {}).get(username, {})
+    raw = meta.get("clearance", {})
+    grants: dict[str, Any] = cast(dict[str, Any], raw) if isinstance(raw, dict) else {}
+    return {db: _level_or_none(grants.get(db)) or 0 for db in meta.get("dbs", [])}
+
+
+def set_clearance(username: str, db: str, level: str, *, by: str) -> None:
+    """Set `username`'s clearance in `db`; `by` is the admin, recorded in the audit log."""
+    key = classification.LEVELS[classification.level_index(level)]
+    data = _load()
+    user = data.get("users", {}).get(username)
+    if user is None:
+        raise ValueError(f"Unknown user: {username!r}")
+    user.setdefault("clearance", {})[db] = key
+    _save(data)
+    audit.record("clearance_set", by, target=username, db=db, level=key)

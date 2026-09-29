@@ -41,7 +41,9 @@ def _fast_bcrypt(monkeypatch: pytest.MonkeyPatch) -> None:
 def _unsealed_clearance():
     """Every test starts unsealed (level 0 of every DB), so a grant never leaks into the next."""
     token = db_context._clearance.set(None)
+    principal = db_context._principal.set(None)
     yield
+    db_context._principal.reset(principal)
     db_context._clearance.reset(token)
 
 
