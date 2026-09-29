@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import agent as research_agent
-import audit
+import audit as security_audit
 import auth
 import chat_agent
 import classification
@@ -964,6 +964,110 @@ def _level_picker(key: str) -> str:
     return shard
 
 
+def _level_key_label(key: str) -> str:
+    return classification.level_label(classification.level_index(key))
+
+
+def _visible_duplicate(data: bytes) -> bool:
+    """Already ingested at a level the user can see. Higher levels stay invisible:
+    a copy there is not reported (that would reveal it); the audit log's hashes show it."""
+    for shard in db_context.reachable_shards(st.session_state["active_db"]):
+        with db_context.using_db(shard):
+            if dedup.is_duplicate(data):
+                return True
+    return False
+
+
+def _shard_ref(name: str) -> str:
+    """`name` qualified with the bound shard unless it is the normal level."""
+    return name if db_context.level() == 0 else f"{db_context.get_active_db()}::{name}"
+
+
+def _ingest_file(
+    f: dict[str, Any], pending: dict[str, Any], agg: dict[str, list[str]], user: str, last: bool
+) -> None:
+    """Register, record ontology facts and ingest one file into the bound shard."""
+    dates: dict[str, str] = pending["dates"]
+    shared: dict[str, str] = pending["shared"]
+    saved = dedup.register_file(f["raw"], f["save_name"], content=f["content_bytes"])
+    shard = db_context.get_active_db()
+    security_audit.record(
+        "classified", user, target=saved.name, shard=shard, sha256=dedup.sha256(f["raw"])
+    )
+    if pending.get("ontology") is not None:
+        review = {
+            **pending["ontology"].get(f["save_name"], {}),
+            "version_date": dates.get(f["save_name"], ""),
+        }
+        agg["ontology"] += wiki_engine.record_source_ontology(
+            f["text"], saved.name, review, f.get("ontology") or {}, user=user
+        )
+    chunks = file_processor.chunk_text(f["text"])
+    per_meta = {
+        k: v
+        for k, v in {
+            "effective as of": dates.get(f["save_name"], ""),
+            "part of": shared["part of"],
+            "description": shared["description"],
+        }.items()
+        if v
+    }
+    ctx = wiki_engine.ingest_begin(f["text"], saved.name, per_meta or None)
+    for j, chunk in enumerate(chunks):
+        wiki_engine.ingest_piece(ctx, chunk, j, len(chunks))
+    res = wiki_engine.ingest_end(ctx, finalize=last)
+    agg["created"] += [_shard_ref(p) for p in res["created"]]
+    agg["updated"] += [_shard_ref(p) for p in res["updated"]]
+    agg["contradictions"] += res["contradictions"]
+
+
+def _ingest_level(
+    shard: str,
+    group: list[dict[str, Any]],
+    pending: dict[str, Any],
+    agg: dict[str, list[str]],
+    user: str,
+    tick: Callable[[], None],
+) -> None:
+    """Ingest one classification level's files, oldest first, into its own shard."""
+    db_context.ensure_shard(shard)
+    with db_context.using_db(shard):
+        wiki_engine.init_wiki()
+        written = len(agg["created"]) + len(agg["updated"])
+        finalized = False
+        for i, f in enumerate(group):
+            last = i == len(group) - 1
+            with st.spinner(f"Ingesting {f['save_name']} ({_level_name(shard)})…"):
+                try:
+                    _ingest_file(f, pending, agg, user, last)
+                    finalized = finalized or last
+                except Exception as e:
+                    agg["failed"].append(f"{f['save_name']}: {e}")
+            tick()
+        if not finalized and len(agg["created"]) + len(agg["updated"]) > written:
+            wiki_engine.rebuild_lex_index()  # last file failed before finalize
+        if pending.get("ontology") is not None:
+            wiki_engine.finish_ontology_batch(user)
+
+
+def _resolve_by_shard(desc: str, refs: list[str], guidance: str) -> dict[str, list[str]]:
+    """Reconcile contradiction pages inside the shard each one lives in."""
+    active = st.session_state["active_db"]
+    reachable = db_context.reachable_shards(active)
+    by_shard: dict[str, list[str]] = {} if refs else {active: []}
+    for ref in refs:
+        head, sep, tail = ref.partition("::")
+        shard, name = (head, tail) if sep and head in reachable else (active, ref)
+        by_shard.setdefault(shard, []).append(name)
+    out: dict[str, list[str]] = {"updated": [], "skipped": []}
+    for shard, names in by_shard.items():
+        with db_context.using_db(shard):
+            res = wiki_engine.resolve_contradiction(desc, names, guidance)
+        out["updated"] += [f"{shard}::{n}" if shard != active else n for n in res["updated"]]
+        out["skipped"] += res["skipped"]
+    return out
+
+
 def _safe_reset() -> None:
     import requests as _req
 
@@ -1208,7 +1312,7 @@ if page == "Upload":
         _onto_schema = ontology_ui.upload_schema()  # None: no ontology columns, no detection
         prepared: list[dict[str, Any]] | None = st.session_state.get("batch_prepared")
         if prepared is None:
-            dupes = [n for n, b in raws.items() if dedup.is_duplicate(b)]
+            dupes = [n for n, b in raws.items() if _visible_duplicate(b)]
             todo = [n for n in raws if n not in dupes]
             if dupes:
                 st.warning("Skipped (already ingested): " + ", ".join(f"**{n}**" for n in dupes))
@@ -1294,15 +1398,37 @@ if page == "Upload":
             shared_part = st.text_input("part of", key="batch_part_of")
             shared_desc = st.text_input("description", key="batch_description")
 
+        # Classification is mandatory and never preselected: a forgotten click must
+        # not file a confidential document as normal. Levels stop at the
+        # uploader's own clearance (docs/security.md).
+        _max_level = _grants.get(st.session_state["active_db"], 0)
+        st.markdown("**Classification** — required for every file.")
+        _levels: dict[str, str | None] = {
+            f["save_name"]: st.segmented_control(
+                f["save_name"],
+                classification.LEVELS[: _max_level + 1],
+                format_func=_level_key_label,
+                key=f"upload_level_{f['save_name']}",
+            )
+            for f in prepared
+        }
+
         # The destination lives in the button label rather than a confirm dialog:
         # a modal could not be closed reliably before the (slow) ingest ran, so it
         # sat on screen for the whole run. Naming the DB on the button keeps the
         # wrong-database guard without a second click.
         _target_db = st.session_state["active_db"]
         st.caption(
-            f"Will be written to database **{_target_db}** — make sure this is the right one."
+            f"Will be written to database **{_target_db}**, each file at its chosen level — "
+            "make sure this is the right one."
         )
-        if st.button(f"Ingest {len(prepared)} file(s) into “{_target_db}”", type="primary"):
+        _plan = classification.plan_upload(_levels, _max_level)
+        _clicked = st.button(f"Ingest {len(prepared)} file(s) into “{_target_db}”", type="primary")
+        if _clicked and _plan.missing:
+            st.error("Choose a classification for: " + ", ".join(_plan.missing))
+        if _clicked and _plan.denied:
+            st.error("Above your clearance: " + ", ".join(_plan.denied))
+        if _clicked and _plan.ok:
             files = prepared
             if single_md_edit:
                 files[0]["text"] = st.session_state.get("convert_editor", files[0]["text"])
@@ -1311,6 +1437,7 @@ if page == "Upload":
                 "files": files,
                 "dates": {r["File"]: str(r.get("effective as of") or "").strip() for r in edited},
                 "shared": {"part of": shared_part.strip(), "description": shared_desc.strip()},
+                "levels": {n: lvl for lvl, names in _plan.by_level.items() for n in names},
                 "ontology": None
                 if _onto_schema is None
                 else {
@@ -1330,7 +1457,6 @@ if page == "Upload":
                 st.session_state.pop("last_contradiction_pages", None)
                 files: list[dict[str, Any]] = pending["files"]
                 dates: dict[str, str] = pending["dates"]
-                shared: dict[str, str] = pending["shared"]
                 files.sort(key=lambda f: dates.get(f["save_name"]) or "")
                 agg: dict[str, list[str]] = {
                     "created": [],
@@ -1339,52 +1465,19 @@ if page == "Upload":
                     "failed": [],
                     "ontology": [],
                 }
-                finalized = False
                 prog = st.progress(0.0, text="Ingesting…")
-                for i, f in enumerate(files):
-                    is_last = i == len(files) - 1
-                    with st.spinner(f"Ingesting {f['save_name']} ({i + 1}/{len(files)})…"):
-                        try:
-                            saved = dedup.register_file(
-                                f["raw"], f["save_name"], content=f["content_bytes"]
-                            )
-                            if pending.get("ontology") is not None:
-                                review = {
-                                    **pending["ontology"].get(f["save_name"], {}),
-                                    "version_date": dates.get(f["save_name"], ""),
-                                }
-                                agg["ontology"] += wiki_engine.record_source_ontology(
-                                    f["text"],
-                                    saved.name,
-                                    review,
-                                    f.get("ontology") or {},
-                                    user=_user,
-                                )
-                            chunks = file_processor.chunk_text(f["text"])
-                            per_meta = {
-                                k: v
-                                for k, v in {
-                                    "effective as of": dates.get(f["save_name"], ""),
-                                    "part of": shared["part of"],
-                                    "description": shared["description"],
-                                }.items()
-                                if v
-                            }
-                            ctx = wiki_engine.ingest_begin(f["text"], saved.name, per_meta or None)
-                            for j, chunk in enumerate(chunks):
-                                wiki_engine.ingest_piece(ctx, chunk, j, len(chunks))
-                            res = wiki_engine.ingest_end(ctx, finalize=is_last)
-                            finalized = finalized or is_last
-                            agg["created"] += res["created"]
-                            agg["updated"] += res["updated"]
-                            agg["contradictions"] += res["contradictions"]
-                        except Exception as e:
-                            agg["failed"].append(f"{f['save_name']}: {e}")
-                    prog.progress((i + 1) / len(files))
-                if not finalized and (agg["created"] or agg["updated"]):
-                    wiki_engine.rebuild_lex_index()  # last file failed before finalize
-                if pending.get("ontology") is not None:
-                    wiki_engine.finish_ontology_batch(_user)
+                _ticks = [0]
+
+                def _tick(_n: int = len(files)) -> None:
+                    _ticks[0] += 1
+                    prog.progress(_ticks[0] / _n)
+
+                # One pass per level, each into its own shard: pages of different
+                # levels are never merged.
+                for _lvl in sorted(set(pending["levels"].values())):
+                    _group = [f for f in files if pending["levels"][f["save_name"]] == _lvl]
+                    _shard = classification.shard_id(st.session_state["active_db"], _lvl)
+                    _ingest_level(_shard, _group, pending, agg, _user, _tick)
                 st.session_state.pop("batch_prepared", None)
                 st.session_state.pop("batch_key", None)
                 st.success("Ingest complete.")
@@ -1439,7 +1532,7 @@ if page == "Upload":
                 if st.button("Reconcile", key=f"resolve_btn_{i}", type="primary"):
                     with st.spinner("Reconciling pages…"):
                         try:
-                            res = wiki_engine.resolve_contradiction(desc, pages, guidance)
+                            res = _resolve_by_shard(desc, pages, guidance)
                             if res["updated"]:
                                 st.success(
                                     "Updated: " + ", ".join(f"`{f}`" for f in res["updated"])
@@ -2249,7 +2342,7 @@ elif page == "Maintenance":
 
             st.markdown("---")
             st.subheader("Security audit log")
-            _audit_rows = audit.recent()
+            _audit_rows = security_audit.recent()
             if _audit_rows:
                 st.dataframe(_audit_rows, use_container_width=True, hide_index=True)
             else:

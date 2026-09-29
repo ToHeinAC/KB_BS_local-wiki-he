@@ -95,6 +95,14 @@ def _click_label(at: AppTest, prefix: str) -> AppTest:
     return button.click().run()
 
 
+def _classify(at: AppTest, level: str = "normal") -> AppTest:
+    """Pick `level` for every file in the upload review."""
+    for control in at.segmented_control:
+        if str(control.key).startswith("upload_level_"):
+            control.set_value(level)
+    return at.run()
+
+
 def _ok(at: AppTest) -> AppTest:
     assert not at.exception, at.exception
     return at
@@ -204,12 +212,80 @@ def test_upload_markdown_runs_three_phases(wiki, ingest_stub):
     at.file_uploader[0].set_value(("notes.md", b"# Notes\n\nStand: 01.02.2024", "text/markdown"))
     at.run()
     assert "1 file(s) ready to ingest." in _texts(_ok(at).info)
+    _classify(at)
     _click_label(at, "Ingest 1 file(s)")
     _ok(at)
     assert ("begin", "notes.md", {"effective as of": "2024-02-01"}) in ingest_stub
     assert ("end", "notes.md", True) in ingest_stub
     assert "Ingest complete." in _texts(at.success)
     assert at.session_state["last_contradictions"] == ["X vs Y"]
+
+
+def test_upload_is_blocked_until_every_file_is_classified(wiki, ingest_stub):
+    at = _app().run()
+    at.file_uploader[0].set_value(("notes.md", b"# Notes", "text/markdown")).run()
+    _click_label(at, "Ingest 1 file(s)")
+    assert "Choose a classification for: notes.md" in _texts(_ok(at).error)
+    assert ingest_stub == []
+
+
+def test_upload_offers_levels_up_to_the_uploaders_clearance(wiki):
+    at = _app().run()
+    at.file_uploader[0].set_value(("notes.md", b"# Notes", "text/markdown")).run()
+    assert _ok(at).segmented_control(key="upload_level_notes.md").options == ["Normal"]
+    auth.set_clearance(ADMIN, DB, "strict", by=ADMIN)
+    at.run()
+    assert at.segmented_control(key="upload_level_notes.md").options == [
+        "Normal",
+        "Confidential",
+        "Strictly confidential",
+    ]
+
+
+def test_upload_ingests_each_file_into_its_level(wiki, ingest_stub, monkeypatch):
+    import audit
+    import dedup
+
+    shards: dict[str, str] = {}
+    begin = wiki_engine.ingest_begin
+    monkeypatch.setattr(
+        wiki_engine,
+        "ingest_begin",
+        lambda text, name, meta: (
+            shards.setdefault(name, db_context.get_active_db()) and begin(text, name, meta)
+        ),
+    )
+    auth.set_clearance(ADMIN, DB, "strict", by=ADMIN)
+    at = _app().run()
+    at.file_uploader[0].set_value(
+        [("open.md", b"# Open", "text/markdown"), ("closed.md", b"# Closed", "text/markdown")]
+    ).run()
+    at.segmented_control(key="upload_level_open.md").set_value("normal")
+    at.segmented_control(key="upload_level_closed.md").set_value("strict").run()
+    _click_label(at, "Ingest 2 file(s)")
+    assert shards == {"open.md": DB, "closed.md": f"{DB}@strict"}
+    assert dedup.list_sources() == ["open.md"]
+    with db_context.clearance({DB: 2}), db_context.using_db(f"{DB}@strict"):
+        assert dedup.list_sources() == ["closed.md"]
+    logged = {r["target"]: r for r in audit.recent() if r["action"] == "classified"}
+    assert logged["closed.md"]["shard"] == f"{DB}@strict"
+    assert logged["closed.md"]["sha256"] == dedup.sha256(b"# Closed")
+
+
+def test_duplicate_check_spans_only_the_levels_the_uploader_sees(wiki):
+    import dedup
+
+    with db_context.clearance({DB: 2}):
+        db_context.ensure_shard(f"{DB}@strict")
+        with db_context.using_db(f"{DB}@strict"):
+            dedup.register_file(b"# Twin", "twin.md")
+    at = _app().run()
+    at.file_uploader[0].set_value(("twin.md", b"# Twin", "text/markdown")).run()
+    assert "1 file(s) ready to ingest." in _texts(_ok(at).info)  # strict copy invisible
+    auth.set_clearance(ADMIN, DB, "strict", by=ADMIN)
+    at = _app().run()
+    at.file_uploader[0].set_value(("twin.md", b"# Twin", "text/markdown")).run()
+    assert "Skipped (already ingested): **twin.md**" in _texts(_ok(at).warning)
 
 
 def test_upload_skips_duplicates(wiki):
@@ -243,6 +319,7 @@ def test_upload_converts_and_offers_markdown_editor(wiki, monkeypatch, ingest_st
     at.run()
     assert at.text_area(key="convert_editor").value == "# Conv"
     at.text_area(key="convert_editor").set_value("# Edited").run()
+    _classify(at)
     _click_label(at, "Ingest 1 file(s)")
     assert ingest_stub[0] == ("begin", "scan.md", None)
     assert (db_context.raw_dir() / "scan.md").read_text() == "# Edited"
@@ -270,6 +347,7 @@ def test_upload_reports_ingest_failures(wiki, monkeypatch):
     at = _app().run()
     at.file_uploader[0].set_value(("notes.md", b"# Notes", "text/markdown"))
     at.run()
+    _classify(at)
     _click_label(at, "Ingest 1 file(s)")
     assert "notes.md: model gone" in _texts(_ok(at).error)
 
@@ -877,6 +955,7 @@ def test_upload_into_an_ontology_db_records_detected_facts(wiki, ingest_stub):
     at = _app().run()
     at.file_uploader[0].set_value(("strlschv.md", head, "text/markdown")).run()
     assert "Class and work are detected" in _texts(_ok(at).caption)
+    _classify(at)
     _click_label(at, "Ingest 1 file(s)")
     facts = ontology_store.source_facts("strlschv.md")
     assert (facts["class"], facts["work"]) == ("ordinance", "de-strlschv-2018")
