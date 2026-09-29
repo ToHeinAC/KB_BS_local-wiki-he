@@ -6,7 +6,7 @@
 # Cues are matched on the first 4000 characters; the match that ends first wins
 # (src/ontology_detect.py). Measured with scripts/bench_ontology_detect.py.
 id: legal-de
-version: 0.1.1
+version: 0.1.2
 requires: ["core@^1"]
 description: German and EU legal instruments, technical rules and decisions.
 
@@ -76,8 +76,8 @@ classes:
     broader: guidance
     rank: 6
     labels: {en: Expert recommendation, de: Fachempfehlung}
-    definition: Recommendation of an expert commission (e.g. SSK)
-    cues: ['\bSSK\b', 'Empfehlung der Strahlenschutzkommission']
+    definition: Recommendation of an expert commission (e.g. SSK, ESK, RSK)
+    cues: ['\b(SSK|ESK|RSK)\b', 'Empfehlung der (Strahlenschutz|Entsorgungs|Reaktor-Sicherheits)kommission']
   permit:
     broader: decision
     rank: 7

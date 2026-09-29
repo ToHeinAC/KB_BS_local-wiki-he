@@ -124,6 +124,20 @@ def test_pdf_exports_are_read_past_the_banner_and_markdown(
     assert found.evidence in text
 
 
+@pytest.mark.parametrize(
+    "text",
+    [
+        "# Empfehlung der Entsorgungskommission vom 16.03.2015\n\nLeitlinien zur Stilllegung\n",
+        "RSK-Stellungnahme zur Robustheit deutscher Kernkraftwerke\n",
+        "Empfehlung der Strahlenschutzkommission\n\nRadon in Wohnungen\n",
+    ],
+)
+def test_expert_commissions_ssk_esk_rsk_are_recommendations(
+    schema: ontology.Schema, text: str
+) -> None:
+    assert od.detect(text, schema).class_id == "expert-recommendation"
+
+
 def test_a_banner_line_later_in_the_text_is_kept() -> None:
     body = "Titel\n\nzitiert nach www.gesetze-im-internet.de\n"
     assert od.clean_head(BANNER + body) == body
