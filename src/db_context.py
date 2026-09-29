@@ -110,6 +110,23 @@ def split_ref(ref: str) -> tuple[str, str]:
     return get_active_db(), ref
 
 
+class AccessDenied(PermissionError):
+    """A path or shard the caller may not reach. Readers report it as "not found"."""
+
+
+def confine(base: Path, name: str) -> Path:
+    """Resolve `name` inside `base`, refusing anything that lands outside it.
+
+    Page and raw names reach the readers from LLM output, so `../` segments and
+    absolute paths are hostile input, not typos.
+    """
+    root = base.resolve()
+    path = (root / name).resolve()
+    if not name or path == root or not path.is_relative_to(root):
+        raise AccessDenied(name)
+    return path
+
+
 def data_root() -> Path:
     return DATA_ROOT / get_active_db()
 

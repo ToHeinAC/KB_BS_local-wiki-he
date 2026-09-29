@@ -65,6 +65,22 @@ def _raw() -> Path:
     return db_context.raw_dir()
 
 
+def _page_path(filename: str) -> Path | None:
+    """`wiki/<filename>`, or None when the name escapes the wiki (reads as missing)."""
+    try:
+        return db_context.confine(_wiki(), filename)
+    except db_context.AccessDenied:
+        return None
+
+
+def _raw_path(filename: str) -> Path | None:
+    """`raw/<filename>`, or None when the name escapes the raw store."""
+    try:
+        return db_context.confine(_raw(), filename)
+    except db_context.AccessDenied:
+        return None
+
+
 def _index_path() -> Path:
     return _wiki() / "index.md"
 
@@ -1920,7 +1936,8 @@ def _candidate_pages_for_query(question: str) -> list[str]:
 
     def _add(fname: str) -> None:
         f = (fname or "").strip()
-        if f and f not in seen and f not in _SYSTEM_PAGES and (_wiki() / f).exists():
+        path = _page_path(f) if f and f not in seen and f not in _SYSTEM_PAGES else None
+        if path is not None and path.exists():
             seen.add(f)
             cands.append(f)
 
@@ -1972,7 +1989,7 @@ def _select_pages(question: str, system: str, index_text: str) -> list[str]:
     if candidates:
         cand_set = set(candidates)
         selected = [s for s in selected if s in cand_set] or candidates[:5]
-    return [s for s in selected if (_wiki() / s).exists()][:5]
+    return [s for s in selected if (p := _page_path(s)) is not None and p.exists()][:5]
 
 
 def _wiki_hits_by_page(
@@ -2022,8 +2039,8 @@ def _page_context(
     used_sources: list[str] = []
     raw_sources_set: set[str] = set()
     for fname in selected:
-        path = _wiki() / fname
-        if not path.exists():
+        path = _page_path(fname)
+        if path is None or not path.exists():
             continue
         label = db_context.qualify(fname)
         used_sources.append(label)
@@ -2235,16 +2252,16 @@ def list_pages(include_insights: bool = False) -> list[dict[str, Any]]:
 
 
 def read_page(filename: str) -> str:
-    path = _wiki() / filename
-    if not path.exists():
+    path = _page_path(filename)
+    if path is None or not path.exists():
         return f"Page not found: {filename}"
     return path.read_text()
 
 
 def read_page_parsed(filename: str) -> dict[str, Any]:
     """Return body content and frontmatter sources/related without the YAML header."""
-    path = _wiki() / filename
-    if not path.exists():
+    path = _page_path(filename)
+    if path is None or not path.exists():
         return {"content": f"Page not found: {filename}", "sources": [], "related": []}
     post = frontmatter.load(str(path))
     return {
@@ -2255,8 +2272,8 @@ def read_page_parsed(filename: str) -> dict[str, Any]:
 
 
 def read_raw_source(filename: str) -> bytes | None:
-    path = _raw() / filename
-    return path.read_bytes() if path.exists() else None
+    path = _raw_path(filename)
+    return path.read_bytes() if path is not None and path.exists() else None
 
 
 # --- DESCRIPTION.md: half-page high-level overview of the whole database ----
