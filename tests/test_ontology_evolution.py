@@ -171,6 +171,36 @@ def test_reclassify_updates_rule_facts_and_keeps_user_decisions(schema: ontology
     assert "class" not in facts.get("src:n.md", {})
 
 
+def test_nothing_to_change_says_when_no_bound_module_has_cues(
+    shared: dict[str, Any],
+) -> None:
+    core_only, errors = ontology.build_schema([shared["core"]])
+    assert core_only is not None, errors
+    heads = {"a.md": "Bericht", "b.md": "Verordnung"}
+    note = ev.reclassify_note(heads, core_only, [])
+    assert "0 of 2 documents classified" in note
+    assert "no cues" in note
+
+
+def test_nothing_to_change_counts_documents_without_a_class(schema: ontology.Schema) -> None:
+    heads = {"a.md": "Notizen", "b.md": "Notizen"}
+    rows = _rows(ontology.assertion("src:a.md", "class", "report", by="user"))
+    note = ev.reclassify_note(heads, schema, rows)
+    assert "1 of 2 documents classified" in note
+    assert "already matches" not in note
+
+
+def test_nothing_to_change_with_every_document_classified(schema: ontology.Schema) -> None:
+    rows = _rows(ontology.assertion("src:a.md", "class", "report", by="user"))
+    assert "already matches" in ev.reclassify_note({"a.md": "Notizen"}, schema, rows)
+
+
+def test_modules_with_cues_skips_modules_that_only_define_genres(
+    shared: dict[str, Any],
+) -> None:
+    assert ev.modules_with_cues(shared) == ["ai-tech", "legal-de"]
+
+
 # --- schema proposals from the model ------------------------------------------------------
 
 HEAD = "Prüfbericht KTA-Wiederholungsprüfung\n\nDieser Prüfbericht dokumentiert die Prüfung."

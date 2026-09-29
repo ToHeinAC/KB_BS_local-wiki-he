@@ -673,9 +673,23 @@ def test_ontology_section_without_ontology_offers_create(wiki):
 
     at = _maint(_app(), "Ontology")
     assert "No ontology for this database." in _texts(at.info)
+    assert "no detection cues" in _texts(at.warning)  # the default is core alone
+    at.multiselect(key="onto_modules").set_value(["core", "legal-de"]).run()
+    assert "no detection cues" not in _texts(at.warning)
     at.button(key="onto_create").click().run()
     assert ontology_store.exists()
     assert "Revision 1" in _texts(_ok(at).markdown)
+
+
+def test_reclassify_without_cues_does_not_claim_everything_matches(wiki):
+    import dedup
+
+    dedup.register_file(b"Bericht 2024", "bericht.md")
+    at = _maint(_app(), "Ontology")
+    at.button(key="onto_create").click().run()  # core only: no cues
+    at.segmented_control(key="onto_view").set_value("Cues").run()
+    assert "0 of 1 documents classified" in _texts(_ok(at).warning)
+    assert "already matches" not in _texts(at.success)
 
 
 def _uploaded(at: AppTest, text: str, name: str = "edited.yaml") -> AppTest:

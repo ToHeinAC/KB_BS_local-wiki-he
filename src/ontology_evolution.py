@@ -171,6 +171,34 @@ def reclassify_changes(
     return changes
 
 
+def reclassify_note(
+    heads: dict[str, str], schema: ontology.Schema, rows: list[dict[str, Any]]
+) -> str:
+    """What to say when re-classify would change nothing: "already matches" only when every
+    document has a class; otherwise how many lack one, and why detection cannot help."""
+    won = ontology.winners(rows, set())
+    typed = sum(1 for s in heads if (won.get((f"src:{s}", "class")) or {}).get("object"))
+    if typed == len(heads):
+        return "Every document already matches the current cues."
+    count = f"{typed} of {len(heads)} documents classified"
+    if not any(c.cues for c in schema.classes.values() if not c.deprecated):
+        return (
+            f"{count}: the bound modules have no cues, so detection finds nothing. Bind a "
+            "module with cues (e.g. legal-de) via Export → edit `schema.modules` → Import."
+        )
+    return f"{count}; no cue matches the others. Classify them under Edit, or test a cue above."
+
+
+def modules_with_cues(shared: dict[str, Any]) -> list[str]:
+    """Ids of the shared modules that can classify documents (at least one class with cues)."""
+
+    def has_cues(module: dict[str, Any]) -> bool:
+        classes = cast(dict[str, dict[str, Any]], module.get("classes") or {})
+        return any(c.get("cues") and not c.get("deprecated") for c in classes.values())
+
+    return sorted(mid for mid, module in shared.items() if has_cues(module))
+
+
 def reclassify_rows(
     changes: list[dict[str, Any]], rows: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:

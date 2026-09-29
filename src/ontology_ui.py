@@ -134,6 +134,12 @@ def _render_missing(user: str, can_maintain: bool) -> None:
     modules = st.multiselect(
         "Modules", options, default=[m for m in ("core",) if m in options], key="onto_modules"
     )
+    with_cues = ontology_evolution.modules_with_cues(ontology_store.shared_modules())
+    if modules and not set(modules) & set(with_cues):
+        st.warning(
+            "The selected modules have no detection cues: documents will not be classified "
+            f"automatically. Modules with cues: {', '.join(with_cues) or 'none'}."
+        )
     if st.button("Create ontology", key="onto_create", type="primary", disabled=not modules):
         _apply(ontology_store.prepare_state({"schema": {"modules": modules}}), user, "create")
     st.markdown("**Or import a file**")
@@ -564,6 +570,16 @@ def _render_cue_tester(heads: dict[str, str]) -> None:
         st.dataframe(rows, hide_index=True, width="stretch")
 
 
+def _render_nothing_to_reclassify() -> None:
+    schema, _ = ontology_store.load()
+    if schema is None:
+        return
+    note = ontology_evolution.reclassify_note(
+        ontology_store.source_heads(), schema, ontology_store.read_rows()
+    )
+    (st.success if note.startswith("Every") else st.warning)(note)
+
+
 def _render_cues(user: str, can_maintain: bool) -> None:
     _render_cue_tester(ontology_store.source_heads())
     st.markdown("**Re-classify**")
@@ -573,7 +589,7 @@ def _render_cues(user: str, can_maintain: bool) -> None:
     )
     changes, _ = wiki_engine.reclassify(user, apply=False)
     if not changes:
-        st.success("Every document already matches the current cues.")
+        _render_nothing_to_reclassify()
         return
     st.dataframe(
         [
