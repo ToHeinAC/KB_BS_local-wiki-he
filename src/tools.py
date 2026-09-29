@@ -14,7 +14,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, date, datetime
 from functools import partial
-from typing import Any, ParamSpec, TypeVar, cast
+from typing import Any, cast
 
 import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 from dotenv import load_dotenv
@@ -66,32 +66,6 @@ WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended 
 # Floor on per-DB hits when a multi-DB search splits its budget — below this a
 # wide scope starves every DB into uselessness.
 MIN_HITS_PER_DB = 3
-
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
-
-
-def _with_active_db(fn: Callable[_P, _R]) -> Callable[_P, _R]:
-    """Wrap `fn` so a ThreadPoolExecutor worker re-applies the caller's DB context.
-
-    Worker threads don't inherit the main thread's ContextVar context, so the
-    active database (`db_context._active`) and the multi-DB search scope
-    (`db_context._scope`) would silently reset to their defaults inside the pool
-    — narrowing a cross-DB search back to one DB. We capture both here (in the
-    calling thread) and re-set them at the start of each worker call.
-    `copy_context().run` can't be used for this: one Context object can't be
-    entered by multiple workers concurrently.
-    """
-    db = db_context.get_active_db()
-    scope = db_context.search_scope()
-
-    def _wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-        db_context.set_active_db(db)
-        db_context.set_search_scope(scope)
-        return fn(*args, **kwargs)
-
-    return _wrapped
-
 
 _URL_RE = re.compile(r"https?://[^\s\)\]]+")
 # Permissive body so a DB-qualified page ("Investing::foo.md") still parses —
@@ -252,7 +226,9 @@ def _wiki_search_impl(
     if len(qs) == 1:
         return _wiki_search_one(qs[0], max_results)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(_with_active_db(partial(_wiki_search_one, max_results=max_results)), qs))
+        outs = list(
+            ex.map(db_context.bind_context(partial(_wiki_search_one, max_results=max_results)), qs)
+        )
     return "\n\n".join(outs)
 
 
@@ -272,7 +248,7 @@ def _wiki_read_impl(filenames: str | list[str] | None) -> str:
     if len(filenames) == 1:
         return _wiki_read_one(filenames[0])
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(_with_active_db(_wiki_read_one), filenames))
+        outs = list(ex.map(db_context.bind_context(_wiki_read_one), filenames))
     return "\n\n".join(outs)
 
 
@@ -330,7 +306,9 @@ def _raw_search_impl(
     if len(qs) == 1:
         return _raw_search_one(qs[0], max_results)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(_with_active_db(partial(_raw_search_one, max_results=max_results)), qs))
+        outs = list(
+            ex.map(db_context.bind_context(partial(_raw_search_one, max_results=max_results)), qs)
+        )
     return "\n\n".join(outs)
 
 
@@ -500,7 +478,9 @@ def _raw_read_impl(filenames: str | list[str] | None, offset: int = 0) -> str:
     if len(filenames) == 1:
         return _raw_read_one(filenames[0], offset=offset)
     with ThreadPoolExecutor(max_workers=PARALLELISM) as ex:
-        outs = list(ex.map(_with_active_db(partial(_raw_read_one, offset=offset)), filenames))
+        outs = list(
+            ex.map(db_context.bind_context(partial(_raw_read_one, offset=offset)), filenames)
+        )
     return "\n\n".join(outs)
 
 

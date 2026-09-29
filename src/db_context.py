@@ -22,6 +22,15 @@ Fan-out pattern — bind one DB at a time, never merge path state:
 Cross-DB result identity goes through `qualify()` / `split_ref()`. Names are
 only prefixed (`Investing::foo.md`) when the scope holds more than one DB, so
 single-DB citations, prompts, and run-memory keys stay byte-identical.
+
+**Classification gate.** Each DB has one shard per classification level
+(`KI`, `KI@confidential`, `KI@strict`; see `classification`). The "active DB"
+and every scope entry are shard ids. `require()` checks a shard against the
+clearance ContextVar and runs in `data_root()` — which every path getter goes
+through — and whenever a shard is bound. Unsealed (tests, scripts) the
+clearance grants level 0 of every DB; the app seals the user's grants on every
+rerun, which also limits it to the user's DBs. Worker threads start unsealed,
+so they only reach normal shards unless `bind_context` carries the grants in.
 """
 
 from __future__ import annotations
@@ -29,12 +38,16 @@ from __future__ import annotations
 import os
 import re
 import shutil
-from collections.abc import Iterable
+from collections.abc import Callable, Generator, Iterable, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from pathlib import Path
+from types import MappingProxyType
+from typing import ParamSpec, TypeVar
 
 from dotenv import load_dotenv
+
+import classification
 
 load_dotenv()
 
@@ -47,12 +60,77 @@ SCOPE_SEP = "::"
 
 _active: ContextVar[str] = ContextVar("active_db", default=DEFAULT_DB)
 _scope: ContextVar[tuple[str, ...]] = ContextVar("search_scope", default=())
+#: None = unsealed (level 0 of every DB); a mapping = exactly these DBs up to these levels.
+_clearance: ContextVar[Mapping[str, int] | None] = ContextVar("clearance", default=None)
+_LEVELS_DIR = "_levels"
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
 _SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\- ]{0,40}$")
+
+
+class AccessDenied(PermissionError):
+    """A path or shard the caller may not reach. Readers report it as "not found"."""
+
+
+def _granted_level(db: str) -> int | None:
+    grants = _clearance.get()
+    if grants is None:
+        return 0
+    return grants.get(db)
+
+
+def require(shard: str) -> None:
+    """Raise AccessDenied unless the current clearance reaches `shard`."""
+    try:
+        db, level = classification.parse_shard(shard)
+    except ValueError:
+        raise AccessDenied(shard) from None
+    granted = _granted_level(db)
+    if granted is None or level > granted:
+        raise AccessDenied(shard)
+
+
+def seal_clearance(grants: Mapping[str, int]) -> None:
+    """Fix the session's grants (DB -> highest level). The app calls this every rerun."""
+    _clearance.set(MappingProxyType(dict(grants)))
+
+
+@contextmanager
+def clearance(grants: Mapping[str, int]) -> Generator[None]:
+    """Grant `grants` for the block only (tests, scripts, maintenance jobs)."""
+    token = _clearance.set(MappingProxyType(dict(grants)))
+    try:
+        yield
+    finally:
+        _clearance.reset(token)
+
+
+def bind_context(fn: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Wrap `fn` so a ThreadPoolExecutor worker re-applies the caller's context.
+
+    Worker threads don't inherit the caller's ContextVars, so clearance, active
+    DB and search scope would reset to their defaults inside the pool. They are
+    captured here and re-set at the start of each call — clearance first, since
+    binding the DB and scope is checked against it. `copy_context().run` can't
+    be used: one Context object can't be entered by several workers at once.
+    """
+    grants = _clearance.get()
+    db = get_active_db()
+    scope = search_scope()
+
+    def _wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        _clearance.set(grants)
+        set_active_db(db)
+        set_search_scope(scope)
+        return fn(*args, **kwargs)
+
+    return _wrapped
 
 
 def set_active_db(name: str) -> None:
     if not name:
         return
+    require(name)
     _active.set(name)
 
 
@@ -63,6 +141,7 @@ def get_active_db() -> str:
 @contextmanager
 def using_db(name: str):
     """Bind `name` as the active DB for the duration of the block."""
+    require(name)
     token = _active.set(name)
     try:
         yield
@@ -72,7 +151,10 @@ def using_db(name: str):
 
 def set_search_scope(names: Iterable[str | None] | None) -> None:
     """Set the DBs that read-only retrieval fans out over. Empty = follow active."""
-    _scope.set(tuple(dict.fromkeys(n for n in (names or []) if n)))
+    scope = tuple(dict.fromkeys(n for n in (names or []) if n))
+    for name in scope:
+        require(name)
+    _scope.set(scope)
 
 
 def search_scope() -> tuple[str, ...]:
@@ -110,10 +192,6 @@ def split_ref(ref: str) -> tuple[str, str]:
     return get_active_db(), ref
 
 
-class AccessDenied(PermissionError):
-    """A path or shard the caller may not reach. Readers report it as "not found"."""
-
-
 def confine(base: Path, name: str) -> Path:
     """Resolve `name` inside `base`, refusing anything that lands outside it.
 
@@ -127,8 +205,57 @@ def confine(base: Path, name: str) -> Path:
     return path
 
 
+def shard_path(shard: str) -> Path:
+    """Directory of a shard: `data/<db>/` for normal, `data/<db>/_levels/<level>/` above."""
+    db, level = classification.parse_shard(shard)
+    root = DATA_ROOT / db
+    return root if level == 0 else root / _LEVELS_DIR / classification.LEVELS[level]
+
+
 def data_root() -> Path:
-    return DATA_ROOT / get_active_db()
+    shard = get_active_db()
+    require(shard)
+    return shard_path(shard)
+
+
+def base_db() -> str:
+    """The active DB without its level — for maintainer checks, tags and prompts."""
+    return classification.parse_shard(get_active_db())[0]
+
+
+def level() -> int:
+    return classification.parse_shard(get_active_db())[1]
+
+
+def reachable_shards(db: str) -> tuple[str, ...]:
+    """The shards of `db` the clearance reaches: normal, plus existing higher levels."""
+    granted = _granted_level(db)
+    if granted is None:
+        return ()
+    higher = (classification.shard_id(db, lvl) for lvl in range(1, granted + 1))
+    return (db, *(s for s in higher if (shard_path(s) / "raw").exists()))
+
+
+def write_target(db: str, read_shards: Iterable[str]) -> str:
+    """Shard of `db` at the high-water mark of what was read; AccessDenied if unreachable."""
+    shard = classification.shard_id(db, classification.high_water(read_shards))
+    require(shard)
+    return shard
+
+
+def ensure_shard(shard: str) -> Path:
+    """Create a shard's store (raw, chunks, index, wiki) and return its root."""
+    require(shard)
+    root = shard_path(shard)
+    for sub in ("raw", "chunks", "index", "wiki"):
+        (root / sub).mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def ontology_binding_path() -> Path:
+    """`ontology.yaml` is per DB, shared by every level (config, not content)."""
+    require(get_active_db())
+    return shard_path(base_db()) / "ontology.yaml"
 
 
 def wiki_dir() -> Path:

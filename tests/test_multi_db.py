@@ -218,7 +218,7 @@ def test_with_active_db_restores_scope_in_worker(two_dbs):
         return db_context.search_scope()
 
     with ThreadPoolExecutor(max_workers=1) as ex:
-        got = list(ex.map(tools._with_active_db(_probe), [1]))
+        got = list(ex.map(db_context.bind_context(_probe), [1]))
     assert got == [("Alpha", "Beta")]
 
 
