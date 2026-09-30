@@ -16,8 +16,11 @@ dotenv.load_dotenv = lambda *_a, **_k: False
 # Ensure src/ is on sys.path so bare module imports work
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+import auth
 import db_context
+import gpu_widget
 import ollama_client
+import ollama_server
 import run_memory
 import wiki_engine
 
@@ -90,3 +93,32 @@ def mock_ollama(monkeypatch):
     mock_instance = MagicMock()
     monkeypatch.setattr(ollama_client, "_client", lambda: mock_instance)
     return mock_instance
+
+
+GUI_USERS = {
+    "reader": ("pw", [db_context.DEFAULT_DB], []),
+    "nodb": ("pw", [], []),
+}
+
+
+@pytest.fixture
+def gui_env(tmp_path, monkeypatch):
+    """Isolated data root, seeded users and a stubbed daemon/GPU for the NiceGUI tests.
+
+    Users: the seeded admin (`auth.DEFAULT_USER` / `auth.DEFAULT_PASSWORD`, maintains the
+    default DB), `reader` (no maintainer rights) and `nodb` (no databases); all with password
+    `pw` except the admin.
+    """
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    monkeypatch.setenv("INGEST_QA", "0")
+    monkeypatch.setenv("INGEST_DESCRIPTION", "0")
+    status = {"host": "http://127.0.0.1:1", "pinned": True, "gpu": 1, "managed": True}
+    monkeypatch.setattr(ollama_server, "status", lambda: {**status, "reason": "test"})
+    idle = {"gpus": [], "elapsed": None, "is_running": False, "model": None}
+    monkeypatch.setattr(gpu_widget, "gpu_payload", lambda: idle)
+    auth.ensure_seeded()
+    for name, (pw, dbs, maintains) in GUI_USERS.items():
+        auth.add_user(name, pw, dbs, maintains=maintains)
+    db_context.set_active_db(db_context.DEFAULT_DB)
+    wiki_engine.init_wiki()
+    return tmp_path

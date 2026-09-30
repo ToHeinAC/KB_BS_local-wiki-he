@@ -8,23 +8,36 @@ per NiceGUI app instance. Start it through `scripts/run_app.py`. Design: docs/ui
 import argparse
 import os
 import secrets
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
 from fastapi import FastAPI
-from nicegui import app, ui
+from nicegui import ui
 
 import audit  # noqa: F401  # pyright: ignore[reportUnusedImport] (registers the denial listener)
 import auth
 import db_context
+import gpu_widget
+import gui_chrome
+import gui_session
 
 MOUNT_PATH = "/wiwi"
 DEFAULT_PORT = 8520
 _CSS = Path(__file__).parent / "assets" / "broadsheet" / "broadsheet.css"
+_PAGES: tuple[tuple[str, str, str], ...] = (
+    ("/", "Front page", "user"),
+    ("/explorer", "Explorer", "user"),
+    ("/chat", "Chat", "user"),
+    ("/research", "Research", "user"),
+    ("/upload", "Upload", "maintainer"),
+    ("/maintenance", "Maintenance", "user"),
+    ("/admin", "Admin", "admin"),
+)
 
 
 def _bootstrap() -> None:
@@ -34,24 +47,48 @@ def _bootstrap() -> None:
     auth.backfill_maintainers()
 
 
-def _signed_in() -> bool:
-    storage = cast(dict[str, Any], app.storage.user)  # pyright: ignore[reportUnknownMemberType]
-    return bool(storage.get("user"))
-
-
 def _login_page() -> None:
+    if gui_session.current() is not None:
+        ui.navigate.to("/")
+        return
+
+    def submit() -> None:
+        message = gui_session.login(username.value or "", password.value or "")
+        if message:
+            error.set_text(message)
+        else:
+            ui.navigate.to("/")
+
     with ui.column().classes("items-center w-full").style("margin-top: 12vh"):
         ui.label("LocalWiki").classes("plate")
-        ui.input("Username").props("outlined dense").classes("w-72")
-        ui.input("Password", password=True).props("outlined dense").classes("w-72")
-        ui.button("Sign in").props("flat")
+        ui.label("Sign in to continue").classes("muted")
+        username = ui.input("Username").props("outlined dense").classes("w-72")
+        password = ui.input("Password", password=True).props("outlined dense").classes("w-72")
+        password.on("keydown.enter", submit)
+        error = ui.label().classes("text-negative")
+        ui.button("Sign in", on_click=submit).props("flat").classes("btn primary").mark("sign-in")
 
 
-def _home_page() -> None:
-    if not _signed_in():
-        ui.navigate.to("/login")
-        return
-    ui.label("LocalWiki").classes("plate")
+def _stub(title: str) -> Callable[[gui_session.Session], None]:
+    """A placeholder body for a page the plan builds in a later phase."""
+
+    def build(_session: gui_session.Session) -> None:
+        with ui.column().classes("q-pa-xl"):
+            ui.label(title).classes("headline m")
+            ui.label("This page is not built yet in the Broadsheet frontend.").classes("muted")
+
+    return build
+
+
+def _shell(path: str, body: Callable[[gui_session.Session], None]):
+    """Wrap a page body in the running head and the folio."""
+
+    def build(session: gui_session.Session) -> None:
+        gui_chrome.running_head(session, path)
+        body(session)
+        gui_chrome.folio(session)
+
+    return build
 
 
 def register() -> None:
@@ -59,7 +96,16 @@ def register() -> None:
     if _CSS.exists():
         ui.add_css(_CSS.read_text(encoding="utf-8"), shared=True)
     ui.page("/login")(_login_page)
-    ui.page("/")(_home_page)
+    for path, title, who in _PAGES:
+        page = gui_session.guard(
+            _shell(path, _stub(title)), maintainer=who == "maintainer", admin=who == "admin"
+        )
+        ui.page(path)(page)
+
+
+def gpu_endpoint() -> dict[str, Any]:
+    """Same JSON the Streamlit app serves at `/_api/gpu`, for scripts that poll it."""
+    return gpu_widget.gpu_payload()
 
 
 def _serve(port: int) -> None:
@@ -67,6 +113,7 @@ def _serve(port: int) -> None:
 
     _bootstrap()
     api = FastAPI()
+    api.add_api_route(f"{MOUNT_PATH}/_api/gpu", gpu_endpoint)
     register()
     secret = os.getenv("GUI_STORAGE_SECRET") or secrets.token_urlsafe(32)
     ui.run_with(api, mount_path=MOUNT_PATH, storage_secret=secret)  # pyright: ignore[reportUnknownMemberType]
