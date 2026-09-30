@@ -1,11 +1,10 @@
 """LocalWiki — Streamlit UI."""
 
-import contextlib
-import gc
 import json
 import os
 import re
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -24,7 +23,6 @@ import classification
 import db_context
 import dedup
 import deep_research_agent
-import file_processor
 import gpu_widget
 import graph_widget
 import lex_index
@@ -36,6 +34,7 @@ import ontology_ui
 import retrieval
 import theme
 import tools
+import ui_logic
 import wiki_engine
 
 st.set_page_config(
@@ -54,29 +53,6 @@ if "theme" not in st.session_state:
 
 _t = theme.inject_css()
 _NEWSPAPER = theme.is_newspaper()
-
-
-_CHUNK_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*$")
-_CITE_SECTION_SUFFIX_RE = re.compile(r"\s*[§#].*$")
-
-_RESOLVE_HELP = """\
-The last ingest flagged claims that may conflict with existing wiki pages.
-Nothing changes until you press **Reconcile**.
-
-**Your options per item**
-- **Ignore it** — if the item is not a real conflict, do nothing or press **Dismiss**.
-- **Narrow the pages** — remove (×) every page not involved; the LLM rewrites
-  *each* selected page in full, so fewer pages means less risk.
-- **Give guidance** — say which claim wins and why (optional but recommended).
-- **Reconcile** — the LLM rewrites the selected pages; the change is logged.
-  Each page keeps its language (a rewrite in another language is not saved).
-  There is no undo except re-ingesting.
-
-**Example**
-*Dose limit: page A says 20 mSv/year, page B says 50 mSv/year.*
-Keep only A and B, write guidance *"20 mSv/year per the 2026 revision is
-authoritative; mention 50 mSv as the superseded value"*, then Reconcile.
-"""
 
 
 @st.dialog("Source", width="large")
@@ -233,33 +209,6 @@ def _render_legacy_graph() -> None:
         st.error(f"Graph render failed: {exc}")
 
 
-_GRAPH_LAYOUTS = {"Galaxy": "galaxy", "Ranked": "arc", "Clusters": "radial", "Pyramid": "pyramid"}
-
-
-_OVERLAY_LABELS = {
-    "Hubs": "hubs",
-    "Bridges": "bridges",
-    "Orphans": "orphans",
-    "Stale": "stale",
-    "Outdated": "outdated",
-    "Low confidence": "confidence",
-}
-_OVERLAY_HELP = (
-    "Highlights only — no node is added or hidden.\n\n"
-    "- **Hubs** — pages in the top 10% by PageRank (most central): "
-    "wider glow.\n"
-    "- **Bridges** — pages in the top 10% by betweenness (they connect "
-    "otherwise separate clusters): light ring.\n"
-    "- **Orphans** — pages with no links at all, in or out: grey dot.\n"
-    "- **Stale** — pages past their freshness window "
-    "(`updated` + `expires_after_days`): pulsing amber ring.\n"
-    "- **Outdated** — pages built only on superseded versions of a law "
-    "(ontology, valid time): dashed ring.\n"
-    "- **Low confidence** — pages with `confidence: low` in their "
-    "frontmatter: dimmed dot."
-)
-
-
 def _neural_graph_controls() -> tuple[bool, list[str]]:
     """(size by degree?, picked overlay labels) from the collapsed Advanced block.
 
@@ -277,11 +226,11 @@ def _neural_graph_controls() -> tuple[bool, list[str]]:
     )
     picked = acol2.multiselect(
         "Style Options",
-        list(_OVERLAY_LABELS),
+        list(ui_logic.OVERLAY_LABELS),
         default=["Hubs"],
         key="graph_overlays",
         placeholder="Style Options",
-        help=_OVERLAY_HELP,
+        help=ui_logic.OVERLAY_HELP,
     )
     return by_degree, picked
 
@@ -353,7 +302,7 @@ def _render_neural_graph(layout: str) -> None:
     with graph_col:
         try:
             clicked = graph_widget.render_graph(
-                overlays=[_OVERLAY_LABELS[p] for p in picked],
+                overlays=[ui_logic.OVERLAY_LABELS[p] for p in picked],
                 size_by="degree" if by_degree else "pagerank",
                 layout=layout,
                 # Newspaper skin draws the same graph as an engraved plate; the
@@ -448,19 +397,13 @@ def _render_graph_health() -> None:
 
 
 def _raw_source_button(filename: str, key: str) -> None:
-    db, ref = db_context.split_ref(filename)  # cross-DB chat cites as "DB::file.md"
-    base = _CHUNK_SUFFIX_RE.sub("", ref)
-    base = _CITE_SECTION_SUFFIX_RE.sub("", base).strip()
-    if base.lower().endswith((".md", ".txt")):
-        with db_context.using_db(db):
-            data = wiki_engine.read_raw_source(base)
-        if data is None:
-            st.markdown(f"- `{filename}` *(not found)*")
-            return
-        if st.button(filename, key=key):
-            _show_md_dialog(filename, data.decode("utf-8", errors="replace"))
-    else:
+    previewable, data = ui_logic.resolve_raw_source(filename)
+    if not previewable:
         st.markdown(f"- `{filename}`")
+    elif data is None:
+        st.markdown(f"- `{filename}` *(not found)*")
+    elif st.button(filename, key=key):
+        _show_md_dialog(filename, data.decode("utf-8", errors="replace"))
 
 
 def _warn_if_no_lex_index() -> bool:
@@ -509,7 +452,7 @@ def _render_search_results(key_prefix: str, search: str) -> str | None:
     st.caption(f"{len(results)} result(s)")
     frame = retrieval.last_frame()
     if frame:
-        st.caption(_ontology_line(frame))
+        st.caption(ui_logic.ontology_line(frame))
     max_score = max((r.get("score", 0.0) for r in results), default=0.0)
     selected = None
     for i, r in enumerate(results):
@@ -519,20 +462,10 @@ def _render_search_results(key_prefix: str, search: str) -> str | None:
     return selected
 
 
-_NAV_GROUPS = {
-    "concept": "Concepts",
-    "entity": "Entities",
-    "source-summary": "Source Summaries",
-    "comparison": "Comparisons",
-    "insight": "Insights",
-    "other": "Other",
-}
-
-
 def _render_nav_tree(key_prefix: str) -> str | None:
     tree = wiki_engine.get_wiki_tree()
     selected = None
-    for grp, group_label in _NAV_GROUPS.items():
+    for grp, group_label in ui_logic.NAV_GROUPS.items():
         group = tree.get(grp)
         if not group:
             continue
@@ -735,10 +668,6 @@ def _record_research_step(step: dict[str, Any]) -> None:
         st.session_state["last_research_error"] = step["content"]
 
 
-def _report_ref(report_path: str) -> str:
-    return "comparisons/" + report_path.split("comparisons/")[-1]
-
-
 def _finish_research(step: dict[str, Any], display_q: str, interpreted: str | None) -> None:
     """Store the final answer. The agent already handed us the report text; the file
     is only a nicer-formatted copy, so a read-back problem never loses the answer."""
@@ -749,14 +678,10 @@ def _finish_research(step: dict[str, Any], display_q: str, interpreted: str | No
     if step.get("report_path"):
         st.session_state["last_report"] = step["report_path"]
         try:
-            _target = db_context.write_target(
-                st.session_state["active_db"], db_context.search_scope()
+            # where the agent filed it (high-water)
+            answer = (
+                ui_logic.read_report(step["report_path"], st.session_state["active_db"]) or answer
             )
-            with db_context.using_db(_target):  # where the agent filed it (high-water)
-                answer = (
-                    wiki_engine.read_page_parsed(_report_ref(step["report_path"]))["content"]
-                    or answer
-                )
         except Exception as exc:
             st.warning(
                 f"Saved report could not be re-read ({type(exc).__name__}); "
@@ -775,7 +700,7 @@ def _finish_research(step: dict[str, Any], display_q: str, interpreted: str | No
             "q": display_q,
             "a": answer,
             "interpreted": interpreted,
-            "report": _report_ref(report) if report else None,
+            "report": ui_logic.report_ref(report) if report else None,
         }
     )
 
@@ -882,68 +807,28 @@ def _render_why_sources(audit: dict[str, Any] | None) -> None:
         for name, s in over:
             st.markdown(f"✗ `{name}` — {_fmt(s)} (over cap)")
         for frame in frames:
-            st.markdown(_ontology_line(frame))
-
-
-def _ontology_line(frame: dict[str, Any]) -> str:
-    """One line saying what the ontology stage matched and which sources it favoured."""
-    named = ", ".join(f"“{m}”" for m in frame.get("matched", []))
-    targets = ", ".join(f"`{t}`" for t in [*frame.get("works", []), *frame.get("classes", [])])
-    favoured = len(frame.get("sources", []))
-    db = f"{frame['db']}: " if frame.get("db") else ""
-    return f"Ontology — {db}{named} → {targets}; {favoured} source(s) favoured"
+            st.markdown(ui_logic.ontology_line(frame))
 
 
 # --- sidebar ---
-
-
-def _convert_progress(
-    prog: Any, name: str, index: int, count: int
-) -> Callable[[int, int, str], None]:
-    """Progress callback for converting file ``index`` of ``count`` in a batch."""
-
-    def _cb(done: int, total: int, label: str) -> None:
-        frac = (index + (done / total if total else 1.0)) / count
-        prog.progress(min(frac, 1.0), text=f"{name}: {label}")
-
-    return _cb
-
-
-# Session keys that hold document-derived content. Dropped on a DB switch and
-# whenever the user's grants shrink, so nothing read under the old grant lingers.
-_CONTENT_KEYS = (
-    "messages",
-    "chat_followup",
-    "research_history",
-    "last_research_q",
-    "last_research_answer",
-    "last_report",
-    "research_sources",
-    "last_research_steps",
-    "last_research_metrics",
-    "explorer_selected_page",
-    "last_contradictions",
-    "pending_batch",
-    "batch_ingesting",
-    "batch_prepared",
-    "batch_key",
-    "convert_editor",
-    "chat_scope",
-    "normalize_report",
-)
 
 
 def _purge_if_downgraded(grants: dict[str, int]) -> None:
     """Drop content-bearing session state when a grant shrank since the last rerun."""
     before: dict[str, int] | None = st.session_state.get("_grants")
     st.session_state["_grants"] = grants
-    if before and any(grants.get(db, -1) < lvl for db, lvl in before.items()):
-        for key in _CONTENT_KEYS:
+    if ui_logic.grants_shrank(before, grants):
+        for key in ui_logic.CONTENT_KEYS:
             st.session_state.pop(key, None)
 
 
-def _level_name(shard: str) -> str:
-    return classification.level_label(classification.parse_shard(shard)[1])
+def _progress_to(bar: Any) -> Callable[[float, str], None]:
+    """Adapt a `st.progress` bar to the (fraction, text) callback `ui_logic` takes."""
+
+    def _set(frac: float, text: str) -> None:
+        bar.progress(frac, text=text)
+
+    return _set
 
 
 def _level_picker(key: str) -> str:
@@ -959,7 +844,7 @@ def _level_picker(key: str) -> str:
         st.segmented_control(
             "Level",
             shards,
-            format_func=_level_name,
+            format_func=ui_logic.level_name,
             required=True,
             key=key,
             label_visibility="collapsed",
@@ -968,113 +853,8 @@ def _level_picker(key: str) -> str:
     if st.session_state.get(f"{key}_bound") != shard:
         st.session_state[f"{key}_bound"] = shard
         st.session_state.pop("explorer_selected_page", None)
-    db_context.set_active_db(shard)
-    db_context.set_search_scope([shard])
+    ui_logic.bind_level(shard)
     return shard
-
-
-def _level_key_label(key: str) -> str:
-    return classification.level_label(classification.level_index(key))
-
-
-def _visible_duplicate(data: bytes) -> bool:
-    """Already ingested at a level the user can see. Higher levels stay invisible:
-    a copy there is not reported (that would reveal it); the audit log's hashes show it."""
-    for shard in db_context.reachable_shards(st.session_state["active_db"]):
-        with db_context.using_db(shard):
-            if dedup.is_duplicate(data):
-                return True
-    return False
-
-
-def _shard_ref(name: str) -> str:
-    """`name` qualified with the bound shard unless it is the normal level."""
-    return name if db_context.level() == 0 else f"{db_context.get_active_db()}::{name}"
-
-
-def _ingest_file(
-    f: dict[str, Any], pending: dict[str, Any], agg: dict[str, list[str]], user: str, last: bool
-) -> None:
-    """Register, record ontology facts and ingest one file into the bound shard."""
-    dates: dict[str, str] = pending["dates"]
-    shared: dict[str, str] = pending["shared"]
-    saved = dedup.register_file(f["raw"], f["save_name"], content=f["content_bytes"])
-    shard = db_context.get_active_db()
-    security_audit.record(
-        "classified", user, target=saved.name, shard=shard, sha256=dedup.sha256(f["raw"])
-    )
-    if pending.get("ontology") is not None:
-        review = {
-            **pending["ontology"].get(f["save_name"], {}),
-            "version_date": dates.get(f["save_name"], ""),
-        }
-        agg["ontology"] += wiki_engine.record_source_ontology(
-            f["text"], saved.name, review, f.get("ontology") or {}, user=user
-        )
-    chunks = file_processor.chunk_text(f["text"])
-    per_meta = {
-        k: v
-        for k, v in {
-            "effective as of": dates.get(f["save_name"], ""),
-            "part of": shared["part of"],
-            "description": shared["description"],
-        }.items()
-        if v
-    }
-    ctx = wiki_engine.ingest_begin(f["text"], saved.name, per_meta or None)
-    for j, chunk in enumerate(chunks):
-        wiki_engine.ingest_piece(ctx, chunk, j, len(chunks))
-    res = wiki_engine.ingest_end(ctx, finalize=last)
-    agg["created"] += [_shard_ref(p) for p in res["created"]]
-    agg["updated"] += [_shard_ref(p) for p in res["updated"]]
-    agg["contradictions"] += res["contradictions"]
-
-
-def _ingest_level(
-    shard: str,
-    group: list[dict[str, Any]],
-    pending: dict[str, Any],
-    agg: dict[str, list[str]],
-    user: str,
-    tick: Callable[[], None],
-) -> None:
-    """Ingest one classification level's files, oldest first, into its own shard."""
-    db_context.ensure_shard(shard)
-    with db_context.using_db(shard):
-        wiki_engine.init_wiki()
-        written = len(agg["created"]) + len(agg["updated"])
-        finalized = False
-        for i, f in enumerate(group):
-            last = i == len(group) - 1
-            with st.spinner(f"Ingesting {f['save_name']} ({_level_name(shard)})…"):
-                try:
-                    _ingest_file(f, pending, agg, user, last)
-                    finalized = finalized or last
-                except Exception as e:
-                    agg["failed"].append(f"{f['save_name']}: {e}")
-            tick()
-        if not finalized and len(agg["created"]) + len(agg["updated"]) > written:
-            wiki_engine.rebuild_lex_index()  # last file failed before finalize
-        if pending.get("ontology") is not None:
-            wiki_engine.finish_ontology_batch(user)
-
-
-def _resolve_by_shard(desc: str, refs: list[str], guidance: str) -> dict[str, list[str]]:
-    """Reconcile contradiction pages inside the shard each one lives in."""
-    active = st.session_state["active_db"]
-    reachable = db_context.reachable_shards(active)
-    by_shard: dict[str, list[str]] = {} if refs else {active: []}
-    for ref in refs:
-        head, sep, tail = ref.partition("::")
-        shard, name = (head, tail) if sep and head in reachable else (active, ref)
-        by_shard.setdefault(shard, []).append(name)
-    out: dict[str, list[str]] = {"updated": [], "skipped": []}
-    for shard, names in by_shard.items():
-        with db_context.using_db(shard):
-            res = wiki_engine.resolve_contradiction(desc, names, guidance)
-        out["updated"] += [f"{shard}::{n}" if shard != active else n for n in res["updated"]]
-        out["skipped"] += res["skipped"]
-    return out
 
 
 def _render_move_source(sources: list[str]) -> None:
@@ -1086,7 +866,9 @@ def _render_move_source(sources: list[str]) -> None:
     st.markdown("---")
     st.markdown("**Move to another classification level**")
     name = st.selectbox("Source to move", sources, key="move_source_pick")
-    target = st.selectbox("Target level", targets, format_func=_level_name, key="move_target_pick")
+    target = st.selectbox(
+        "Target level", targets, format_func=ui_logic.level_name, key="move_target_pick"
+    )
     if classification.parse_shard(target)[1] > db_context.level():
         st.caption(
             "Moving up removes every trace from this level: pages it shares with other "
@@ -1106,15 +888,7 @@ def _render_move_source(sources: list[str]) -> None:
 
 
 def _safe_reset() -> None:
-    import requests as _req
-
-    with contextlib.suppress(Exception):
-        _req.post(
-            f"{ollama_client.host()}/api/generate",
-            json={"model": os.getenv("OLLAMA_MODEL", "gemma4:e4b"), "keep_alive": 0},
-            timeout=5,
-        )
-    gc.collect()
+    ui_logic.unload_model()
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.rerun()
@@ -1286,7 +1060,7 @@ if _db_choice != st.session_state["active_db"]:
     st.session_state["active_db"] = _db_choice
     db_context.set_active_db(_db_choice)
     # Clear per-DB session state to avoid cross-DB leakage.
-    for _k in _CONTENT_KEYS:
+    for _k in ui_logic.CONTENT_KEYS:
         st.session_state.pop(_k, None)
     st.rerun()
 
@@ -1349,7 +1123,11 @@ if page == "Upload":
         _onto_schema = ontology_ui.upload_schema()  # None: no ontology columns, no detection
         prepared: list[dict[str, Any]] | None = st.session_state.get("batch_prepared")
         if prepared is None:
-            dupes = [n for n, b in raws.items() if _visible_duplicate(b)]
+            dupes = [
+                n
+                for n, b in raws.items()
+                if ui_logic.visible_duplicate(b, st.session_state["active_db"])
+            ]
             todo = [n for n in raws if n not in dupes]
             if dupes:
                 st.warning("Skipped (already ingested): " + ", ".join(f"**{n}**" for n in dupes))
@@ -1367,7 +1145,9 @@ if page == "Upload":
                 if convertible:
                     try:
                         text = md_convert.convert_to_markdown(
-                            b, name, _convert_progress(prog, name, i, len(todo))
+                            b,
+                            name,
+                            ui_logic.convert_progress(_progress_to(prog), name, i, len(todo)),
                         )
                     except (RuntimeError, ValueError) as e:
                         st.warning(f"Skipped **{name}** — conversion failed: {e}")
@@ -1444,7 +1224,7 @@ if page == "Upload":
             f["save_name"]: st.segmented_control(
                 f["save_name"],
                 classification.LEVELS[: _max_level + 1],
-                format_func=_level_key_label,
+                format_func=ui_logic.level_key_label,
                 key=f"upload_level_{f['save_name']}",
             )
             for f in prepared
@@ -1509,12 +1289,13 @@ if page == "Upload":
                     _ticks[0] += 1
                     prog.progress(_ticks[0] / _n)
 
+                _spinner: Callable[[str], AbstractContextManager[Any]] = st.spinner
                 # One pass per level, each into its own shard: pages of different
                 # levels are never merged.
                 for _lvl in sorted(set(pending["levels"].values())):
                     _group = [f for f in files if pending["levels"][f["save_name"]] == _lvl]
                     _shard = classification.shard_id(st.session_state["active_db"], _lvl)
-                    _ingest_level(_shard, _group, pending, agg, _user, _tick)
+                    ui_logic.ingest_level(_shard, _group, pending, agg, _user, _spinner, _tick)
                 st.session_state.pop("batch_prepared", None)
                 st.session_state.pop("batch_key", None)
                 st.success("Ingest complete.")
@@ -1546,7 +1327,7 @@ if page == "Upload":
     if st.session_state.get("last_contradictions"):
         st.markdown("---")
         _hdr, _dismiss = st.columns([5, 1], vertical_alignment="bottom")
-        _hdr.subheader("Resolve contradictions", help=_RESOLVE_HELP)
+        _hdr.subheader("Resolve contradictions", help=ui_logic.RESOLVE_HELP)
         if _dismiss.button(
             "Dismiss", key="resolve_dismiss", help="Hide this list without changing any page."
         ):
@@ -1569,7 +1350,9 @@ if page == "Upload":
                 if st.button("Reconcile", key=f"resolve_btn_{i}", type="primary"):
                     with st.spinner("Reconciling pages…"):
                         try:
-                            res = _resolve_by_shard(desc, pages, guidance)
+                            res = ui_logic.resolve_by_shard(
+                                desc, pages, guidance, st.session_state["active_db"]
+                            )
                             if res["updated"]:
                                 st.success(
                                     "Updated: " + ", ".join(f"`{f}`" for f in res["updated"])
@@ -1619,7 +1402,7 @@ elif page == "Wiki Explorer":
             with _lcol:
                 _picked_layout = st.segmented_control(
                     "Layout",
-                    list(_GRAPH_LAYOUTS),
+                    list(ui_logic.GRAPH_LAYOUTS),
                     default="Galaxy",
                     key="graph_layout",
                     label_visibility="collapsed",
@@ -1629,7 +1412,7 @@ elif page == "Wiki Explorer":
                 )
             # Clearing the control returns None; the map still has to be drawn
             # in *some* geometry.
-            graph_layout = _GRAPH_LAYOUTS.get(_picked_layout or "", "galaxy")
+            graph_layout = ui_logic.GRAPH_LAYOUTS.get(_picked_layout or "", "galaxy")
         # Switching into Tree always lands on the database overview: both views
         # share `explorer_selected_page`, so without this a node opened in the
         # graph would silently preselect the reader instead.
@@ -1828,16 +1611,14 @@ elif page == "Wiki Chat":
                 key="save_answer",
                 help=f"Files the answer into {classification.label(_target)}.",
             ):
-                # `related:` links are intra-shard, so a cross-DB answer only carries
-                # over the pages that actually live in the shard being written to.
-                _refs = [db_context.split_ref(s) for s in last.get("sources", [])]
-                _related = [_name for _db, _name in _refs if _db == _target]
-                _derived = [*last.get("sources", []), *last.get("raw_sources", [])]
                 try:
-                    with db_context.using_db(_target):
-                        rel = wiki_engine.file_answer(
-                            last["question"], last["content"], _related, derived_from=_derived
-                        )
+                    rel = ui_logic.save_answer(
+                        last["question"],
+                        last["content"],
+                        last.get("sources", []),
+                        last.get("raw_sources", []),
+                        _target,
+                    )
                     st.success(f"Filed as `{rel}` in **{classification.label(_target)}**")
                 except RuntimeError as e:
                     st.error(str(e))
@@ -1876,24 +1657,9 @@ elif page == "Wiki Chat":
                 st.caption(f"🔎 Researching as: {interpreted}")
         if st.session_state.get("chat_mode", "Fast") == "Fast":
             with st.spinner("Thinking…"):
-                try:
-                    res = wiki_engine.query_with_sources(q_to_ask)
-                    answer = res["answer"]
-                    sources = res["sources"]
-                    raw_sources = res["raw_sources"]
-                    audit = res.get("audit")
-                except RuntimeError as e:
-                    answer, sources, raw_sources, audit = f"Error: {e}", [], [], None
+                fast = ui_logic.answer_fast(q_to_ask)
             st.session_state["messages"].append(
-                {
-                    "role": "assistant",
-                    "content": answer,
-                    "question": prompt,
-                    "sources": sources,
-                    "raw_sources": raw_sources,
-                    "interpreted": interpreted,
-                    "audit": audit,
-                }
+                {"role": "assistant", "question": prompt, "interpreted": interpreted, **fast}
             )
         else:
             steps: list[dict[str, Any]] = []
@@ -2096,26 +1862,17 @@ elif page == "Research":
                 help="Ingest this result into the wiki as new/updated pages, at the "
                 "highest level this research searched.",
             ):
-                with (
-                    st.spinner("Ingesting result into wiki…"),
-                    db_context.using_db(
-                        db_context.write_target(
-                            st.session_state["active_db"], db_context.search_scope()
-                        )
-                    ),
-                ):
+                _write_to = db_context.write_target(
+                    st.session_state["active_db"], db_context.search_scope()
+                )
+                with st.spinner("Ingesting result into wiki…"):
                     try:
-                        _title = st.session_state["last_research_q"][:60]
-                        if st.session_state.get("research_save_as_source"):
-                            _res = wiki_engine.ingest_as_source(_ans, f"Research: {_title}")
-                            st.session_state["research_saved_note"] = (
-                                "Already registered as a source."
-                                if _res["duplicate"]
-                                else f"Saved as source `{_res['source_name']}`."
-                            )
-                        else:
-                            wiki_engine.ingest(_ans, f"Research: {_title}")
-                            st.session_state["research_saved_note"] = "Saved to wiki."
+                        st.session_state["research_saved_note"] = ui_logic.save_research(
+                            _ans,
+                            st.session_state["last_research_q"][:60],
+                            bool(st.session_state.get("research_save_as_source")),
+                            _write_to,
+                        )
                         st.session_state["research_saved"] = True
                         st.rerun()
                     except Exception as exc:

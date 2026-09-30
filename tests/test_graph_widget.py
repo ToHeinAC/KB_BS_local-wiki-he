@@ -135,3 +135,27 @@ def test_health_reads_the_drawn_payload(app):
     assert health == graph_export.health(graph_widget.graph_stats())
     assert health["pages"] == 2
     assert health["low_confidence"] == ["beta.md"]
+
+
+def test_render_args_carry_the_payload_and_view_settings(monkeypatch):
+    payload = {"lang": "de", "nodes": [], "edges": []}
+    monkeypatch.setattr(graph_widget, "_payload", lambda _sig: payload)
+    monkeypatch.setattr(graph_widget, "_bundle_signature", lambda: ("sig",))
+    args = graph_widget.render_args(
+        overlays=["hubs"], size_by="degree", layout="arc", height=500, paper=True,
+        accent="#8f2d1a", selected="a.md",
+    )  # fmt: skip
+    assert args["graph"] is payload
+    assert args["strings"] == graph_widget._STRINGS["de"]
+    assert (args["overlays"], args["sizeBy"], args["layout"]) == (["hubs"], "degree", "arc")
+    assert (args["paper"], args["accent"], args["selected"], args["height"]) == (
+        True, "#8f2d1a", "a.md", 500,
+    )  # fmt: skip
+    assert args["backdrop"] == graph_widget.BACKDROP
+
+
+def test_render_args_fall_back_to_english_strings(monkeypatch):
+    monkeypatch.setattr(graph_widget, "_payload", lambda _sig: {"lang": "xx"})
+    monkeypatch.setattr(graph_widget, "_bundle_signature", lambda: ("sig",))
+    args = graph_widget.render_args(overlays=[], accent="#000", selected=None)
+    assert args["strings"] == graph_widget._STRINGS["en"]

@@ -57,6 +57,12 @@ def test_payload_reports_timer_and_model(monkeypatch):
     assert len(payload["gpus"]) == 2
 
 
+def test_gpu_payload_is_the_endpoint_json_as_a_dict(monkeypatch):
+    _smi(monkeypatch)
+    monkeypatch.setattr("ollama_client.loaded_model", lambda: "m")
+    assert gpu_widget.gpu_payload() == json.loads(gpu_widget._build_payload())
+
+
 def test_payload_without_timer(monkeypatch):
     _smi(monkeypatch, stdout="")
     monkeypatch.setattr("ollama_client.loaded_model", lambda: "m")

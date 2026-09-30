@@ -150,21 +150,42 @@ def render_graph(
     * `pyramid` — documents in rows by the rank of their ontology class (legal
       pyramid), relation edges drawn with arrowheads; pages hidden.
     """
-    payload = _payload(_bundle_signature())
-    strings = _STRINGS.get(payload["lang"], _STRINGS["en"])
-    return _component()(
-        graph=payload,
+    args = render_args(
         overlays=overlays,
-        sizeBy=size_by,
+        size_by=size_by,
         layout=layout,
-        backdrop=BACKDROP,
+        height=height,
         paper=paper,
-        strings=strings,
         accent=st.get_option("theme.primaryColor") or "#4a9eff",
         selected=st.session_state.get("explorer_selected_page"),
-        height=height,
-        default=None,
     )
+    return _component()(**args, default=None)
+
+
+def render_args(
+    *,
+    overlays: list[str],
+    accent: str,
+    selected: str | None,
+    size_by: str = "pagerank",
+    layout: str = "galaxy",
+    height: int = 720,
+    paper: bool = False,
+) -> dict[str, Any]:
+    """The arguments `assets/graph/index.html` renders from, for any host that embeds it."""
+    payload = _payload(_bundle_signature())
+    return {
+        "graph": payload,
+        "overlays": overlays,
+        "sizeBy": size_by,
+        "layout": layout,
+        "backdrop": BACKDROP,
+        "paper": paper,
+        "strings": _STRINGS.get(payload["lang"], _STRINGS["en"]),
+        "accent": accent,
+        "selected": selected,
+        "height": height,
+    }
 
 
 def graph_stats() -> dict[str, Any]:

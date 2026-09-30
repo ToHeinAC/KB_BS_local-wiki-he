@@ -83,8 +83,8 @@ def _get_gpu_stats() -> list[dict[str, Any]]:
         return []
 
 
-def _build_payload() -> str:
-    """Build JSON payload for the GPU stats endpoint."""
+def gpu_payload() -> dict[str, Any]:
+    """GPU stats, research timer and loaded model: what the endpoint serves, as a dict."""
     import ollama_client
 
     gpus = _get_gpu_stats()
@@ -95,14 +95,17 @@ def _build_payload() -> str:
         end = _timer["end"] if _timer["end"] is not None else time.monotonic()
         elapsed = int(end - start)
         is_running = _timer["end"] is None
-    return json.dumps(
-        {
-            "gpus": gpus,
-            "elapsed": elapsed,
-            "is_running": is_running,
-            "model": ollama_client.loaded_model(),
-        }
-    )
+    return {
+        "gpus": gpus,
+        "elapsed": elapsed,
+        "is_running": is_running,
+        "model": ollama_client.loaded_model(),
+    }
+
+
+def _build_payload() -> str:
+    """Build JSON payload for the GPU stats endpoint."""
+    return json.dumps(gpu_payload())
 
 
 # ---------------------------------------------------------------------------
