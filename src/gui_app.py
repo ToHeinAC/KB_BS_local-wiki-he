@@ -29,6 +29,7 @@ import gui_explorer
 import gui_graph
 import gui_research
 import gui_session
+import gui_upload
 
 # Hovering a citation numeral lights its margin note and the other way round (docs/ui.md).
 CITE_JS = """<script>
@@ -59,6 +60,7 @@ _BODIES: dict[str, Callable[[gui_session.Session], None]] = {
     "/chat": gui_chat.build,
     "/explorer": gui_explorer.build,
     "/research": gui_research.build,
+    "/upload": gui_upload.build,
 }
 
 
