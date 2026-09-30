@@ -179,16 +179,17 @@ def _read_source(ref: str, kind: str) -> str | None:
     return data.decode("utf-8", errors="replace") if previewable and data is not None else None
 
 
-async def _open_source(session: gui_session.Session, note: gui_cite.Note) -> None:
+async def open_source(session: gui_session.Session, ref: str, kind: str, label: str) -> None:
+    """Show a cited original or wiki page in a dialog (a denied name looks like a missing one)."""
     session.seal()
-    text = await gui_session.in_worker(_read_source, note.ref, note.kind)
+    text = await gui_session.in_worker(_read_source, ref, kind)
     with ui.dialog() as dialog, ui.card().classes("w-full").style("max-width: 760px"):
-        ui.label(note.label).classes("file")
+        ui.label(label).classes("file")
         if text is None:
             ui.label("This document cannot be previewed.").classes("muted")
         else:
             ui.markdown(text).classes("prose compact")
-            ui.button("Download", on_click=lambda: ui.download.content(text, note.file)).props(
+            ui.button("Download", on_click=lambda: ui.download.content(text, ref)).props(
                 "flat"
             ).classes("btn sm")
         ui.button("Close", on_click=dialog.close).props("flat").classes("btn text sm")
@@ -233,7 +234,7 @@ def _render_trace(steps: list[dict[str, Any]]) -> None:
 
 def _opener(session: gui_session.Session, note: gui_cite.Note) -> Callable[[], Any]:
     async def open_it() -> None:
-        await _open_source(session, note)
+        await open_source(session, note.ref, note.kind, note.label)
 
     return open_it
 

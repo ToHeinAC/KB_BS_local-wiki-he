@@ -25,6 +25,8 @@ import db_context
 import gpu_widget
 import gui_chat
 import gui_chrome
+import gui_explorer
+import gui_graph
 import gui_session
 
 # Hovering a citation numeral lights its margin note and the other way round (docs/ui.md).
@@ -52,7 +54,10 @@ _PAGES: tuple[tuple[str, str, str], ...] = (
 )
 
 
-_BODIES: dict[str, Callable[[gui_session.Session], None]] = {"/chat": gui_chat.build}
+_BODIES: dict[str, Callable[[gui_session.Session], None]] = {
+    "/chat": gui_chat.build,
+    "/explorer": gui_explorer.build,
+}
 
 
 def _bootstrap() -> None:
@@ -111,6 +116,8 @@ def register() -> None:
     if _CSS.exists():
         ui.add_css(_CSS.read_text(encoding="utf-8"), shared=True)
     ui.add_body_html(CITE_JS, shared=True)
+    ui.add_body_html(gui_graph.GRAPH_JS, shared=True)
+    gui_graph.register_assets()
     ui.page("/login")(_login_page)
     for path, title, who in _PAGES:
         body = _BODIES.get(path, _stub(title))
