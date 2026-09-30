@@ -76,6 +76,8 @@ def test_route_is_injected_once_and_serves_json(monkeypatch):
     monkeypatch.setattr(gpu_widget, "_base_path", lambda: "/wiwi")
     monkeypatch.setattr(gpu_widget, "_build_payload", lambda: '{"gpus": []}')
     app = Starlette(routes=[Route("/health", lambda request: None)])
+    # NiceGUI (imported by the GUI tests) owns a bigger Starlette app; see only ours.
+    monkeypatch.setattr(gpu_widget.gc, "get_objects", lambda: [app])
     assert gpu_widget._inject_gpu_route() is True
     assert gpu_widget._inject_gpu_route() is True  # guard: no second route
     paths = [getattr(r, "path", None) for r in app.router.routes]

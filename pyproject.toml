@@ -38,6 +38,7 @@ dependencies = [
     "networkx>=3.6.1",
     "scipy>=1.17.1",
     "pyyaml>=6.0",
+    "nicegui>=3.17.1",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +61,7 @@ dev = [
     "pre-commit>=4.6",
     "pyright[nodejs]>=1.1.414",
     "pytest>=9.0",
+    "pytest-asyncio>=1.4.0",
     "pytest-cov>=7.1",
     "pytest-timeout>=2.4",
     "pytest-xdist>=3.8",
@@ -90,6 +92,7 @@ allowed-confusables = ["–", "×", "−"]
 # Import order is the point: app.py loads .env before modules read env vars at import
 # (theme.FRONTEND, graph_widget.RENDERER); conftest disables it before any src import.
 "src/app.py" = ["E402"]
+"src/gui_app.py" = ["E402"]
 "tests/conftest.py" = ["E402"]
 
 [tool.ruff.lint.mccabe]
@@ -105,7 +108,10 @@ strict = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = ["-ra", "--strict-markers", "--strict-config"]
+addopts = ["-ra", "--strict-markers", "--strict-config", "-p", "nicegui.testing.user_plugin"]
+asyncio_mode = "auto"
+# NiceGUI's `user` fixture: no main file, tests register pages through gui_app.register()
+main_file = ""
 xfail_strict = true
 session_timeout = 60
 

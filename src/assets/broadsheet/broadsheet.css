@@ -1,0 +1,160 @@
+/* Broadsheet 2 — shared tokens and components for the LocalWiki redesign mockups.
+   One bold element: the citation apparatus (numerals in the text, notes in the margin).
+   Everything else stays quiet: ink, paper, hairlines, one accent. */
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,700;6..96,900&family=Libre+Franklin:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400;1,8..60,600&family=IBM+Plex+Mono:wght@400;500&display=block');
+
+:root {
+  --paper: #f7f5ef;      /* cleaner newsprint, less yellow than the current #f4f1e6 */
+  --panel: #efece3;      /* rails, folds, the agate box */
+  --ink: #1b1a17;
+  --ink-2: #45423b;
+  --muted: #736e60;
+  --hair: #d9d3c4;
+  --oxide: #8f2d1a;      /* the one accent: citations, links, the active state */
+  --oxide-tint: #f2e4dc;
+  --violet: #5e4a8a;     /* rubber-stamp ink: Confidential */
+  --slate: #3f5b73;      /* graph: entities */
+  --olive: #8a7a36;      /* graph: summaries */
+  --serif: 'Source Serif 4', Georgia, serif;
+  --sans: 'Libre Franklin', 'Helvetica Neue', Arial, sans-serif;
+  --display: 'Bodoni Moda', Didot, serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--paper); color: var(--ink); }
+body {
+  min-height: 100vh;
+  font: 400 14px/1.45 var(--sans);
+  font-variant-numeric: lining-nums tabular-nums;
+  -webkit-font-smoothing: antialiased;
+  display: flex; flex-direction: column;
+}
+main { flex: 1; min-height: 0; }
+
+/* ── Running head (inner pages) ─────────────────────────────── */
+.runhead {
+  height: 60px; flex: none; display: flex; align-items: center; gap: 40px;
+  padding: 0 40px; border-bottom: 1px solid var(--ink);
+}
+/* opsz 11: at display optical sizes Bodoni's hairlines vanish and "LocalWiki" reads as "Local W iki". */
+.runhead .plate { font: 900 30px/1 var(--display); font-optical-sizing: none; font-variation-settings: 'opsz' 11; }
+.nav { display: flex; gap: 28px; height: 100%; }
+.nav a {
+  display: flex; align-items: center; height: 100%; color: var(--ink-2);
+  text-decoration: none; font: 500 15px var(--sans);
+  border-bottom: 3px solid transparent; margin-bottom: -1px;
+}
+.nav a.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--ink); }
+.runhead .right { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+.edition {
+  display: flex; align-items: baseline; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid var(--ink); font: 600 15px var(--sans);
+}
+.edition small { font: 400 12px var(--sans); color: var(--muted); }
+.caret { font-size: 10px; color: var(--ink-2); }
+.user { color: var(--ink-2); font-size: 13px; }
+
+/* Classification is a stamp, never a colour wash. */
+.stamp {
+  font: 600 11px/1 var(--sans); letter-spacing: 0.04em; padding: 5px 7px;
+  border: 1.5px solid currentColor; color: var(--ink-2);
+}
+.stamp.conf { color: var(--violet); transform: rotate(-2deg); }
+.stamp.strict { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+
+/* ── Folio (page foot): machine status lives here, not in a sidebar ── */
+.folio {
+  height: 30px; flex: none; display: flex; align-items: center; gap: 0;
+  padding: 0 40px; border-top: 1px solid var(--ink); font-size: 12px; color: var(--muted);
+}
+.folio span { padding: 0 14px; border-left: 1px solid var(--hair); }
+.folio span:first-child { padding-left: 0; border-left: 0; }
+.folio .push { margin-left: auto; }
+.folio .ok { color: var(--ink-2); }
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #4d7a4f; margin-right: 6px; }
+
+/* ── Editorial type ─────────────────────────────────────────── */
+.kicker { font: 700 13px var(--sans); color: var(--oxide); margin-bottom: 8px; }
+.headline { font: 600 40px/1.08 var(--serif); font-optical-sizing: auto; letter-spacing: -0.012em; }
+.headline.xl { font-size: 56px; line-height: 1.02; letter-spacing: -0.02em; }
+.headline.m { font-size: 30px; line-height: 1.12; }
+.headline.s { font-size: 21px; line-height: 1.2; }
+.standfirst { font: italic 400 20px/1.45 var(--serif); color: var(--ink-2); }
+.prose { font: 400 18px/1.62 var(--serif); max-width: 66ch; hyphens: manual; }
+.prose p + p { margin-top: 0.8em; }
+.prose h3 { font: 700 19px/1.3 var(--serif); margin: 1.1em 0 0.3em; }
+.prose.compact { font-size: 16.5px; line-height: 1.58; }
+.dropcap::first-letter {
+  float: left; font: 600 76px/0.82 var(--serif); padding: 7px 8px 0 0; color: var(--ink);
+}
+.meta { display: flex; flex-wrap: wrap; gap: 0; font-size: 13px; color: var(--muted); }
+.meta > * { padding: 0 12px; border-left: 1px solid var(--hair); }
+.meta > *:first-child { padding-left: 0; border-left: 0; }
+.meta b { color: var(--ink-2); font-weight: 600; }
+.file { font: 400 0.86em var(--mono); color: var(--ink-2); }
+.section-label { font: 700 14px var(--sans); padding-bottom: 7px; border-bottom: 1px solid var(--ink); margin-bottom: 12px; }
+.muted { color: var(--muted); }
+.hair { border: 0; border-top: 1px solid var(--hair); margin: 16px 0; }
+.rule { border: 0; border-top: 1px solid var(--ink); margin: 16px 0; }
+
+/* ── Citations: the one loud thing ──────────────────────────── */
+sup.cite {
+  font: 700 0.62em/0 var(--sans); color: var(--oxide); vertical-align: super;
+  padding: 0 0 0 1px;
+}
+sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
+.note { display: grid; grid-template-columns: 22px 1fr; column-gap: 6px; font-size: 13px; line-height: 1.45; }
+.note .n { font: 700 13px var(--sans); color: var(--oxide); }
+.note .t { font-weight: 600; color: var(--ink); }
+.note .q { grid-column: 2; font: italic 400 14px/1.45 var(--serif); color: var(--ink-2); margin-top: 3px; }
+.note .w { grid-column: 2; color: var(--muted); font-size: 12px; margin-top: 3px; }
+.note.hl { background: var(--oxide-tint); box-shadow: -8px 0 0 var(--oxide-tint), 8px 0 0 var(--oxide-tint); }
+
+/* ── Controls ───────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 16px;
+  font: 600 14px var(--sans); color: var(--ink); background: transparent;
+  border: 1px solid var(--ink);
+}
+.btn.primary { background: var(--ink); color: var(--paper); }
+.btn.sm { height: 30px; padding: 0 12px; font-size: 13px; }
+.btn.text { border: 0; padding: 0 2px; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--hair); font-weight: 500; }
+.btn.disabled { border-style: dashed; border-color: var(--muted); color: var(--muted); background: transparent; }
+.toggle { display: inline-flex; border: 1px solid var(--ink); }
+.toggle span { padding: 6px 14px; font: 500 13px var(--sans); }
+.toggle span + span { border-left: 1px solid var(--ink); }
+.toggle .on { background: var(--ink); color: var(--paper); font-weight: 600; }
+.field { border-bottom: 1px solid var(--ink); padding: 8px 0; font: italic 400 18px var(--serif); color: var(--muted); }
+.field.focus { border-bottom-width: 2px; color: var(--ink); font-style: normal; }
+.label { font: 600 13px var(--sans); color: var(--ink-2); margin-bottom: 4px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 3px 8px;
+  border: 1px solid var(--ink-2); font: 500 13px var(--sans); background: var(--paper);
+}
+.chip .x { color: var(--muted); font-size: 12px; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+.check i { width: 14px; height: 14px; border: 1px solid var(--ink); display: inline-block; }
+.check i.on { background: var(--ink); box-shadow: inset 0 0 0 2px var(--paper); }
+
+/* Folds replace expanders: a sentence-case label, a chevron, a hairline. */
+.fold { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.fold > .sum { display: flex; align-items: baseline; gap: 10px; padding: 11px 0; font: 600 14px var(--sans); }
+.fold > .sum .chev { font-size: 11px; width: 12px; color: var(--ink-2); }
+.fold > .sum .aside { margin-left: auto; font-weight: 400; color: var(--muted); font-size: 13px; }
+
+/* ── Tables: hairlines and tabular figures ──────────────────── */
+table.agate { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.agate th {
+  text-align: left; font: 600 12px var(--sans); color: var(--muted);
+  padding: 6px 10px 6px 0; border-bottom: 1px solid var(--ink);
+}
+table.agate td { padding: 7px 10px 7px 0; border-bottom: 1px solid var(--hair); vertical-align: middle; }
+table.agate .num { text-align: right; }
+table.agate tr.sel td { background: var(--oxide-tint); }
+
+/* ── NiceGUI / Quasar overrides: square corners, no shadows, sentence-case controls ── */
+.q-btn, .q-field__control, .q-card, .q-menu, .q-dialog__inner > div { border-radius: 0 !important; box-shadow: none !important; }
+.q-btn { text-transform: none; font: 600 14px var(--sans); letter-spacing: 0; }
+.nicegui-content { padding: 0; gap: 0; }
+.plate { font: 900 30px/1 var(--display); font-optical-sizing: none; font-variation-settings: 'opsz' 11; }

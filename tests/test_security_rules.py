@@ -2,7 +2,8 @@
 
 `data_root()` and the path getters are gated; `DATA_ROOT` and `shard_path` are not,
 so product code outside `db_context` must never touch them, nor the gate's private
-state. Only the app seals a session's clearance; elevation is for tests and scripts.
+state. Only the frontends (app.py, gui_session.py) seal a session's clearance; elevation is
+for tests and scripts.
 """
 
 import ast
@@ -22,7 +23,7 @@ UNGATED = {
     "_granted_level",
     "_deny",
 }
-ONLY_IN = {"seal_clearance": {"app.py"}, "clearance": set[str]()}
+ONLY_IN = {"seal_clearance": {"app.py", "gui_session.py"}, "clearance": set[str]()}
 
 
 def violations(source: str, module: str) -> list[str]:
@@ -62,6 +63,13 @@ def test_sealing_is_reserved_for_the_app_and_elevation_for_tests() -> None:
     assert violations(seal, "wiki_engine.py") == ["1: seal_clearance"]
     assert violations(seal, "app.py") == []
     assert violations("with db_context.clearance({}):\n    pass\n", "app.py") == ["1: clearance"]
+
+
+def test_gui_sealing_lives_in_gui_session_only() -> None:
+    seal = "db_context.seal_clearance({})\n"
+    assert violations(seal, "gui_session.py") == []
+    assert violations(seal, "gui_chat.py") == ["1: seal_clearance"]
+    assert violations(seal, "gui_app.py") == ["1: seal_clearance"]
 
 
 def test_gated_accessors_are_allowed_everywhere() -> None:
