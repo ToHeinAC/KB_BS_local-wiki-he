@@ -108,7 +108,8 @@ strict = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = ["-ra", "--strict-markers", "--strict-config", "-p", "nicegui.testing.user_plugin"]
+# `-n auto`: the suite runs in parallel by default (serially it exceeds session_timeout); `-n0` to debug
+addopts = ["-ra", "--strict-markers", "--strict-config", "-p", "nicegui.testing.user_plugin", "-n", "auto"]
 asyncio_mode = "auto"
 # NiceGUI's `user` fixture: no main file, tests register pages through gui_app.register()
 main_file = ""

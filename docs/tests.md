@@ -56,7 +56,9 @@ Prefer a compact suite of high-signal unit + integration tests over a large volu
 
 - pytest with pytest-cov and pytest-timeout (`[dependency-groups] dev` in `pyproject.toml`).
 - Fast loop: `uv run pytest`; full gate: `uv run pre-commit run --all-files` (branch coverage
-  ≥ 85 %, suite ≤ 60 s; numbers in `pyproject.toml`).
+  ≥ 85 %, suite ≤ 60 s; numbers in `pyproject.toml`). Runs are parallel by default (`-n auto` in
+  `addopts`): serially the suite takes about 95 s, mostly the NiceGUI tests, and `session_timeout`
+  would cut it short. Pass `-n0` for a serial run while debugging one file.
 - Offline: `tests/conftest.py` blocks every socket connect. Stub Ollama, Tavily and the pinned
   daemon (`ollama_client.host`) instead of reaching them.
 - Hermetic: `conftest.py` disables `load_dotenv`, so the developer's `.env` never changes test
