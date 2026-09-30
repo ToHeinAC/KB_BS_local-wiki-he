@@ -19,9 +19,21 @@ The UI must feel like a premium digital publication, not a SaaS dashboard. Concr
 - **No SaaS aesthetics.** No neon, no overly rounded chrome, no playful tone.
 - **Documents/citations/research read like articles.** Whatever framework is chosen must be re-styled to this language; the framework's default look is not acceptable.
 
+## Broadsheet frontend (NiceGUI, `FRONTEND=broadsheet`)
+
+A second GUI, built from the mockups in [`ideas/gui-redesign/`](../ideas/gui-redesign/notes.md) and planned in
+[_plan-gui-broadsheet.md](_plan-gui-broadsheet.md). It serves the same backend as the Streamlit app, which stays in
+the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching server on port 8520 under `/wiwi`.
+
+- **Entry:** `src/gui_app.py` mounts NiceGUI with `ui.run_with(api, mount_path="/wiwi")`; pages register through
+  `register()`. The stylesheet is `src/assets/broadsheet/broadsheet.css` (the mockup tokens plus Quasar overrides).
+- **Tests:** NiceGUI's `user` fixture (`-p nicegui.testing.user_plugin`, `asyncio_mode = "auto"`, `main_file = ""` in
+  `pyproject.toml`). Tests call `gui_app.register()` after the fixture, because it resets NiceGUI per test.
+- **Status:** phase 0 (harness, mount, login page). Pages follow the plan's phases.
+
 ## Frontend skins (`FRONTEND`)
 
-Two frontends ship, chosen once per process by `FRONTEND` in `.env`. They render the **same pages, widgets and
+Two Streamlit frontends ship, chosen once per process by `FRONTEND` in `.env`. They render the **same pages, widgets and
 behaviour** — only the chrome differs, so nothing below §Pages depends on which is active.
 
 | `FRONTEND` | Look |

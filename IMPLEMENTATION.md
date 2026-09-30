@@ -8,7 +8,7 @@ Rules: [AGENTS.md](AGENTS.md). Design: [docs/architecture.md](docs/architecture.
 | Task | Command |
 |---|---|
 | Install (once per clone) | `uv sync && uv run pre-commit install` |
-| Run the app | `uv run streamlit run src/app.py --server.port 8520`, then open `http://localhost:8520/wiwi/` |
+| Run the app | `uv run python scripts/run_app.py` (starts the frontend chosen by `FRONTEND`), then open `http://localhost:8520/wiwi/`. Streamlit directly: `uv run streamlit run src/app.py --server.port 8520` |
 | Tests (fast loop) | `uv run pytest` or `uv run pytest tests/test_wiki_engine.py` |
 | Full gate | `uv run pre-commit run --all-files` |
 | Ontology detection bench | `uv run python scripts/bench_ontology_detect.py` (legal heads; `--gold bench/fixture_ontology_detect_KI.json` for KI, see [docs/ontology.md](docs/ontology.md)) |
@@ -37,6 +37,7 @@ One row per PRD milestone. Status: `planned`, `in progress`, `done`.
 | 5 | M5: Quality gate (claude-dev-schema) | done | `uv run pre-commit run --all-files` green (3.11, 3.13) |
 | 6 | M6: Ontology ([plan](docs/_plan-ontology.md) phases 1–8) | done (plan phases 1–8; §-level validity not built) | `test_ontology`, `test_ontology_store`, `test_ontology_bundle`, `test_ontology_detect`, `test_ontology_ingest`, `test_ontology_query`, `test_ontology_search`, `test_ontology_time`, `test_ontology_time_search`, `test_ontology_merge`, `test_ontology_outdated`, `test_ontology_relations`, `test_ontology_relations_flow`, `test_ontology_evolution`, `test_ontology_evolution_flow`, `test_ontology_export`, `test_ontology_pages`, `test_delete_source`, `test_app`; `scripts/bench_ontology_detect.py`, `scripts/eval_ontology_search.py` |
 | 7 | M7: Classification ([design](docs/security.md)) | done | `test_confine`, `test_classification`, `test_classification_gate`, `test_classification_shards`, `test_classification_leaks`, `test_classification_writes`, `test_classification_move`, `test_security_rules`, `test_audit`, `test_auth`, `test_app` |
+| 8 | M8: Broadsheet GUI ([plan](docs/_plan-gui-broadsheet.md)) | in progress (phase 0 of the plan) | `test_gui_app`, `test_run_app`, `test_security_rules` |
 | – | Extensions beyond the original spec (no PRD milestone): hybrid retrieval stages A–F, multi-DB + auth, OKF bundle, language pinning, GPU pinning | done | `test_lex_index`, `test_embed_index`, `test_rerank`, `test_calibrate`, `test_multi_db`, `test_auth`, `test_lang`, `test_page_language`, `test_gpu_placement` |
 
 ## 3. Module map
@@ -56,6 +57,7 @@ Full responsibilities per module: [docs/architecture.md](docs/architecture.md) �
 | `okf.py`, `lang.py`, `page_lang.py`, `graph_export.py` | OKF stamping, language pinning, graph analytics |
 | `ontology.py`, `ontology_bundle.py`, `ontology_store.py`, `ontology_detect.py`, `ontology_query.py`, `ontology_time.py`, `ontology_graph.py`, `ontology_evolution.py`, `ontology_export.py`, `ontology_ui.py`, `ontology/*.yaml` | Ontology schema modules, validation, per-DB fact ledger, export/import with revisions, detection at upload, page stamping, the ontology stage in every search, valid time, relations/binding/lint, editor/cue tester/re-classify/suggestions, SKOS/JSON-LD export, Maintenance → Ontology ([docs/ontology.md](docs/ontology.md)) |
 | `db_context.py`, `classification.py`, `auth.py`, `audit.py` | Per-DB paths, search scope and the classification gate (shards per level); users, bcrypt, DB allowlists, clearance; security audit log ([docs/security.md](docs/security.md)) |
+| `gui_app.py`, `assets/broadsheet/`, `scripts/run_app.py` | Broadsheet frontend (NiceGUI, `FRONTEND=broadsheet`) and the launcher that picks the frontend ([docs/ui.md](docs/ui.md)) |
 | `prompts.py`, `schema_loader.py` | All prompt strings; `SCHEMA.md` / `SCHEMA_QUERY.md` injection |
 | `tests/test_code_rules.py`, `tests/test_docs.py` | Gate rules: functions ≤ 50 lines; doc size limits and local links |
 | `.claude/hooks/format_on_edit.py` | PostToolUse hook: ruff-formats each `.py` file Claude edits |

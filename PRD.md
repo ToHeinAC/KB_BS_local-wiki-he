@@ -130,6 +130,26 @@ correct, cited, deduplicated pages that answer later questions with traceable so
   covert channels, content that authorised users copy out.
 - **Dependencies:** M2, M3, M4, M6.
 
+### M8 — Broadsheet GUI
+- **Deliverable:** a second frontend in NiceGUI (`src/gui_*.py`), selected by
+  `FRONTEND=broadsheet`, next to the Streamlit app, which stays in the codebase. It follows the
+  Broadsheet 2 mockups in `ideas/gui-redesign/` and serves the same backend on port 8520 under
+  `/wiwi`. Plan: [docs/_plan-gui-broadsheet.md](docs/_plan-gui-broadsheet.md).
+- **Acceptance criteria:**
+  - Every M4 criterion holds in the new GUI (login, Upload, Explorer, Chat, Research,
+    Maintenance, Admin).
+  - A front page shows recent activity, the most connected page, "Ask the archive" and the graph
+    health figures.
+  - Chat and Research answers show numbered citations with a source-note column.
+  - The classification level appears as a stamp in the page header.
+  - Clearance is sealed on every event, so the M7 canary suite holds in this GUI too.
+  - `FRONTEND` other than `broadsheet` starts the Streamlit app unchanged.
+- **Edge cases:** two browsers with different clearances never see each other's content;
+  document text is never written to NiceGUI's persistent storage; long backend calls run in
+  worker threads that carry the session's clearance.
+- **Non-goals:** removing the Streamlit app; new backend features.
+- **Dependencies:** M4, M7.
+
 ## 5. Open risks & assumptions
 
 - Small-model output drifts in format → keep every structural decision in code, and add a
