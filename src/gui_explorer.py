@@ -11,8 +11,6 @@ from typing import Any
 
 from nicegui import ui
 
-import auth
-import classification
 import db_context
 import graph_widget
 import gui_chat
@@ -437,11 +435,3 @@ class ExplorerView:
 def build(session: gui_session.Session) -> None:
     """Page body of `/explorer`."""
     ExplorerView(session).build()
-
-
-def level_names(session: gui_session.Session) -> list[str]:
-    """Labels of the levels the user can reach in the active DB (for tests and captions)."""
-    return [classification.label(s) for s in db_context.reachable_shards(session.active_db)]
-
-
-_ = auth  # the allow-list is applied by gui_session.guard before any build runs

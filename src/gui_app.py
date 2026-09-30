@@ -27,6 +27,7 @@ import gui_chat
 import gui_chrome
 import gui_explorer
 import gui_graph
+import gui_research
 import gui_session
 
 # Hovering a citation numeral lights its margin note and the other way round (docs/ui.md).
@@ -57,6 +58,7 @@ _PAGES: tuple[tuple[str, str, str], ...] = (
 _BODIES: dict[str, Callable[[gui_session.Session], None]] = {
     "/chat": gui_chat.build,
     "/explorer": gui_explorer.build,
+    "/research": gui_research.build,
 }
 
 

@@ -187,3 +187,19 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .fold.q-expansion-item { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
 .fold .q-item { font: 600 14px var(--sans); padding-left: 0; }
 .q-toggle-group, .toggle .q-btn { border-radius: 0; }
+
+/* ── Research (mockup 04): question bar, article, figures and the wire ───────────────── */
+.qbar { padding: 16px 40px; border-bottom: 1px solid var(--hair); gap: 20px; }
+.qbar .field { font-size: 19px; border-bottom: 1px solid var(--ink); }
+.research-grid { display: grid; grid-template-columns: minmax(0, 760px) minmax(0, 1fr); column-gap: 64px; padding: 0 40px; width: 100%; }
+.research-grid .report { padding-top: 26px; align-items: stretch; min-width: 0; }
+.research-grid .report .prose { max-width: none; column-count: 2; column-gap: 36px; }
+.research-grid .endnotes { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 36px; margin-top: 16px; }
+.research-grid .side { padding-top: 26px; min-width: 0; }
+.figs { background: var(--panel); padding: 14px 18px; margin-bottom: 26px; }
+.figs .num { font-weight: 700; }
+.wire .row { display: grid; grid-template-columns: 70px 18px 1fr; column-gap: 8px; padding-bottom: 12px; }
+.wire .time { font-size: 13px; color: var(--muted); }
+.wire .pin { position: relative; }
+.wire .pin::after { content: ""; position: absolute; left: 4px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--paper); border: 1px solid var(--ink); }
+.wire .row.done .pin::after { background: var(--ink); }

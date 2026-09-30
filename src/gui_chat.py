@@ -232,7 +232,7 @@ def _render_trace(steps: list[dict[str, Any]]) -> None:
             ui.label(line).classes("muted text-caption")
 
 
-def _opener(session: gui_session.Session, note: gui_cite.Note) -> Callable[[], Any]:
+def opener(session: gui_session.Session, note: gui_cite.Note) -> Callable[[], Any]:
     async def open_it() -> None:
         await open_source(session, note.ref, note.kind, note.label)
 
@@ -247,7 +247,7 @@ def _render_note(session: gui_session.Session, note: gui_cite.Note) -> None:
                 ui.link(note.label, note.file, new_tab=True).classes("t")
             else:
                 title = ui.label(note.label).classes("t file cursor-pointer").mark(f"note-{note.n}")
-                title.on("click", gui_session.guarded(session)(_opener(session, note)))
+                title.on("click", gui_session.guarded(session)(opener(session, note)))
             hint = "Wiki page" if note.kind == "wiki" else ontology_ui.source_badge(note.ref)
             if hint:
                 ui.label(hint).classes("w")
