@@ -76,6 +76,11 @@ class Session:
             db_context.set_active_db(self.shard)
             db_context.set_search_scope([])
 
+    def bind_shard(self, shard: str) -> None:
+        """Read one classification level: it becomes the active DB and the only scope."""
+        self.shard, self.scope = shard, [shard]
+        ui_logic.bind_level(shard)
+
     def switch_db(self, db: str) -> None:
         """Move to another database: content of the old one must not follow."""
         self.active_db, self.shard, self.scope = db, db, []

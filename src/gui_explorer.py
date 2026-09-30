@@ -125,8 +125,7 @@ class ExplorerView:
     async def _set_level(self, event: Any) -> None:
         if event.value not in db_context.reachable_shards(self.session.active_db):
             return
-        self.session.shard, self.session.scope = event.value, [event.value]
-        ui_logic.bind_level(event.value)
+        self.session.bind_shard(event.value)
         self.ex.level, self.ex.selected, self.ex.query = event.value, None, ""
         await self.load()
 

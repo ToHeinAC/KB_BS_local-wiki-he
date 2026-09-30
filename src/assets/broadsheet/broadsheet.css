@@ -209,3 +209,6 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .upload-col .q-uploader { width: 100%; max-height: 200px; border: 1px dashed var(--ink-2); box-shadow: none; }
 .review .file { font-size: 0.9em; }
 .btn.primary.q-btn.disabled, .btn.primary.q-btn[disabled] { background: transparent !important; color: var(--muted) !important; border: 1px dashed var(--muted); opacity: 1 !important; }
+
+/* ── Maintenance and Admin ──────────────────────────────────────────────────────────────── */
+.maint-col, .admin-col { padding: 26px 40px 40px; width: 100%; max-width: 1000px; gap: 12px; }

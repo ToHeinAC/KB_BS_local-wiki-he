@@ -23,10 +23,12 @@ import audit  # noqa: F401  # pyright: ignore[reportUnusedImport] (registers the
 import auth
 import db_context
 import gpu_widget
+import gui_admin
 import gui_chat
 import gui_chrome
 import gui_explorer
 import gui_graph
+import gui_maint
 import gui_research
 import gui_session
 import gui_upload
@@ -61,6 +63,8 @@ _BODIES: dict[str, Callable[[gui_session.Session], None]] = {
     "/explorer": gui_explorer.build,
     "/research": gui_research.build,
     "/upload": gui_upload.build,
+    "/admin": gui_admin.build,
+    "/maintenance": gui_maint.build,
 }
 
 
