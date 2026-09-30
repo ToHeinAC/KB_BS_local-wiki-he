@@ -30,7 +30,24 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
 - **Tests:** NiceGUI's `user` fixture (`-p nicegui.testing.user_plugin`, `asyncio_mode = "auto"`, `main_file = ""` in
   `pyproject.toml`). Tests call `gui_app.register()` after the fixture, because it resets NiceGUI per test.
 - **Shared logic:** `src/ui_logic.py` holds what both frontends do the same way (ingest driver, save paths, level binding); `gpu_widget.gpu_payload()` and `graph_widget.render_args()` expose the GPU stats and the graph component arguments without Streamlit.
-- **Status:** plan phases 0–1 (harness, mount, login page; shared logic extracted). Pages follow the plan's phases.
+- **Session and sealing (`src/gui_session.py`):** NiceGUI runs every page build, handler and timer tick in its own
+  task, and the classification gate lives in ContextVars, so **every entry point re-seals** the session's clearance
+  before reading a path: pages through `guard(build)`, handlers and timer callbacks through `guarded(session)`
+  (`Session.seal` re-reads `auth.clearance_map`, so a revocation applies at the next interaction and a shrunk grant
+  drops the session's content). Blocking backend calls go through `in_worker` (`db_context.bind_context` carries the
+  binding into the worker thread); agent generators through `stream_steps`, which consumes the generator and runs an
+  `after` callback (e.g. the audit read) in the same worker. Only `gui_session.py` may seal clearance or touch
+  `storage.user` (`tests/test_security_rules.py`, `tests/test_gui_session.py`).
+- **What is persisted:** `app.storage.user` (a file under `.nicegui/`, gitignored) holds only `user`, `active_db` and an
+  opaque `sid` (`PERSISTED_KEYS`). Everything document-derived lives in the in-memory `Session.state`, keyed by `sid`
+  in a process-level registry so it survives page navigation but not a server restart.
+- **Chrome (`src/gui_chrome.py`):** running head (nameplate, nav, edition = database picker, level stamp, user menu
+  with Admin, Reset and Sign out) and a one-line folio (model and GPU pinning, GPU load, search-index size; refreshed
+  in a worker every 5 s). Pages are plain `ui.page` routes (`/`, `/explorer`, `/chat`, `/research`, `/upload`,
+  `/maintenance`, `/admin`), each wrapped by `guard`; a signed-out visitor goes to `/login`, and Upload (maintainers)
+  and Admin (admins) send everyone else home. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
+- **Status:** plan phases 0–2 (harness, mount, login, session, chrome; shared logic extracted). The page bodies are
+  placeholders until their phases.
 
 ## Frontend skins (`FRONTEND`)
 

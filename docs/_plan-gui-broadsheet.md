@@ -19,6 +19,14 @@ Decisions already taken with the user:
 - **Implementation model:** Sonnet (medium effort). Every phase below is one self-contained Sonnet
   session with its own red → green → gate → docs → commit (AGENTS.md §5.6).
 
+## Deviations found while building
+
+- Phase 0: pages are plain `ui.page` routes (each wrapped by `gui_session.guard`), not `ui.sub_pages`.
+- Phase 2: `Session` objects live in a process-level registry keyed by the opaque `sid` in `storage.user` (a
+  per-page-load store would lose chat history on every navigation). `PERSISTED_KEYS` is `user`, `active_db`, `sid`.
+  `Session.shard`/`scope` hold the level a page reads; `seal()` re-binds them and falls back to the normal level when
+  the bound one was revoked. Reset unloads the model and signs out, as the Streamlit button clears the session.
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)
