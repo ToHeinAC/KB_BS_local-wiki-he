@@ -47,6 +47,10 @@ Decisions already taken with the user:
   select for every database and reveals the ones the user is allowed in. `Session.bind_shard` is shared by Explorer and
   Maintenance. The Ontology section is a placeholder until 7b.
 
+- Phase 7b: the Edit view is rows of inputs with an explicit Preview step (Streamlit previewed on every edit); read-only
+  tables are CSS grids of labels, as the test harness cannot read `ui.table` cells. The Streamlit helpers the port
+  reuses became public in `ontology_ui.py`.
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)
