@@ -43,7 +43,7 @@ def render(user: str, can_maintain: bool) -> None:
     if errors:
         st.error(
             "**This ontology is invalid.** Nothing uses it until it is fixed "
-            "(import a corrected file or restore a revision):\n\n" + _bullets(errors)
+            "(import a corrected file or restore a revision):\n\n" + bullets(errors)
         )
     if st.session_state.get("onto_view") not in VIEWS:
         st.session_state["onto_view"] = VIEWS[0]
@@ -66,28 +66,28 @@ def render(user: str, can_maintain: bool) -> None:
 # --- helpers -------------------------------------------------------------------------
 
 
-def _bullets(items: list[str]) -> str:
+def bullets(items: list[str]) -> str:
     return "\n".join(f"- {i}" for i in items)
 
 
-def _when(iso: str) -> str:
+def when(iso: str) -> str:
     return iso[:16].replace("T", " ") + " UTC"
 
 
-def _fmt(value: object) -> str:
+def fmt(value: object) -> str:
     if value is None:
         return ""
     items = bundle.as_list(value)  # before narrowing: a narrowed list is list[Unknown]
     return ", ".join(str(v) for v in items) if isinstance(value, list) else str(value)
 
 
-def _change_line(title: str, row: dict[str, Any] | None) -> str:
+def change_line(title: str, row: dict[str, Any] | None) -> str:
     if row is None:
         return f"**{title}:** none yet"
     source = f" of `{row['file']}`" if row.get("file") else ""
     who = row.get("user") or "system"
     summary = bundle.summary_text(row["summary"])
-    return f"**{title}:** {_when(row['at'])} · {who} · {row['via']}{source} — {summary}"
+    return f"**{title}:** {when(row['at'])} · {who} · {row['via']}{source} — {summary}"
 
 
 def _apply(
@@ -101,7 +101,7 @@ def _apply(
         st.info("Identical to the current revision — nothing changed.")
         return
     if plan.status != "ready":
-        st.error("**Cannot apply:**\n\n" + _bullets(plan.errors))
+        st.error("**Cannot apply:**\n\n" + bullets(plan.errors))
         return
     try:
         row = wiki_engine.apply_ontology(
@@ -155,8 +155,8 @@ def _render_header(user: str) -> None:
     if open_proposals:
         note += f" · **{open_proposals} open proposal(s)**"
     st.markdown(f"**Revision {seq}** · `{rev}`{note}")
-    st.markdown(_change_line("Last change", ontology_store.last_change(human=True)))
-    st.markdown(_change_line("Last automatic change", ontology_store.last_change(human=False)))
+    st.markdown(change_line("Last change", ontology_store.last_change(human=True)))
+    st.markdown(change_line("Last automatic change", ontology_store.last_change(human=False)))
     db = db_context.get_active_db()
     day = datetime.now(UTC).strftime("%Y%m%d")
     st.download_button(
@@ -199,7 +199,7 @@ def _render_overview(schema: ontology.Schema | None) -> None:
         )
 
 
-def _class_usage() -> dict[str, int]:
+def class_usage() -> dict[str, int]:
     usage: dict[str, int] = {}
     for section in ontology_store.current_state()["facts"].values():
         for facts in section.values():
@@ -209,7 +209,7 @@ def _class_usage() -> dict[str, int]:
     return usage
 
 
-def _class_line(c: ontology.ClassDef, used: int) -> str:
+def class_line(c: ontology.ClassDef, used: int) -> str:
     parts = [f"**{c.labels.get('de', c.id)}** / {c.labels.get('en', c.id)} `{c.id}`"]
     if c.rank is not None:
         parts.append(f"rank {c.rank}")
@@ -229,11 +229,11 @@ def _render_classes(schema: ontology.Schema | None) -> None:
     children: dict[str | None, list[str]] = {}
     for c in schema.classes.values():
         children.setdefault(c.broader, []).append(c.id)
-    usage, lines = _class_usage(), list[str]()
+    usage, lines = class_usage(), list[str]()
 
     def walk(parent: str | None, depth: int) -> None:
         for cid in sorted(children.get(parent, [])):
-            lines.append("  " * depth + "- " + _class_line(schema.classes[cid], usage.get(cid, 0)))
+            lines.append("  " * depth + "- " + class_line(schema.classes[cid], usage.get(cid, 0)))
             walk(cid, depth + 1)
 
     walk(None, 0)
@@ -261,10 +261,10 @@ def _render_facts() -> None:
         {
             "Kind": section,
             "Subject": key,
-            "Class": _fmt(values.get("class")),
-            "Work": _fmt(values.get("work")),
+            "Class": fmt(values.get("class")),
+            "Work": fmt(values.get("work")),
             "Other": "; ".join(
-                f"{p} = {_fmt(v)}" for p, v in values.items() if p not in ("class", "work")
+                f"{p} = {fmt(v)}" for p, v in values.items() if p not in ("class", "work")
             ),
         }
         for section, entries in facts.items()
@@ -282,8 +282,8 @@ def _diff_table(changes: list[dict[str, Any]]) -> None:
             {
                 "Item": bundle.label(c["path"]),
                 "Change": c["op"],
-                "Before": _fmt(c.get("from")),
-                "After": _fmt(c.get("to")),
+                "Before": fmt(c.get("from")),
+                "After": fmt(c.get("to")),
             }
             for c in changes
         ],
@@ -301,7 +301,7 @@ def _render_history(user: str, can_maintain: bool) -> None:
         [
             {
                 "Rev": r["seq"],
-                "When": _when(r["at"]),
+                "When": when(r["at"]),
                 "Who": r.get("user") or "system",
                 "Via": r["via"],
                 "File": r.get("file") or "",
@@ -337,7 +337,7 @@ def _conflict_choices(conflicts: list[dict[str, Any]]) -> dict[str, str]:
     choices: dict[str, str] = {}
     for i, c in enumerate(conflicts):
         pick = st.radio(
-            f"{c['path']} — current: `{_fmt(c['current'])}`, yours: `{_fmt(c['mine'])}`",
+            f"{c['path']} — current: `{fmt(c['current'])}`, yours: `{fmt(c['mine'])}`",
             ["Keep current", "Use mine"],
             key=f"onto_conflict_{i}",
             horizontal=True,
@@ -351,7 +351,7 @@ def _render_plan(plan: bundle.ImportPlan) -> None:
     for warning in plan.warnings:
         st.warning(warning)
     if plan.status == "error":
-        st.error("**The file cannot be imported:**\n\n" + _bullets(plan.errors))
+        st.error("**The file cannot be imported:**\n\n" + bullets(plan.errors))
     elif plan.status == "unchanged":
         seq, _ = ontology_store.current_revision()
         st.info(f"Identical to revision {seq} — nothing changed.")
@@ -547,7 +547,7 @@ def _render_edit(schema: ontology.Schema | None, user: str, can_maintain: bool) 
     classes, facts = _edited_tables(schema, state)
     new, errors = ontology_evolution.state_from_tables(state, classes, facts)
     if errors:
-        st.error("**Fix the tables first:**\n\n" + _bullets(errors))
+        st.error("**Fix the tables first:**\n\n" + bullets(errors))
         return
     plan = ontology_store.prepare_state(new)
     _render_plan(plan)
@@ -596,8 +596,8 @@ def _render_cues(user: str, can_maintain: bool) -> None:
             {
                 "Document": c["source"],
                 "Fact": c["predicate"],
-                "Now": _fmt(c["old"]),
-                "Would be": _fmt(c["new"]),
+                "Now": fmt(c["old"]),
+                "Would be": fmt(c["new"]),
                 "Action": c["action"],
             }
             for c in changes

@@ -14,6 +14,7 @@ from nicegui import ui
 import classification
 import db_context
 import dedup
+import gui_ontology
 import gui_session
 import lex_index
 import wiki_engine
@@ -351,9 +352,8 @@ class MaintView:
 
     async def _ontology(self) -> None:
         with self.body:
-            ui.label("The ontology workbench is not built yet in the Broadsheet frontend.").classes(
-                "muted"
-            )
+            box = ui.column().classes("w-full gap-2")
+        gui_ontology.render(self.session, box)
 
     async def _log(self) -> None:
         text = await gui_session.in_worker(wiki_engine.read_log)

@@ -259,10 +259,10 @@ async def test_the_activity_log_is_shown(wiki: Path, user: User) -> None:
     await _see(user, "ingest | doc.md")
 
 
-async def test_the_ontology_section_points_at_its_phase(wiki: Path, user: User) -> None:
+async def test_the_ontology_section_shows_the_workbench(wiki: Path, user: User) -> None:
     await _open(user)
     await _section(user, "Ontology")
-    await _see(user, "not built yet")
+    await _see(user, "No ontology for this database.")
 
 
 def _strict_log() -> None:
