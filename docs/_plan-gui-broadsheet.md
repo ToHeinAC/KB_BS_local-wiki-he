@@ -36,6 +36,10 @@ Decisions already taken with the user:
   selected the reader column shows the bundle health (Map) or the overview (Index). The iframe handshake and the
   double-click event need a real browser to verify: unit tests cover `graph_click` and the shim's source text.
 
+- Phase 5: the timeline stamps each step with its arrival time; "Pages consulted" (URLs not cited in the report) is a
+  fold; the follow-up is a fold in the side column. The wiki-context paste of the Streamlit page is not ported: the
+  agent browses the wiki on its own and Deep ignores it.
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)

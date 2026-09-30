@@ -70,8 +70,19 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   and linked pages; with nothing selected it shows the bundle health (Map) or the database overview (Index). One level
   at a time: switching binds that shard as the active DB and the only scope. Graph data is computed in a worker and
   cached per shard by `graph_widget._payload`, the cache the classification leak suite covers.
-- **Status:** plan phases 0–4 (harness, mount, login, session, chrome, Chat, Explorer). The other page bodies are
-  placeholders until their phases.
+- **Research (`src/gui_research.py`):** a question bar (question, Quick/Deep method, "Include classified levels", Start,
+  New research) above an article-style report and a side column. The report is the agent's answer with numbered
+  citations (`gui_cite`), endnotes (web links with their host, originals opening in a dialog), the search-ladder audit,
+  Save to wiki with "Also register as a source document" (maintainers) and Download. The side column holds the figures
+  box (sub-tasks, web searches, pages read, sources cited; from a Deep run's metrics), a timeline "How the research
+  ran" built from the persisted steps (`ResearchComplete` is a finished-phase line, never `— {}`; a Deep to Quick
+  fallback `notice` is shown), the pages consulted and a follow-up. Runs stream through
+  `gui_session.stream_steps` with `agent.run_research_agent` or `deep_research_agent.run_deep_research`; the audit is
+  read in the same worker. Including classified levels widens the scope to every reachable level, forces Quick (web
+  tools stay off, Deep is not run) and locks the choice until New research. Everything is gated on `TAVILY_API_KEY`; a
+  run that ends with neither a result nor an error says so instead of showing a blank page.
+- **Status:** plan phases 0–5 (harness, mount, login, session, chrome, Chat, Explorer, Research). The other page
+  bodies are placeholders until their phases.
 
 ## Frontend skins (`FRONTEND`)
 
