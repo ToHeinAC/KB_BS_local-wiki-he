@@ -58,8 +58,20 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   Opening a note reads the document in a worker; a denied name looks exactly like a missing one. The conversation is a
   `Chat` in `Session.state`, so it is dropped with the session's content. Each page starts at the base level with no
   widened scope (`guard`); Chat sets its own scope for its handlers.
-- **Status:** plan phases 0–3 (harness, mount, login, session, chrome, Chat). The other page bodies are placeholders
-  until their phases.
+- **Explorer (`src/gui_explorer.py`, `src/gui_graph.py`):** a bar (level picker when more than one level is reachable,
+  Map/Index, layout, Find, size-by, overlays), the left column and the reader on the right. **Map** is the existing
+  canvas renderer (`src/assets/graph/index.html`, served from `graph-assets/`) in an iframe on the paper palette, with a
+  standings table (top pages by PageRank or connections) beside it. `gui_graph.GRAPH_JS` plays the Streamlit component
+  host's side of the `postMessage` protocol: it answers `streamlit:componentReady` with the arguments from
+  `graph_widget.render_args` and forwards `streamlit:setComponentValue` (a double-click) as the `graph_open` event, so
+  no page reloads; `graph_click` decides between opening a page and a notice for a source node. **Index** is the tree by
+  type (`get_wiki_tree`); **Find** shows hits with an excerpt and the ontology line, and reports a missing index instead
+  of "no results". The reader shows the page, its original documents (opened in a dialog through `gui_chat.open_source`)
+  and linked pages; with nothing selected it shows the bundle health (Map) or the database overview (Index). One level
+  at a time: switching binds that shard as the active DB and the only scope. Graph data is computed in a worker and
+  cached per shard by `graph_widget._payload`, the cache the classification leak suite covers.
+- **Status:** plan phases 0–4 (harness, mount, login, session, chrome, Chat, Explorer). The other page bodies are
+  placeholders until their phases.
 
 ## Frontend skins (`FRONTEND`)
 

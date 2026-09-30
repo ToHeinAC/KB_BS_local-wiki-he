@@ -31,6 +31,11 @@ Decisions already taken with the user:
   (the backend returns none); uncited sources go in an "Also read" fold. `guard` resets `shard` and `scope` at every
   page build, so Chat's widened scope never reaches the next page.
 
+- Phase 4: the map always uses the neural renderer on the paper palette (`GRAPH_RENDERER` applies to Streamlit only);
+  the index is a Map/Index toggle in the bar rather than a left drawer; all six overlays are checkboxes; with nothing
+  selected the reader column shows the bundle health (Map) or the overview (Index). The iframe handshake and the
+  double-click event need a real browser to verify: unit tests cover `graph_click` and the shim's source text.
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)
