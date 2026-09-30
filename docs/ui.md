@@ -29,7 +29,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   `register()`. The stylesheet is `src/assets/broadsheet/broadsheet.css` (the mockup tokens plus Quasar overrides).
 - **Tests:** NiceGUI's `user` fixture (`-p nicegui.testing.user_plugin`, `asyncio_mode = "auto"`, `main_file = ""` in
   `pyproject.toml`). Tests call `gui_app.register()` after the fixture, because it resets NiceGUI per test.
-- **Status:** phase 0 (harness, mount, login page). Pages follow the plan's phases.
+- **Shared logic:** `src/ui_logic.py` holds what both frontends do the same way (ingest driver, save paths, level binding); `gpu_widget.gpu_payload()` and `graph_widget.render_args()` expose the GPU stats and the graph component arguments without Streamlit.
+- **Status:** plan phases 0–1 (harness, mount, login page; shared logic extracted). Pages follow the plan's phases.
 
 ## Frontend skins (`FRONTEND`)
 
