@@ -72,10 +72,11 @@ async def test_admin_signs_in_to_the_front_page_with_the_full_nav(
 async def test_reader_has_no_upload_and_is_sent_home_from_it(gui_env: Path, user: User) -> None:
     await _sign_in(user, "reader", "pw")
     await user.should_see("Explorer")
-    await user.should_not_see("Upload")
+    await user.should_not_see(kind=ui.link, content="Upload")
     await user.open("/upload")
     await user.should_see("Front page")
-    await user.should_not_see("Upload")
+    await user.should_not_see(kind=ui.link, content="Upload")
+    await user.should_not_see("ingest-batch")
 
 
 async def test_only_admins_reach_the_admin_page(gui_env: Path, user: User) -> None:

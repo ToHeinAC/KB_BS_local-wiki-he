@@ -38,6 +38,7 @@ class Chat:
     scope: list[str] = field(default_factory=lambda: [])
     followup: dict[str, str] | None = None
     live: dict[str, Any] | None = None
+    pending: str | None = None  # asked on another page (Front page); run when Chat opens
 
 
 def chat_state(session: gui_session.Session) -> Chat:
@@ -275,6 +276,13 @@ class ChatView:
                 self._ask_row()
             self.notes = ui.column().classes("notes-col")
         self.refresh()
+        if self.chat.pending:
+            ui.timer(0.05, self._guard(self._run_pending), once=True)
+
+    async def _run_pending(self) -> None:
+        prompt, self.chat.pending = self.chat.pending, None
+        if prompt:
+            await self._submit(prompt)
 
     def refresh(self) -> None:
         for box, render in (
@@ -455,9 +463,13 @@ class ChatView:
 
     async def _ask(self) -> None:
         prompt = (self.field.value or "").strip()
-        if not prompt or self.chat.live is not None:
+        if prompt:
+            self.field.set_value("")
+            await self._submit(prompt)
+
+    async def _submit(self, prompt: str) -> None:
+        if self.chat.live is not None:
             return
-        self.field.set_value("")
         self.follow_box.clear()
         await run_turn(self.chat, prompt, self.refresh)
 

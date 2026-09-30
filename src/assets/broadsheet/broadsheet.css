@@ -212,3 +212,19 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 
 /* ── Maintenance and Admin ──────────────────────────────────────────────────────────────── */
 .maint-col, .admin-col { padding: 26px 40px 40px; width: 100%; max-width: 1000px; gap: 12px; }
+
+/* ── Front page (mockup 01) ─────────────────────────────────────────────────────────────── */
+.front { padding: 12px 40px 40px; gap: 0; }
+.front .plate-wrap { border-top: 3px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 14px 0 12px; margin-top: 8px; }
+.front .nameplate { font: 900 104px/0.95 var(--display); font-optical-sizing: none; font-variation-settings: 'opsz' 11; }
+.front .tagline { font: italic 400 19px var(--serif); color: var(--ink-2); margin-top: 10px; }
+.front-grid { display: grid; grid-template-columns: 330px minmax(0, 1fr) 420px; width: 100%; }
+.front-grid > * { padding: 22px 28px 0; }
+.front-grid > * + * { border-left: 1px solid var(--hair); }
+.front-grid .log .entry { padding: 10px 0 11px; border-bottom: 1px solid var(--hair); width: 100%; }
+.front-grid .log .when { font-size: 12.5px; color: var(--muted); }
+.front-grid .more { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.front-grid .more .k { font: 600 12.5px var(--sans); color: var(--muted); }
+.front-grid .figure { border-bottom: 1px solid var(--hair); padding: 6px 0; font-size: 14px; }
+.front-grid .num { font-weight: 700; }
+.front-grid .num.warn { color: var(--oxide); }
