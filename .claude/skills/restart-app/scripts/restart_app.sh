@@ -1,5 +1,5 @@
 #!/bin/bash
-# Restart the LocalWiki Streamlit app (port 8520) to pick up code changes
+# Restart the LocalWiki app (port 8520, either frontend) to pick up code changes
 # WITHOUT dropping the Cloudflare quick-tunnel URL.
 #
 # Why this is not just `pkill + relaunch`: tunnel.sh ends in a watchdog loop
@@ -17,7 +17,8 @@ PORT=8520
 LOG=/tmp/wiki-tunnel.log
 APP_LOG=/tmp/wiki-app.log
 URL_FILE=/tmp/wiki-app-url.txt
-APP_PATTERN="streamlit run src/app.py --server.port $PORT"
+# Matches either frontend (Streamlit src/app.py or NiceGUI src/gui_app.py) on this port only.
+APP_PATTERN="src/(app|gui_app)\.py .*port $PORT\b"
 TUNNEL_PATTERN="cloudflared tunnel --url http://localhost:$PORT"
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -89,8 +90,8 @@ fi
 # 4. Relaunch exactly as tunnel.sh does, but in its own session (setsid) and
 #    immune to SIGHUP (nohup), headless, detached, logging to the same file.
 say "Relaunching app from $REPO ..."
-( cd "$REPO" && setsid nohup uv run streamlit run src/app.py \
-    --server.port "$PORT" --server.headless true \
+# scripts/run_app.py reads FRONTEND from .env and execs the matching server.
+( cd "$REPO" && setsid nohup uv run python scripts/run_app.py --port "$PORT" \
     < /dev/null > "$APP_LOG" 2>&1 & )
 
 if ! wait_port up 30; then

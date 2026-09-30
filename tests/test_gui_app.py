@@ -1,6 +1,8 @@
 """Smoke tests for the NiceGUI (Broadsheet) entry point: harness, routing, login page."""
 
 import asyncio
+import os
+import signal
 from pathlib import Path
 
 import pytest
@@ -161,3 +163,31 @@ async def test_each_page_starts_at_the_base_level_with_no_widened_scope(
     await user.open("/scoped")
     await user.should_see(f"scope ('{db_context.DEFAULT_DB}',)")
     assert session.scope == []
+
+
+async def test_admins_can_stop_the_server_by_signalling_its_own_process(
+    gui_env: Path, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    signals: list[tuple[int, int]] = []
+    monkeypatch.setattr(gui_chrome.os, "kill", lambda pid, sig: signals.append((pid, sig)))
+    await _sign_in(user, auth.DEFAULT_USER, auth.DEFAULT_PASSWORD)
+    await user.should_see("Front page")
+    user.find("user-menu").click()
+    user.find("stop-server").click()
+    for _ in range(40):
+        if signals:
+            break
+        await asyncio.sleep(0.05)
+    assert signals == [(os.getpid(), signal.SIGTERM)]
+
+
+async def test_readers_have_no_stop_server_item(gui_env: Path, user: User) -> None:
+    await _sign_in(user, "reader", "pw")
+    await user.should_see("Front page")
+    user.find("user-menu").click()
+    await user.should_not_see("stop-server")
+
+
+def test_stopping_is_refused_for_non_admins(gui_env: Path) -> None:
+    with pytest.raises(PermissionError):
+        gui_chrome.stop_server("reader")

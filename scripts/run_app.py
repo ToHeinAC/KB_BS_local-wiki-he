@@ -1,7 +1,7 @@
 """Start the LocalWiki server for the frontend chosen by `FRONTEND` in `.env`.
 
-`broadsheet` runs the NiceGUI app (src/gui_app.py); every other value runs the Streamlit app
-(src/app.py) with its default or newspaper skin. Both serve port 8520 under /wiwi. The
+`broadsheet` (the default) runs the NiceGUI app (src/gui_app.py); `default` or `newspaper`
+runs the Streamlit app (src/app.py) with that skin. Both serve port 8520 under /wiwi. The
 process is replaced (`exec`), so the server's PID is the one you stop; see docs/ui.md.
 
 Usage:
@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-DEFAULT_FRONTEND = "default"
+DEFAULT_FRONTEND = "broadsheet"
 DEFAULT_PORT = 8520
 ROOT = Path(__file__).resolve().parent.parent
 

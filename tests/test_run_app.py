@@ -1,6 +1,7 @@
 """The launcher picks the server from FRONTEND (docs/ui.md): NiceGUI or Streamlit."""
 
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -35,5 +36,37 @@ def test_everything_else_starts_streamlit_on_the_same_port(frontend: str) -> Non
     assert "--server.headless" in cmd
 
 
-def test_default_frontend_is_streamlit_until_cutover() -> None:
-    assert _load().DEFAULT_FRONTEND == "default"
+def test_the_broadsheet_frontend_is_the_default() -> None:
+    assert _load().DEFAULT_FRONTEND == "broadsheet"
+
+
+# --- the launch scripts find either server by one pattern -------------------------------
+
+ROOT = SCRIPT.parents[1]
+SCRIPTS = [ROOT / "tunnel.sh", ROOT / ".claude/skills/restart-app/scripts/restart_app.sh"]
+
+
+def _pattern(script: Path) -> re.Pattern[str]:
+    line = next(ln for ln in script.read_text().splitlines() if ln.startswith("APP_PATTERN="))
+    return re.compile(line.split("=", 1)[1].strip("'\"").replace("$PORT", "8520"))
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda p: p.name)
+def test_the_app_pattern_matches_both_servers_and_never_the_tunnel(script: Path) -> None:
+    pattern = _pattern(script)
+    for frontend in ("broadsheet", "default"):
+        argv = " ".join(_load().command(frontend, 8520))
+        assert pattern.search(argv), argv
+    for other in (
+        "cloudflared tunnel --url http://localhost:8520",
+        "uv run streamlit run src/app.py --server.port 8511",
+        "python src/gui_app.py --port 85201",
+    ):
+        assert not pattern.search(other), other
+
+
+@pytest.mark.parametrize("script", SCRIPTS, ids=lambda p: p.name)
+def test_the_scripts_launch_through_the_frontend_launcher(script: Path) -> None:
+    text = script.read_text()
+    assert "scripts/run_app.py" in text
+    assert "streamlit run src/app.py --server.port" not in text

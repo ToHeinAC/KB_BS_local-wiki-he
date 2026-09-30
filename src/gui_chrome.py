@@ -5,6 +5,8 @@ nameplate, the primary nav, the edition (database) picker, the level stamp and t
 machine status lives in the one-line folio at the page foot, not in a sidebar.
 """
 
+import os
+import signal
 from collections.abc import Callable
 from typing import Any
 
@@ -40,6 +42,14 @@ def stamp(shard: str) -> tuple[str, str]:
 def nav_items(can_maintain: bool) -> list[tuple[str, str]]:
     """The primary nav; Upload is for maintainers only."""
     return [(label, href) for label, href in NAV if href != "/upload" or can_maintain]
+
+
+def stop_server(actor: str) -> None:
+    """End this server gracefully: SIGTERM to its own process, never a kill by port.
+    Admins only; the check is here, not just in the menu."""
+    if not auth.is_admin(actor):
+        raise PermissionError("Admins only.")
+    os.kill(os.getpid(), signal.SIGTERM)
 
 
 def folio_data() -> dict[str, Any]:
@@ -102,6 +112,10 @@ def _user_menu(session: gui_session.Session) -> None:
         await gui_session.in_worker(ui_logic.unload_model)
         _sign_out()
 
+    def _stop() -> None:
+        ui.notify("Stopping the server…")
+        ui.timer(0.5, lambda: stop_server(session.user), once=True)  # let the notice reach the page
+
     def _sign_out() -> None:
         gui_session.logout()
         ui.navigate.to("/login")
@@ -110,6 +124,9 @@ def _user_menu(session: gui_session.Session) -> None:
     with button, ui.menu():
         if auth.is_admin(session.user):
             ui.menu_item("Admin", on_click=lambda: ui.navigate.to("/admin"))
+            ui.menu_item("Stop server", on_click=gui_session.guarded(session)(_stop)).mark(
+                "stop-server"
+            )
         ui.menu_item("Reset", on_click=gui_session.guarded(session)(_reset))
         ui.menu_item("Sign out", on_click=_sign_out).mark("sign-out")
 

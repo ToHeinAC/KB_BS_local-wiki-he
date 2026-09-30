@@ -13,7 +13,8 @@ URL_FILE=/tmp/wiki-app-url.txt
 CONFIG=~/.cloudflared/config.yml
 CRED_FILE=~/.cloudflared/5bc36850-dc39-48be-81ab-fd15f8071bd0.json
 
-APP_PATTERN="streamlit run src/app.py --server.port $PORT"
+# Matches either frontend (Streamlit src/app.py or NiceGUI src/gui_app.py) on this port only.
+APP_PATTERN="src/(app|gui_app)\.py .*port $PORT\b"
 TUNNEL_PATTERN="cloudflared tunnel --url http://localhost:$PORT"
 
 if [ "$1" = "stop" ]; then
@@ -38,7 +39,7 @@ fi
 # ignore SIGHUP. Together, closing this terminal cannot kill it.
 if ! lsof -ti:"$PORT" >/dev/null 2>&1; then
   echo "App not running — starting LocalWiki on port $PORT..."
-  setsid nohup uv run streamlit run src/app.py --server.port "$PORT" --server.headless true \
+  setsid nohup uv run python scripts/run_app.py --port "$PORT" \
     < /dev/null > "$APP_LOG" 2>&1 &
   echo "  App logs: $APP_LOG"
   for i in $(seq 1 30); do
