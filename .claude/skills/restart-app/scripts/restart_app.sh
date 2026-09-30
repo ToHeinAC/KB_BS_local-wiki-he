@@ -89,10 +89,12 @@ fi
 
 # 4. Relaunch exactly as tunnel.sh does, but in its own session (setsid) and
 #    immune to SIGHUP (nohup), headless, detached, logging to the same file.
+#    scripts/run_app.py reads FRONTEND from .env and execs the matching server.
+#    The redirections sit on the subshell, and it execs: a subshell that kept this
+#    script's stdout open would make whoever reads our output wait until the app exits.
 say "Relaunching app from $REPO ..."
-# scripts/run_app.py reads FRONTEND from .env and execs the matching server.
-( cd "$REPO" && setsid nohup uv run python scripts/run_app.py --port "$PORT" \
-    < /dev/null > "$APP_LOG" 2>&1 & )
+( cd "$REPO" && exec setsid nohup uv run python scripts/run_app.py --port "$PORT" ) \
+    < /dev/null > "$APP_LOG" 2>&1 &
 
 if ! wait_port up 30; then
   say "ERROR: app did not start within 30s. Last 20 app-log lines:"

@@ -2,7 +2,9 @@
 
 import importlib.util
 import re
+import subprocess
 import sys
+import time
 from pathlib import Path
 from types import ModuleType
 
@@ -70,3 +72,28 @@ def test_the_scripts_launch_through_the_frontend_launcher(script: Path) -> None:
     text = script.read_text()
     assert "scripts/run_app.py" in text
     assert "streamlit run src/app.py --server.port" not in text
+
+
+def _relaunch_block(script: str) -> str:
+    """The restart script's relaunch command (from the `run_app.py` line to its closing `&`)."""
+    lines = script.splitlines()
+    start = next(i for i, ln in enumerate(lines) if "scripts/run_app.py" in ln)
+    end = next(i for i in range(start, len(lines)) if lines[i].rstrip().endswith(("&", "& )")))
+    return "\n".join(lines[start : end + 1])
+
+
+def test_restart_relaunch_releases_the_scripts_output(tmp_path: Path) -> None:
+    """The relaunch must not leave a subshell holding the caller's stdout: whoever reads the
+    script's output (a pipe, a tool) would otherwise wait until the app exits."""
+    block = (
+        _relaunch_block(SCRIPTS[1].read_text())
+        .replace('uv run python scripts/run_app.py --port "$PORT"', "sleep 3")
+        .replace('"$REPO"', str(tmp_path))
+        .replace('"$APP_LOG"', str(tmp_path / "app.log"))
+    )
+    runnable = tmp_path / "launch.sh"
+    runnable.write_text(block + "\necho launched\n")
+    started = time.monotonic()
+    out = subprocess.run(["bash", str(runnable)], capture_output=True, text=True, timeout=10)
+    assert out.stdout.strip() == "launched"
+    assert time.monotonic() - started < 2
