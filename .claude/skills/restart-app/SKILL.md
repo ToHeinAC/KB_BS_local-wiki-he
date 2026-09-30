@@ -1,19 +1,20 @@
 ---
 name: restart-app
-description: Restart the LocalWiki Streamlit app (port 8520) to pick up code changes without dropping the Cloudflare quick-tunnel URL. Use when asked to restart/reload/update the running app while a tunnel is live.
+description: Restart the LocalWiki app (port 8520, either frontend) to pick up code changes without dropping the Cloudflare quick-tunnel URL. Use when asked to restart/reload/update the running app while a tunnel is live.
 version: 1.0.0
 ---
 
 # Restart app (tunnel-preserving)
 
-Restart the live Streamlit app on **port 8520** so it re-imports changed code,
+Restart the live app on **port 8520** (the NiceGUI or the Streamlit frontend, whichever
+`FRONTEND` in `.env` names) so it re-imports changed code,
 **without** losing the public `*.trycloudflare.com` URL.
 
 ## When to use
 
 - "Restart / reload / update the running app" while it's exposed via `tunnel.sh`.
-- Changes to imported submodules or constants that Streamlit `runOnSave` does not
-  reliably hot-reload.
+- Code changes: the NiceGUI frontend does not hot-reload, and Streamlit's `runOnSave`
+  misses imported submodules and constants.
 - The app process died and needs to come back on the same tunnel.
 
 Do **not** use it to *stop* the app — `Ctrl-C` on `tunnel.sh` intentionally tears
@@ -50,4 +51,5 @@ Then relay its result:
 - Logs: app `/tmp/wiki-app.log`, tunnel `/tmp/wiki-tunnel.log`.
 - Watchdog disarming is scoped to **this** repo / port 8520 — other projects'
   tunnels (e.g. ports 8511, 8530) are left alone.
-- Assumes the fixed project port **8520** and a single app instance.
+- Assumes the fixed project port **8520** and a single app instance. The app is
+  relaunched through `scripts/run_app.py` and found by `src/(app|gui_app).py … port 8520`.

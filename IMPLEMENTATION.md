@@ -16,10 +16,10 @@ Rules: [AGENTS.md](AGENTS.md). Design: [docs/architecture.md](docs/architecture.
 | Ontology search eval | `uv run python scripts/eval_ontology_search.py --root <scratch dir>` (downloads public law texts; never writes `data/`) |
 | Optional reranker | `uv sync --inexact --extra rerank` (see [docs/retrieval.md](docs/retrieval.md)) |
 
-- Port 8520 (8511 belongs to another app on this host). `.streamlit/config.toml` sets
-  `baseUrlPath = "wiwi"` to match the nginx proxy at `https://ai.brenk.com/wiwi/`, so the port
-  root returns 404. Keep `--server.port 8520` on the command line: `tunnel.sh` and the
-  `restart-app` skill find the process by that flag.
+- Port 8520 (8511 belongs to another app on this host). Both frontends serve under `/wiwi` to
+  match the nginx proxy at `https://ai.brenk.com/wiwi/` (NiceGUI's mount path, Streamlit's
+  `baseUrlPath`), so the port root returns 404. `tunnel.sh` and the `restart-app` skill launch
+  through `scripts/run_app.py` and find either server by `src/(app|gui_app).py … port 8520`.
 - `uv sync` removes packages that are not in the lock, including a hand-installed CUDA build of
   `llama-cpp-python`; use `uv sync --inexact` on a machine that has one.
 - Configuration: [docs/configuration.md](docs/configuration.md).
@@ -37,7 +37,7 @@ One row per PRD milestone. Status: `planned`, `in progress`, `done`.
 | 5 | M5: Quality gate (claude-dev-schema) | done | `uv run pre-commit run --all-files` green (3.11, 3.13) |
 | 6 | M6: Ontology ([plan](docs/_plan-ontology.md) phases 1–8) | done (plan phases 1–8; §-level validity not built) | `test_ontology`, `test_ontology_store`, `test_ontology_bundle`, `test_ontology_detect`, `test_ontology_ingest`, `test_ontology_query`, `test_ontology_search`, `test_ontology_time`, `test_ontology_time_search`, `test_ontology_merge`, `test_ontology_outdated`, `test_ontology_relations`, `test_ontology_relations_flow`, `test_ontology_evolution`, `test_ontology_evolution_flow`, `test_ontology_export`, `test_ontology_pages`, `test_delete_source`, `test_app`; `scripts/bench_ontology_detect.py`, `scripts/eval_ontology_search.py` |
 | 7 | M7: Classification ([design](docs/security.md)) | done | `test_confine`, `test_classification`, `test_classification_gate`, `test_classification_shards`, `test_classification_leaks`, `test_classification_writes`, `test_classification_move`, `test_security_rules`, `test_audit`, `test_auth`, `test_app` |
-| 8 | M8: Broadsheet GUI ([plan](docs/_plan-gui-broadsheet.md)) | in progress (plan phases 0–8 done; cutover left) | `test_gui_app`, `test_gui_session`, `test_gui_chrome`, `test_gui_chat`, `test_gui_cite`, `test_gui_explorer`, `test_gui_graph`, `test_gui_research`, `test_gui_upload`, `test_gui_maint`, `test_gui_admin`, `test_gui_ontology`, `test_gui_front`, `test_run_app`, `test_ui_logic`, `test_security_rules` |
+| 8 | M8: Broadsheet GUI ([plan](docs/_plan-gui-broadsheet.md)) | done (default frontend; browser walk-through pending) | `test_gui_app`, `test_gui_session`, `test_gui_chrome`, `test_gui_chat`, `test_gui_cite`, `test_gui_explorer`, `test_gui_graph`, `test_gui_research`, `test_gui_upload`, `test_gui_maint`, `test_gui_admin`, `test_gui_ontology`, `test_gui_front`, `test_run_app`, `test_ui_logic`, `test_security_rules` |
 | – | Extensions beyond the original spec (no PRD milestone): hybrid retrieval stages A–F, multi-DB + auth, OKF bundle, language pinning, GPU pinning | done | `test_lex_index`, `test_embed_index`, `test_rerank`, `test_calibrate`, `test_multi_db`, `test_auth`, `test_lang`, `test_page_language`, `test_gpu_placement` |
 
 ## 3. Module map

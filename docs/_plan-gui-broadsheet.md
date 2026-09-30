@@ -55,6 +55,10 @@ Decisions already taken with the user:
   "Recent activity" (no per-user read marker exists); the lead's standfirst is the page's `description`, and the mockup's
   body excerpt and "Show it on the map" are not built. Chat gained `Chat.pending` for the hand-off.
 
+- Phase 9: the stop pattern ends in `\b` so port 8520 never matches 85201; *Stop server* sends SIGTERM to
+  `os.getpid()` rather than calling `app.shutdown()`, since the server is our own uvicorn under `ui.run_with`. The
+  suite runs with `-n auto` by default (serially it exceeds `session_timeout`).
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)

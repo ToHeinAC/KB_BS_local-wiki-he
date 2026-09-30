@@ -61,7 +61,8 @@ Dev: `pytest ≥ 8.0`.
 uv sync && uv run pre-commit install                  # create .venv, install locked deps + gate
 uv run pytest                                         # run tests
 uv run pre-commit run --all-files                     # full quality gate
-uv run streamlit run src/app.py --server.port 8520    # run app
+uv run python scripts/run_app.py                        # run app (FRONTEND picks the frontend)
+uv run streamlit run src/app.py --server.port 8520    # Streamlit app directly
 ```
 
 `pyproject.toml` and `uv.lock` are checked in (`uv sync --locked` in CI). Add dependencies with
@@ -69,9 +70,9 @@ uv run streamlit run src/app.py --server.port 8520    # run app
 
 ## Streamlit notes
 
-Streamlit is the chosen UI framework. Port is fixed at **8520** (8511 is reserved on this host). The sidebar's **Reset** unloads the model from VRAM and clears the session; the app has no exit button (see [openissues.md](openissues.md)).
+Streamlit is the chosen UI framework. Port is fixed at **8520** (8511 is reserved on this host). The sidebar's **Reset** unloads the model from VRAM and clears the session; the Streamlit app has no exit button (see [openissues.md](openissues.md)); the Broadsheet frontend's user menu has an admin-only *Stop server*, which sends SIGTERM to its own process.
 
-The app is served under the base path **`/wiwi/`** (`baseUrlPath` in `.streamlit/config.toml`), matching the nginx reverse proxy that publishes it at `https://ai.brenk.com/wiwi/`. The two must agree or the app renders blank. The port root 404s. `src/gpu_widget.py` reads the same option to place its injected `_api/gpu` route under the prefix — Streamlit only prefixes its *own* routes. Keep `--server.port 8520` on the command line: `tunnel.sh` and the `restart-app` skill match the process by that flag.
+The app is served under the base path **`/wiwi/`** (`baseUrlPath` in `.streamlit/config.toml`), matching the nginx reverse proxy that publishes it at `https://ai.brenk.com/wiwi/`. The two must agree or the app renders blank. The port root 404s. `src/gpu_widget.py` reads the same option to place its injected `_api/gpu` route under the prefix — Streamlit only prefixes its *own* routes. `tunnel.sh` and the `restart-app` skill start the app through `scripts/run_app.py` and match either frontend by script name and port.
 
 ## Licensing
 

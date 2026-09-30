@@ -55,15 +55,15 @@ musl-linked and fail to import on glibc. Set `RERANK_ENABLED=0` to switch it off
 ## Run
 
 ```bash
-uv run streamlit run src/app.py --server.port 8520
+uv run python scripts/run_app.py                     # the frontend FRONTEND names, port 8520
 ```
 
-Open [http://localhost:8520/wiwi/](http://localhost:8520/wiwi/) — not the port
-root, which returns 404. `.streamlit/config.toml` sets `baseUrlPath = "wiwi"` so
-the app can be served under a path; see [Remote access](#remote-access).
-
-Keep `--server.port 8520` on the command line: `tunnel.sh` and the `restart-app`
-skill find the process by matching that flag.
+`FRONTEND=broadsheet` (the default) starts the NiceGUI frontend; `default` or `newspaper` starts the
+Streamlit app, which also runs on its own with `uv run streamlit run src/app.py --server.port 8520`.
+Open [http://localhost:8520/wiwi/](http://localhost:8520/wiwi/) — not the port root, which returns
+404. Both serve under `/wiwi` (NiceGUI through its mount path, Streamlit through `baseUrlPath` in
+`.streamlit/config.toml`); see [Remote access](#remote-access). `tunnel.sh` and the `restart-app`
+skill start the app through the launcher and find either server by its script and port.
 
 ## Configuration
 
@@ -118,7 +118,7 @@ The wiki is served publicly at **<https://ai.brenk.com/wiwi/>** by an nginx reve
 | Side | Setting |
 |---|---|
 | nginx | `location /wiwi/` → `proxy_pass http://172.16.4.112:8520;` |
-| this app | `.streamlit/config.toml` → `[server] baseUrlPath = "wiwi"` |
+| this app | NiceGUI: `gui_app.MOUNT_PATH = "/wiwi"`; Streamlit: `.streamlit/config.toml` → `[server] baseUrlPath = "wiwi"` |
 
 `src/gpu_widget.py` reads the same value to register its `_api/gpu` route under the prefix, so changing `baseUrlPath` carries the widget along. The proxy config and the full reasoning live in the orchestrator repo: `local_app-orchestrator/deploy/ai.brenk.com.conf` and `docs/reverse-proxy.md`. The app directory at <https://ai.brenk.com/> links here.
 

@@ -118,7 +118,11 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   updated pages; and "Ask the archive" (Fast/Deep, hands the question to Chat as `Chat.pending`, which runs it when the
   Chat page opens) above the archive's figures and the clusters growing in the health window
   (`graph_widget.graph_health`). An empty wiki shows onboarding, worded for maintainers or readers.
-- **Status:** plan phases 0–8: every page is built. Phase 9 (cutover: default frontend, launch scripts, docs) remains.
+- **Cutover:** `broadsheet` is the default `FRONTEND`; `tunnel.sh` and the `restart-app` skill launch through
+  `scripts/run_app.py` and stop either server by `src/(app|gui_app).py … port 8520` (SIGTERM first). Admins have a
+  *Stop server* item in the user menu (`gui_chrome.stop_server`: SIGTERM to the server's own process, never a kill by
+  port; the admin check is in the function).
+- **Status:** plan phases 0–9 done. The Streamlit app stays in the codebase behind `FRONTEND=default` or `newspaper`.
 
 ## Frontend skins (`FRONTEND`)
 

@@ -143,7 +143,7 @@ correct, cited, deduplicated pages that answer later questions with traceable so
   - Chat and Research answers show numbered citations with a source-note column.
   - The classification level appears as a stamp in the page header.
   - Clearance is sealed on every event, so the M7 canary suite holds in this GUI too.
-  - `FRONTEND` other than `broadsheet` starts the Streamlit app unchanged.
+  - `FRONTEND=default` or `newspaper` starts the Streamlit app unchanged.
 - **Edge cases:** two browsers with different clearances never see each other's content;
   document text is never written to NiceGUI's persistent storage; long backend calls run in
   worker threads that carry the session's clearance.

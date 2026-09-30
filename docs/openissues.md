@@ -16,8 +16,9 @@ Track open work and resolved items here. Keep entries short; link to PRs/commits
 - **Dead code kept pending a decision:** `wiki_engine._build_existing_block` (only its test calls
   it) and `app._render_chat_sources` (unused since the chat sources side panel). Both carry a
   `reportUnusedFunction` ignore.
-- **No safe exit button in the app.** The global Streamlit rule asks for one (SIGTERM to the app's
-  own PID); the sidebar only has Reset.
+- **No safe exit button in the Streamlit app.** The global Streamlit rule asks for one (SIGTERM to
+  the app's own PID); its sidebar only has Reset. The Broadsheet frontend (the default) has one:
+  *Stop server* in the user menu, admins only.
 - **Stale `postings.json` / `stats.json` in most `data/<DB>/index/`.** Dead artifacts of the JSON-postings backend retired in `d25fbe8`; nothing reads them (~4 MB in KI alone). Safe to delete, but they are inside user databases, so removal needs an explicit go-ahead.
 - **No migration hook for derived indexes.** `d25fbe8` changed the on-disk index format with no upgrade path, which silently broke retrieval on 10 of 12 databases until 2026-07-24. A startup check (`lex_index.index_health()` per DB) or a one-shot migration script would have caught it; today only the Maintenance banner does, and only once a user visits the DB.
 
