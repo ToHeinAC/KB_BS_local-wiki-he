@@ -40,6 +40,9 @@ Decisions already taken with the user:
   fold; the follow-up is a fold in the side column. The wiki-context paste of the Streamlit page is not ported: the
   agent browses the wiki on its own and Deep ignores it.
 
+- Phase 6: files that are already ingested are skipped and named above the table, not shown as a "Duplicate" column;
+  the review table is a CSS grid of inputs rather than `ui.table`; the uploader is Quasar's (`ui.upload`, batch mode).
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)

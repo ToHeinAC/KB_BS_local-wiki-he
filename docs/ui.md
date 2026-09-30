@@ -81,8 +81,19 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   read in the same worker. Including classified levels widens the scope to every reachable level, forces Quick (web
   tools stay off, Deep is not run) and locks the choice until New research. Everything is gated on `TAVILY_API_KEY`; a
   run that ends with neither a result nor an error says so instead of showing a blank page.
-- **Status:** plan phases 0–5 (harness, mount, login, session, chrome, Chat, Explorer, Research). The other page
-  bodies are placeholders until their phases.
+- **Upload (`src/gui_upload.py`, maintainers only):** three steps, never automatic. *Prepare* (in a worker,
+  `prepare_batch`): duplicates at levels the user can see are skipped and named, PDF/DOCX/images are converted through
+  `md_convert` with a progress bar (Ollama must be reachable), the effective date and, in a database with an ontology,
+  the class, work and other versions are detected. *Review*: one table (file, date, class, work, other versions, and a
+  classification toggle per file with no default and levels only up to the uploader's clearance); a single converted
+  file has an editable Markdown preview; the ingest button is dashed and disabled until every file is classified, with the
+  reason beside it (`block_reason`). *Ingest* (`run_ingest`): oldest first, one level at a time through
+  `ui_logic.ingest_level`, each level into its own shard, then a summary (created, updated, contradictions, failures,
+  ignored ontology values). Reported contradictions feed a **Resolve contradictions** panel (pages, guidance, Reconcile
+  through `ui_logic.resolve_by_shard`, Dismiss); a new ingest resets it. Progress is a plain object the worker writes and
+  a timer reads, so no widget is touched from a thread.
+- **Status:** plan phases 0–6 (harness, mount, login, session, chrome, Chat, Explorer, Research, Upload). Maintenance,
+  Admin and the Front page are placeholders until their phases.
 
 ## Frontend skins (`FRONTEND`)
 
