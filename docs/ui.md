@@ -112,8 +112,13 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   tester, re-classify preview and apply), Lint, History (diff, download, restore as a new revision) and Import (upload,
   conflict choices, preview, apply). Every write goes through the same plans and `wiki_engine` calls, which check
   maintainer rights and record a revision; model calls run in a worker.
-- **Status:** plan phases 0–7b (harness, mount, login, session, chrome, Chat, Explorer, Research, Upload, Maintenance
-  with the ontology workbench, Admin). The Front page is a placeholder until phase 8.
+- **Front page (`src/gui_front.py`, `/`):** the only place with the full nameplate. Three columns: recent activity
+  parsed from the wiki's OKF `log.md` (`log_entries`), the most connected page (highest PageRank in the graph payload) as
+  the lead with its description, link count and "Open the page" (opens it in the Explorer reader), plus the recently
+  updated pages; and "Ask the archive" (Fast/Deep, hands the question to Chat as `Chat.pending`, which runs it when the
+  Chat page opens) above the archive's figures and the clusters growing in the health window
+  (`graph_widget.graph_health`). An empty wiki shows onboarding, worded for maintainers or readers.
+- **Status:** plan phases 0–8: every page is built. Phase 9 (cutover: default frontend, launch scripts, docs) remains.
 
 ## Frontend skins (`FRONTEND`)
 

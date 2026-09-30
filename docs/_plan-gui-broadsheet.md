@@ -51,6 +51,10 @@ Decisions already taken with the user:
   tables are CSS grids of labels, as the test harness cannot read `ui.table` cells. The Streamlit helpers the port
   reuses became public in `ontology_ui.py`.
 
+- Phase 8: the running head stays above the Front page's nameplate (the nav lives there); "Since you were last here" is
+  "Recent activity" (no per-user read marker exists); the lead's standfirst is the page's `description`, and the mockup's
+  body excerpt and "Show it on the map" are not built. Chat gained `Chat.pending` for the hand-off.
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)
