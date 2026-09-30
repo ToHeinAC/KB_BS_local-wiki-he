@@ -140,3 +140,23 @@ def test_every_route_of_the_nav_is_registered_and_guarded() -> None:
     assert {path for path, _, _ in gui_app._PAGES} == {href for _, href in gui_chrome.NAV} | {
         "/admin"
     }
+
+
+async def test_each_page_starts_at_the_base_level_with_no_widened_scope(
+    gui_env: Path, user: User
+) -> None:
+    auth.set_clearance("reader", db_context.DEFAULT_DB, "confidential", by="t")
+    with db_context.clearance({db_context.DEFAULT_DB: 1}):
+        db_context.ensure_shard(f"{db_context.DEFAULT_DB}@confidential")
+    await _sign_in(user, "reader", "pw")
+    await user.should_see("Front page")
+    (session,) = gui_session._SESSIONS.values()
+    session.scope = [db_context.DEFAULT_DB, f"{db_context.DEFAULT_DB}@confidential"]  # Chat's
+
+    def build(_s: gui_session.Session) -> None:
+        ui.label(f"scope {db_context.search_scope()}")
+
+    ui.page("/scoped")(gui_session.guard(build))
+    await user.open("/scoped")
+    await user.should_see(f"scope ('{db_context.DEFAULT_DB}',)")
+    assert session.scope == []

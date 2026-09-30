@@ -23,9 +23,21 @@ import audit  # noqa: F401  # pyright: ignore[reportUnusedImport] (registers the
 import auth
 import db_context
 import gpu_widget
+import gui_chat
 import gui_chrome
 import gui_session
 
+# Hovering a citation numeral lights its margin note and the other way round (docs/ui.md).
+CITE_JS = """<script>
+document.addEventListener('mouseover', (e) => {
+  const hit = e.target.closest('sup.cite, .note[data-n]');
+  document.querySelectorAll('.hl').forEach((x) => x.classList.remove('hl'));
+  if (!hit) return;
+  const n = hit.dataset.n;
+  document.querySelectorAll(`sup.cite[data-n="${n}"], .note[data-n="${n}"]`)
+    .forEach((x) => x.classList.add('hl'));
+});
+</script>"""
 MOUNT_PATH = "/wiwi"
 DEFAULT_PORT = 8520
 _CSS = Path(__file__).parent / "assets" / "broadsheet" / "broadsheet.css"
@@ -38,6 +50,9 @@ _PAGES: tuple[tuple[str, str, str], ...] = (
     ("/maintenance", "Maintenance", "user"),
     ("/admin", "Admin", "admin"),
 )
+
+
+_BODIES: dict[str, Callable[[gui_session.Session], None]] = {"/chat": gui_chat.build}
 
 
 def _bootstrap() -> None:
@@ -95,10 +110,12 @@ def register() -> None:
     """Register every page route on the current NiceGUI app."""
     if _CSS.exists():
         ui.add_css(_CSS.read_text(encoding="utf-8"), shared=True)
+    ui.add_body_html(CITE_JS, shared=True)
     ui.page("/login")(_login_page)
     for path, title, who in _PAGES:
+        body = _BODIES.get(path, _stub(title))
         page = gui_session.guard(
-            _shell(path, _stub(title)), maintainer=who == "maintainer", admin=who == "admin"
+            _shell(path, body), maintainer=who == "maintainer", admin=who == "admin"
         )
         ui.page(path)(page)
 

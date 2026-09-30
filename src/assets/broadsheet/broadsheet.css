@@ -167,3 +167,23 @@ table.agate tr.sel td { background: var(--oxide-tint); }
 .runhead .nav a.on { color: var(--ink); font-weight: 700; border-bottom-color: var(--ink); }
 .edition-select { min-width: 8rem; font: 600 15px var(--sans); }
 .btn.primary.q-btn { background: var(--ink) !important; color: var(--paper) !important; padding: 0 16px; }
+
+/* ── Chat (mockup 03): rail, reading column, margin notes ─────────────────────────────── */
+.chat-grid { display: grid; grid-template-columns: 250px minmax(0, 640px) minmax(0, 440px); column-gap: 56px; padding: 0 40px; width: 100%; }
+.chat-grid .rail { padding-top: 28px; border-right: 1px solid var(--hair); padding-right: 28px; margin-right: -24px; align-items: flex-start; gap: 6px; }
+.chat-grid .hint { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+.chat-grid .hist { font: 400 15px/1.35 var(--serif); color: var(--ink-2); padding: 8px 0; border-bottom: 1px solid var(--hair); width: 100%; }
+.chat-col { padding-top: 26px; min-width: 0; }
+.chat-col .earlier { font: 400 15px/1.4 var(--serif); color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--hair); width: 100%; }
+.chat-col .prose { font-size: 17.5px; line-height: 1.6; }
+.chat-col .prose sup.cite, .notes-col .note .n { color: var(--oxide); }
+.chat-col .ask { margin-top: 18px; }
+.chat-col .ask .field { flex: 1; border-bottom: 1px solid var(--ink); font: 400 18px var(--serif); }
+.notes-col { padding-top: 26px; gap: 14px; }
+.notes-col .note { display: grid; grid-template-columns: 22px 1fr; column-gap: 6px; font-size: 13px; line-height: 1.45; }
+.notes-col .note.hl { background: var(--oxide-tint); box-shadow: -8px 0 0 var(--oxide-tint), 8px 0 0 var(--oxide-tint); }
+.notes-col .note .w { color: var(--muted); font-size: 12px; }
+sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
+.fold.q-expansion-item { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+.fold .q-item { font: 600 14px var(--sans); padding-left: 0; }
+.q-toggle-group, .toggle .q-btn { border-radius: 0; }

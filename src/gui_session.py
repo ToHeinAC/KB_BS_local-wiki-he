@@ -165,6 +165,7 @@ def guard(build: Callable[[Session], None], *, maintainer: bool = False, admin: 
         if session is None:
             ui.navigate.to("/login")
             return
+        session.shard, session.scope = session.active_db, []  # a page never inherits another's
         session.seal()
         if (maintainer and not session.can_maintain) or (admin and not auth.is_admin(session.user)):
             ui.navigate.to("/")
