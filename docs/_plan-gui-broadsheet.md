@@ -43,6 +43,10 @@ Decisions already taken with the user:
 - Phase 6: files that are already ingested are skipped and named above the table, not shown as a "Duplicate" column;
   the review table is a CSS grid of inputs rather than `ui.table`; the uploader is Quasar's (`ui.upload`, batch mode).
 
+- Phase 7a: Admin is its own `/admin` page (not a Maintenance section); the user allow-list editor shows a clearance
+  select for every database and reveals the ones the user is allowed in. `Session.bind_shard` is shared by Explorer and
+  Maintenance. The Ontology section is a placeholder until 7b.
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)

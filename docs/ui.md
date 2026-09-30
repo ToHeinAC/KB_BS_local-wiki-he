@@ -92,8 +92,19 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   ignored ontology values). Reported contradictions feed a **Resolve contradictions** panel (pages, guidance, Reconcile
   through `ui_logic.resolve_by_shard`, Dismiss); a new ingest resets it. Progress is a plain object the worker writes and
   a timer reads, so no widget is touched from a thread.
-- **Status:** plan phases 0–6 (harness, mount, login, session, chrome, Chat, Explorer, Research, Upload). Maintenance,
-  Admin and the Front page are placeholders until their phases.
+- **Maintenance (`src/gui_maint.py`):** statistics (pages, raw sources, data size), a level picker when more than one
+  level is reachable (`Session.bind_shard`: that shard becomes the active DB and the only scope, so every section
+  follows it), and a section toggle: *Search index* (counts, a missing-index warning, Rebuild), *Delete source* (a
+  confirmation checkbox enables the dashed button; below it *Move to another classification level* with the purge
+  warning when moving up), *Link graph health* (orphans), *Lint*, *Page language* (scan, then Normalize), *Ontology*
+  (placeholder until plan phase 7b) and the *Activity log*. Destructive actions are maintainer-only and re-checked in the
+  handler (`_maintainer_only`), not just hidden; long backend calls run in workers.
+- **Admin (`src/gui_admin.py`, admins only, reached from the user menu):** databases (create, with maintainers), users
+  (allowed databases, maintained databases, clearance per allowed database, a new password, Save, Delete, never your own
+  account) and the security audit log. Every action goes through a function that re-checks `auth.is_admin(actor)`
+  (`require_admin`) and is tested to refuse a non-admin; clearance changes are audit-logged by `auth.set_clearance`.
+- **Status:** plan phases 0–7a (harness, mount, login, session, chrome, Chat, Explorer, Research, Upload, Maintenance,
+  Admin). The ontology workbench (7b) and the Front page are placeholders until their phases.
 
 ## Frontend skins (`FRONTEND`)
 
