@@ -46,8 +46,20 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   in a worker every 5 s). Pages are plain `ui.page` routes (`/`, `/explorer`, `/chat`, `/research`, `/upload`,
   `/maintenance`, `/admin`), each wrapped by `guard`; a signed-out visitor goes to `/login`, and Upload (maintainers)
   and Admin (admins) send everyone else home. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
-- **Status:** plan phases 0–2 (harness, mount, login, session, chrome; shared logic extracted). The page bodies are
-  placeholders until their phases.
+- **Chat (`src/gui_chat.py`, `src/gui_cite.py`):** three columns: a rail (Fast/Deep toggle, "Search in" checkboxes per
+  reachable level, the conversation's questions, New conversation), the reading column (question as headline,
+  answer, actions, the agent trace in a fold, the follow-up banner, the input) and a margin column of numbered
+  source notes. `gui_cite.number_citations` turns `[Source: file §x]` / `[Wiki: page.md]` tags into
+  `<sup class="cite" data-n>` numerals plus notes (same file and section reuse a number); hovering a numeral lights its
+  note (`gui_app.CITE_JS`). The answer is rendered through `ui.markdown` with client-side sanitising, so LLM output
+  cannot inject script. Fast runs `ui_logic.answer_fast` in a worker; Deep consumes `chat_agent.run_chat_agent` through
+  `stream_steps` (steps appear live, the audit is read in the same worker). Follow-ups go through
+  `wiki_engine.condense_followup`; Save (maintainers) files at the highest level searched via `ui_logic.save_answer`.
+  Opening a note reads the document in a worker; a denied name looks exactly like a missing one. The conversation is a
+  `Chat` in `Session.state`, so it is dropped with the session's content. Each page starts at the base level with no
+  widened scope (`guard`); Chat sets its own scope for its handlers.
+- **Status:** plan phases 0–3 (harness, mount, login, session, chrome, Chat). The other page bodies are placeholders
+  until their phases.
 
 ## Frontend skins (`FRONTEND`)
 

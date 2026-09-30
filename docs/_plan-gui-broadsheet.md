@@ -27,6 +27,10 @@ Decisions already taken with the user:
   `Session.shard`/`scope` hold the level a page reads; `seal()` re-binds them and falls back to the normal level when
   the bound one was revoked. Reset unloads the model and signs out, as the Streamlit button clears the session.
 
+- Phase 3: margin notes are numbered per file and section without the mockup's "Also cited" merge, and show no quotes
+  (the backend returns none); uncited sources go in an "Also read" fold. `guard` resets `shard` and `scope` at every
+  page build, so Chat's widened scope never reaches the next page.
+
 ## Architecture (fixed; Sonnet must not re-decide)
 
 ### Files (flat `src/`, per AGENTS.md §5.2)
