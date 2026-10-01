@@ -124,6 +124,17 @@ async def test_a_deep_answer_streams_its_trace_and_shows_the_audit(
     await user.should_see("Why these sources")
 
 
+async def test_latex_in_an_answer_is_rendered_as_math(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    answer = {**FAST, "answer": "Plan $\\to$ act [Source: ai.md §6.1]."}
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: answer)
+    await _open(user)
+    await _ask(user, "Q")
+    await user.should_see('<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline">')
+    await user.should_not_see("$\\to$")
+
+
 def _options(user: User) -> ui.expansion:
     (options,) = user.find("chat-options").elements
     assert isinstance(options, ui.expansion)

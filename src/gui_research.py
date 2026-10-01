@@ -382,7 +382,7 @@ class ResearchView:
             ui.label(run.saved or "Not yet saved")
         if run.notice:
             ui.label(run.notice).classes("text-warning")
-        ui.markdown(text).classes("prose")
+        ui.markdown(gui_cite.render_math(text)).classes("prose")
         self._render_actions()
 
     def _render_actions(self) -> None:
@@ -409,7 +409,7 @@ class ResearchView:
         with ui.expansion(f"Earlier research ({len(earlier)})").classes("fold w-full"):
             for h in earlier:
                 ui.label(h["q"]).classes("t")
-                ui.markdown(h["a"]).classes("prose compact")
+                ui.markdown(gui_cite.render_math(h["a"])).classes("prose compact")
 
     def _render_side(self) -> None:
         _render_figures(self.run.metrics)

@@ -14,6 +14,7 @@ from nicegui import ui
 import db_context
 import graph_widget
 import gui_chat
+import gui_cite
 import gui_graph
 import gui_session
 import lex_index
@@ -340,7 +341,7 @@ class ExplorerView:
                 ui.button("Close", on_click=self._guard(self._close)).props("flat").classes(
                     "btn text small"
                 ).mark("close-reader")
-            ui.markdown(parsed["content"]).classes("prose compact")
+            ui.markdown(gui_cite.render_math(parsed["content"])).classes("prose compact")
             ui.button(
                 "Download Markdown", on_click=lambda: ui.download.content(parsed["content"], page)
             ).props("flat").classes("btn text small")
@@ -426,7 +427,7 @@ class ExplorerView:
         text = await gui_session.in_worker(_overview)
         with self._reader:
             if text:
-                ui.markdown(text).classes("prose compact")
+                ui.markdown(gui_cite.render_math(text)).classes("prose compact")
             else:
                 ui.label("Select a page from the index.").classes("muted")
 

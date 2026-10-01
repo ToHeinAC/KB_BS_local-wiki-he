@@ -311,3 +311,5 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .runhead .edition .q-field__native, .runhead .edition .q-field__native span,
 .runhead .edition .q-field__append .q-icon { color: var(--paper); font-weight: 700; }
 .runhead .edition .muted { color: #cfdcd4; }
+sup.cite-sep { font: 700 0.62em/0 var(--sans); color: var(--oxide); vertical-align: super; }
+.prose math { font-size: 1.05em; }

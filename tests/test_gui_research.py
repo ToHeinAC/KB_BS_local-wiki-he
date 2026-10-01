@@ -221,6 +221,24 @@ async def test_run_report_and_sources_sit_in_three_columns_like_chat(user: User)
     assert "How the research ran" not in sources
 
 
+async def test_latex_in_a_report_is_rendered_as_math(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def run(q: str, ctx: str) -> Iterator[dict[str, Any]]:
+        yield {"type": "final_answer", "content": "Growth $x^2$ [Source: https://eo.example/a]."}
+
+    monkeypatch.setattr(agent, "run_research_agent", run)
+    monkeypatch.setattr(
+        wiki_engine,
+        "read_page_parsed",
+        lambda ref: {"content": "Growth $x^2$ [Source: https://eo.example/a]."},
+    )
+    await _open(user)
+    await _start(user)
+    await _see(user, "Research report")
+    await _see(user, '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline">')
+
+
 async def test_a_run_without_a_result_says_so_instead_of_a_blank_page(
     user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:

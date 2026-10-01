@@ -80,3 +80,40 @@ def test_an_answer_without_citations_exports_without_a_sources_list() -> None:
 def test_the_export_is_named_after_the_question() -> None:
     assert gui_cite.export_name("Was ist §5 BImSchG?") == "was-ist-5-bimschg.md"
     assert gui_cite.export_name("???") == "answer.md"
+
+
+def test_a_tag_with_several_sources_becomes_several_notes() -> None:
+    text, notes = gui_cite.number_citations("A [Source: a.md; Source: b.md §2] B.")
+    assert text == (
+        'A <sup class="cite" data-n="1">1</sup><sup class="cite-sep">,</sup>'
+        '<sup class="cite" data-n="2">2</sup> B.'
+    )
+    assert [(n.n, n.kind, n.file, n.section) for n in notes] == [
+        (1, "source", "a.md", ""),
+        (2, "source", "b.md", "§2"),
+    ]
+    _, mixed = gui_cite.number_citations("[Source: a.md, Wiki: p.md]")
+    assert [(n.kind, n.file) for n in mixed] == [("source", "a.md"), ("wiki", "p.md")]
+    _, one = gui_cite.number_citations("[Source: Report, final.md]")  # a comma inside a name
+    assert [n.file for n in one] == ["Report, final.md"]
+
+
+def test_markdown_escapes_in_cited_names_are_undone() -> None:
+    _, notes = gui_cite.number_citations("[Source: JEN\\_KOINNO.md] [Wiki: a\\*b.md]")
+    assert [n.file for n in notes] == ["JEN_KOINNO.md", "a*b.md"]
+
+
+def test_latex_becomes_mathml_and_everything_else_stays() -> None:
+    inline = gui_cite.render_math("Planning $\\to$ Tool call \\(x^2\\)")
+    assert inline.count('<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline">') == 2
+    assert "$" not in inline
+    assert "\\to" not in inline
+    block = gui_cite.render_math("Energy:\n\n$$E=mc^2$$\n")
+    assert 'display="block"' in block
+    for plain in (
+        "It costs $5 and $10.",  # currency, not math
+        "Run `echo ${HOME}` and $x$ stays",  # code untouched; no LaTeX marker in $x$
+        "```\n$a^2$\n```",  # fenced code untouched
+        "Broken $\\frac{$ stays",  # conversion failure keeps the text
+    ):
+        assert gui_cite.render_math(plain) == plain

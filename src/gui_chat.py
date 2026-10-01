@@ -376,7 +376,7 @@ class ChatView:
             ui.label(f"{msg['mode']} answer")
             ui.label(f"{len(notes)} cited")
             ui.label(f"{msg['seconds']} seconds")
-        ui.markdown(text).classes("prose")
+        ui.markdown(gui_cite.render_math(text)).classes("prose")
         if not msg["content"].startswith("Error:"):
             self._render_actions(msg)
 
