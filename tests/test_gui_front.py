@@ -114,6 +114,7 @@ async def test_an_empty_wiki_shows_onboarding(user: User) -> None:
 
 async def test_2brain_shows_activity_the_galaxy_upload_and_figures(wiki: Path, user: User) -> None:
     await _sign_in(user)
+    await _see(user, "Your documents, compiled into a linked archive on your infrastructure")
     await _see(user, "orbit.pdf created 2")
     await _see(user, "3 pages, ")  # the galaxy's caption
     await _see(user, "front-map")

@@ -53,3 +53,30 @@ def test_uncited_lists_the_sources_no_inline_tag_points_at() -> None:
     _, notes = gui_cite.number_citations("[Source: a.md §1] [Wiki: p.md]")
     refs = ["a.md", "p.md", "KI::b.md [Teil 2/3]", "c.md"]
     assert gui_cite.uncited(notes, refs) == ["KI::b.md [Teil 2/3]", "c.md"]
+
+
+def test_an_answer_exports_as_markdown_with_footnotes() -> None:
+    md = gui_cite.answer_markdown(
+        "What is X?",
+        "X is Y [Source: a.pdf §2]. See [Wiki: x.md], [Source: https://e.org/p] "
+        "and [Source: a.pdf §2].",
+        "Fast answer, KI, 2026-10-01",
+    )
+    assert md == (
+        "# What is X?\n\n"
+        "_Fast answer, KI, 2026-10-01_\n\n"
+        "X is Y[^1]. See[^2],[^3] and[^1].\n\n"
+        "## Sources\n\n"
+        "[^1]: a.pdf §2\n"
+        "[^2]: x.md (wiki page)\n"
+        "[^3]: https://e.org/p\n"
+    )
+
+
+def test_an_answer_without_citations_exports_without_a_sources_list() -> None:
+    assert gui_cite.answer_markdown("Q", "Plain.", "m") == "# Q\n\n_m_\n\nPlain.\n"
+
+
+def test_the_export_is_named_after_the_question() -> None:
+    assert gui_cite.export_name("Was ist §5 BImSchG?") == "was-ist-5-bimschg.md"
+    assert gui_cite.export_name("???") == "answer.md"

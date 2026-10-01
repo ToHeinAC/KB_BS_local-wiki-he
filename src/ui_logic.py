@@ -9,7 +9,7 @@ import contextlib
 import gc
 import os
 import re
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from contextlib import AbstractContextManager, nullcontext
 from typing import Any
 
@@ -24,6 +24,9 @@ import ollama_client
 import wiki_engine
 
 CHUNK_SUFFIX_RE = re.compile(r"\s*\[Teil\s+\d+/\d+\]\s*$")
+# A bare `[…]` that is not a Markdown link and not already a `[Source:`/`[Wiki:` tag.
+_TEIL_RE = re.compile(r"\s*\(Teil\s+\d+(?:/\d+)?\)\s*$")
+_BARE_TAG_RE = re.compile(r"\[(?!(?:Source|Wiki):)([^\[\]\n]{1,160})\](?!\()")
 
 
 CITE_SECTION_SUFFIX_RE = re.compile(r"\s*[§#].*$")
@@ -272,14 +275,72 @@ def resolve_raw_source(ref: str) -> tuple[bool, bytes | None]:
         return True, wiki_engine.read_raw_source(base)
 
 
+def _names(ref: str) -> tuple[str, str, str]:
+    """A ref, its bare file name (no DB qualifier) and that name's stem."""
+    name = ref.split(db_context.SCOPE_SEP)[-1]
+    return ref, name, name.removesuffix(".md")
+
+
+def wiki_aliases(
+    sources: Sequence[str], titles: Mapping[str, str], raw_sources: Sequence[str] = ()
+) -> dict[str, str]:
+    """Lower-cased names a Fast answer may cite by → the citation tag's content.
+
+    The answer's pages first (they keep their DB qualifier), then every page of the database by
+    file, stem or title, then the answer's original documents as `Source:`.
+    """
+    aliases: dict[str, str] = {}
+
+    def add(names: tuple[str, ...], tag: str) -> None:
+        for alias in names:
+            if alias:
+                aliases.setdefault(alias.strip().lower(), tag)
+
+    for ref in sources:
+        add((*_names(ref), titles.get(_names(ref)[1], "")), f"Wiki: {ref}")
+    for name, title in titles.items():
+        add((*_names(name), title), f"Wiki: {name}")
+    for ref in raw_sources:
+        add(_names(ref), f"Source: {ref}")
+    return aliases
+
+
+def _cited_page(part: str, aliases: Mapping[str, str]) -> str | None:
+    """The page one cited name means: a file, stem or title, maybe with a section after `.md`."""
+    key = _TEIL_RE.sub("", part).strip().lower()
+    for candidate in (key, key.removesuffix(".md")):
+        if candidate in aliases:
+            return aliases[candidate]
+    return aliases.get(key.split(".md ", 1)[0] + ".md") if ".md " in key else None
+
+
+def tag_wiki_citations(text: str, aliases: Mapping[str, str]) -> str:
+    """Turn the Fast prompt's `[page title]` citations into `[Wiki: …]` / `[Source: …]` tags.
+
+    Small models also write `[file.md Section (Teil 4)]` and comma-separated lists. Only names of
+    the pages the answer was given are tagged; a bracket with any other name stays as it is.
+    """
+
+    def tag(match: re.Match[str]) -> str:
+        tags = [_cited_page(part, aliases) for part in re.split(r"[,;]", match.group(1))]
+        if not all(tags):
+            return match.group(0)
+        return " ".join(f"[{tag}]" for tag in dict.fromkeys(tags))
+
+    return _BARE_TAG_RE.sub(tag, text)
+
+
 def answer_fast(question: str) -> dict[str, Any]:
     """One-shot wiki answer as chat-message fields; a backend error becomes the answer text."""
     try:
         res = wiki_engine.query_with_sources(question)
     except RuntimeError as e:
         return {"content": f"Error: {e}", "sources": [], "raw_sources": [], "audit": None}
+    titles = {p["filename"]: str(p.get("title") or "") for p in wiki_engine.list_pages()}
     return {
-        "content": res["answer"],
+        "content": tag_wiki_citations(
+            res["answer"], wiki_aliases(res["sources"], titles, res["raw_sources"])
+        ),
         "sources": res["sources"],
         "raw_sources": res["raw_sources"],
         "audit": res.get("audit"),

@@ -86,9 +86,9 @@ class FrontView:
             ui.label(date.today().strftime("%A, %d %B %Y")).classes("muted text-caption")
             with ui.column().classes("plate-wrap w-full items-center"):
                 ui.label("2BrAIn").classes("nameplate")
-                ui.label("Your documents, compiled into a linked archive on this machine").classes(
-                    "tagline"
-                )
+                ui.label(
+                    "Your documents, compiled into a linked archive on your infrastructure"
+                ).classes("tagline")
             with ui.element("div").classes("front-grid"):
                 self.side = ui.column().classes("log gap-0")
                 self.galaxy = ui.column().classes("galaxy gap-1")

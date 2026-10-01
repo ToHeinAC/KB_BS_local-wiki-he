@@ -228,6 +228,13 @@ async def test_a_margin_note_opens_the_cited_original(
     await user.should_see("Download")
 
 
+async def test_an_answer_offers_a_markdown_export(user: User) -> None:
+    await _open(user)
+    await _ask(user, "Q")
+    await user.should_see("ai.md §6.1")
+    await user.should_see("export-md")
+
+
 def test_the_hover_script_pairs_numerals_with_notes() -> None:
     assert "sup.cite" in gui_app.CITE_JS
     assert ".note[data-n" in gui_app.CITE_JS

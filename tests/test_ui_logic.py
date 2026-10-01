@@ -178,6 +178,46 @@ def test_answer_fast_returns_the_message_fields_or_an_error(
     assert (err["sources"], err["raw_sources"], err["audit"]) == ([], [], None)
 
 
+def test_fast_answer_page_tags_become_wiki_citations() -> None:
+    aliases = ui_logic.wiki_aliases(["hub.md", "KI::orbit.md"], {"hub.md": "Hub Page"})
+    text = (
+        "See [Hub Page] and [hub.md], [orbit] [Source: x.pdf] [Wiki: a.md] "
+        "[link](http://a) [unknown]."
+    )
+    assert ui_logic.tag_wiki_citations(text, aliases) == (
+        "See [Wiki: hub.md] and [Wiki: hub.md], [Wiki: KI::orbit.md] [Source: x.pdf] "
+        "[Wiki: a.md] [link](http://a) [unknown]."
+    )
+
+
+def test_fast_answer_tags_in_the_forms_small_models_write() -> None:
+    aliases = ui_logic.wiki_aliases(["hub.md", "why.md"], {"why.md": "Why Agents"})
+    text = (
+        "A [hub.md Key facts (Teil 4)]. B [hub.md, why.md Key facts]. C [Why Agents.md]. "
+        "D [hub.md, x]."
+    )
+    assert ui_logic.tag_wiki_citations(text, aliases) == (
+        "A [Wiki: hub.md]. B [Wiki: hub.md] [Wiki: why.md]. C [Wiki: why.md]. D [hub.md, x]."
+    )
+
+
+def test_fast_answer_other_pages_and_originals_are_tagged_too() -> None:
+    aliases = ui_logic.wiki_aliases(
+        ["hub.md"], {"hub.md": "Hub", "other.md": "Other Page"}, ["KI::JEN.md"]
+    )
+    text = "A [other.md] B [JEN.md] C [Other Page] D [JEN]"
+    assert ui_logic.tag_wiki_citations(text, aliases) == (
+        "A [Wiki: other.md] B [Source: KI::JEN.md] C [Wiki: other.md] D [Source: KI::JEN.md]"
+    )
+
+
+def test_answer_fast_tags_the_pages_it_cites(monkeypatch: pytest.MonkeyPatch) -> None:
+    res = {"answer": "Orbits [Hub].", "sources": ["hub.md"], "raw_sources": [], "audit": None}
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: res)
+    monkeypatch.setattr(wiki_engine, "list_pages", lambda: [{"filename": "hub.md", "title": "Hub"}])
+    assert ui_logic.answer_fast("q")["content"] == "Orbits [Wiki: hub.md]."
+
+
 def test_save_answer_files_into_the_target_with_only_its_own_related_pages(
     raw_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

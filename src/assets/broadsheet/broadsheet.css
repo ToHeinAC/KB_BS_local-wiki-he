@@ -172,13 +172,13 @@ table.agate tr.sel td { background: var(--oxide-tint); }
 .btn.primary.q-btn { background: var(--ink) !important; color: var(--paper) !important; padding: 0 16px; }
 
 /* ── Chat (mockup 03): rail, reading column, margin notes ─────────────────────────────── */
-.chat-grid { display: grid; grid-template-columns: 250px minmax(0, 640px) minmax(0, 440px); column-gap: 56px; padding: 0 40px; width: 100%; }
+.chat-grid { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(240px, 320px); column-gap: 56px; padding: 0 40px; width: 100%; }
 .chat-grid .rail { padding-top: 28px; border-right: 1px solid var(--hair); padding-right: 28px; margin-right: -24px; align-items: flex-start; gap: 6px; }
 .chat-grid .hint { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 .chat-grid .hist { font: 400 15px/1.35 var(--serif); color: var(--ink-2); padding: 8px 0; border-bottom: 1px solid var(--hair); width: 100%; }
 .chat-col { padding-top: 26px; min-width: 0; }
 .chat-col .earlier { font: 400 15px/1.4 var(--serif); color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--hair); width: 100%; }
-.chat-col .prose { font-size: 17.5px; line-height: 1.6; }
+.chat-col .prose { font-size: 17.5px; line-height: 1.6; max-width: 92ch; }
 .chat-col .prose sup.cite, .notes-col .note .n { color: var(--oxide); }
 .chat-col .ask { margin-top: 18px; }
 .chat-col .ask .field { flex: 1; border-bottom: 1px solid var(--ink); font: 400 18px var(--serif); }
@@ -293,3 +293,9 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
   .btn.primary.q-btn { color: var(--paper) !important; }
   .btn.primary.q-btn.disabled, .btn.primary.q-btn[disabled] { color: var(--muted) !important; }
 }
+
+/* The selected database (edition) sits in a green box, so it is never missed. */
+.runhead .edition { align-items: center; padding: 0 12px; border: 0; background: var(--green); }
+.runhead .edition .q-field__native, .runhead .edition .q-field__native span,
+.runhead .edition .q-field__append .q-icon { color: var(--paper); font-weight: 700; }
+.runhead .edition .muted { color: #cfdcd4; }

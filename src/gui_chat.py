@@ -9,6 +9,7 @@ produce the same message dicts, so the view does not care which one ran.
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Any
 
 from nicegui import ui
@@ -396,9 +397,9 @@ class ChatView:
                 ui.button("Save to wiki", on_click=self._guard(lambda: self._save(msg))).props(
                     "flat"
                 ).classes("btn sm").mark("save-answer")
-            ui.button(
-                "Download", on_click=lambda: ui.download.content(msg["content"], "answer.md")
-            ).props("flat").classes("btn text sm")
+            ui.button("Export .md", on_click=lambda: self._export(msg)).props("flat").classes(
+                "btn text sm"
+            ).mark("export-md")
             ui.button(
                 "Copy with citations", on_click=lambda: ui.clipboard.write(msg["content"])
             ).props("flat").classes("btn text sm")
@@ -411,6 +412,11 @@ class ChatView:
             ui.label(
                 "This answer searched a level above your clearance; narrow 'Search in' to save it."
             ).classes("hint")
+
+    def _export(self, msg: dict[str, Any]) -> None:
+        meta = f"{msg['mode']} answer, {self.session.active_db}, {date.today().isoformat()}"
+        text = gui_cite.answer_markdown(msg["question"], msg["content"], meta)
+        ui.download.content(text, gui_cite.export_name(msg["question"]))
 
     async def _save(self, msg: dict[str, Any]) -> None:
         target = save_target(self.session)
