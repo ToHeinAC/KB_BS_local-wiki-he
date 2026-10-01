@@ -129,6 +129,7 @@ async def test_2brain_shows_activity_the_galaxy_upload_and_figures(wiki: Path, u
     assert isinstance(activity, ui.expansion)
     assert activity.value is False  # one collapsed line until opened
     await _see(user, "3 pages, ")  # the galaxy's caption
+    await _see(user, f"Edition “{db_context.DEFAULT_DB}” as a galaxy")
     await _see(user, "front-map")
     await _see(user, "upload-files")
     await _see(user, "The archive in figures")

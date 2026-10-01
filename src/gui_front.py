@@ -156,7 +156,7 @@ class FrontView:
     def _render_galaxy(self, data: dict[str, Any]) -> None:
         with self.galaxy:
             with ui.row().classes("w-full items-baseline no-wrap"):
-                ui.label("The archive as a galaxy").classes("kicker")
+                ui.label(f"Edition “{self.session.active_db}” as a galaxy").classes("kicker")
                 ui.space()
                 ui.label(data["caption"]).classes("hint")
             ui.element("iframe").props(
