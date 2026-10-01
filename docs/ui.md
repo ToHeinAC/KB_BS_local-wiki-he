@@ -59,8 +59,12 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   "How the answer ran", live while it runs, so it sits at the top; the conversation's questions, New conversation), the reading column (question as headline, answer, actions, the follow-up banner, the input)
   and a margin column of numbered source notes. The timeline is `src/gui_trace.py`, shared with Research: agent steps
   stamped with their arrival time become dated items that fold open to the detail. `gui_cite.number_citations` turns `[Source: file §x]` / `[Wiki: page.md]` tags into
-  `<sup class="cite" data-n>` numerals plus notes (same file and section reuse a number); hovering a numeral lights its
-  note (`gui_app.CITE_JS`). The answer is rendered through `ui.markdown` with client-side sanitising, so LLM output
+  `<sup class="cite" data-n>` numerals plus notes (same file and section reuse a number; one bracket naming several
+  sources, `[Source: a.md; Source: b.md]`, gives several numerals; Markdown escapes such as `JEN\_KOINNO.md` are undone);
+  hovering a numeral lights its note (`gui_app.CITE_JS`). LaTeX in `$…$`, `$$…$$`, `\(…\)`, `\[…\]` becomes MathML
+  (`gui_cite.render_math`, `latex2mathml`) in Chat, Research and the Explorer reader, but only spans that contain a
+  `\command`, `^`, `_` or braces and never inside code, so `$5 and $10` stays text; a formula that fails to convert
+  is left as written. The answer is rendered through `ui.markdown` with client-side sanitising, so LLM output
   cannot inject script. Fast runs `ui_logic.answer_fast` in a worker. Its prompt asks for `[page title]` citations,
   and small models also write `[file.md Section (Teil 4)]` or comma lists; `ui_logic.tag_wiki_citations` turns every
   bracket that names one of the database's pages (file, stem or title) or one of the answer's originals into a

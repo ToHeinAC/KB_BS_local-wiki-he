@@ -37,6 +37,7 @@ author: Tobias Hein
 | YAML (ontology modules) | `pyyaml` | 6.0 |
 | RDF parsing in export tests (dev only) | `rdflib` | 7.6 |
 | Env variables | `python-dotenv` | 1.0 |
+| LaTeX → MathML in answers (Broadsheet GUI) | `latex2mathml` (MIT) | 3.81 |
 | Web UI | `streamlit` | 1.35 |
 | Optional graph view | `pyvis` | 0.3 |
 | Standard library | `hashlib`, `pathlib`, `json`, `re`, `shutil` | — |
