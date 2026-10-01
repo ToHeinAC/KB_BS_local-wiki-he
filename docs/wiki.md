@@ -69,7 +69,8 @@ goes through `wiki_engine.linked_pages()`, which traverses the graph undirected
 - `index.md` — bundle root. Frontmatter declares `okf_version: "0.1"`; body has
   `# Pages` / `# Insights` sections with `* [Title](filename.md) - one-line description`.
 - `log.md` — date-grouped, newest first: `## YYYY-MM-DD` headings with
-  `- HH:MM — <action>: <detail>` bullets.
+  `- HH:MM — <action>: <detail>` bullets. Day and time are **UTC** (`_append_log`); 2BrAIn converts them to
+  local time for display, and the Maintenance log view says they are UTC.
 
 Both are rewritten by `wiki_engine` (`_rebuild_index` / `_append_log`), never
 hand-edited.

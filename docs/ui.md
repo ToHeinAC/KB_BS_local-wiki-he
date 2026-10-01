@@ -130,7 +130,7 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   conflict choices, preview, apply). Every write goes through the same plans and `wiki_engine` calls, which check
   maintainer rights and record a revision; model calls run in a worker.
 - **2BrAIn (`src/gui_front.py`, `/`):** the front page and the start of the user flow. A dateline (the date left, the
-  tagline right; no nameplate, so the galaxy fits on screen), then three columns: recent activity parsed from the wiki's OKF `log.md` (`log_entries`) above the archive's
+  tagline right; no nameplate, so the galaxy fits on screen), then three columns: recent activity parsed from the wiki's OKF `log.md` (`log_entries`; one collapsed fold, one line per entry, times converted from the log's UTC to local time by `local_time`) above the archive's
   figures and the clusters growing in the health window (`graph_widget.graph_health`); the galaxy map
   (`gui_graph.map_data`, Hubs overlay, the same iframe renderer as the Explorer; a double-click on a page opens it in the
   Explorer reader); and the upload (`gui_upload.UploadView`) for maintainers, a note for readers. While a batch is
