@@ -55,8 +55,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   everyone else home. There is no separate Upload page: it is the right column of 2BrAIn. The selected database (edition) sits
   in a green box in the running head. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
 - **Chat (`src/gui_chat.py`, `src/gui_cite.py`):** three columns (1/4, 1/2, 1/4, as on Research): a rail (Fast/Deep toggle, "Search in" checkboxes per
-  reachable level, the conversation's questions, New conversation, and a Deep answer's timeline "How the answer ran",
-  live while it runs), the reading column (question as headline, answer, actions, the follow-up banner, the input)
+  reachable level, folded into one line such as "Deep · KI" once a question is asked; then a Deep answer's timeline
+  "How the answer ran", live while it runs, so it sits at the top; the conversation's questions, New conversation), the reading column (question as headline, answer, actions, the follow-up banner, the input)
   and a margin column of numbered source notes. The timeline is `src/gui_trace.py`, shared with Research: agent steps
   stamped with their arrival time become dated items that fold open to the detail. `gui_cite.number_citations` turns `[Source: file §x]` / `[Wiki: page.md]` tags into
   `<sup class="cite" data-n>` numerals plus notes (same file and section reuse a number); hovering a numeral lights its
