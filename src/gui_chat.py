@@ -277,6 +277,21 @@ class ChatView:
     # --- rail ---------------------------------------------------------------------------
 
     def _render_rail(self) -> None:
+        asked = self.chat.live is not None or bool(self.chat.messages)
+        places = ", ".join(classification.label(s) for s in self.chat.scope)
+        options = ui.expansion(f"{self.chat.mode} · {places}", value=not asked)
+        with options.classes("fold w-full").mark("chat-options"):
+            self._render_options()
+        gui_trace.render_timeline("How the answer ran", self._steps())
+        ui.label("This conversation").classes("label q-mt-md")
+        for m in (m for m in self.chat.messages if m["role"] == "user"):
+            ui.label(m["content"]).classes("hist")
+        ui.button("New conversation", on_click=self._guard(self._new)).props("flat").classes(
+            "btn small q-mt-md"
+        ).mark("new-chat")
+
+    def _render_options(self) -> None:
+        """How to answer and where to search; folded once a question is asked (docs/ui.md)."""
         ui.label("How to answer").classes("label")
         toggle = ui.toggle(list(MODES), value=self.chat.mode, on_change=self._guard(self._set_mode))
         toggle.classes("toggle").mark("mode")
@@ -296,13 +311,6 @@ class ChatView:
             ui.label(
                 f"Answers you save go to {classification.label(target)}, the top level searched."
             ).classes("hint")
-        ui.label("This conversation").classes("label q-mt-md")
-        for m in (m for m in self.chat.messages if m["role"] == "user"):
-            ui.label(m["content"]).classes("hist")
-        ui.button("New conversation", on_click=self._guard(self._new)).props("flat").classes(
-            "btn small q-mt-md"
-        ).mark("new-chat")
-        gui_trace.render_timeline("How the answer ran", self._steps())
 
     def _steps(self) -> list[dict[str, Any]]:
         """The steps of the answer being made, else of the last answer (Fast has none)."""

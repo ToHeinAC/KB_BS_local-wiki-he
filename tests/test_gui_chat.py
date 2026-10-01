@@ -124,6 +124,42 @@ async def test_a_deep_answer_streams_its_trace_and_shows_the_audit(
     await user.should_see("Why these sources")
 
 
+def _options(user: User) -> ui.expansion:
+    (options,) = user.find("chat-options").elements
+    assert isinstance(options, ui.expansion)
+    return options
+
+
+async def test_asking_folds_the_options_so_the_timeline_comes_first(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def agent(q: str) -> Iterator[dict[str, Any]]:
+        yield {"type": "tool_call", "name": "raw_search", "args": {"q": q}}
+        yield {"type": "final_answer", "content": ANSWER, "sources": ["ai.md"], "wiki_sources": []}
+
+    monkeypatch.setattr(chat_agent, "run_chat_agent", agent)
+    monkeypatch.setattr(tools, "current_run_audit", lambda db=None: None)
+    await _open(user)
+    assert _options(user).value is True
+    (toggle,) = user.find("mode").elements
+    assert isinstance(toggle, ui.toggle)
+    toggle.set_value("Deep")
+    await _ask(user, "Deep question")
+    await user.should_see("How the answer ran")
+    options = _options(user)
+    assert options.value is False
+    assert str(options.props["label"]).startswith("Deep · ")
+    (rail,) = user.find("chat-run").elements
+    texts = [str(getattr(e, "text", "") or e.props.get("label", "")) for e in rail.descendants()]
+    assert texts.index("How the answer ran") < texts.index("This conversation")
+    user.find("new-chat").click()
+    for _ in range(40):
+        if _options(user).value is True:
+            break
+        await asyncio.sleep(0.05)
+    assert _options(user).value is True
+
+
 async def test_a_backend_error_becomes_the_answer_without_actions(
     user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
