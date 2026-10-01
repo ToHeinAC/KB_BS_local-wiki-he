@@ -153,6 +153,15 @@ def _files() -> list[dict[str, Any]]:
     return [{"save_name": "a.md"}, {"save_name": "b.md"}, {"save_name": "c.md"}]
 
 
+def test_dates_must_be_iso_and_undated_files_are_named() -> None:
+    assert gui_upload.date_problem("") is None
+    assert gui_upload.date_problem("2024-01-15") is None
+    assert gui_upload.date_problem("2024-13-01") == "Use YYYY-MM-DD, e.g. 2024-01-15."
+    assert gui_upload.date_problem("15.01.2024") == "Use YYYY-MM-DD, e.g. 2024-01-15."
+    dates = {"a.md": "2024-01-15", "b.md": "", "c.md": "15.01.2024"}
+    assert gui_upload.undated(["a.md", "b.md", "c.md"], dates) == ["b.md", "c.md"]
+
+
 def test_the_plan_blocks_unclassified_and_over_clearance_files() -> None:
     plan = gui_upload.make_plan({"a.md": None, "b.md": "confidential", "c.md": "normal"}, 0)
     assert (plan.missing, plan.denied, plan.ok) == (["a.md"], ["b.md"], False)
@@ -312,6 +321,19 @@ async def test_a_classified_batch_is_ingested_into_the_chosen_level_only(
         with db_context.using_db(f"{DB}@confidential"):
             assert (db_context.raw_dir() / "a.md").exists()
         assert not (db_context.raw_dir() / "a.md").exists()  # never filed at the normal level
+
+
+async def test_a_file_without_a_date_is_pointed_out_until_one_is_entered(user: User) -> None:
+    await _open(user)
+    await _drop(user, {"c.md": b"# Gamma\n\nNo date in here."})
+    await _see(user, "No effective date for: c.md.")
+    (field,) = user.find("date-c.md").elements
+    assert isinstance(field, ui.input)
+    assert field.props.get("placeholder") == "YYYY-MM-DD"
+    assert "missing" in field.classes
+    field.set_value("2024-02-01")
+    await user.should_not_see("No effective date for")
+    assert "missing" not in field.classes
 
 
 async def test_a_prepared_batch_can_be_discarded_and_the_galaxy_returns(user: User) -> None:

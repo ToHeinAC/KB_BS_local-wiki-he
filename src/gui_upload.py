@@ -10,6 +10,7 @@ disabled. Contradictions the ingest reports feed a Resolve panel.
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +28,7 @@ import ui_logic
 ACCEPT = ".md,.pdf,.docx,.png,.jpg,.jpeg,.tiff,.tif,.bmp"
 _OLLAMA_DOWN = "Ollama is not reachable. Start it to convert non-Markdown files."
 _TICK_SECONDS = 0.2
+_DATE_FORMAT = "Use YYYY-MM-DD, e.g. 2024-01-15."
 
 
 @dataclass
@@ -138,6 +140,23 @@ def prepare_batch(
 
 
 # --- planning and ingesting ----------
+
+
+def date_problem(value: str) -> str | None:
+    """Why an entered effective date cannot be used; None when it is empty or valid."""
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        datetime.strptime(text, "%Y-%m-%d")
+    except ValueError:
+        return _DATE_FORMAT
+    return None
+
+
+def undated(names: list[str], dates: dict[str, str]) -> list[str]:
+    """Files without a usable effective date (empty or malformed), in table order."""
+    return [n for n in names if not dates.get(n, "").strip() or date_problem(dates[n])]
 
 
 def make_plan(levels: dict[str, str | None], max_level: int) -> classification.UploadPlan:
@@ -331,7 +350,10 @@ class UploadView:
             editor = ui.textarea(value=self.state.convert_text).classes("w-full")
             editor.props("outlined rows=3").mark("convert-editor")
             editor.on_value_change(lambda e: setattr(self.state, "convert_text", e.value))
+        self.date_fields: dict[str, ui.input] = {}
         self._render_table(prep)
+        self.date_hint = ui.label("").classes("date-hint")
+        self._sync_date_hint()
         with ui.expansion("Optional shared metadata (applied to all files)").classes("fold w-full"):
             ui.input("part of", on_change=lambda e: setattr(self.state, "part_of", e.value or ""))
             ui.input(
@@ -361,7 +383,7 @@ class UploadView:
         self._render()
 
     def _render_table(self, prep: Prepared) -> None:
-        cols = "minmax(0,2fr) 9rem" + (" 9rem 10rem minmax(0,1.5fr)" if prep.classes else "")
+        cols = "minmax(0,2fr) 11rem" + (" 9rem 10rem minmax(0,1.5fr)" if prep.classes else "")
         with (
             ui.element("div")
             .classes("review")
@@ -381,9 +403,7 @@ class UploadView:
     def _render_row(self, name: str, prep: Prepared) -> None:
         state = self.state
         ui.label(name).classes("file")
-        ui.input(value=state.dates.get(name, ""), on_change=self._setter(state.dates, name)).props(
-            "dense borderless"
-        ).mark(f"date-{name}")
+        self._render_date(name)
         if prep.classes:
             ui.select(
                 prep.classes,
@@ -399,6 +419,42 @@ class UploadView:
         ui.toggle(options, value=None, on_change=self._guard(self._set_level(name))).classes(
             "toggle"
         ).mark(f"level-{name}")
+
+    def _render_date(self, name: str) -> None:
+        """The effective date: typed as YYYY-MM-DD or picked, highlighted while it is missing."""
+        box = ui.input(
+            value=self.state.dates.get(name, ""),
+            placeholder="YYYY-MM-DD",
+            validation=lambda v: date_problem(str(v or "")),
+        )
+        box.props("dense outlined").classes("date-field").mark(f"date-{name}")
+        with box, ui.menu().props("no-parent-event") as menu:
+            ui.date(mask="YYYY-MM-DD").bind_value(box)
+        with box.add_slot("append"):
+            ui.icon("edit_calendar").classes("cursor-pointer").on("click", menu.open)
+
+        def changed(event: Any) -> None:
+            self.state.dates[name] = str(event.value or "")
+            menu.close()
+            self._sync_date_hint()
+
+        box.on_value_change(changed)
+        self.date_fields[name] = box
+
+    def _sync_date_hint(self) -> None:
+        prep = self.state.prepared
+        names = [f["save_name"] for f in prep.files] if prep else []
+        missing = undated(names, self.state.dates)
+        self.date_hint.set_text(
+            f"No effective date for: {', '.join(missing)}. Add the date the document took effect "
+            "(look for “Stand”, “Fassung vom”, “gültig ab”): it decides which source is newer "
+            "when pages merge. Without one, the file counts as undated."
+            if missing
+            else ""
+        )
+        self.date_hint.set_visibility(bool(missing))
+        for name, box in self.date_fields.items():
+            box.classes(add="missing") if name in missing else box.classes(remove="missing")
 
     @staticmethod
     def _setter(target: dict[str, str], name: str) -> Callable[[Any], None]:
