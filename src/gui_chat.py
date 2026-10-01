@@ -21,6 +21,7 @@ import classification
 import db_context
 import gui_cite
 import gui_session
+import gui_trace
 import lex_index
 import ontology_ui
 import tools
@@ -94,20 +95,6 @@ def apply_deep_step(acc: dict[str, Any], step: dict[str, Any]) -> None:
         acc["answer"] = f"Error: {step['content']}"
 
 
-def step_line(step: dict[str, Any]) -> str | None:
-    """One line of the trace for an agent step; None for steps that are not shown."""
-    kind = step["type"]
-    if kind in ("thought", "ontology"):
-        return str(step["content"])
-    if kind == "tool_call":
-        return f"{step['name']} — {step['args']}"
-    if kind == "tool_result":
-        return str(step["result"])[:600]
-    if kind == "error":
-        return f"Error: {step['content']}"
-    return None
-
-
 async def _deep_message(chat: Chat, question: str, on_update: Callable[[], None]) -> dict[str, Any]:
     acc = new_deep()
     steps: list[dict[str, Any]] = []
@@ -116,7 +103,7 @@ async def _deep_message(chat: Chat, question: str, on_update: Callable[[], None]
     )
     try:
         async for step in stream:
-            steps.append(step)
+            steps.append(gui_trace.stamp(step))
             if chat.live is not None:
                 chat.live["steps"] = list(steps)
             apply_deep_step(acc, step)
@@ -194,8 +181,8 @@ async def open_source(session: gui_session.Session, ref: str, kind: str, label: 
             ui.markdown(text).classes("prose compact")
             ui.button("Download", on_click=lambda: ui.download.content(text, ref)).props(
                 "flat"
-            ).classes("btn sm")
-        ui.button("Close", on_click=dialog.close).props("flat").classes("btn text sm")
+            ).classes("btn small")
+        ui.button("Close", on_click=dialog.close).props("flat").classes("btn text small")
     dialog.open()
 
 
@@ -222,17 +209,6 @@ def render_why(audit: dict[str, Any] | None) -> None:
             ui.label(f"✗ {name} — {score(s)} (over cap)").classes("file muted")
         for frame in frames:
             ui.label(ui_logic.ontology_line(frame)).classes("muted")
-
-
-def _render_trace(steps: list[dict[str, Any]]) -> None:
-    lines = [line for line in map(step_line, steps) if line]
-    with (
-        ui.expansion("How this answer was made")
-        .classes("fold w-full")
-        .props(f'caption="{len(lines)} steps"')
-    ):
-        for line in lines:
-            ui.label(line).classes("muted text-caption")
 
 
 def opener(session: gui_session.Session, note: gui_cite.Note) -> Callable[[], Any]:
@@ -274,7 +250,7 @@ class ChatView:
                 "rebuilt: Maintenance → Search index → Rebuild."
             ).classes("text-negative q-pa-md")
         with ui.element("div").classes("chat-grid"):
-            self.rail = ui.column().classes("rail")
+            self.rail = ui.column().classes("rail").mark("chat-run")
             with ui.column().classes("chat-col"):
                 self.convo = ui.column().classes("w-full gap-2")
                 self._ask_row()
@@ -324,8 +300,16 @@ class ChatView:
         for m in (m for m in self.chat.messages if m["role"] == "user"):
             ui.label(m["content"]).classes("hist")
         ui.button("New conversation", on_click=self._guard(self._new)).props("flat").classes(
-            "btn sm q-mt-md"
+            "btn small q-mt-md"
         ).mark("new-chat")
+        gui_trace.render_timeline("How the answer ran", self._steps())
+
+    def _steps(self) -> list[dict[str, Any]]:
+        """The steps of the answer being made, else of the last answer (Fast has none)."""
+        if self.chat.live is not None:
+            return self.chat.live["steps"]
+        last = next((m for m in reversed(self.chat.messages) if m["role"] == "assistant"), None)
+        return last.get("steps", []) if last else []
 
     def _scope_handler(self, shard: str) -> Callable[[Any], Any]:
         def on_change(event: Any) -> None:
@@ -373,10 +357,7 @@ class ChatView:
         ui.label(live["question"]).classes("headline m")
         if live["interpreted"]:
             ui.label(f"Interpreted as: {live['interpreted']}").classes("muted")
-        ui.label("Working…").classes("muted")
-        lines = [line for line in map(step_line, live["steps"]) if line]
-        for line in lines[-6:]:
-            ui.label(line).classes("muted text-caption")
+        ui.label("Working… the steps appear on the left.").classes("muted")
 
     def _render_answer(self, msg: dict[str, Any]) -> None:
         text, notes = gui_cite.number_citations(msg["content"])
@@ -390,8 +371,6 @@ class ChatView:
         ui.markdown(text).classes("prose")
         if not msg["content"].startswith("Error:"):
             self._render_actions(msg)
-        if msg.get("steps"):
-            _render_trace(msg["steps"])
 
     def _render_actions(self, msg: dict[str, Any]) -> None:
         with ui.row().classes("actions items-center"):
@@ -399,16 +378,16 @@ class ChatView:
             if self.session.can_maintain and target and not msg.get("saved"):
                 ui.button("Save to wiki", on_click=self._guard(lambda: self._save(msg))).props(
                     "flat"
-                ).classes("btn sm").mark("save-answer")
+                ).classes("btn small").mark("save-answer")
             ui.button("Export .md", on_click=lambda: self._export(msg)).props("flat").classes(
-                "btn text sm"
+                "btn text small"
             ).mark("export-md")
             ui.button(
                 "Copy with citations", on_click=lambda: ui.clipboard.write(msg["content"])
-            ).props("flat").classes("btn text sm")
+            ).props("flat").classes("btn text small")
             ui.button("Follow up", on_click=self._guard(lambda: self._follow(msg))).props(
                 "flat"
-            ).classes("btn text sm").mark("follow-up")
+            ).classes("btn text small").mark("follow-up")
         if msg.get("saved"):
             ui.label(msg["saved"]).classes("muted")
         elif self.session.can_maintain and save_target(self.session) is None:
@@ -463,7 +442,7 @@ class ChatView:
         with self.follow_box:
             ui.label(f"Follow-up to: {self.chat.followup['q']}").classes("muted")
             ui.button("Cancel", on_click=self._guard(self._cancel_followup)).props("flat").classes(
-                "btn text sm"
+                "btn text small"
             ).mark("cancel-follow-up")
 
     def _cancel_followup(self) -> None:

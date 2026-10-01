@@ -80,7 +80,6 @@ main { flex: 1; min-height: 0; }
 /* ── Editorial type ─────────────────────────────────────────── */
 .kicker { font: 700 13px var(--sans); color: var(--oxide); margin-bottom: 8px; }
 .headline { font: 600 40px/1.08 var(--serif); font-optical-sizing: auto; letter-spacing: -0.012em; }
-.headline.xl { font-size: 56px; line-height: 1.02; letter-spacing: -0.02em; }
 .headline.m { font-size: 30px; line-height: 1.12; }
 .headline.s { font-size: 21px; line-height: 1.2; }
 .standfirst { font: italic 400 20px/1.45 var(--serif); color: var(--ink-2); }
@@ -121,7 +120,7 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
   border: 1px solid var(--ink);
 }
 .btn.primary { background: var(--ink); color: var(--paper); }
-.btn.sm { height: 30px; padding: 0 12px; font-size: 13px; }
+.btn.small { height: 30px; padding: 0 12px; font-size: 13px; }
 .btn.text { border: 0; padding: 0 2px; text-decoration: underline; text-underline-offset: 4px; text-decoration-color: var(--hair); font-weight: 500; }
 .btn.disabled { border-style: dashed; border-color: var(--muted); color: var(--muted); background: transparent; }
 .toggle { display: inline-flex; border: 1px solid var(--ink); }
@@ -172,13 +171,14 @@ table.agate tr.sel td { background: var(--oxide-tint); }
 .btn.primary.q-btn { background: var(--ink) !important; color: var(--paper) !important; padding: 0 16px; }
 
 /* ── Chat (mockup 03): rail, reading column, margin notes ─────────────────────────────── */
-.chat-grid { display: grid; grid-template-columns: 250px minmax(0, 1fr) minmax(240px, 320px); column-gap: 56px; padding: 0 40px; width: 100%; }
-.chat-grid .rail { padding-top: 28px; border-right: 1px solid var(--hair); padding-right: 28px; margin-right: -24px; align-items: flex-start; gap: 6px; }
+/* Same 1/4 : 1/2 : 1/4 grid as Research: the run on the left, the answer, the sources. */
+.chat-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); column-gap: 48px; padding: 0 40px; width: 100%; }
+.chat-grid .rail { padding-top: 28px; border-right: 1px solid var(--hair); padding-right: 28px; margin-right: -20px; min-width: 0; align-items: flex-start; gap: 6px; }
 .chat-grid .hint { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 .chat-grid .hist { font: 400 15px/1.35 var(--serif); color: var(--ink-2); padding: 8px 0; border-bottom: 1px solid var(--hair); width: 100%; }
 .chat-col { padding-top: 26px; min-width: 0; }
 .chat-col .earlier { font: 400 15px/1.4 var(--serif); color: var(--muted); padding-bottom: 10px; border-bottom: 1px solid var(--hair); width: 100%; }
-.chat-col .prose { font-size: 17.5px; line-height: 1.6; max-width: 92ch; }
+.chat-col .prose { font-size: 17.5px; line-height: 1.6; max-width: none; }
 .chat-col .prose sup.cite, .notes-col .note .n { color: var(--oxide); }
 .chat-col .ask { margin-top: 18px; }
 .chat-col .ask .field { flex: 1; border-bottom: 1px solid var(--ink); font: 400 18px var(--serif); }

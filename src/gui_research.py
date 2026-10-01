@@ -21,6 +21,7 @@ import deep_research_agent
 import gui_chat
 import gui_cite
 import gui_session
+import gui_trace
 import tools
 import ui_logic
 import wiki_engine
@@ -60,14 +61,6 @@ class Research:
     seconds: int = 0
 
 
-@dataclass(frozen=True)
-class TraceItem:
-    kind: str  # call, result, thought, notice, error, done
-    title: str
-    detail: str
-    at: str
-
-
 def research_state(session: gui_session.Session) -> Research:
     state = session.state.get("research")
     if not isinstance(state, Research):
@@ -90,7 +83,7 @@ def record_urls(panel: list[dict[str, str]], step: dict[str, Any]) -> None:
 
 def apply_step(run: Research, step: dict[str, Any]) -> None:
     """Record one intermediate step: the trace, the sources panel and the error line."""
-    run.steps.append({**step, "at": time.strftime("%H:%M:%S")})
+    run.steps.append(gui_trace.stamp(step))
     kind = step["type"]
     if kind == "tool_call":
         run.sources.append({"tool": step["name"], "query": str(step["args"])[:80]})
@@ -109,36 +102,6 @@ def metric_tiles(metrics: dict[str, Any] | None) -> list[tuple[str, int]]:
     if checked != metrics.get("searches", 0):
         tiles.append(("Pages read", checked))
     return [*tiles, ("Sources cited", metrics.get("sources_cited", 0))]
-
-
-def _item(step: dict[str, Any]) -> TraceItem | None:
-    kind, at = step["type"], step.get("at", "")
-    if kind == "thought":
-        return TraceItem("thought", step.get("label") or "Thought", step["content"], at)
-    if kind == "notice":
-        return TraceItem("notice", "Notice", step["content"], at)
-    if kind == "ontology":
-        return TraceItem("thought", "Ontology frame", step["content"], at)
-    if kind == "error":
-        return TraceItem("error", "Error", step["content"], at)
-    if kind == "tool_call":
-        args: dict[str, Any] = step.get("args") or {}
-        if step.get("terminal"):
-            return TraceItem("done", f"{step['name']} — research phase finished", "", at)
-        detail = "\n".join(p for p in (str(args)[:300] if args else "", step.get("note", "")) if p)
-        return TraceItem("call", step["name"], detail, at)
-    if kind == "tool_result":
-        srcs: list[dict[str, str]] = step.get("sources") or []
-        title = f"Result: {step['name']}" + (f" — {len(srcs)} source(s)" if srcs else "")
-        lines = [step.get("note", ""), *(f"{s['title'] or s['url']} ({s['url']})" for s in srcs)]
-        return TraceItem(
-            "result", title, "\n".join([*filter(None, lines), step["result"][:2000]]), at
-        )
-    return None
-
-
-def trace_items(steps: list[dict[str, Any]]) -> list[TraceItem]:
-    return [item for item in map(_item, steps) if item is not None]
 
 
 def new_run(run: Research, question_to_run: str, display_q: str) -> str | None:
@@ -231,22 +194,6 @@ async def run_research(
 
 
 # --- rendering ------------------------------------------------------------------------------
-
-
-def _render_item(item: TraceItem) -> None:
-    with ui.element("div").classes(f"row {'done' if item.kind == 'done' else ''}".strip()):
-        ui.label(item.at).classes("time")
-        ui.element("span").classes("pin")
-        with ui.column().classes("what gap-0"):
-            if item.detail and item.kind in ("result", "call", "thought"):
-                with ui.expansion(item.title).classes("fold w-full"):
-                    ui.label(item.detail).classes("muted text-caption").style(
-                        "white-space: pre-wrap"
-                    )
-            else:
-                ui.label(item.title).classes("text-negative" if item.kind == "error" else "")
-                if item.detail:
-                    ui.label(item.detail).classes("muted text-caption")
 
 
 def _render_figures(metrics: dict[str, Any] | None) -> None:
@@ -453,7 +400,7 @@ class ResearchView:
             name = run.report.rsplit("/", 1)[-1] if run.report else "research-answer.md"
             ui.button(
                 "Download report", on_click=lambda: ui.download.content(run.answer, name)
-            ).props("flat").classes("btn text sm")
+            ).props("flat").classes("btn text small")
 
     def _render_history(self) -> None:
         earlier = self.run.history[:-1] if self.run.answer.strip() else self.run.history
@@ -466,12 +413,7 @@ class ResearchView:
 
     def _render_side(self) -> None:
         _render_figures(self.run.metrics)
-        items = trace_items(self.run.steps)
-        if items:
-            ui.label("How the research ran").classes("section-label")
-            with ui.column().classes("wire w-full gap-0"):
-                for item in items:
-                    _render_item(item)
+        gui_trace.render_timeline("How the research ran", self.run.steps)
         if self.run.question and not self.run.running:
             self._render_follow_up()
 
@@ -499,7 +441,7 @@ class ResearchView:
             field_.mark("followup")
             ui.button("Ask follow-up", on_click=self._guard(lambda: self._follow_up(field_))).props(
                 "flat"
-            ).classes("btn sm").mark("followup-go")
+            ).classes("btn small").mark("followup-go")
 
 
 def build(session: gui_session.Session) -> None:

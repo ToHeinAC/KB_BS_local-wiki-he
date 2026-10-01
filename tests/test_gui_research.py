@@ -137,35 +137,6 @@ def test_metric_tiles_drop_sources_checked_when_it_repeats_the_searches() -> Non
     assert gui_research.metric_tiles(None) == []
 
 
-def test_trace_items_name_the_terminal_call_and_summarise_results() -> None:
-    items = gui_research.trace_items(
-        [
-            {"type": "tool_call", "name": "ResearchComplete", "args": {}, "terminal": True},
-            {"type": "tool_call", "name": "web_search", "args": {"q": "x"}, "note": "n"},
-            {
-                "type": "tool_result",
-                "name": "web_search",
-                "result": "text",
-                "sources": [{"url": "https://a", "title": "A"}],
-            },
-            {"type": "thought", "content": "t", "label": "Plan"},
-            {"type": "notice", "content": "fell back"},
-            {"type": "error", "content": "bad"},
-            {"type": "final_answer", "content": "A"},
-        ]
-    )
-    assert [(i.kind, i.title) for i in items] == [
-        ("done", "ResearchComplete — research phase finished"),
-        ("call", "web_search"),
-        ("result", "Result: web_search — 1 source(s)"),
-        ("thought", "Plan"),
-        ("notice", "Notice"),
-        ("error", "Error"),
-    ]
-    assert items[1].detail == "{'q': 'x'}\nn"
-    assert "A (https://a)" in items[2].detail
-
-
 def test_a_run_resets_the_previous_results_and_notes_a_rephrased_question() -> None:
     run = gui_research.Research(answer="old", error="e", steps=[{"type": "x"}], saved="s")
     interpreted = gui_research.new_run(run, "standalone question", "asked")

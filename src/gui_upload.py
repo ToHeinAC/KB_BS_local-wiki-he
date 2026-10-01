@@ -480,7 +480,7 @@ class UploadView:
             )
             ui.space()
             ui.button("Dismiss", on_click=self._guard(self._dismiss)).props("flat").classes(
-                "btn text sm"
+                "btn text small"
             ).mark("dismiss-contradictions")
         for i, desc in enumerate(self.state.contradictions):
             self._render_contradiction(i, desc)

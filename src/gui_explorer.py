@@ -338,12 +338,12 @@ class ExplorerView:
                 ui.label(page).classes("file")
                 ui.space()
                 ui.button("Close", on_click=self._guard(self._close)).props("flat").classes(
-                    "btn text sm"
+                    "btn text small"
                 ).mark("close-reader")
             ui.markdown(parsed["content"]).classes("prose compact")
             ui.button(
                 "Download Markdown", on_click=lambda: ui.download.content(parsed["content"], page)
-            ).props("flat").classes("btn text sm")
+            ).props("flat").classes("btn text small")
             self._render_sources(parsed["sources"])
             self._render_related(parsed["related"])
 

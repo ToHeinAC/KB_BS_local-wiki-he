@@ -202,11 +202,11 @@ class AdminView:
                 self.flash = message
                 self.render()
 
-        ui.button("Save", on_click=self._guard(save)).props("flat").classes("btn sm").mark(
+        ui.button("Save", on_click=self._guard(save)).props("flat").classes("btn small").mark(
             f"user-save-{name}"
         )
         gone = ui.button("Delete", on_click=self._guard(delete)).props("flat")
-        gone.classes("btn text sm").set_enabled(name != self.session.user)
+        gone.classes("btn text small").set_enabled(name != self.session.user)
         gone.mark(f"user-delete-{name}")
 
     def _render_add_user(self) -> None:

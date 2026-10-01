@@ -73,18 +73,6 @@ def test_an_error_step_is_the_answer_only_when_there_is_none_yet() -> None:
     assert acc["answer"] == "A"
 
 
-def test_step_lines_are_short_and_typed() -> None:
-    assert gui_chat.step_line({"type": "thought", "content": "think"}) == "think"
-    assert gui_chat.step_line({"type": "tool_call", "name": "raw_search", "args": {"q": "x"}}) == (
-        "raw_search — {'q': 'x'}"
-    )
-    assert (
-        gui_chat.step_line({"type": "tool_result", "name": "n", "result": "r" * 900}) == "r" * 600
-    )
-    assert gui_chat.step_line({"type": "error", "content": "bad"}) == "Error: bad"
-    assert gui_chat.step_line({"type": "final_answer", "content": "A"}) is None
-
-
 # --- page --------------------------------------------------------------------------------------
 
 
@@ -128,7 +116,11 @@ async def test_a_deep_answer_streams_its_trace_and_shows_the_audit(
     toggle.set_value("Deep")
     await _ask(user, "Deep question")
     await user.should_see("Deep answer")
-    await user.should_see("How this answer was made")
+    await user.should_see("How the answer ran")
+    await user.should_not_see("How this answer was made")
+    (rail,) = user.find("chat-run").elements
+    texts = [str(getattr(e, "text", "") or e.props.get("label", "")) for e in rail.descendants()]
+    assert {"How the answer ran", "raw_search"} <= set(texts)
     await user.should_see("Why these sources")
 
 

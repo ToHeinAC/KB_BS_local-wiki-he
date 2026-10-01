@@ -129,7 +129,7 @@ class FrontView:
             with ui.column().classes("entry gap-0"):
                 ui.label(f"{day}, {time}").classes("when")
                 ui.label(f"{action.capitalize()}: {detail}" if detail else action.capitalize())
-        ui.link("Full activity log", "/maintenance").classes("btn text sm q-mt-sm")
+        ui.link("Full activity log", "/maintenance").classes("btn text small q-mt-sm")
 
     def _render_galaxy(self, data: dict[str, Any]) -> None:
         with self.galaxy:

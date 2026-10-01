@@ -160,7 +160,7 @@ class OntologyView:
         self, label: str, marker: str, action: Callable[[], Any], primary: bool = False
     ) -> ui.button:
         button = ui.button(label, on_click=self._guard(action)).props("flat")
-        return button.classes("btn primary" if primary else "btn sm").mark(marker)
+        return button.classes("btn primary" if primary else "btn small").mark(marker)
 
     # --- states --------------------
 
@@ -229,7 +229,7 @@ class OntologyView:
         )
         ui.button("Export current (YAML)", on_click=lambda: ui.download.content(text, name)).props(
             "flat"
-        ).classes("btn text sm")
+        ).classes("btn text small")
 
     # --- read views --------------------
 
@@ -249,7 +249,7 @@ class OntologyView:
             ui.button(
                 "Schema as SKOS (Turtle)",
                 on_click=lambda: ui.download.content(turtle, f"ontology-{db}.ttl"),
-            ).props("flat").classes("btn text sm")
+            ).props("flat").classes("btn text small")
             view = ontology_store.view()
             if view is not None:
                 doc = json.dumps(
@@ -258,7 +258,7 @@ class OntologyView:
                 ui.button(
                     "Facts as JSON-LD",
                     on_click=lambda: ui.download.content(doc, f"ontology-{db}.jsonld"),
-                ).props("flat").classes("btn text sm")
+                ).props("flat").classes("btn text small")
 
     def _classes(self, schema: ontology.Schema | None) -> None:
         if schema is None:
@@ -350,7 +350,7 @@ class OntologyView:
             name = f"ontology-{db_context.get_active_db()}-rev{seq}.yaml"
             ui.button(
                 f"Download revision {seq}", on_click=lambda: ui.download.content(text, name)
-            ).props("flat").classes("btn text sm")
+            ).props("flat").classes("btn text small")
         if self.session.can_maintain and seq != rows[0]["seq"]:
             self._restore_controls(seq)
 
