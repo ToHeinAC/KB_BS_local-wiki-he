@@ -127,8 +127,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   tester, re-classify preview and apply), Lint, History (diff, download, restore as a new revision) and Import (upload,
   conflict choices, preview, apply). Every write goes through the same plans and `wiki_engine` calls, which check
   maintainer rights and record a revision; model calls run in a worker.
-- **2BrAIn (`src/gui_front.py`, `/`):** the front page and the start of the user flow, the only place with the full
-  nameplate. Three columns: recent activity parsed from the wiki's OKF `log.md` (`log_entries`) above the archive's
+- **2BrAIn (`src/gui_front.py`, `/`):** the front page and the start of the user flow. A dateline (the date left, the
+  tagline right; no nameplate, so the galaxy fits on screen), then three columns: recent activity parsed from the wiki's OKF `log.md` (`log_entries`) above the archive's
   figures and the clusters growing in the health window (`graph_widget.graph_health`); the galaxy map
   (`gui_graph.map_data`, Hubs overlay, the same iframe renderer as the Explorer; a double-click on a page opens it in the
   Explorer reader); and the upload (`gui_upload.UploadView`) for maintainers, a note for readers. The upload column is
