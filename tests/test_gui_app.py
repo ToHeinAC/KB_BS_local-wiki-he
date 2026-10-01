@@ -72,12 +72,12 @@ async def test_admin_signs_in_to_the_front_page_with_the_full_nav(
     await user.should_see("Normal")  # the level stamp
 
 
-async def test_the_browser_tab_reads_wiwi_with_an_emoji_icon(gui_env: Path, user: User) -> None:
+async def test_the_browser_tab_reads_l_wiki_with_an_emoji_icon(gui_env: Path, user: User) -> None:
     await _sign_in(user, "reader", "pw")
     await user.should_see("2BrAIn")
     assert user.client is not None
     page = user.client.page
-    assert (page.resolve_title(), page.favicon) == ("wiwi", gui_app.FAVICON)
+    assert (page.resolve_title(), page.favicon) == ("L-Wiki", gui_app.FAVICON)
     assert not str(gui_app.FAVICON).isascii()  # an emoji, not a file path
 
 

@@ -26,7 +26,7 @@ A second GUI, built from the mockups in [`ideas/gui-redesign/`](../ideas/gui-red
 the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching server on port 8520 under `/wiwi`.
 
 - **Entry:** `src/gui_app.py` mounts NiceGUI with `ui.run_with(api, mount_path="/wiwi")`; pages register through
-  `register()`, every page titled `wiwi` with a 🧠 favicon. Quasar's primary colour is the Streamlit theme's dark green
+  `register()`, every page titled `L-Wiki` with a 🧠 favicon. Quasar's primary colour is the Streamlit theme's dark green
   `#234637` (`app.colors`). The stylesheet is `src/assets/broadsheet/broadsheet.css` (the mockup tokens plus Quasar
   overrides). NiceGUI 3 loads Quasar into CSS cascade layers, and unlayered rules beat every layer: the mockup's
   `* { margin: 0; padding: 0 }` reset therefore sits in `@layer base`, or it would erase Quasar's own spacing

@@ -46,7 +46,7 @@ document.addEventListener('mouseover', (e) => {
 </script>"""
 MOUNT_PATH = "/wiwi"
 DEFAULT_PORT = 8520
-TITLE = "wiwi"
+TITLE = "L-Wiki"
 FAVICON = "🧠"
 PRIMARY = "#234637"  # the Streamlit theme's dark green (.streamlit/config.toml primaryColor)
 _CSS = Path(__file__).parent / "assets" / "broadsheet" / "broadsheet.css"
