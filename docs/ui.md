@@ -50,14 +50,20 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   with Admin, Reset and Sign out) and a one-line folio (model and GPU pinning, GPU load, search-index size; refreshed
   in a worker every 5 s). Pages are plain `ui.page` routes (`/`, `/explorer`, `/chat`, `/research`,
   `/maintenance`, `/admin`), each wrapped by `guard`; a signed-out visitor goes to `/login`, and Admin (admins) sends
-  everyone else home. There is no separate Upload page: it is the right column of 2BrAIn. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
+  everyone else home. There is no separate Upload page: it is the right column of 2BrAIn. The selected database (edition) sits
+  in a green box in the running head. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
 - **Chat (`src/gui_chat.py`, `src/gui_cite.py`):** three columns: a rail (Fast/Deep toggle, "Search in" checkboxes per
   reachable level, the conversation's questions, New conversation), the reading column (question as headline,
   answer, actions, the agent trace in a fold, the follow-up banner, the input) and a margin column of numbered
   source notes. `gui_cite.number_citations` turns `[Source: file §x]` / `[Wiki: page.md]` tags into
   `<sup class="cite" data-n>` numerals plus notes (same file and section reuse a number); hovering a numeral lights its
   note (`gui_app.CITE_JS`). The answer is rendered through `ui.markdown` with client-side sanitising, so LLM output
-  cannot inject script. Fast runs `ui_logic.answer_fast` in a worker; Deep consumes `chat_agent.run_chat_agent` through
+  cannot inject script. Fast runs `ui_logic.answer_fast` in a worker. Its prompt asks for `[page title]` citations,
+  and small models also write `[file.md Section (Teil 4)]` or comma lists; `ui_logic.tag_wiki_citations` turns every
+  bracket that names one of the database's pages (file, stem or title) or one of the answer's originals into a
+  `[Wiki: …]` / `[Source: …]` tag in code, and leaves any other bracket alone. *Export .md* downloads the answer as a
+  standalone file (`gui_cite.answer_markdown`: question as title, a meta line, citations as Markdown footnotes under
+  Sources), named after the question. Deep consumes `chat_agent.run_chat_agent` through
   `stream_steps` (steps appear live, the audit is read in the same worker). Follow-ups go through
   `wiki_engine.condense_followup`; Save (maintainers) files at the highest level searched via `ui_logic.save_answer`.
   Opening a note reads the document in a worker; a denied name looks exactly like a missing one. The conversation is a
