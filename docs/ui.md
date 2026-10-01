@@ -101,7 +101,9 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   `md_convert` with a progress bar (Ollama must be reachable), the effective date and, in a database with an ontology,
   the class, work and other versions are detected. *Review*: one table (file, date, class, work, other versions, and a
   classification toggle per file with no default and levels only up to the uploader's clearance); a single converted
-  file has an editable Markdown preview (three lines, scrolling, so the metadata and Ingest stay in view); the ingest button is dashed and disabled until every file is classified, with the
+  file has an editable Markdown preview (three lines, scrolling, so the metadata and Ingest stay in view); the
+  effective date is an outlined YYYY-MM-DD field with a calendar picker, marked in oxide while missing or malformed,
+  and a hint line names the undated files and why the date matters (`date_problem`, `undated`); the ingest button is dashed and disabled until every file is classified, with the
   reason beside it (`block_reason`). *Ingest* (`run_ingest`): oldest first, one level at a time through
   `ui_logic.ingest_level`, each level into its own shard, then a summary (created, updated, contradictions, failures,
   ignored ontology values). Reported contradictions feed a **Resolve contradictions** panel (pages, guidance, Reconcile
