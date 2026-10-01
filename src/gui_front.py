@@ -1,6 +1,6 @@
 """2BrAIn, the front page of the Broadsheet frontend (mockup `01-front-page.html`, docs/ui.md).
 
-The one place with the full nameplate, and the start of the user flow. Three columns: recent
+The start of the user flow: a dateline with the tagline, then three columns: recent
 activity from the wiki's `log.md` with the archive's figures, the galaxy map of the wiki (a
 double-click opens the page in the Explorer), and the upload for maintainers. Everything is read
 for the session's database at its normal level.
@@ -83,9 +83,8 @@ class FrontView:
 
     def build(self) -> None:
         with ui.column().classes("front w-full"):
-            ui.label(date.today().strftime("%A, %d %B %Y")).classes("muted text-caption")
-            with ui.column().classes("plate-wrap w-full items-center"):
-                ui.label("2BrAIn").classes("nameplate")
+            with ui.row().classes("dateline w-full items-baseline justify-between no-wrap"):
+                ui.label(date.today().strftime("%A, %d %B %Y")).classes("muted text-caption")
                 ui.label(
                     "Your documents, compiled into a linked archive on your infrastructure"
                 ).classes("tagline")

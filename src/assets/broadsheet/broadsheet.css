@@ -221,9 +221,8 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 
 /* ── Front page (mockup 01) ─────────────────────────────────────────────────────────────── */
 .front { padding: 12px 40px 40px; gap: 0; }
-.front .plate-wrap { border-top: 3px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 14px 0 12px; margin-top: 8px; }
-.front .nameplate { font: 900 104px/0.95 var(--display); font-optical-sizing: none; font-variation-settings: 'opsz' 11; }
-.front .tagline { font: italic 400 19px var(--serif); color: var(--ink-2); margin-top: 10px; }
+.front .dateline { padding: 10px 0 9px; border-bottom: 1px solid var(--ink); }
+.front .tagline { font: italic 400 17px var(--serif); color: var(--ink-2); text-align: right; }
 .front-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr) 460px; width: 100%; }
 .front-grid .galaxy .graph-frame { width: 100%; height: 580px; border: 0; display: block; }
 .front-grid .intake .hint { padding: 0 !important; }

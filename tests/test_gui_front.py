@@ -4,6 +4,7 @@ from pathlib import Path
 
 import frontmatter
 import pytest
+from nicegui import ui
 from nicegui.testing import User, UserInteraction
 
 import auth
@@ -122,6 +123,18 @@ async def test_2brain_shows_activity_the_galaxy_upload_and_figures(wiki: Path, u
     await _see(user, "The archive in figures")
     await _see(user, "Pages with no links")
     await user.should_not_see("Ask the archive")
+
+
+async def test_the_tagline_shares_the_date_line_and_there_is_no_nameplate(
+    wiki: Path, user: User
+) -> None:
+    await _sign_in(user)
+    await _see(user, "on your infrastructure")
+    (tagline,) = user.find("on your infrastructure").elements
+    assert tagline.parent_slot is not None
+    line = tagline.parent_slot.parent
+    assert "dateline" in line.classes
+    assert not [e for e in user.find(ui.label).elements if e.text == "2BrAIn"]
 
 
 async def test_an_empty_wiki_still_offers_the_upload(user: User) -> None:
