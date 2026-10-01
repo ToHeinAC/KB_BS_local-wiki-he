@@ -101,11 +101,11 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   `md_convert` with a progress bar (Ollama must be reachable), the effective date and, in a database with an ontology,
   the class, work and other versions are detected. *Review*: one table (file, date, class, work, other versions, and a
   classification toggle per file with no default and levels only up to the uploader's clearance); a single converted
-  file has an editable Markdown preview; the ingest button is dashed and disabled until every file is classified, with the
+  file has an editable Markdown preview (three lines, scrolling, so the metadata and Ingest stay in view); the ingest button is dashed and disabled until every file is classified, with the
   reason beside it (`block_reason`). *Ingest* (`run_ingest`): oldest first, one level at a time through
   `ui_logic.ingest_level`, each level into its own shard, then a summary (created, updated, contradictions, failures,
   ignored ontology values). Reported contradictions feed a **Resolve contradictions** panel (pages, guidance, Reconcile
-  through `ui_logic.resolve_by_shard`, Dismiss); a new ingest resets it. Progress is a plain object the worker writes and
+  through `ui_logic.resolve_by_shard`, Dismiss); a new ingest resets it. *Discard* drops a prepared batch unwritten. Progress is a plain object the worker writes and
   a timer reads, so no widget is touched from a thread.
 - **Maintenance (`src/gui_maint.py`):** statistics (pages, raw sources, data size), a level picker when more than one
   level is reachable (`Session.bind_shard`: that shard becomes the active DB and the only scope, so every section
@@ -131,7 +131,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   tagline right; no nameplate, so the galaxy fits on screen), then three columns: recent activity parsed from the wiki's OKF `log.md` (`log_entries`) above the archive's
   figures and the clusters growing in the health window (`graph_widget.graph_health`); the galaxy map
   (`gui_graph.map_data`, Hubs overlay, the same iframe renderer as the Explorer; a double-click on a page opens it in the
-  Explorer reader); and the upload (`gui_upload.UploadView`) for maintainers, a note for readers. The upload column is
+  Explorer reader); and the upload (`gui_upload.UploadView`) for maintainers, a note for readers. While a batch is
+  prepared or reviewed (`on_review`), the upload takes the galaxy's place; when it ends, the columns reload. The upload column is
   built at once, so an empty wiki still offers it.
 - **Cutover:** `broadsheet` is the default `FRONTEND`; `tunnel.sh` and the `restart-app` skill launch through
   `scripts/run_app.py` and stop either server by `src/(app|gui_app).py … port 8520` (SIGTERM first). Admins have a
