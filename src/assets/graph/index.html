@@ -226,6 +226,7 @@ let S = {                    // everything that survives a Streamlit rerun
   rankColors: null,          // id -> rank colour, set while a selection is live
   maxPr: 1e-9, maxDeg: 1,
   view: { x: 0, y: 0, k: 1 },
+  userView: false,           // the reader panned or zoomed: stop auto-framing
   hover: null, selected: null, query: "", clicks: 0,
   alpha: 1, t: 0,
 };
@@ -300,6 +301,7 @@ const PYRAMID_ROW = 96;  // px between pyramid rows (one per class rank)
 
 function relayout() {
   S.view = { x: 0, y: 0, k: 1 };
+  S.userView = false;
   if (S.layout === "arc") layoutArc();
   else if (S.layout === "radial") layoutRadial();
   else if (S.layout === "pyramid") layoutPyramid();
@@ -310,6 +312,23 @@ function relayout() {
 function fitTo(size) {
   const room = Math.min(cv.clientWidth, cv.clientHeight) - 48;
   if (room > 0 && size > 0) S.view.k = Math.max(0.25, Math.min(1, room / size));
+}
+
+/** Centre the visible nodes and zoom out until all of them fit the canvas. Never zooms in.
+ *  The galaxy is a force layout whose extent is only known once it settles, so this runs
+ *  every tick until it does — or until the reader takes over the view. */
+const FIT_MARGIN = 64;  // px of canvas kept free around the outermost dots (room for labels)
+function fitAll() {
+  const vis = S.nodes.filter((n) => n.vis);
+  const w = cv.clientWidth - 2 * FIT_MARGIN, h = cv.clientHeight - 2 * FIT_MARGIN;
+  if (!vis.length || w <= 0 || h <= 0) return;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  vis.forEach((n) => {
+    x0 = Math.min(x0, n.x - n.r); x1 = Math.max(x1, n.x + n.r);
+    y0 = Math.min(y0, n.y - n.r); y1 = Math.max(y1, n.y + n.r);
+  });
+  const k = Math.max(0.1, Math.min(1, w / Math.max(x1 - x0, 1), h / Math.max(y1 - y0, 1)));
+  S.view = { x: -((x0 + x1) / 2) * k, y: -((y0 + y1) / 2) * k, k };
 }
 
 function layoutGalaxy() {
@@ -505,6 +524,7 @@ function tick() {
     n.gx = n.x; n.gy = n.y;  // so a return to galaxy restores this exact map
   });
   S.alpha *= 0.985;
+  if (!S.userView) fitAll();
 }
 
 // --- drawing ---------------------------------------------------------------
@@ -776,7 +796,7 @@ cv.addEventListener("mousemove", (e) => {
     S.view.y += dy;
     // A few pixels of jitter while clicking must not be read as a pan, or the
     // click would be swallowed and the node never open.
-    if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+    if (Math.abs(dx) + Math.abs(dy) > 2) moved = S.userView = true;
     last = { x: e.clientX, y: e.clientY };
     return;
   }
@@ -786,8 +806,9 @@ cv.addEventListener("mousemove", (e) => {
 });
 cv.addEventListener("wheel", (e) => {
   e.preventDefault();
-  const k = Math.min(4, Math.max(0.25, S.view.k * (e.deltaY < 0 ? 1.12 : 0.89)));
+  const k = Math.min(4, Math.max(0.1, S.view.k * (e.deltaY < 0 ? 1.12 : 0.89)));
   S.view.k = k;
+  S.userView = true;
 }, { passive: false });
 
 // Single click selects: it lights the neighbourhood and fills the info panel,
