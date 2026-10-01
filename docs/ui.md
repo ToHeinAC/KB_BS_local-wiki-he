@@ -26,7 +26,12 @@ A second GUI, built from the mockups in [`ideas/gui-redesign/`](../ideas/gui-red
 the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching server on port 8520 under `/wiwi`.
 
 - **Entry:** `src/gui_app.py` mounts NiceGUI with `ui.run_with(api, mount_path="/wiwi")`; pages register through
-  `register()`. The stylesheet is `src/assets/broadsheet/broadsheet.css` (the mockup tokens plus Quasar overrides).
+  `register()`, every page titled `wiwi` with a 🧠 favicon. Quasar's primary colour is the Streamlit theme's dark green
+  `#234637` (`app.colors`). The stylesheet is `src/assets/broadsheet/broadsheet.css` (the mockup tokens plus Quasar
+  overrides). NiceGUI 3 loads Quasar into CSS cascade layers, and unlayered rules beat every layer: the mockup's
+  `* { margin: 0; padding: 0 }` reset therefore sits in `@layer base`, or it would erase Quasar's own spacing
+  (`q-px-*`, menu items, fields). Conversely, Quasar's `!important` utilities (`text-primary` on flat buttons) sit in
+  its last layer and outrank unlayered `!important`; an override that must win goes in `@layer theme`.
 - **Tests:** NiceGUI's `user` fixture (`-p nicegui.testing.user_plugin`, `asyncio_mode = "auto"`, `main_file = ""` in
   `pyproject.toml`). Tests call `gui_app.register()` after the fixture, because it resets NiceGUI per test.
 - **Shared logic:** `src/ui_logic.py` holds what both frontends do the same way (ingest driver, save paths, level binding); `gpu_widget.gpu_payload()` and `graph_widget.render_args()` expose the GPU stats and the graph component arguments without Streamlit.
@@ -43,9 +48,9 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   in a process-level registry so it survives page navigation but not a server restart.
 - **Chrome (`src/gui_chrome.py`):** running head (nameplate, nav, edition = database picker, level stamp, user menu
   with Admin, Reset and Sign out) and a one-line folio (model and GPU pinning, GPU load, search-index size; refreshed
-  in a worker every 5 s). Pages are plain `ui.page` routes (`/`, `/explorer`, `/chat`, `/research`, `/upload`,
-  `/maintenance`, `/admin`), each wrapped by `guard`; a signed-out visitor goes to `/login`, and Upload (maintainers)
-  and Admin (admins) send everyone else home. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
+  in a worker every 5 s). Pages are plain `ui.page` routes (`/`, `/explorer`, `/chat`, `/research`,
+  `/maintenance`, `/admin`), each wrapped by `guard`; a signed-out visitor goes to `/login`, and Admin (admins) sends
+  everyone else home. There is no separate Upload page: it is the right column of 2BrAIn. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
 - **Chat (`src/gui_chat.py`, `src/gui_cite.py`):** three columns: a rail (Fast/Deep toggle, "Search in" checkboxes per
   reachable level, the conversation's questions, New conversation), the reading column (question as headline,
   answer, actions, the agent trace in a fold, the follow-up banner, the input) and a margin column of numbered
@@ -81,7 +86,7 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   read in the same worker. Including classified levels widens the scope to every reachable level, forces Quick (web
   tools stay off, Deep is not run) and locks the choice until New research. Everything is gated on `TAVILY_API_KEY`; a
   run that ends with neither a result nor an error says so instead of showing a blank page.
-- **Upload (`src/gui_upload.py`, maintainers only):** three steps, never automatic. *Prepare* (in a worker,
+- **Upload (`src/gui_upload.py`, the right column of 2BrAIn, maintainers only):** three steps, never automatic. *Prepare* (in a worker,
   `prepare_batch`): duplicates at levels the user can see are skipped and named, PDF/DOCX/images are converted through
   `md_convert` with a progress bar (Ollama must be reachable), the effective date and, in a database with an ontology,
   the class, work and other versions are detected. *Review*: one table (file, date, class, work, other versions, and a
@@ -112,12 +117,12 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   tester, re-classify preview and apply), Lint, History (diff, download, restore as a new revision) and Import (upload,
   conflict choices, preview, apply). Every write goes through the same plans and `wiki_engine` calls, which check
   maintainer rights and record a revision; model calls run in a worker.
-- **Front page (`src/gui_front.py`, `/`):** the only place with the full nameplate. Three columns: recent activity
-  parsed from the wiki's OKF `log.md` (`log_entries`), the most connected page (highest PageRank in the graph payload) as
-  the lead with its description, link count and "Open the page" (opens it in the Explorer reader), plus the recently
-  updated pages; and "Ask the archive" (Fast/Deep, hands the question to Chat as `Chat.pending`, which runs it when the
-  Chat page opens) above the archive's figures and the clusters growing in the health window
-  (`graph_widget.graph_health`). An empty wiki shows onboarding, worded for maintainers or readers.
+- **2BrAIn (`src/gui_front.py`, `/`):** the front page and the start of the user flow, the only place with the full
+  nameplate. Three columns: recent activity parsed from the wiki's OKF `log.md` (`log_entries`) above the archive's
+  figures and the clusters growing in the health window (`graph_widget.graph_health`); the galaxy map
+  (`gui_graph.map_data`, Hubs overlay, the same iframe renderer as the Explorer; a double-click on a page opens it in the
+  Explorer reader); and the upload (`gui_upload.UploadView`) for maintainers, a note for readers. The upload column is
+  built at once, so an empty wiki still offers it.
 - **Cutover:** `broadsheet` is the default `FRONTEND`; `tunnel.sh` and the `restart-app` skill launch through
   `scripts/run_app.py` and stop either server by `src/(app|gui_app).py … port 8520` (SIGTERM first). Admins have a
   *Stop server* item in the user menu (`gui_chrome.stop_server`: SIGTERM to the server's own process, never a kill by
