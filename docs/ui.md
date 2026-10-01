@@ -31,7 +31,9 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   overrides). NiceGUI 3 loads Quasar into CSS cascade layers, and unlayered rules beat every layer: the mockup's
   `* { margin: 0; padding: 0 }` reset therefore sits in `@layer base`, or it would erase Quasar's own spacing
   (`q-px-*`, menu items, fields). Conversely, Quasar's `!important` utilities (`text-primary` on flat buttons) sit in
-  its last layer and outrank unlayered `!important`; an override that must win goes in `@layer theme`.
+  its last layer and outrank unlayered `!important`; an override that must win goes in `@layer theme`. Never name a
+  class `xs`/`sm`/`md`/`lg`/`xl` (or `lt-*`/`gt-*`): Quasar shows such an element only at that screen size, which once
+  hid every `btn sm` on desktop. Size modifiers are words (`btn small`); `tests/test_gui_classes.py` guards it.
 - **Tests:** NiceGUI's `user` fixture (`-p nicegui.testing.user_plugin`, `asyncio_mode = "auto"`, `main_file = ""` in
   `pyproject.toml`). Tests call `gui_app.register()` after the fixture, because it resets NiceGUI per test.
 - **Shared logic:** `src/ui_logic.py` holds what both frontends do the same way (ingest driver, save paths, level binding); `gpu_widget.gpu_payload()` and `graph_widget.render_args()` expose the GPU stats and the graph component arguments without Streamlit.
@@ -52,10 +54,11 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   `/maintenance`, `/admin`), each wrapped by `guard`; a signed-out visitor goes to `/login`, and Admin (admins) sends
   everyone else home. There is no separate Upload page: it is the right column of 2BrAIn. The selected database (edition) sits
   in a green box in the running head. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
-- **Chat (`src/gui_chat.py`, `src/gui_cite.py`):** three columns: a rail (Fast/Deep toggle, "Search in" checkboxes per
-  reachable level, the conversation's questions, New conversation), the reading column (question as headline,
-  answer, actions, the agent trace in a fold, the follow-up banner, the input) and a margin column of numbered
-  source notes. `gui_cite.number_citations` turns `[Source: file §x]` / `[Wiki: page.md]` tags into
+- **Chat (`src/gui_chat.py`, `src/gui_cite.py`):** three columns (1/4, 1/2, 1/4, as on Research): a rail (Fast/Deep toggle, "Search in" checkboxes per
+  reachable level, the conversation's questions, New conversation, and a Deep answer's timeline "How the answer ran",
+  live while it runs), the reading column (question as headline, answer, actions, the follow-up banner, the input)
+  and a margin column of numbered source notes. The timeline is `src/gui_trace.py`, shared with Research: agent steps
+  stamped with their arrival time become dated items that fold open to the detail. `gui_cite.number_citations` turns `[Source: file §x]` / `[Wiki: page.md]` tags into
   `<sup class="cite" data-n>` numerals plus notes (same file and section reuse a number); hovering a numeral lights its
   note (`gui_app.CITE_JS`). The answer is rendered through `ui.markdown` with client-side sanitising, so LLM output
   cannot inject script. Fast runs `ui_logic.answer_fast` in a worker. Its prompt asks for `[page title]` citations,
@@ -84,8 +87,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
 - **Research (`src/gui_research.py`):** a question bar (question, Quick/Deep method, "Include classified levels", Start,
   New research) above three columns (1/4, 1/2, 1/4). Left: the figures box (sub-tasks, web searches, pages read,
   sources cited; from a Deep run's metrics), a timeline "How the research ran" built from the persisted steps
-  (`ResearchComplete` is a finished-phase line, never `— {}`; a Deep to Quick fallback `notice` is shown) and a
-  follow-up. Middle: the report, the agent's answer with numbered citations (`gui_cite`), Save to wiki with "Also
+  (`gui_trace`; `ResearchComplete` is a finished-phase line, never `— {}`; a Deep to Quick fallback `notice` is shown)
+  and a follow-up. Middle: the report, the agent's answer with numbered citations (`gui_cite`), Save to wiki with "Also
   register as a source document" (maintainers) and Download. Right: the sources exactly as in Chat
   (`gui_chat.render_note`: web notes with page title and host, originals opening in a dialog), the pages read but not
   cited under "Also read", and the search-ladder audit. Runs stream through
