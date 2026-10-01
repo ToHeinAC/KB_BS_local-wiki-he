@@ -11,7 +11,6 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urlparse
 
 from nicegui import ui
 
@@ -261,21 +260,6 @@ def _render_figures(metrics: dict[str, Any] | None) -> None:
                 ui.label(str(value)).classes("num")
 
 
-def _render_endnote(
-    session: gui_session.Session, note: gui_cite.Note, sources: list[dict[str, str]]
-) -> None:
-    title = next((s.get("title") for s in sources if s.get("url") == note.file), "") or note.label
-    with ui.element("div").classes("note").props(f"data-n={note.n}"):
-        ui.label(str(note.n)).classes("n")
-        with ui.column().classes("gap-0"):
-            if note.kind == "web":
-                ui.link(title, note.file, new_tab=True).classes("t")
-                ui.label(urlparse(note.file).netloc).classes("muted text-caption")
-            else:
-                label = ui.label(note.label).classes("t file cursor-pointer")
-                label.on("click", gui_session.guarded(session)(gui_chat.opener(session, note)))
-
-
 class ResearchView:
     """The question bar, the report column, the side column and their handlers."""
 
@@ -299,8 +283,9 @@ class ResearchView:
         with ui.row().classes("qbar items-end w-full no-wrap"):
             self._render_bar()
         with ui.element("div").classes("research-grid"):
-            self.report = ui.column().classes("report")
-            self.side = ui.column().classes("side")
+            self.side = ui.column().classes("side").mark("research-run")
+            self.report = ui.column().classes("report").mark("research-report")
+            self.notes = ui.column().classes("notes-col").mark("research-sources")
         self._sync_controls()
         self.refresh()
 
@@ -413,7 +398,11 @@ class ResearchView:
     # --- columns -----------------------------------------------------------------------------
 
     def refresh(self) -> None:
-        for box, render in ((self.report, self._render_report), (self.side, self._render_side)):
+        for box, render in (
+            (self.report, self._render_report),
+            (self.side, self._render_side),
+            (self.notes, self._render_sources),
+        ):
             box.clear()
             with box:
                 render()
@@ -447,10 +436,6 @@ class ResearchView:
         if run.notice:
             ui.label(run.notice).classes("text-warning")
         ui.markdown(text).classes("prose")
-        with ui.element("div").classes("endnotes"):
-            for note in notes:
-                _render_endnote(self.session, note, run.sources)
-        gui_chat.render_why(run.audit)
         self._render_actions()
 
     def _render_actions(self) -> None:
@@ -487,13 +472,26 @@ class ResearchView:
             with ui.column().classes("wire w-full gap-0"):
                 for item in items:
                     _render_item(item)
-        urls = [s for s in self.run.sources if s.get("url")]
-        if urls:
-            with ui.expansion(f"Pages consulted ({len(urls)})").classes("fold w-full"):
-                for src in urls:
-                    ui.link(src.get("title") or src["url"], src["url"], new_tab=True)
         if self.run.question and not self.run.running:
             self._render_follow_up()
+
+    def _render_sources(self) -> None:
+        """Numbered notes as in Chat, then the pages read but not cited, then the search audit."""
+        run = self.run
+        ui.label("Sources").classes("section-label")
+        if not run.answer.strip():
+            ui.label("Sources appear here after the research.").classes("muted")
+            return
+        _, notes = gui_cite.number_citations(run.answer)
+        titles = {s["url"]: s.get("title") or "" for s in run.sources if s.get("url")}
+        for note in notes:
+            gui_chat.render_note(self.session, note, titles.get(note.file, ""))
+        rest = {url: title for url, title in titles.items() if url not in {n.file for n in notes}}
+        if rest:
+            with ui.expansion(f"Also read ({len(rest)})").classes("fold w-full"):
+                for url, title in rest.items():
+                    ui.link(title or url, url, new_tab=True)
+        gui_chat.render_why(run.audit)
 
     def _render_follow_up(self) -> None:
         with ui.expansion("Ask a follow-up").classes("fold w-full"):

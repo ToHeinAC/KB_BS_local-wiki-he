@@ -38,7 +38,10 @@ def deep_run(q: str, ctx: str) -> Iterator[dict[str, Any]]:
         "type": "tool_result",
         "name": "web_search",
         "result": "r",
-        "sources": [{"url": "https://eo.example/a", "title": "EO budgets"}],
+        "sources": [
+            {"url": "https://eo.example/a", "title": "EO budgets"},
+            {"url": "https://x.example/c", "title": "Extra reading"},
+        ],
     }
     yield {"type": "tool_call", "name": "ResearchComplete", "args": {}, "terminal": True}
     yield {
@@ -221,6 +224,30 @@ async def test_a_deep_run_shows_metrics_the_terminal_step_and_the_fallback_notic
     await _see(user, "Pages read")
     await _see(user, "ResearchComplete — research phase finished")
     await _see(user, "Deep mode fell back to Quick.")
+
+
+def _texts(user: User, marker: str) -> list[str]:
+    (column,) = user.find(marker).elements
+    return [
+        str(getattr(e, "text", "") or e.props.get("label", ""))
+        for e in [column, *column.descendants()]
+    ]
+
+
+async def test_run_report_and_sources_sit_in_three_columns_like_chat(user: User) -> None:
+    await _open(user)
+    (toggle,) = user.find("research-method").elements
+    assert isinstance(toggle, ui.toggle)
+    toggle.set_value("Deep")
+    await _start(user)
+    await _see(user, "Deep research report")
+    run = _texts(user, "research-run")
+    assert {"Sub-tasks", "How the research ran"} <= set(run)
+    assert "Deep research report" in _texts(user, "research-report")
+    sources = _texts(user, "research-sources")
+    assert {"Sources", "EO budgets", "eo.example", "Also read (1)"} <= set(sources)
+    assert "Extra reading" in sources
+    assert "How the research ran" not in sources
 
 
 async def test_a_run_without_a_result_says_so_instead_of_a_blank_page(

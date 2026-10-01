@@ -11,6 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
+from urllib.parse import urlparse
 
 from nicegui import ui
 
@@ -241,16 +242,18 @@ def opener(session: gui_session.Session, note: gui_cite.Note) -> Callable[[], An
     return open_it
 
 
-def _render_note(session: gui_session.Session, note: gui_cite.Note) -> None:
+def render_note(session: gui_session.Session, note: gui_cite.Note, title: str = "") -> None:
+    """One numbered margin note (Chat and Research); a web note shows its page title and site."""
     with ui.element("div").classes("note").props(f"data-n={note.n}"):
         ui.label(str(note.n)).classes("n")
         with ui.column().classes("gap-0"):
             if note.kind == "web":
-                ui.link(note.label, note.file, new_tab=True).classes("t")
+                ui.link(title or note.label, note.file, new_tab=True).classes("t")
+                hint = urlparse(note.file).netloc
             else:
-                title = ui.label(note.label).classes("t file cursor-pointer").mark(f"note-{note.n}")
-                title.on("click", gui_session.guarded(session)(opener(session, note)))
-            hint = "Wiki page" if note.kind == "wiki" else ontology_ui.source_badge(note.ref)
+                label = ui.label(note.label).classes("t file cursor-pointer").mark(f"note-{note.n}")
+                label.on("click", gui_session.guarded(session)(opener(session, note)))
+                hint = "Wiki page" if note.kind == "wiki" else ontology_ui.source_badge(note.ref)
             if hint:
                 ui.label(hint).classes("w")
 
@@ -489,7 +492,7 @@ class ChatView:
             return
         _, notes = gui_cite.number_citations(last["content"])
         for note in notes:
-            _render_note(self.session, note)
+            render_note(self.session, note)
         used = [*last.get("sources", []), *last.get("raw_sources", [])]
         rest = gui_cite.uncited(notes, used)
         if rest:
