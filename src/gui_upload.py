@@ -1,4 +1,4 @@
-"""Upload page of the Broadsheet frontend (mockup `05-upload.html`, docs/ui.md).
+"""Upload panel of the Broadsheet frontend, the right column of 2BrAIn (mockup `05-upload.html`).
 
 Three steps, never automatic: files are prepared (duplicates skipped, PDF/DOCX/images
 converted, dates and ontology classes detected); the user reviews one table (date, class,
@@ -528,8 +528,3 @@ class UploadView:
     def _dismiss(self) -> None:
         self.state.contradictions, self.state.pages = [], []
         self._render()
-
-
-def build(session: gui_session.Session) -> None:
-    """Page body of `/upload`."""
-    UploadView(session).build()

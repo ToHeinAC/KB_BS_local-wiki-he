@@ -324,7 +324,7 @@ class ResearchView:
         with ui.column().classes("grow gap-0"):
             ui.label("Question").classes("label")
             self.question = ui.input(placeholder="e.g. What are the latest advances in RAG?")
-            self.question.props("borderless").classes("field").mark("research-question")
+            self.question.props("borderless").classes("field w-full").mark("research-question")
             self.question.on("keydown.enter", self._guard(self._start))
         with ui.column().classes("gap-0"):
             ui.label("Method").classes("label")

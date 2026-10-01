@@ -9,11 +9,14 @@ def test_stamp_is_plain_violet_or_reversed_by_level() -> None:
     assert gui_chrome.stamp("KI@strict") == ("Strictly confidential", "strict")
 
 
-def test_nav_hides_upload_and_maintenance_from_readers() -> None:
-    reader = [label for label, _ in gui_chrome.nav_items(can_maintain=False)]
-    assert reader == ["Front page", "Explorer", "Chat", "Research", "Maintenance"]
-    maintainer = [label for label, _ in gui_chrome.nav_items(can_maintain=True)]
-    assert maintainer == ["Front page", "Explorer", "Chat", "Research", "Upload", "Maintenance"]
+def test_nav_starts_at_2brain_and_has_no_upload_page() -> None:
+    assert gui_chrome.NAV == (
+        ("2BrAIn", "/"),
+        ("Explorer", "/explorer"),
+        ("Chat", "/chat"),
+        ("Research", "/research"),
+        ("Maintenance", "/maintenance"),
+    )
 
 
 def test_folio_text_reports_model_gpu_and_index() -> None:

@@ -6,7 +6,7 @@ import signal
 from pathlib import Path
 
 import pytest
-from nicegui import ui
+from nicegui import app, ui
 from nicegui.testing import User
 
 import auth
@@ -54,7 +54,7 @@ async def test_bad_credentials_show_an_error_and_stay_on_the_login_page(
 ) -> None:
     await _sign_in(user, "reader", "wrong")
     await user.should_see("Invalid username or password.")
-    await user.should_not_see("Front page")
+    await user.should_not_see("2BrAIn")
 
 
 async def test_an_account_without_databases_cannot_sign_in(gui_env: Path, user: User) -> None:
@@ -66,19 +66,23 @@ async def test_admin_signs_in_to_the_front_page_with_the_full_nav(
     gui_env: Path, user: User
 ) -> None:
     await _sign_in(user, auth.DEFAULT_USER, auth.DEFAULT_PASSWORD)
-    for text in ("Front page", "Explorer", "Chat", "Research", "Upload", "Maintenance"):
+    for text in ("2BrAIn", "Explorer", "Chat", "Research", "Maintenance"):
         await user.should_see(text)
+    await user.should_not_see(kind=ui.link, content="Upload")
     await user.should_see("Normal")  # the level stamp
 
 
-async def test_reader_has_no_upload_and_is_sent_home_from_it(gui_env: Path, user: User) -> None:
+async def test_the_browser_tab_reads_wiwi_with_an_emoji_icon(gui_env: Path, user: User) -> None:
     await _sign_in(user, "reader", "pw")
-    await user.should_see("Explorer")
-    await user.should_not_see(kind=ui.link, content="Upload")
-    await user.open("/upload")
-    await user.should_see("Front page")
-    await user.should_not_see(kind=ui.link, content="Upload")
-    await user.should_not_see("ingest-batch")
+    await user.should_see("2BrAIn")
+    assert user.client is not None
+    page = user.client.page
+    assert (page.resolve_title(), page.favicon) == ("wiwi", gui_app.FAVICON)
+    assert not str(gui_app.FAVICON).isascii()  # an emoji, not a file path
+
+
+def test_the_quasar_primary_is_the_newspaper_green() -> None:
+    assert app.config.quasar_config["brand"]["primary"] == "#234637"
 
 
 async def test_only_admins_reach_the_admin_page(gui_env: Path, user: User) -> None:
@@ -96,7 +100,7 @@ async def test_a_signed_out_visitor_is_sent_to_login_from_every_page(user: User)
 async def test_signed_in_users_skip_the_login_page(gui_env: Path, user: User) -> None:
     await _sign_in(user, "reader", "pw")
     await user.open("/login")
-    await user.should_see("Front page")
+    await user.should_see("2BrAIn")
 
 
 async def test_sign_out_returns_to_login_and_drops_the_session(gui_env: Path, user: User) -> None:
@@ -119,7 +123,7 @@ async def test_the_folio_reports_model_and_index(gui_env: Path, user: User) -> N
 async def test_switching_database_rebinds_the_session(gui_env: Path, user: User) -> None:
     auth.set_user_dbs("reader", [db_context.DEFAULT_DB, "Other"])
     await _sign_in(user, "reader", "pw")
-    await user.should_see("Front page")
+    await user.should_see("2BrAIn")
     user.find(ui.select).click()
     user.find("Other").click()
     (session,) = gui_session._SESSIONS.values()
@@ -152,7 +156,7 @@ async def test_each_page_starts_at_the_base_level_with_no_widened_scope(
     with db_context.clearance({db_context.DEFAULT_DB: 1}):
         db_context.ensure_shard(f"{db_context.DEFAULT_DB}@confidential")
     await _sign_in(user, "reader", "pw")
-    await user.should_see("Front page")
+    await user.should_see("2BrAIn")
     (session,) = gui_session._SESSIONS.values()
     session.scope = [db_context.DEFAULT_DB, f"{db_context.DEFAULT_DB}@confidential"]  # Chat's
 
@@ -171,7 +175,7 @@ async def test_admins_can_stop_the_server_by_signalling_its_own_process(
     signals: list[tuple[int, int]] = []
     monkeypatch.setattr(gui_chrome.os, "kill", lambda pid, sig: signals.append((pid, sig)))
     await _sign_in(user, auth.DEFAULT_USER, auth.DEFAULT_PASSWORD)
-    await user.should_see("Front page")
+    await user.should_see("2BrAIn")
     user.find("user-menu").click()
     user.find("stop-server").click()
     for _ in range(40):
@@ -183,7 +187,7 @@ async def test_admins_can_stop_the_server_by_signalling_its_own_process(
 
 async def test_readers_have_no_stop_server_item(gui_env: Path, user: User) -> None:
     await _sign_in(user, "reader", "pw")
-    await user.should_see("Front page")
+    await user.should_see("2BrAIn")
     user.find("user-menu").click()
     await user.should_not_see("stop-server")
 

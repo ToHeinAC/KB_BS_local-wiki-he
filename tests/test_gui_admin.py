@@ -116,7 +116,7 @@ async def _open_admin(user: User) -> None:
     user.find("Username").type(ADMIN)
     user.find("Password").type(auth.DEFAULT_PASSWORD)
     user.find("sign-in").click()
-    await user.should_see("Front page")
+    await user.should_see("2BrAIn")
     await user.open("/admin")
 
 

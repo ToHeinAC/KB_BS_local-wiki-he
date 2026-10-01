@@ -55,7 +55,7 @@ async def _open(user: User, name: str = auth.DEFAULT_USER, pw: str = auth.DEFAUL
     user.find("Username").type(name)
     user.find("Password").type(pw)
     user.find("sign-in").click()
-    await _see(user, "Front page")
+    await _see(user, "2BrAIn")
     await user.open("/explorer")
 
 

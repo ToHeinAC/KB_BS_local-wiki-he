@@ -22,11 +22,10 @@ import ollama_server
 import ui_logic
 
 NAV: tuple[tuple[str, str], ...] = (
-    ("Front page", "/"),
+    ("2BrAIn", "/"),
     ("Explorer", "/explorer"),
     ("Chat", "/chat"),
     ("Research", "/research"),
-    ("Upload", "/upload"),
     ("Maintenance", "/maintenance"),
 )
 _STAMP_CLASS = ("", "conf", "strict")
@@ -37,11 +36,6 @@ def stamp(shard: str) -> tuple[str, str]:
     """`(label, css class)` of the level stamp: plain, violet or reversed ink."""
     level = classification.parse_shard(shard)[1]
     return classification.level_label(level), _STAMP_CLASS[level]
-
-
-def nav_items(can_maintain: bool) -> list[tuple[str, str]]:
-    """The primary nav; Upload is for maintainers only."""
-    return [(label, href) for label, href in NAV if href != "/upload" or can_maintain]
 
 
 def stop_server(actor: str) -> None:
@@ -82,7 +76,7 @@ def running_head(session: gui_session.Session, path: str) -> None:
     with ui.header().classes("runhead"):
         ui.link("LocalWiki", "/").classes("plate")
         with ui.row().classes("nav no-wrap"):
-            for label, href in nav_items(session.can_maintain):
+            for label, href in NAV:
                 ui.link(label, href).classes("on" if href == path else "")
         ui.space()
         _edition_picker(session)

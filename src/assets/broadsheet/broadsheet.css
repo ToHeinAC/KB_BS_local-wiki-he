@@ -12,6 +12,7 @@
   --hair: #d9d3c4;
   --oxide: #8f2d1a;      /* the one accent: citations, links, the active state */
   --oxide-tint: #f2e4dc;
+  --green: #234637;      /* controls: the Streamlit theme's primaryColor, set as Quasar's primary */
   --violet: #5e4a8a;     /* rubber-stamp ink: Confidential */
   --slate: #3f5b73;      /* graph: entities */
   --olive: #8a7a36;      /* graph: summaries */
@@ -21,7 +22,9 @@
   --mono: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* NiceGUI 3 puts Quasar in cascade layers, and unlayered rules beat every layer: an unlayered
+   reset would erase Quasar's own spacing (q-px-*, menu items, field paddings). Keep it layered. */
+@layer base { * { box-sizing: border-box; margin: 0; padding: 0; } }
 html, body { background: var(--paper); color: var(--ink); }
 body {
   min-height: 100vh;
@@ -218,7 +221,10 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .front .plate-wrap { border-top: 3px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 14px 0 12px; margin-top: 8px; }
 .front .nameplate { font: 900 104px/0.95 var(--display); font-optical-sizing: none; font-variation-settings: 'opsz' 11; }
 .front .tagline { font: italic 400 19px var(--serif); color: var(--ink-2); margin-top: 10px; }
-.front-grid { display: grid; grid-template-columns: 330px minmax(0, 1fr) 420px; width: 100%; }
+.front-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr) 460px; width: 100%; }
+.front-grid .galaxy .graph-frame { width: 100%; height: 580px; border: 0; display: block; }
+.front-grid .intake .hint { padding: 0 !important; }
+.front-grid .intake .upload-col { padding: 0; max-width: none; }
 .front-grid > * { padding: 22px 28px 0; }
 .front-grid > * + * { border-left: 1px solid var(--hair); }
 .front-grid .log .entry { padding: 10px 0 11px; border-bottom: 1px solid var(--hair); width: 100%; }
@@ -228,3 +234,62 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .front-grid .figure { border-bottom: 1px solid var(--hair); padding: 6px 0; font-size: 14px; }
 .front-grid .num { font-weight: 700; }
 .front-grid .num.warn { color: var(--oxide); }
+
+/* ── Shared small type ──────────────────────────────────────────────────────────────────── */
+.hint { font-size: 13px; line-height: 1.45; color: var(--muted); }
+
+/* ── Explorer (mockup 02): bar, map with standings, reader ─────────────────────────────── */
+.bar { padding: 10px 40px; gap: 10px 14px; border-bottom: 1px solid var(--hair); flex-wrap: wrap; }
+.bar .find { width: 180px; border-bottom: 1px solid var(--ink); font-size: 15px; }
+.bar .text-caption, .bar .q-checkbox__label { white-space: nowrap; }
+.explorer-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 40%); width: 100%; }
+.explorer-grid .left { padding: 14px 32px 24px 40px; border-right: 1px solid var(--ink); min-width: 0; }
+.explorer-grid .reader { padding: 26px 40px 24px 40px; min-width: 0; gap: 10px; }
+.explorer-grid .reader .top { border-bottom: 1px solid var(--hair); padding-bottom: 6px; }
+.graph-frame { width: 100%; height: 580px; border: 0; display: block; }
+.standings { display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px; width: 100%; margin-top: 8px; }
+.standing {
+  display: grid; grid-template-columns: 24px minmax(0, 1fr) 72px 88px 44px; column-gap: 8px;
+  align-items: center; padding: 7px 0; border-bottom: 1px solid var(--hair); cursor: pointer;
+}
+.standing .rk { color: var(--muted); font-weight: 600; }
+.standing .pg { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.standing .ty { font-size: 12.5px; }
+.standing .bar-pr { justify-self: start; height: 6px; background: var(--ink-2); }
+.standing:hover { background: var(--panel); }
+.standing.sel { background: var(--oxide-tint); }
+.standing.sel .bar-pr { background: var(--oxide); }
+.nav-row { padding: 5px 0; border-bottom: 1px solid var(--hair); width: 100%; }
+.nav-row.sel { background: var(--oxide-tint); }
+.explorer-grid .hit { padding: 12px 0; border-bottom: 1px solid var(--hair); }
+.linked { flex-wrap: wrap; gap: 6px; }
+.chip.q-btn { border: 1px solid var(--ink-2); font: 500 13px var(--sans); padding: 2px 8px; min-height: 0; }
+
+/* ── Research: the question field fills its column ───────────────────────────────────────── */
+.qbar > .grow { flex: 1 1 auto; min-width: 0; }
+
+/* ── Dropdowns: a ruled field and a ruled sheet of options, like the rest of the paper ──── */
+.q-select .q-field__control { min-height: 34px; }
+.q-select .q-field__control::before { border: 0; }
+.q-select .q-field__native, .q-select .q-field__native span { font: 600 15px var(--sans); color: var(--ink); }
+.q-select .q-field__append .q-icon { font-size: 18px; color: var(--ink-2); }
+.bar .q-select { border-bottom: 1px solid var(--ink); min-width: 8rem; }
+.q-menu { background: var(--paper); border: 1px solid var(--ink); }
+.q-menu .q-item { min-height: 34px; padding: 6px 16px; font: 500 14px var(--sans); color: var(--ink); }
+.q-menu .q-item + .q-item { border-top: 1px solid var(--hair); }
+.q-menu .q-item:hover { background: var(--panel); }
+.q-menu .q-item--active, .q-menu .q-item.text-primary { color: var(--green); font-weight: 700; }
+.q-menu .q-focus-helper { display: none; }
+
+/* Quasar's toggle is a row of q-btns full of spans: the mockup's `.toggle span` rules must not
+   pad or rule those inner spans; the buttons themselves carry the padding and the dividers. */
+.toggle.q-btn-group span { padding: 0; border-left: 0; }
+.toggle .q-btn { min-height: 32px; padding: 0 14px; font: 500 13px var(--sans); }
+.toggle .q-btn + .q-btn { border-left: 1px solid var(--ink); }
+.q-uploader__header { background: var(--panel); color: var(--ink); border-bottom: 1px solid var(--hair); }
+/* NiceGUI marks flat buttons `text-primary !important` inside Quasar's last layer. An important
+   rule in the first-declared layer outranks it; unlayered important rules do not. */
+@layer theme {
+  .btn.primary.q-btn { color: var(--paper) !important; }
+  .btn.primary.q-btn.disabled, .btn.primary.q-btn[disabled] { color: var(--muted) !important; }
+}

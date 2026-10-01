@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI
-from nicegui import ui
+from nicegui import app, ui
 
 import audit  # noqa: F401  # pyright: ignore[reportUnusedImport] (registers the denial listener)
 import auth
@@ -32,7 +32,6 @@ import gui_graph
 import gui_maint
 import gui_research
 import gui_session
-import gui_upload
 
 # Hovering a citation numeral lights its margin note and the other way round (docs/ui.md).
 CITE_JS = """<script>
@@ -47,13 +46,15 @@ document.addEventListener('mouseover', (e) => {
 </script>"""
 MOUNT_PATH = "/wiwi"
 DEFAULT_PORT = 8520
+TITLE = "wiwi"
+FAVICON = "🧠"
+PRIMARY = "#234637"  # the Streamlit theme's dark green (.streamlit/config.toml primaryColor)
 _CSS = Path(__file__).parent / "assets" / "broadsheet" / "broadsheet.css"
 _PAGES: tuple[tuple[str, str, str], ...] = (
-    ("/", "Front page", "user"),
+    ("/", "2BrAIn", "user"),
     ("/explorer", "Explorer", "user"),
     ("/chat", "Chat", "user"),
     ("/research", "Research", "user"),
-    ("/upload", "Upload", "maintainer"),
     ("/maintenance", "Maintenance", "user"),
     ("/admin", "Admin", "admin"),
 )
@@ -64,7 +65,6 @@ _BODIES: dict[str, Callable[[gui_session.Session], None]] = {
     "/chat": gui_chat.build,
     "/explorer": gui_explorer.build,
     "/research": gui_research.build,
-    "/upload": gui_upload.build,
     "/admin": gui_admin.build,
     "/maintenance": gui_maint.build,
 }
@@ -128,13 +128,14 @@ def register() -> None:
     ui.add_body_html(CITE_JS, shared=True)
     ui.add_body_html(gui_graph.GRAPH_JS, shared=True)
     gui_graph.register_assets()
-    ui.page("/login")(_login_page)
+    app.colors(primary=PRIMARY)
+    ui.page("/login", title=TITLE, favicon=FAVICON)(_login_page)
     for path, title, who in _PAGES:
         body = _BODIES.get(path, _stub(title))
         page = gui_session.guard(
             _shell(path, body), maintainer=who == "maintainer", admin=who == "admin"
         )
-        ui.page(path)(page)
+        ui.page(path, title=TITLE, favicon=FAVICON)(page)
 
 
 def gpu_endpoint() -> dict[str, Any]:
@@ -150,7 +151,7 @@ def _serve(port: int) -> None:
     api.add_api_route(f"{MOUNT_PATH}/_api/gpu", gpu_endpoint)
     register()
     secret = os.getenv("GUI_STORAGE_SECRET") or secrets.token_urlsafe(32)
-    ui.run_with(api, mount_path=MOUNT_PATH, storage_secret=secret)  # pyright: ignore[reportUnknownMemberType]
+    ui.run_with(api, mount_path=MOUNT_PATH, storage_secret=secret, title=TITLE, favicon=FAVICON)  # pyright: ignore[reportUnknownMemberType]
     uvicorn.run(api, host="0.0.0.0", port=port, log_level="warning")
 
 
