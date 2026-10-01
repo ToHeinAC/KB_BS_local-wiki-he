@@ -228,11 +228,15 @@ def upload_state(session: gui_session.Session) -> Upload:
 class UploadView:
     """The drop zone, the review table, the result and the Resolve panel."""
 
-    def __init__(self, session: gui_session.Session) -> None:
+    def __init__(
+        self, session: gui_session.Session, on_review: Callable[[bool], None] | None = None
+    ) -> None:
         self.session = session
         self.state = upload_state(session)
         self._guard = gui_session.guarded(session)
         self.progress = Progress()
+        self.on_review = on_review  # told when a batch starts or stops being prepared/reviewed
+        self._reviewing = False
 
     def build(self) -> None:
         ui.label(
@@ -292,6 +296,11 @@ class UploadView:
     # --- rendering ----------
 
     def _render(self) -> None:
+        prep = self.state.prepared
+        reviewing = self.state.busy or (prep is not None and bool(prep.files))
+        if self.on_review is not None and reviewing != self._reviewing:
+            self._reviewing = reviewing
+            self.on_review(reviewing)
         self.stage.clear()
         with self.stage:
             prep = self.state.prepared
@@ -320,7 +329,7 @@ class UploadView:
         if self.state.convert_text is not None:
             ui.label("Converted Markdown: review and edit before ingest.").classes("label")
             editor = ui.textarea(value=self.state.convert_text).classes("w-full")
-            editor.props("outlined autogrow").mark("convert-editor")
+            editor.props("outlined rows=3").mark("convert-editor")
             editor.on_value_change(lambda e: setattr(self.state, "convert_text", e.value))
         self._render_table(prep)
         with ui.expansion("Optional shared metadata (applied to all files)").classes("fold w-full"):
@@ -332,12 +341,24 @@ class UploadView:
             f"Will be written to database {self.session.active_db}, each file at its chosen level."
         ).classes("hint")
         self.reason = ui.label("").classes("muted")
-        self.ingest = ui.button(
-            f"Ingest {len(prep.files)} file(s) into “{self.session.active_db}”",
-            on_click=self._guard(self._ingest),
-        )
-        self.ingest.props("flat").classes("btn primary").mark("ingest-batch")
+        with ui.row().classes("items-center gap-4"):
+            self.ingest = ui.button(
+                f"Ingest {len(prep.files)} file(s) into “{self.session.active_db}”",
+                on_click=self._guard(self._ingest),
+            )
+            self.ingest.props("flat").classes("btn primary").mark("ingest-batch")
+            ui.button("Discard", on_click=self._guard(self._discard)).props("flat").classes(
+                "btn text small"
+            ).mark("discard-batch")
         self._sync_ingest()
+
+    def _discard(self) -> None:
+        """Drop the prepared batch without ingesting it (nothing has been written yet)."""
+        if self.state.busy:
+            return
+        self.state.prepared, self.state.key, self.state.convert_text = None, "", None
+        self.uploader.reset()
+        self._render()
 
     def _render_table(self, prep: Prepared) -> None:
         cols = "minmax(0,2fr) 9rem" + (" 9rem 10rem minmax(0,1.5fr)" if prep.classes else "")

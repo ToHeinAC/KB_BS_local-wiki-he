@@ -227,6 +227,11 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .front-grid .galaxy .graph-frame { width: 100%; height: 580px; border: 0; display: block; }
 .front-grid .intake .hint { padding: 0 !important; }
 .front-grid .intake .upload-col { padding: 0; max-width: none; }
+/* While a batch is prepared or reviewed, the upload takes the galaxy's place. */
+.front-grid.reviewing { grid-template-columns: 300px minmax(0, 1fr); }
+.front-grid.reviewing .galaxy { display: none; }
+/* The converted Markdown scrolls inside three lines, so the metadata and Ingest stay in view. */
+.front-grid .intake .q-textarea textarea { resize: vertical; }
 .front-grid > * { padding: 22px 28px 0; }
 .front-grid > * + * { border-left: 1px solid var(--hair); }
 .front-grid .log .entry { padding: 10px 0 11px; border-bottom: 1px solid var(--hair); width: 100%; }

@@ -250,6 +250,12 @@ def _classify(user: User, name: str, level: str) -> None:
     toggle.set_value(level)
 
 
+def _reviewing(user: User) -> bool:
+    """2BrAIn hides the galaxy and widens the upload while a batch is prepared or reviewed."""
+    (grid,) = user.find("front-grid").elements
+    return "reviewing" in grid.classes
+
+
 def _stub_ingest(monkeypatch: pytest.MonkeyPatch, seen: list[tuple[str, str]]) -> None:
     def begin(text: str, name: str, meta: Any) -> dict[str, Any]:
         seen.append((db_context.get_active_db(), name))
@@ -291,18 +297,34 @@ async def test_a_classified_batch_is_ingested_into_the_chosen_level_only(
     seen: list[tuple[str, str]] = []
     _stub_ingest(monkeypatch, seen)
     await _open(user, "lead", "pw")
+    assert not _reviewing(user)
     await _drop(user, {"a.md": DOC_A})
     await _see(user, "1 file(s) ready to ingest.")
+    assert _reviewing(user)
     _classify(user, "a.md", "confidential")
     await _until(lambda: user.find("ingest-batch").elements.copy().pop().enabled)  # type: ignore[union-attr]
     user.find("ingest-batch").click()
     await _see(user, "Ingest complete.")
     await _see(user, "a.md-page.md")
+    assert not _reviewing(user)
     assert seen == [(f"{DB}@confidential", "a.md")]
     with db_context.clearance({DB: 1}):
         with db_context.using_db(f"{DB}@confidential"):
             assert (db_context.raw_dir() / "a.md").exists()
         assert not (db_context.raw_dir() / "a.md").exists()  # never filed at the normal level
+
+
+async def test_a_prepared_batch_can_be_discarded_and_the_galaxy_returns(user: User) -> None:
+    await _open(user)
+    await _drop(user, {"a.md": DOC_A})
+    await _see(user, "1 file(s) ready to ingest.")
+    assert _reviewing(user)
+    user.find("discard-batch").click()
+    await _until(lambda: not _reviewing(user))
+    assert not _reviewing(user)
+    await user.should_not_see("1 file(s) ready to ingest.")
+    await _drop(user, {"a.md": DOC_A})  # the same file can be dropped again
+    await _see(user, "1 file(s) ready to ingest.")
 
 
 async def test_levels_above_the_uploaders_clearance_are_not_offered(user: User) -> None:
@@ -337,6 +359,8 @@ async def test_a_single_converted_file_can_be_edited_before_ingest(
     await _see(user, "Converted Markdown")
     (editor,) = user.find("convert-editor").elements
     assert isinstance(editor, ui.textarea)
+    assert str(editor.props.get("rows")) == "3"  # scrolls, so the ingest button stays in view
+    assert "autogrow" not in editor.props
     editor.set_value("# Scan\n\nCorrected text")
     _classify(user, "scan.md", "normal")
     await _until(lambda: user.find("ingest-batch").elements.copy().pop().enabled)  # type: ignore[union-attr]

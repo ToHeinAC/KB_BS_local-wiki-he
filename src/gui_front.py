@@ -88,7 +88,8 @@ class FrontView:
                 ui.label(
                     "Your documents, compiled into a linked archive on your infrastructure"
                 ).classes("tagline")
-            with ui.element("div").classes("front-grid"):
+            self.grid = ui.element("div").classes("front-grid").mark("front-grid")
+            with self.grid:
                 self.side = ui.column().classes("log gap-0")
                 self.galaxy = ui.column().classes("galaxy gap-1")
                 with ui.column().classes("intake gap-1"):
@@ -99,9 +100,19 @@ class FrontView:
     def _render_intake(self) -> None:
         ui.label("Add documents").classes("section-label")
         if self.session.can_maintain:
-            gui_upload.UploadView(self.session).build()
+            gui_upload.UploadView(self.session, on_review=self._review).build()
         else:
             ui.label("A maintainer of this database can add documents.").classes("muted")
+
+    def _review(self, reviewing: bool) -> None:
+        """While a batch is prepared or reviewed the upload takes the galaxy's place; when it
+        ends, the columns reload so new pages show up."""
+        if reviewing:
+            self.grid.classes(add="reviewing")
+            return
+        self.grid.classes(remove="reviewing")
+        with self.grid:
+            ui.timer(0.05, self._guard(self.load), once=True)
 
     async def load(self) -> None:
         data = await gui_session.in_worker(front_data)
