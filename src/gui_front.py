@@ -94,7 +94,8 @@ class FrontView:
             with ui.row().classes("dateline w-full items-baseline justify-between no-wrap"):
                 ui.label(date.today().strftime("%A, %d %B %Y")).classes("muted text-caption")
                 ui.label(
-                    "Your documents, compiled into a linked archive on your infrastructure"
+                    "Your documents, compiled into a linked knowledge archive "
+                    "on your infrastructure"
                 ).classes("tagline")
             self.grid = ui.element("div").classes("front-grid").mark("front-grid")
             with self.grid:
