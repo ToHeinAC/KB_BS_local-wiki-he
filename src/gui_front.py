@@ -7,7 +7,7 @@ for the session's database at its normal level.
 """
 
 import re
-from datetime import date
+from datetime import UTC, date, datetime, tzinfo
 from typing import Any
 
 from nicegui import ui
@@ -24,6 +24,14 @@ _ENTRY_RE = re.compile(r"^- (\d{2}:\d{2}) — ([^:]+?)(?::\s*(.*))?$")
 _DAY_RE = re.compile(r"^## (\d{4}-\d{2}-\d{2})\s*$")
 _LOG_LIMIT = 6
 _RECENT_LIMIT = 3
+LOCAL_TZ: tzinfo | None = None  # None: the server's own zone. `log.md` times are written in UTC.
+
+
+def local_time(day: str, time: str, tz: tzinfo | None = None) -> tuple[str, str]:
+    """A `log.md` entry's UTC day and HH:MM in local time (the day moves across midnight)."""
+    stamp = datetime.strptime(f"{day} {time}", "%Y-%m-%d %H:%M").replace(tzinfo=UTC)
+    local = stamp.astimezone(tz)
+    return local.strftime("%Y-%m-%d"), local.strftime("%H:%M")
 
 
 def log_entries(text: str, limit: int) -> list[tuple[str, str, str, str]]:
@@ -132,14 +140,18 @@ class FrontView:
         self._render_galaxy(data["map"])
 
     def _render_log(self, entries: list[tuple[str, str, str, str]]) -> None:
-        ui.label("Recent activity").classes("section-label")
-        if not entries:
-            ui.label("Nothing has happened yet.").classes("muted")
-        for day, time, action, detail in entries:
-            with ui.column().classes("entry gap-0"):
-                ui.label(f"{day}, {time}").classes("when")
-                ui.label(f"{action.capitalize()}: {detail}" if detail else action.capitalize())
-        ui.link("Full activity log", "/maintenance").classes("btn text small q-mt-sm")
+        """One collapsed line; opened, one line per entry in local time, the rest on hover."""
+        fold = ui.expansion("Recent activity", value=False).classes("fold w-full activity")
+        with fold.mark("recent-activity"):
+            if not entries:
+                ui.label("Nothing has happened yet.").classes("muted")
+            for day, time, action, detail in entries:
+                when = " ".join(local_time(day, time, LOCAL_TZ))
+                what = f"{action.capitalize()}: {detail}" if detail else action.capitalize()
+                with ui.row().classes("entry no-wrap items-baseline").tooltip(f"{when} · {what}"):
+                    ui.label(when).classes("when")
+                    ui.label(what).classes("what")
+            ui.link("Full activity log", "/maintenance").classes("btn text small q-mt-sm")
 
     def _render_galaxy(self, data: dict[str, Any]) -> None:
         with self.galaxy:

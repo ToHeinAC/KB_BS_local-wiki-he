@@ -358,6 +358,7 @@ class MaintView:
     async def _log(self) -> None:
         text = await gui_session.in_worker(wiki_engine.read_log)
         with self.body:
+            ui.label("Times in this log are UTC.").classes("hint")
             ui.label(text).classes("file").style("white-space: pre-wrap")
 
 

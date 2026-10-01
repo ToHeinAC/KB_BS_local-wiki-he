@@ -1,6 +1,7 @@
 """Front page of the Broadsheet frontend (src/gui_front.py)."""
 
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import frontmatter
 import pytest
@@ -25,6 +26,13 @@ LOG = okf.add_log_entry(
 )
 
 # --- pure helpers ------------------------------------------------------------------------------
+
+
+def test_log_times_are_utc_and_shown_in_local_time() -> None:
+    berlin = ZoneInfo("Europe/Berlin")
+    assert gui_front.local_time("2026-09-29", "18:40", berlin) == ("2026-09-29", "20:40")
+    assert gui_front.local_time("2026-09-29", "23:10", berlin) == ("2026-09-30", "01:10")
+    assert gui_front.local_time("2026-01-15", "09:00", berlin) == ("2026-01-15", "10:00")
 
 
 def test_log_entries_are_newest_first_with_their_day() -> None:
@@ -117,6 +125,9 @@ async def test_2brain_shows_activity_the_galaxy_upload_and_figures(wiki: Path, u
     await _sign_in(user)
     await _see(user, "Your documents, compiled into a linked archive on your infrastructure")
     await _see(user, "orbit.pdf created 2")
+    (activity,) = user.find("recent-activity").elements
+    assert isinstance(activity, ui.expansion)
+    assert activity.value is False  # one collapsed line until opened
     await _see(user, "3 pages, ")  # the galaxy's caption
     await _see(user, "front-map")
     await _see(user, "upload-files")
@@ -135,6 +146,15 @@ async def test_the_tagline_shares_the_date_line_and_there_is_no_nameplate(
     line = tagline.parent_slot.parent
     assert "dateline" in line.classes
     assert not [e for e in user.find(ui.label).elements if e.text == "2BrAIn"]
+
+
+async def test_activity_entries_are_one_line_in_local_time(
+    wiki: Path, user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(gui_front, "LOCAL_TZ", ZoneInfo("Europe/Berlin"))
+    await _sign_in(user)
+    await _see(user, "2026-09-29 20:40")  # logged at 18:40 UTC
+    await _see(user, "Ingest: orbit.pdf created 2")
 
 
 async def test_an_empty_wiki_still_offers_the_upload(user: User) -> None:

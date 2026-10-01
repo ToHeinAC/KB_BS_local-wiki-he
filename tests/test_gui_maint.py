@@ -257,6 +257,7 @@ async def test_the_activity_log_is_shown(wiki: Path, user: User) -> None:
     await _open(user)
     await _section(user, "Activity log")
     await _see(user, "ingest | doc.md")
+    await _see(user, "Times in this log are UTC.")
 
 
 async def test_the_ontology_section_shows_the_workbench(wiki: Path, user: User) -> None:
