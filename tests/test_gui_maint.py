@@ -92,6 +92,11 @@ def test_sections_are_the_streamlit_ones_without_admin() -> None:
     )
 
 
+def test_only_admins_get_the_admin_section(gui_env: Path) -> None:
+    assert gui_maint.sections(auth.DEFAULT_USER) == (*gui_maint.SECTIONS, "Admin")
+    assert gui_maint.sections("reader") == gui_maint.SECTIONS
+
+
 def test_data_size_is_shown_in_megabytes() -> None:
     assert gui_maint.megabytes(1_048_576) == "1.0"
     assert gui_maint.megabytes(0) == "0.0"
@@ -299,3 +304,23 @@ async def test_a_cleared_user_switches_level_and_the_sections_follow(
     level.set_value(f"{DB}@strict")
     await _see(user, "CANARY-strict-log")
     await _see(user, "Wiki pages 0")
+
+
+async def test_an_admin_manages_users_and_databases_from_maintenance(
+    wiki: Path, user: User
+) -> None:
+    await _open(user)
+    await _section(user, "Admin")
+    await _see(user, "Security audit log")
+    (await _find(user, "new-db-name")).type("Fresh")
+    (await _find(user, "create-db")).click()
+    await _see(user, "Created `Fresh` and assigned maintainers.")
+    assert "Fresh" in db_context.list_dbs()
+
+
+async def test_a_reader_has_no_admin_section(wiki: Path, user: User) -> None:
+    await _open(user, "reader", "pw")
+    (toggle,) = user.find("maint-section").elements
+    assert isinstance(toggle, ui.toggle)
+    assert "Admin" not in toggle.options
+    await user.should_not_see("Security audit log")

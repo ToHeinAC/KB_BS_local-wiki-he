@@ -122,9 +122,10 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   follows it), and a section toggle: *Search index* (counts, a missing-index warning, Rebuild), *Delete source* (a
   confirmation checkbox enables the dashed button; below it *Move to another classification level* with the purge
   warning when moving up), *Link graph health* (orphans), *Lint*, *Page language* (scan, then Normalize), *Ontology* (the
-  workbench, below) and the *Activity log*. Destructive actions are maintainer-only and re-checked in the
+  workbench, below) and the *Activity log*, plus *Admin* for admins (`gui_maint.sections`: the Admin view below,
+  as in Streamlit). Destructive actions are maintainer-only and re-checked in the
   handler (`_maintainer_only`), not just hidden; long backend calls run in workers.
-- **Admin (`src/gui_admin.py`, admins only, reached from the user menu):** databases (create, with maintainers), users
+- **Admin (`src/gui_admin.py`, admins only, reached from the user menu and Maintenance → Admin):** databases (create, with maintainers), users
   (allowed databases, maintained databases, clearance per allowed database, a new password, Save, Delete, never your own
   account) and the security audit log. Every action goes through a function that re-checks `auth.is_admin(actor)`
   (`require_admin`) and is tested to refuse a non-admin; clearance changes are audit-logged by `auth.set_clearance`.

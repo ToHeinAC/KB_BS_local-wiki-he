@@ -3,7 +3,8 @@
 Sections work on one classification level at a time (a level picker appears when more than one
 is reachable): the search index, deleting and moving sources, link health, lint, page
 language, the ontology workbench and the activity log. Destructive actions are for
-maintainers and re-checked in the handler, not just hidden. Admin lives on its own page.
+maintainers and re-checked in the handler, not just hidden. Admins also get an Admin section:
+the `/admin` page's view, whose actions re-check admin rights themselves.
 """
 
 from dataclasses import dataclass, field
@@ -11,9 +12,11 @@ from typing import Any
 
 from nicegui import ui
 
+import auth
 import classification
 import db_context
 import dedup
+import gui_admin
 import gui_ontology
 import gui_session
 import lex_index
@@ -28,6 +31,12 @@ SECTIONS = (
     "Ontology",
     "Activity log",
 )
+ADMIN_SECTION = "Admin"
+
+
+def sections(user: str) -> tuple[str, ...]:
+    """The sections `user` may pick: admins also get the Admin section."""
+    return (*SECTIONS, ADMIN_SECTION) if auth.is_admin(user) else SECTIONS
 
 
 def megabytes(size: int) -> str:
@@ -83,6 +92,9 @@ class MaintView:
             self.session.bind_shard(self.state.level or "")
         else:
             self.state.level = None
+        options = sections(self.session.user)
+        if self.state.section not in options:
+            self.state.section = SECTIONS[0]
         with ui.column().classes("maint-col"):
             if len(shards) > 1:
                 ui.toggle(
@@ -95,7 +107,7 @@ class MaintView:
                 ).classes("toggle").mark("maint-level")
             self.stats = ui.row().classes("meta")
             ui.toggle(
-                list(SECTIONS), value=self.state.section, on_change=self._guard(self._set_section)
+                list(options), value=self.state.section, on_change=self._guard(self._set_section)
             ).classes("toggle").mark("maint-section")
             self.body = ui.column().classes("w-full gap-2")
         ui.timer(0.05, self._guard(self.load), once=True)
@@ -130,6 +142,7 @@ class MaintView:
             "Page language": self._language,
             "Ontology": self._ontology,
             "Activity log": self._log,
+            ADMIN_SECTION: self._admin,
         }
         with self.body:
             if self.state.flash:
@@ -360,6 +373,12 @@ class MaintView:
         with self.body:
             ui.label("Times in this log are UTC.").classes("hint")
             ui.label(text).classes("file").style("white-space: pre-wrap")
+
+    async def _admin(self) -> None:
+        if not auth.is_admin(self.session.user):
+            raise PermissionError("Admins only.")
+        with self.body:
+            gui_admin.AdminView(self.session).build()
 
 
 def build(session: gui_session.Session) -> None:

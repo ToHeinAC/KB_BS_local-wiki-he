@@ -222,6 +222,7 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 
 /* ── Maintenance and Admin ──────────────────────────────────────────────────────────────── */
 .maint-col, .admin-col { padding: 26px 40px 40px; width: 100%; max-width: 1000px; gap: 12px; }
+.maint-col .admin-col { padding: 0; }  /* the Admin view as a Maintenance section */
 
 /* ── Front page (mockup 01) ─────────────────────────────────────────────────────────────── */
 .front { padding: 12px 40px 40px; gap: 0; }
