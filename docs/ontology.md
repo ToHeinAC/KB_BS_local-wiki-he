@@ -400,7 +400,10 @@ warns; it never decides a legal conflict.
 **Graph:** relation edges are directed edges between source nodes (a work is drawn by its
 version in force today), coloured apart and with arrowheads in the Galaxy and Pyramid
 layouts. *Pyramid* puts documents in rows by their class `rank` (1 = top; unranked last)
-and hides pages.
+and hides pages. A document node is the registered file a page's `sources:` entry names:
+an LLM-written spelling variant (`KTA_1401_r_2013-11.md` for `…_2013_11.md`) is folded into
+it when case, spaces, `-` and `_` aside it matches exactly one registered file
+(`_TypedGraph.canonical`); otherwise it would be a second, classless document in the last row.
 
 ## Evolution (plan Phase 7)
 

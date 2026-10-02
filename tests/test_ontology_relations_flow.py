@@ -105,6 +105,33 @@ def test_the_graph_draws_directed_relation_edges_and_ranks(legal: Path) -> None:
     assert (nodes["source::strlschv.md"]["rank"], nodes["source::strlschg.md"]["rank"]) == (4, 3)
 
 
+def test_a_misspelt_source_entry_joins_the_registered_document_and_its_rank(
+    legal: Path,
+) -> None:
+    # The LLM wrote "2013-11" where the file is "2013_11"; code added the real name too.
+    real, typo = "KTA_1401_r_2013_11.md", "KTA_1401_r_2013-11.md"
+    dedup.register_file(b"kta", real)
+    ontology_store.append_rows(
+        [ontology.assertion(f"src:{real}", "class", "technical-rule", by="rule")]
+    )
+    (legal / "concept-qm.md").write_text(
+        f"---\ntitle: QM\ntype: concept\nsources: [{typo}, {real}]\n---\n\nBody.\n"
+    )
+    nodes = {n["id"]: n for n in graph_export.export()["nodes"] if n["kind"] == "source"}
+    assert list(nodes) == [f"source::{real}"]
+    assert nodes[f"source::{real}"]["rank"] == 6
+
+
+def test_a_source_entry_matching_two_registered_spellings_is_left_alone(legal: Path) -> None:
+    for name in ("a-b.md", "a_b.md"):
+        dedup.register_file(name.encode(), name)
+    (legal / "concept-x.md").write_text(
+        "---\ntitle: X\ntype: concept\nsources: [A B.md]\n---\n\nBody.\n"
+    )
+    sources = {n["id"] for n in wiki_engine.build_typed_graph()["nodes"] if n["type"] == "source"}
+    assert sources == {"source::A B.md"}
+
+
 def test_lint_includes_the_ontology_findings(legal: Path) -> None:
     _two_laws()
     ontology_store.append_rows(

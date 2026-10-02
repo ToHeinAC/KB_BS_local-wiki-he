@@ -5,7 +5,7 @@ import json
 import os
 import re
 import shutil
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -2793,6 +2793,20 @@ def _graph_source(name: object) -> str | None:
     return raw
 
 
+def _source_key(name: str) -> str:
+    """A source name with case, spaces, `-`, `_` and other punctuation ignored."""
+    return re.sub(r"[\W_]+", "", name.casefold())
+
+
+def _spelling_index(registered: Iterable[str]) -> dict[str, str | None]:
+    """Key → the one registered source with that key; None where several share it."""
+    index: dict[str, str | None] = {}
+    for name in registered:
+        key = _source_key(name)
+        index[key] = None if key in index else name
+    return index
+
+
 def _graph_page_meta(md: Path) -> tuple[list[Any], list[Any], str, str]:
     """(related, sources, title, type) of a page; defaults when it can't be parsed."""
     try:
@@ -2817,6 +2831,15 @@ class _TypedGraph:
     related_pairs: set[frozenset[str]] = field(default_factory=set[frozenset[str]])
     derived_pairs: set[tuple[str, str]] = field(default_factory=set[tuple[str, str]])
     sources: set[str] = field(default_factory=set[str])
+    registered: set[str] = field(default_factory=set[str])
+    spellings: dict[str, str | None] = field(default_factory=dict[str, str | None])
+
+    def canonical(self, raw: str) -> str:
+        """The registered source `raw` names despite its spelling: an LLM-written `sources:`
+        entry ("2013-11" for "2013_11") must not become a second document without a class."""
+        if raw in self.registered:
+            return raw
+        return self.spellings.get(_source_key(raw)) or raw
 
     def relate(self, page_id: str, related: list[Any]) -> None:
         for item in related:
@@ -2833,6 +2856,7 @@ class _TypedGraph:
             raw = _graph_source(s)
             if raw is None:
                 continue
+            raw = self.canonical(raw)
             self.sources.add(raw)
             if not is_page:
                 # source-summary: register source node but emit no page→source edge
@@ -2860,7 +2884,8 @@ def build_typed_graph() -> dict[str, Any]:
         for md in insights.glob("*.md"):
             existing.add(f"{_INSIGHTS_DIR}/{md.name}")
 
-    g = _TypedGraph(existing)
+    registered = dedup.list_sources()
+    g = _TypedGraph(existing, registered=set(registered), spellings=_spelling_index(registered))
     for md in _content_pages():
         related, sources, title, ptype = _graph_page_meta(md)
         if ptype not in ("concept", "entity", "source-summary"):
