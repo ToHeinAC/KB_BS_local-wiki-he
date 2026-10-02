@@ -313,3 +313,7 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .runhead .edition .muted { color: #cfdcd4; }
 sup.cite-sep { font: 700 0.62em/0 var(--sans); color: var(--oxide); vertical-align: super; }
 .prose math { font-size: 1.05em; }
+
+/* Explorer: size-by and overlays live in the "Advanced" menu at the bar's right end. */
+.advanced-menu { padding: 14px 18px; min-width: 14rem; }
+.advanced-menu .q-select { border-bottom: 1px solid var(--ink); }

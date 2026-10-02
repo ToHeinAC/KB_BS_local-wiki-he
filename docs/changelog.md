@@ -65,3 +65,4 @@ author: Tobias Hein
 | 2026-10-01 | **2BrAIn: the galaxy names its edition.** The caption "The archive as a galaxy" now reads "Edition “<database>” as a galaxy" for the selected database. Verified by `test_gui_front`. |
 | 2026-10-01 | **2BrAIn tagline** now reads "Your documents, compiled into a linked knowledge archive on your infrastructure". |
 | 2026-10-01 | **Browser tab** reads "L-Wiki" (was "wiwi"); the URL path `/wiwi` is unchanged. |
+| 2026-10-02 | **Explorer: Advanced menu.** "Size by" and the six overlay checkboxes moved from the bar into a right-aligned *Advanced* menu, so the bar is one line again. Verified by `test_gui_explorer` and a headless-browser check (the size-by dropdown opens inside the menu). |

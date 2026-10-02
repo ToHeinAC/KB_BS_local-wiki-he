@@ -114,14 +114,27 @@ class ExplorerView:
         find.classes("find").mark("find")
         find.on_value_change(self._guard(self._set_query))
         ui.space()
-        ui.label("Size by").classes("muted text-caption")
-        ui.select(SIZES, value=self.ex.size_by, on_change=self._guard(self._set_size)).props(
-            "dense borderless options-dense"
-        ).mark("size-by")
-        for label in ui_logic.OVERLAY_LABELS:
-            ui.checkbox(
-                label, value=label in self.ex.overlays, on_change=self._guard(self._set_overlays)
-            ).mark(f"overlay-{label}")
+        self._render_advanced()
+
+    def _render_advanced(self) -> None:
+        """Size-by and the overlays, folded into one right-aligned "Advanced" menu."""
+        button = ui.button("Advanced", icon="tune").props("flat no-caps").classes("btn small")
+        with (
+            button.mark("advanced"),
+            ui.menu().props('anchor="bottom right" self="top right"'),
+            ui.column().classes("advanced-menu gap-1"),
+        ):
+            ui.label("Size by").classes("label")
+            ui.select(SIZES, value=self.ex.size_by, on_change=self._guard(self._set_size)).props(
+                "dense borderless options-dense"
+            ).mark("size-by")
+            ui.label("Highlight").classes("label q-mt-sm")
+            for label in ui_logic.OVERLAY_LABELS:
+                ui.checkbox(
+                    label,
+                    value=label in self.ex.overlays,
+                    on_change=self._guard(self._set_overlays),
+                ).mark(f"overlay-{label}")
 
     async def _set_level(self, event: Any) -> None:
         if event.value not in db_context.reachable_shards(self.session.active_db):

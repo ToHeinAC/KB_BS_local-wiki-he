@@ -102,6 +102,20 @@ async def test_choosing_a_page_opens_it_in_the_reader_with_sources_and_links(
     assert gui_explorer.explorer_state(_session()).selected == "beta.md"
 
 
+async def test_size_and_overlays_are_folded_into_advanced(wiki: Path, user: User) -> None:
+    await _open(user)
+    await _see(user, "Advanced")
+    (button,) = user.find("advanced").elements
+    inside = set(button.descendants())
+    (size,) = user.find("size-by").elements
+    (bridges,) = user.find("overlay-Bridges").elements
+    assert {size, bridges} <= inside  # in the Advanced menu, not in the bar itself
+    assert isinstance(bridges, ui.checkbox)
+    bridges.set_value(True)
+    await _until(lambda: "Bridges" in gui_explorer.explorer_state(_session()).overlays)
+    assert gui_explorer.explorer_state(_session()).overlays == ["Hubs", "Bridges"]
+
+
 async def test_closing_the_reader_returns_to_the_bundle_health(wiki: Path, user: User) -> None:
     await _open(user)
     await _see(user, "Bundle health")

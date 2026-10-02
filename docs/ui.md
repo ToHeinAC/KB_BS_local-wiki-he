@@ -77,7 +77,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   `Chat` in `Session.state`, so it is dropped with the session's content. Each page starts at the base level with no
   widened scope (`guard`); Chat sets its own scope for its handlers.
 - **Explorer (`src/gui_explorer.py`, `src/gui_graph.py`):** a bar (level picker when more than one level is reachable,
-  Map/Index, layout, Find, size-by, overlays), the left column and the reader on the right. **Map** is the existing
+  Map/Index, layout, Find, and a right-aligned *Advanced* menu with size-by and the overlays), the left column and the
+  reader on the right. **Map** is the existing
   canvas renderer (`src/assets/graph/index.html`, served from `graph-assets/`) in an iframe on the paper palette, with a
   standings table (top pages by PageRank or connections) beside it. `gui_graph.GRAPH_JS` plays the Streamlit component
   host's side of the `postMessage` protocol: it answers `streamlit:componentReady` with the arguments from
