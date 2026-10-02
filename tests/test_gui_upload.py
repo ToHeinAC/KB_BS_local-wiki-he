@@ -1,6 +1,7 @@
 """Upload page of the Broadsheet frontend (src/gui_upload.py)."""
 
 import asyncio
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -446,6 +447,33 @@ async def test_contradictions_feed_a_resolve_panel_that_reconciles_or_dismisses(
     assert resolved == [("Alpha says 5, Beta says 6", ["p.md"], "")]
     user.find("dismiss-contradictions").click()
     await user.should_not_see("Resolve contradictions")
+
+
+async def test_a_spinner_shows_while_the_batch_is_ingested(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_ingest(monkeypatch, [])
+    release, begin = threading.Event(), wiki_engine.ingest_begin
+
+    def slow(text: str, name: str, meta: Any) -> dict[str, Any]:
+        release.wait(5)
+        return begin(text, name, meta)
+
+    monkeypatch.setattr(wiki_engine, "ingest_begin", slow)
+    await _open(user)
+    await _drop(user, {"a.md": DOC_A})
+    await _see(user, "1 file(s) ready to ingest.")
+    (spinner,) = user.find("ingest-spinner").elements
+    await _until(lambda: not spinner.visible)
+    _classify(user, "a.md", "normal")
+    await _until(lambda: user.find("ingest-batch").elements.copy().pop().enabled)  # type: ignore[union-attr]
+    user.find("ingest-batch").click()
+    await _until(lambda: spinner.visible)
+    assert spinner.visible
+    release.set()
+    await _see(user, "Ingest complete.")
+    await _until(lambda: not spinner.visible)
+    assert not spinner.visible
 
 
 def test_status_text_reaches_the_progress_readout() -> None:

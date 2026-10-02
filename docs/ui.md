@@ -50,7 +50,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   in a process-level registry so it survives page navigation but not a server restart.
 - **Chrome (`src/gui_chrome.py`):** running head (nameplate, nav, edition = database picker, level stamp, user menu
   with Admin, Reset and Sign out) and a one-line folio (model and GPU pinning, GPU load, search-index size; refreshed
-  in a worker every 5 s). Pages are plain `ui.page` routes (`/`, `/explorer`, `/chat`, `/research`,
+  in a worker every 5 s). The GPU segment shows the card the model works on (`gui_chrome.working_card`): the pinned
+  card, else the busiest one, then named by its index. Pages are plain `ui.page` routes (`/`, `/explorer`, `/chat`, `/research`,
   `/maintenance`, `/admin`), each wrapped by `guard`; a signed-out visitor goes to `/login`, and Admin (admins) sends
   everyone else home. There is no separate Upload page: it is the right column of 2BrAIn. The selected database (edition) sits
   in a green box in the running head. `GET /wiwi/_api/gpu` serves the same JSON as the Streamlit route.
@@ -115,7 +116,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   reason beside it (`block_reason`). *Ingest* (`run_ingest`): oldest first, one level at a time through
   `ui_logic.ingest_level`, each level into its own shard, then a summary (created, updated, contradictions, failures,
   ignored ontology values). Reported contradictions feed a **Resolve contradictions** panel (pages, guidance, Reconcile
-  through `ui_logic.resolve_by_shard`, Dismiss); a new ingest resets it. *Discard* drops a prepared batch unwritten. Progress is a plain object the worker writes and
+  through `ui_logic.resolve_by_shard`, Dismiss); a new ingest resets it. *Discard* drops a prepared batch unwritten. While a batch is prepared or ingested, a progress bar
+  and a spinner beside the current step show it is working. Progress is a plain object the worker writes and
   a timer reads, so no widget is touched from a thread.
 - **Maintenance (`src/gui_maint.py`):** statistics (pages, raw sources, data size), a level picker when more than one
   level is reachable (`Session.bind_shard`: that shard becomes the active DB and the only scope, so every section

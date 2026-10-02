@@ -26,6 +26,7 @@ def _fresh(monkeypatch):
     monkeypatch.setattr(ollama_server, "_proc", None)
     monkeypatch.setattr(ollama_server, "_serving", lambda base, **k: False)
     monkeypatch.setattr(ollama_server, "_get_json", lambda url, timeout=3.0: None)
+    monkeypatch.setattr(ollama_server, "_environs", lambda: iter(()))
     monkeypatch.setattr(
         gpu_placement,
         "gpus",
@@ -184,6 +185,30 @@ def test_an_existing_pinned_daemon_is_adopted_not_duplicated(monkeypatch):
     assert not status["managed"]
     assert "reusing" in status["reason"]
     assert ollama_server._proc is None
+
+
+def _environ(**env: str) -> bytes:
+    return b"\0".join(f"{k}={v}".encode() for k, v in env.items()) + b"\0"
+
+
+def test_an_adopted_daemon_reports_the_card_it_runs_on_not_a_fresh_plan(monkeypatch):
+    # The plan would pick card 1 (more free VRAM); the running daemon was pinned to card 0.
+    monkeypatch.setattr(ollama_server, "_serving", lambda base, **k: True)
+    on_card0 = _environ(OLLAMA_HOST="127.0.0.1:11435", CUDA_VISIBLE_DEVICES="0")
+    monkeypatch.setattr(ollama_server, "_environs", lambda: iter([on_card0]))
+    assert ollama_server.status()["gpu"] == 0
+
+
+def test_the_daemon_card_is_read_from_the_process_serving_that_port():
+    environs = [
+        _environ(OLLAMA_HOST="127.0.0.1:11999", CUDA_VISIBLE_DEVICES="0"),
+        _environ(PATH="/bin"),
+        _environ(OLLAMA_HOST="127.0.0.1:11435", CUDA_VISIBLE_DEVICES="1"),
+    ]
+    assert ollama_server.gpu_from_environs(environs, 11435) == 1
+    assert ollama_server.gpu_from_environs(environs, 12000) is None
+    unpinned = _environ(OLLAMA_HOST="127.0.0.1:11435", CUDA_VISIBLE_DEVICES="0,1")
+    assert ollama_server.gpu_from_environs([unpinned], 11435) is None
 
 
 def test_resolution_is_cached_for_the_process(monkeypatch):

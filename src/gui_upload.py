@@ -270,14 +270,16 @@ class UploadView:
                 "upload-files"
             )
             self.bar = ui.linear_progress(value=0, show_value=False).props("size=4px")
-            self.readout = ui.label("").classes("muted text-caption")
+            with ui.row().classes("items-center no-wrap gap-2"):
+                self.spinner = ui.spinner(size="1.4em").mark("ingest-spinner")
+                self.readout = ui.label("").classes("muted text-caption")
             self.stage = ui.column().classes("w-full gap-3")
         ui.timer(_TICK_SECONDS, self._tick)
         self._render()
 
     def _tick(self) -> None:
-        self.bar.set_visibility(self.state.busy)
-        self.readout.set_visibility(self.state.busy)
+        for part in (self.bar, self.spinner, self.readout):
+            part.set_visibility(self.state.busy)
         if self.state.busy:
             self.bar.set_value(self.progress.fraction)
             self.readout.set_text(self.progress.text)

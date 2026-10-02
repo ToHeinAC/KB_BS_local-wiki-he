@@ -95,7 +95,10 @@ is the right bias: if no daemon answers, ours is the app's only LLM.
 so Streamlit's SIGTERM shutdown reaps it. A daemon already listening on the
 pinned port is **adopted**, not duplicated, so a hard kill leaves at most one
 stray daemon and the next app start reuses it. `stop()` never touches an adopted
-daemon — only one we started.
+daemon — only one we started. An adopted daemon's card is read from its own
+`CUDA_VISIBLE_DEVICES` (`gpu_from_environs` over `/proc/*/environ`), not re-planned:
+the model it already holds makes its card look fuller, so a fresh plan would name
+the other card. Only when that lookup fails does `status()` report the plan's card.
 
 The one sharp edge: **run a single LocalWiki instance per pinned port.** With two
 up at once the second adopts the first's daemon, and if the owner exits first the

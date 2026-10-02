@@ -36,6 +36,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
@@ -232,6 +233,33 @@ def stop() -> None:
 atexit.register(stop)
 
 
+def gpu_from_environs(environs: Iterable[bytes], port: int) -> int | None:
+    """The single card in `CUDA_VISIBLE_DEVICES` of the process serving `127.0.0.1:<port>`.
+
+    An adopted daemon keeps the card it was started on, which a fresh plan need not
+    pick again (the model it holds makes its own card look fuller).
+    """
+    host = f"OLLAMA_HOST=127.0.0.1:{port}".encode()
+    for raw in environs:
+        entries = raw.split(b"\0")
+        if host not in entries:
+            continue
+        for entry in entries:
+            key, _, value = entry.partition(b"=")
+            if key == b"CUDA_VISIBLE_DEVICES" and value.isdigit():
+                return int(value)
+    return None
+
+
+def _environs() -> Iterator[bytes]:
+    """Every readable process environment (Linux `/proc`); others' are skipped."""
+    for path in Path("/proc").glob("[0-9]*/environ"):
+        try:
+            yield path.read_bytes()
+        except OSError:
+            continue
+
+
 # ---------------------------------------------------------------------------
 # resolution
 
@@ -254,10 +282,11 @@ def _resolve() -> dict[str, Any]:
     port = _pinned_port()
     base = f"http://127.0.0.1:{port}"
     if _serving(base):
+        adopted = gpu_from_environs(_environs(), port)
         return {
             "host": base,
             "pinned": True,
-            "gpu": placement.index,
+            "gpu": placement.index if adopted is None else adopted,
             "managed": False,
             "reason": f"reusing the pinned daemon already on port {port}",
         }

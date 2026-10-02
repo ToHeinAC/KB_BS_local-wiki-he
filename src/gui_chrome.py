@@ -57,15 +57,32 @@ def folio_data() -> dict[str, Any]:
     }
 
 
+def _load(card: dict[str, Any]) -> int:
+    util = str(card["util"])
+    return int(util) if util.isdigit() else -1
+
+
+def working_card(gpus: list[dict[str, Any]], pinned: int | None) -> int | None:
+    """Index of the card the model works on: the pinned one, else the busiest.
+    `gpus` is in nvidia-smi order, which the pin's PCI_BUS_ID numbering matches."""
+    if not gpus:
+        return None
+    if pinned is not None and 0 <= pinned < len(gpus):
+        return pinned
+    return max(range(len(gpus)), key=lambda i: _load(gpus[i]))
+
+
 def folio_text(data: dict[str, Any]) -> list[str]:
     """The folio's status segments, left to right."""
     gpu = data["pinned_gpu"]
     where = "the shared daemon" if gpu is None else f"GPU {gpu}"
     parts = [f"{data['model']} on {where}"]
-    if data["gpus"]:
-        card = data["gpus"][0]
+    index = working_card(data["gpus"], gpu)
+    if index is not None:
+        card = data["gpus"][index]
         name = str(card["name"]).replace("NVIDIA GeForce ", "")
-        parts.append(f"{name} at {card['temp']} °C, load {card['util']} %")
+        label = "" if index == gpu else f"GPU {index}: "
+        parts.append(f"{label}{name} at {card['temp']} °C, load {card['util']} %")
     passages = sum(data["index"].values())
     parts.append(f"Search index: {passages} passages" if passages else "No search index")
     return parts
