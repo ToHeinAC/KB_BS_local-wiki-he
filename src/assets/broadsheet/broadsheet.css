@@ -251,8 +251,11 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .hint { font-size: 13px; line-height: 1.45; color: var(--muted); }
 
 /* ── Explorer (mockup 02): bar, map with standings, reader ─────────────────────────────── */
-.bar { padding: 10px 40px; gap: 10px 14px; border-bottom: 1px solid var(--hair); flex-wrap: wrap; }
-.bar .find { width: 180px; border-bottom: 1px solid var(--ink); font-size: 15px; }
+/* The bar shares the content grid below, so Find ends exactly at the map column's edge. */
+.bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 40%); padding: 10px 0; gap: 0; border-bottom: 1px solid var(--hair); }
+.bar .bar-left { padding-left: 40px; gap: 14px 20px; min-width: 0; }
+.bar .bar-right { padding: 0 40px; }
+.bar .find { flex: 1 1 auto; min-width: 140px; border-bottom: 2px solid var(--green); font-size: 15px; }
 .bar .text-caption, .bar .q-checkbox__label { white-space: nowrap; }
 .explorer-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, 40%); width: 100%; }
 .explorer-grid .left { padding: 14px 32px 24px 40px; border-right: 1px solid var(--ink); min-width: 0; }

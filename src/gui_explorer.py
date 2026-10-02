@@ -59,6 +59,41 @@ def _search(query: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None, bo
     return results, retrieval.last_frame(), bool(lex_index.index_health()["wiki"])
 
 
+# A page's reference blocks (OKF stamps `## Citations`): the numbered notes replace them.
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
+_REF_TITLE_RE = re.compile(r"(?i)references|citations|sources|quellen|referenzen|literatur")
+
+
+def _drop_reference_sections(text: str) -> str:
+    out: list[str] = []
+    skip = 0  # the level of the reference heading being skipped, 0 when not skipping
+    for line in text.splitlines(keepends=True):
+        heading = _HEADING_RE.match(line)
+        if heading:
+            level = len(heading.group(1))
+            if _REF_TITLE_RE.fullmatch(heading.group(2)):
+                skip = min(skip, level) if skip else level
+                continue
+            if skip and level <= skip:
+                skip = 0
+        if not skip:
+            out.append(line)
+    return "".join(out).rstrip("\n") + "\n" if out else ""
+
+
+def cite_page(content: str, sources: list[str], titles: dict[str, str]) -> str:
+    """A wiki page's body with its `[file.md]` / `[page title]` citations as `[Source: …]` /
+    `[Wiki: …]` tags (only names of its own sources or of wiki pages), reference blocks removed."""
+    aliases = ui_logic.wiki_aliases([], titles, sources)
+    return ui_logic.tag_wiki_citations(_drop_reference_sections(content), aliases)
+
+
+def _reader_data(page: str) -> tuple[dict[str, Any], dict[str, str]]:
+    """The parsed page and every page's title (blocking)."""
+    titles = {p["filename"]: str(p.get("title") or "") for p in wiki_engine.list_pages()}
+    return wiki_engine.read_page_parsed(page), titles
+
+
 def _overview() -> str:
     wiki_engine.ensure_description()
     return wiki_engine.read_description() or ""
@@ -93,6 +128,13 @@ class ExplorerView:
     # --- bar --------------------------------------------------------------------------------
 
     def _render_bar(self, shards: tuple[str, ...]) -> None:
+        with ui.row().classes("bar-left items-center no-wrap"):
+            self._render_bar_left(shards)
+        with ui.row().classes("bar-right items-center justify-end no-wrap"):
+            self._render_advanced()
+
+    def _render_bar_left(self, shards: tuple[str, ...]) -> None:
+        """Level, view, layout and Find; Find runs to the map column's edge (CSS grid)."""
         if len(shards) > 1:
             ui.toggle(
                 {s: ui_logic.level_name(s) for s in shards},
@@ -113,8 +155,6 @@ class ExplorerView:
         )
         find.classes("find").mark("find")
         find.on_value_change(self._guard(self._set_query))
-        ui.space()
-        self._render_advanced()
 
     def _render_advanced(self) -> None:
         """Size-by and the overlays, folded into one right-aligned "Advanced" menu."""
@@ -342,7 +382,7 @@ class ExplorerView:
     async def _render_reader(self) -> None:
         page = self.ex.selected or ""
         try:
-            parsed = await gui_session.in_worker(wiki_engine.read_page_parsed, page)
+            parsed, titles = await gui_session.in_worker(_reader_data, page)
         except Exception as exc:
             with self._reader:
                 ui.label(f"Could not load page: {exc}").classes("text-negative")
@@ -354,11 +394,13 @@ class ExplorerView:
                 ui.button("Close", on_click=self._guard(self._close)).props("flat").classes(
                     "btn text small"
                 ).mark("close-reader")
-            ui.markdown(gui_cite.render_math(parsed["content"])).classes("prose compact")
+            cited = cite_page(parsed["content"], parsed["sources"], titles)
+            text, notes = gui_cite.number_citations(cited)
+            ui.markdown(gui_cite.render_math(text)).classes("prose compact")
             ui.button(
                 "Download Markdown", on_click=lambda: ui.download.content(parsed["content"], page)
             ).props("flat").classes("btn text small")
-            self._render_sources(parsed["sources"])
+            self._render_sources(parsed["sources"], notes)
             self._render_related(parsed["related"])
 
     async def _close(self) -> None:
@@ -370,11 +412,14 @@ class ExplorerView:
             row.classes(remove="sel")
         await self.refresh_right()
 
-    def _render_sources(self, sources: list[str]) -> None:
-        if not sources:
+    def _render_sources(self, sources: list[str], notes: list[gui_cite.Note]) -> None:
+        """Numbered notes for what the text cites (as in Chat), then the page's other sources."""
+        if not sources and not notes:
             return
         ui.label("Sources").classes("section-label")
-        for ref in sources:
+        for note in notes:
+            gui_chat.render_note(self.session, note)
+        for ref in gui_cite.uncited(notes, sources):
             title = ui.label(ref).classes("file cursor-pointer")
             title.on("click", self._guard(self._source_opener(ref)))
             title.mark(f"source-{ref}")

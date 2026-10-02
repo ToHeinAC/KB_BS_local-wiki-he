@@ -102,6 +102,39 @@ async def test_choosing_a_page_opens_it_in_the_reader_with_sources_and_links(
     assert gui_explorer.explorer_state(_session()).selected == "beta.md"
 
 
+def test_a_pages_citations_become_tags_and_its_reference_blocks_go() -> None:
+    content = (
+        "# Overview\n\nCooling [doc.md] and [Beta].\n\n# Trajectory\n\nLater.\n\n"
+        "# References\n\n[doc.md]\n\n## Citations\n\n1. doc.md\n"
+    )
+    assert gui_explorer.cite_page(content, ["doc.md"], {"beta.md": "Beta"}) == (
+        "# Overview\n\nCooling [Source: doc.md] and [Wiki: beta.md].\n\n# Trajectory\n\nLater.\n"
+    )
+    assert gui_explorer.cite_page("No refs.\n", [], {}) == "No refs.\n"
+
+
+async def test_the_reader_numbers_a_pages_citations_like_chat(gui_env: Path, user: User) -> None:
+    (db_context.raw_dir() / "doc.md").write_text("# Doc\n\nOriginal text of doc.")
+    _page("gamma.md", "Gamma", body="Lasers [doc.md].\n\n# References\n\n[doc.md]")
+    wiki_engine.rebuild_lex_index()
+    await _open(user)
+    await _see(user, "Gamma")
+    user.find("row-gamma.md").click()
+    await _see(user, '<sup class="cite" data-n="1">1</sup>')
+    user.find("note-1").click()
+    await _see(user, "Original text of doc.")
+
+
+async def test_the_find_field_runs_to_the_map_column_edge(wiki: Path, user: User) -> None:
+    await _open(user)
+    (find,) = user.find("find").elements
+    assert find.parent_slot is not None
+    assert "bar-left" in find.parent_slot.parent.classes
+    (advanced,) = user.find("advanced").elements
+    assert advanced.parent_slot is not None
+    assert "bar-right" in advanced.parent_slot.parent.classes
+
+
 async def test_size_and_overlays_are_folded_into_advanced(wiki: Path, user: User) -> None:
     await _open(user)
     await _see(user, "Advanced")

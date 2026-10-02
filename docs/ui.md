@@ -78,15 +78,18 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   widened scope (`guard`); Chat sets its own scope for its handlers.
 - **Explorer (`src/gui_explorer.py`, `src/gui_graph.py`):** a bar (level picker when more than one level is reachable,
   Map/Index, layout, Find, and a right-aligned *Advanced* menu with size-by and the overlays), the left column and the
-  reader on the right. **Map** is the existing
+  reader on the right. The bar uses the same two-column grid as the content, so Find (dark-green rule) ends exactly at
+  the map column's edge. **Map** is the existing
   canvas renderer (`src/assets/graph/index.html`, served from `graph-assets/`) in an iframe on the paper palette, with a
   standings table (top pages by PageRank or connections) beside it. `gui_graph.GRAPH_JS` plays the Streamlit component
   host's side of the `postMessage` protocol: it answers `streamlit:componentReady` with the arguments from
   `graph_widget.render_args` and forwards `streamlit:setComponentValue` (a double-click) as the `graph_open` event, so
   no page reloads; `graph_click` decides between opening a page and a notice for a source node. **Index** is the tree by
   type (`get_wiki_tree`); **Find** shows hits with an excerpt and the ontology line, and reports a missing index instead
-  of "no results". The reader shows the page, its original documents (opened in a dialog through `gui_chat.open_source`)
-  and linked pages; with nothing selected it shows the bundle health (Map) or the database overview (Index). One level
+  of "no results". The reader shows the page with its citations numbered as in Chat (`cite_page`: a bracket naming
+  one of the page's sources or a wiki page becomes a `[Source: …]`/`[Wiki: …]` tag; the page's own References and OKF
+  Citations blocks are left out of the view, the stored page is unchanged), the numbered notes and then its other
+  original documents (opened in a dialog through `gui_chat.open_source`), and linked pages; with nothing selected it shows the bundle health (Map) or the database overview (Index). One level
   at a time: switching binds that shard as the active DB and the only scope. Graph data is computed in a worker and
   cached per shard by `graph_widget._payload`, the cache the classification leak suite covers.
 - **Research (`src/gui_research.py`):** a question bar (question, Quick/Deep method, "Include classified levels", Start,
