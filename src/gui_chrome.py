@@ -16,6 +16,7 @@ import auth
 import classification
 import gpu_widget
 import gui_session
+import gui_upload
 import lex_index
 import ollama_client
 import ollama_server
@@ -30,6 +31,7 @@ NAV: tuple[tuple[str, str], ...] = (
 )
 _STAMP_CLASS = ("", "conf", "strict")
 _FOLIO_SECONDS = 5.0
+INGEST_BUSY = "An ingest is running. Stop the server after it has finished."
 
 
 def stamp(shard: str) -> tuple[str, str]:
@@ -43,7 +45,17 @@ def stop_server(actor: str) -> None:
     Admins only; the check is here, not just in the menu."""
     if not auth.is_admin(actor):
         raise PermissionError("Admins only.")
+    if gui_upload.ingest_running():
+        raise RuntimeError(INGEST_BUSY)
     os.kill(os.getpid(), signal.SIGTERM)
+
+
+def release_model() -> bool:
+    """Unload the model unless an ingest still needs it. Blocking: run in a worker."""
+    if gui_upload.ingest_running():
+        return False
+    ui_logic.unload_model()
+    return True
 
 
 def folio_data() -> dict[str, Any]:
@@ -120,10 +132,14 @@ def _edition_picker(session: gui_session.Session) -> None:
 
 def _user_menu(session: gui_session.Session) -> None:
     async def _reset() -> None:
-        await gui_session.in_worker(ui_logic.unload_model)
+        if not await gui_session.in_worker(release_model):
+            ui.notify("An ingest is running: the model stays loaded.", type="warning")
         _sign_out()
 
     def _stop() -> None:
+        if gui_upload.ingest_running():
+            ui.notify(INGEST_BUSY, type="warning")
+            return
         ui.notify("Stopping the server…")
         ui.timer(0.5, lambda: stop_server(session.user), once=True)  # let the notice reach the page
 

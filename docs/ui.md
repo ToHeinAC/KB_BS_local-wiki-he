@@ -47,7 +47,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   `storage.user` (`tests/test_security_rules.py`, `tests/test_gui_session.py`).
 - **What is persisted:** `app.storage.user` (a file under `.nicegui/`, gitignored) holds only `user`, `active_db` and an
   opaque `sid` (`PERSISTED_KEYS`). Everything document-derived lives in the in-memory `Session.state`, keyed by `sid`
-  in a process-level registry so it survives page navigation but not a server restart.
+  in a process-level registry so it survives page navigation but not a server restart. The one exception is a batch
+  being prepared or ingested (`gui_upload._RUNNING`, below).
 - **Chrome (`src/gui_chrome.py`):** running head (nameplate, nav, edition = database picker, level stamp, user menu
   with Admin, Reset and Sign out) and a one-line folio (model and GPU pinning, GPU load, search-index size; refreshed
   in a worker every 5 s). The GPU segment shows the card the model works on (`gui_chrome.working_card`): the pinned
@@ -118,7 +119,13 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   ignored ontology values). Reported contradictions feed a **Resolve contradictions** panel (pages, guidance, Reconcile
   through `ui_logic.resolve_by_shard`, Dismiss); a new ingest resets it. *Discard* drops a prepared batch unwritten. While a batch is prepared or ingested, a progress bar
   and a spinner beside the current step show it is working. Progress is a plain object the worker writes and
-  a timer reads, so no widget is touched from a thread.
+  a timer reads, so no widget is touched from a thread. **A running batch is protected from the GUI:** its state and
+  progress live in the session's `Upload`, and while it runs also in `gui_upload._RUNNING` keyed by (user, database),
+  so leaving the page, a database switch, Sign out or Reset neither stops it nor lets a second batch start beside
+  it. Whichever page shows the upload panel shows its progress, then its outcome. It is picked up again only while
+  every level it writes is still reachable (`_resume`), so a shrunk clearance still drops it from view. *Reset* keeps
+  the model loaded while a batch runs (`gui_chrome.release_model`), and *Stop server* refuses until it has finished.
+  A server restart (`restart-app`, `tunnel.sh`) still ends it.
 - **Maintenance (`src/gui_maint.py`):** statistics (pages, raw sources, data size), a level picker when more than one
   level is reachable (`Session.bind_shard`: that shard becomes the active DB and the only scope, so every section
   follows it), and a section toggle: *Search index* (counts, a missing-index warning, Rebuild), *Delete source* (a
@@ -150,7 +157,7 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
 - **Cutover:** `broadsheet` is the default `FRONTEND`; `tunnel.sh` and the `restart-app` skill launch through
   `scripts/run_app.py` and stop either server by `src/(app|gui_app).py … port 8520` (SIGTERM first). Admins have a
   *Stop server* item in the user menu (`gui_chrome.stop_server`: SIGTERM to the server's own process, never a kill by
-  port; the admin check is in the function).
+  port; the admin check is in the function, and it refuses while an ingest runs).
 - **Status:** plan phases 0–9 done. The Streamlit app stays in the codebase behind `FRONTEND=default` or `newspaper`.
 
 ## Frontend skins (`FRONTEND`)

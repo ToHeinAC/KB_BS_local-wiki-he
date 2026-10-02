@@ -14,6 +14,7 @@ import db_context
 import gui_app
 import gui_chrome
 import gui_session
+import gui_upload
 
 
 @pytest.fixture(autouse=True)
@@ -195,3 +196,24 @@ async def test_readers_have_no_stop_server_item(gui_env: Path, user: User) -> No
 def test_stopping_is_refused_for_non_admins(gui_env: Path) -> None:
     with pytest.raises(PermissionError):
         gui_chrome.stop_server("reader")
+
+
+def test_the_server_is_not_stopped_while_an_ingest_runs(
+    gui_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(gui_chrome.os, "kill", lambda *a: pytest.fail("must not stop"))
+    monkeypatch.setattr(gui_upload, "_RUNNING", {("x", "db"): gui_upload.Upload(busy=True)})
+    with pytest.raises(RuntimeError, match="ingest is running"):
+        gui_chrome.stop_server(auth.DEFAULT_USER)
+
+
+def test_reset_keeps_the_model_loaded_while_an_ingest_runs(
+    gui_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    unloaded: list[bool] = []
+    monkeypatch.setattr(gui_chrome.ui_logic, "unload_model", lambda: unloaded.append(True))
+    monkeypatch.setattr(gui_upload, "_RUNNING", {("x", "db"): gui_upload.Upload(busy=True)})
+    assert gui_chrome.release_model() is False
+    monkeypatch.setattr(gui_upload, "_RUNNING", {})
+    assert gui_chrome.release_model() is True
+    assert unloaded == [True]

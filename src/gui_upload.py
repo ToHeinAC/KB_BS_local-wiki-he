@@ -17,6 +17,7 @@ from typing import Any
 from nicegui import events, ui
 
 import classification
+import db_context
 import dedup
 import gui_session
 import md_convert
@@ -235,12 +236,62 @@ class Upload:
     pages: list[str] = field(default_factory=lambda: [])
     busy: bool = False
     message: str = ""
+    progress: Progress = field(default_factory=Progress)
+    shards: list[str] = field(default_factory=lambda: [])  # the levels the running batch writes
+
+
+# The batch each (user, database) is preparing or ingesting. It outlives the page that started it:
+# leaving the page, switching the database, signing out or Reset drop the session's content, but
+# must neither lose a running job nor let a second one start beside it.
+_RUNNING: dict[tuple[str, str], Upload] = {}
+
+
+def ingest_running() -> bool:
+    """Whether any batch is being prepared or ingested (Stop server and Reset wait for it)."""
+    return any(job.busy for job in _RUNNING.values())
+
+
+def _begin(owner: tuple[str, str], state: Upload, progress: Progress) -> None:
+    state.busy, state.progress = True, progress
+    _RUNNING[owner] = state
+
+
+def _end(owner: tuple[str, str], state: Upload) -> None:
+    state.busy = False
+    if _RUNNING.get(owner) is state:
+        del _RUNNING[owner]
+
+
+def _resume(session: gui_session.Session) -> Upload | None:
+    """This user's running batch in this database, unless it writes a level the session can
+    no longer reach (a shrunk clearance drops content, see `Session.seal`)."""
+    job = _RUNNING.get((session.user, session.active_db))
+    if job is None or not set(job.shards) <= set(db_context.reachable_shards(session.active_db)):
+        return None
+    return job
+
+
+def adopt(state: Upload, prep: Prepared) -> None:
+    """Take a prepared batch into the review state."""
+    state.prepared = prep
+    for name, row in prep.rows.items():
+        state.dates[name], state.classes[name] = row["date"], row["class"]
+        state.works[name], state.levels[name] = row["work"], None
+    if len(prep.files) == 1 and prep.files[0]["convertible"]:
+        state.convert_text = prep.files[0]["text"]
+
+
+def finish(state: Upload, agg: dict[str, list[str]]) -> None:
+    """Record an ingest's outcome; the batch is done."""
+    state.prepared, state.key, state.result = None, "", agg
+    state.contradictions = agg["contradictions"]
+    state.pages = list({*agg["created"], *agg["updated"]})
 
 
 def upload_state(session: gui_session.Session) -> Upload:
     state = session.state.get("upload")
     if not isinstance(state, Upload):
-        state = session.state["upload"] = Upload()
+        state = session.state["upload"] = _resume(session) or Upload()
     return state
 
 
@@ -253,7 +304,7 @@ class UploadView:
         self.session = session
         self.state = upload_state(session)
         self._guard = gui_session.guarded(session)
-        self.progress = Progress()
+        self._was_busy = self.state.busy
         self.on_review = on_review  # told when a batch starts or stops being prepared/reviewed
         self._reviewing = False
 
@@ -277,12 +328,29 @@ class UploadView:
         ui.timer(_TICK_SECONDS, self._tick)
         self._render()
 
-    def _tick(self) -> None:
+    async def _tick(self) -> None:
+        """Follow the batch, whichever page started it: progress while it runs, then the outcome."""
+        busy = self.state.busy
         for part in (self.bar, self.spinner, self.readout):
-            part.set_visibility(self.state.busy)
-        if self.state.busy:
-            self.bar.set_value(self.progress.fraction)
-            self.readout.set_text(self.progress.text)
+            part.set_visibility(busy)
+        if busy:
+            self.bar.set_value(self.state.progress.fraction)
+            self.readout.set_text(self.state.progress.text)
+        elif self._was_busy:
+            await self._guard(self._show_outcome)()
+        self._was_busy = busy
+
+    def _settled(self) -> None:
+        """Show a finished job on the page that started it, if the user is still on it; a page
+        opened meanwhile shows it from its own timer."""
+        if not self.stage.is_deleted:
+            self._was_busy = False
+            self._show_outcome()
+
+    def _show_outcome(self) -> None:
+        if self.state.prepared is None:  # ingested: the drop zone is ready for the next batch
+            self.uploader.reset()
+        self._render()
 
     # --- receiving and preparing ----------
 
@@ -292,27 +360,20 @@ class UploadView:
         if key == self.state.key or self.state.busy:
             return
         keep = (self.state.contradictions, self.state.pages)
-        self.state = self.session.state["upload"] = Upload(key=key)
-        self.state.contradictions, self.state.pages = keep
-        self.state.busy, self.progress = True, Progress()
+        state = self.state = self.session.state["upload"] = Upload(key=key)
+        state.contradictions, state.pages = keep
+        owner = (self.session.user, self.session.active_db)
+        _begin(owner, state, Progress())
         self._render()
         try:
             prep = await gui_session.in_worker(
-                prepare_batch, raws, self.session.active_db, self.progress.set
+                prepare_batch, raws, self.session.active_db, state.progress.set
             )
         except Exception as exc:
             prep = Prepared(error=f"Preparing the files failed: {exc}")
-        self._adopt(prep)
-
-    def _adopt(self, prep: Prepared) -> None:
-        state = self.state
-        state.prepared, state.busy = prep, False
-        for name, row in prep.rows.items():
-            state.dates[name], state.classes[name] = row["date"], row["class"]
-            state.works[name], state.levels[name] = row["work"], None
-        if len(prep.files) == 1 and prep.files[0]["convertible"]:
-            state.convert_text = prep.files[0]["text"]
-        self._render()
+        adopt(state, prep)
+        _end(owner, state)
+        self._settled()
 
     # --- rendering ----------
 
@@ -507,30 +568,28 @@ class UploadView:
             {"part of": state.part_of, "description": state.description},
         )
         state.contradictions, state.pages, state.result, state.message = [], [], None, ""
-        state.busy, self.progress = True, Progress(total=len(files))
+        db = self.session.active_db
+        state.shards = sorted(
+            {classification.shard_id(db, lvl) for lvl in pending["levels"].values()}
+        )
+        owner = (self.session.user, db)
+        _begin(owner, state, Progress(total=len(files)))
         self._sync_ingest()
         try:
             agg = await gui_session.in_worker(
                 run_ingest,
                 pending,
-                self.session.active_db,
+                db,
                 self.session.user,
-                self.progress.status,
-                self.progress.tick,
+                state.progress.status,
+                state.progress.tick,
             )
         except Exception as exc:
-            state.busy, state.message = False, f"Ingest failed: {exc}"
-            self._render()
-            return
-        self._finish(agg)
-
-    def _finish(self, agg: dict[str, list[str]]) -> None:
-        state = self.state
-        state.busy, state.prepared, state.key, state.result = False, None, "", agg
-        state.contradictions = agg["contradictions"]
-        state.pages = list({*agg["created"], *agg["updated"]})
-        self.uploader.reset()
-        self._render()
+            state.message = f"Ingest failed: {exc}"
+        else:
+            finish(state, agg)
+        _end(owner, state)
+        self._settled()
 
     def _render_result(self, agg: dict[str, list[str]]) -> None:
         ui.label("Ingest complete.").classes("section-label")

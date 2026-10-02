@@ -221,6 +221,7 @@ def test_ingest_runs_oldest_first_one_level_at_a_time(
 @pytest.fixture(autouse=True)
 def _pages(user: User, gui_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     gui_session._SESSIONS.clear()
+    monkeypatch.setattr(gui_upload, "_RUNNING", {})
     gui_app.register()
 
 
@@ -474,6 +475,91 @@ async def test_a_spinner_shows_while_the_batch_is_ingested(
     await _see(user, "Ingest complete.")
     await _until(lambda: not spinner.visible)
     assert not spinner.visible
+
+
+def _slow_ingest(monkeypatch: pytest.MonkeyPatch, seen: list[tuple[str, str]]) -> threading.Event:
+    """Stub the ingest; `ingest_begin` blocks until the returned event is set."""
+    _stub_ingest(monkeypatch, seen)
+    release, begin = threading.Event(), wiki_engine.ingest_begin
+
+    def slow(text: str, name: str, meta: Any) -> dict[str, Any]:
+        release.wait(5)
+        return begin(text, name, meta)
+
+    monkeypatch.setattr(wiki_engine, "ingest_begin", slow)
+    return release
+
+
+async def _start_ingest(user: User, name: str = "a.md") -> None:
+    await _drop(user, {name: DOC_A})
+    await _see(user, "1 file(s) ready to ingest.")
+    _classify(user, name, "normal")
+    await _until(lambda: user.find("ingest-batch").elements.copy().pop().enabled)  # type: ignore[union-attr]
+    user.find("ingest-batch").click()
+    await _see(user, f"Ingesting {name}")
+
+
+async def test_an_ingest_keeps_running_and_reporting_after_leaving_the_page(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[tuple[str, str]] = []
+    release = _slow_ingest(monkeypatch, seen)
+    await _open(user)
+    await _start_ingest(user)
+    await user.open("/chat")
+    await user.open("/")
+    await _see(user, "Ingesting a.md")  # the new page shows the running job's progress
+    release.set()
+    await _see(user, "Ingest complete.")
+    await _see(user, "a.md-page.md")
+    assert seen == [(DB, "a.md")]
+
+
+async def test_signing_out_and_in_again_finds_the_running_ingest(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[tuple[str, str]] = []
+    release = _slow_ingest(monkeypatch, seen)
+    await _open(user)
+    await _start_ingest(user)
+    assert gui_upload.ingest_running()
+    user.find("user-menu").click()
+    user.find("sign-out").click()
+    await _see(user, "Sign in to continue")
+    await _open(user)  # a new sign-in starts an empty session
+    await _see(user, "Ingesting a.md")
+    await _drop(user, {"b.md": DOC_B})  # no second batch beside the running one
+    await user.should_not_see("b.md")
+    release.set()
+    await _see(user, "Ingest complete.")
+    assert seen == [(DB, "a.md")]
+    assert not gui_upload.ingest_running()
+
+
+async def test_a_running_ingest_at_a_revoked_level_is_not_shown_again(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    auth.add_user("lead", "pw", [DB], maintains=[DB], clearance={DB: "confidential"})
+    with db_context.clearance({DB: 1}):
+        db_context.ensure_shard(f"{DB}@confidential")
+    seen: list[tuple[str, str]] = []
+    release = _slow_ingest(monkeypatch, seen)
+    await _open(user, "lead", "pw")
+    await _drop(user, {"a.md": DOC_A})
+    await _see(user, "1 file(s) ready to ingest.")
+    _classify(user, "a.md", "confidential")
+    await _until(lambda: user.find("ingest-batch").elements.copy().pop().enabled)  # type: ignore[union-attr]
+    user.find("ingest-batch").click()
+    await _see(user, "Ingesting a.md")
+    auth.set_clearance("lead", DB, "normal", by="t")
+    await user.open("/")  # the shrunk grant drops the session's content
+    await _see(user, "2BrAIn")
+    await asyncio.sleep(0.5)  # a resumed job would show its review now and its progress by now
+    await user.should_not_see("ready to ingest")
+    await user.should_not_see("Ingesting a.md")
+    release.set()
+    await _until(lambda: not gui_upload.ingest_running())
+    assert seen == [(f"{DB}@confidential", "a.md")]  # the job itself still finished
 
 
 def test_status_text_reaches_the_progress_readout() -> None:
