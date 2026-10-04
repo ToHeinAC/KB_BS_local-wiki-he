@@ -199,6 +199,27 @@ def test_an_adopted_daemon_reports_the_card_it_runs_on_not_a_fresh_plan(monkeypa
     assert ollama_server.status()["gpu"] == 0
 
 
+def test_a_running_pinned_daemon_is_adopted_even_when_no_card_has_room_left(monkeypatch):
+    # After a restart the daemon still holds the model, so its own card looks full and the
+    # plan finds no card that fits; falling back would load the model a second time.
+    monkeypatch.setattr(ollama_server, "required_gib", lambda host: 40.0)
+    monkeypatch.setattr(ollama_server, "_serving", lambda base, **k: True)
+    on_card0 = _environ(OLLAMA_HOST="127.0.0.1:11435", CUDA_VISIBLE_DEVICES="0")
+    monkeypatch.setattr(ollama_server, "_environs", lambda: iter([on_card0]))
+    status = ollama_server.status()
+    assert status["pinned"]
+    assert status["gpu"] == 0
+    assert status["host"] == "http://127.0.0.1:11435"
+
+
+def test_pinning_off_ignores_a_running_pinned_daemon(monkeypatch):
+    monkeypatch.setenv("OLLAMA_PIN_GPU", "off")
+    monkeypatch.setattr(ollama_server, "_serving", lambda base, **k: True)
+    on_card0 = _environ(OLLAMA_HOST="127.0.0.1:11435", CUDA_VISIBLE_DEVICES="0")
+    monkeypatch.setattr(ollama_server, "_environs", lambda: iter([on_card0]))
+    assert not ollama_server.status()["pinned"]
+
+
 def test_the_daemon_card_is_read_from_the_process_serving_that_port():
     environs = [
         _environ(OLLAMA_HOST="127.0.0.1:11999", CUDA_VISIBLE_DEVICES="0"),

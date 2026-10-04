@@ -104,6 +104,11 @@ def gpus() -> list[Gpu]:
     return found
 
 
+def pinning_off(mode: str | None) -> bool:
+    """Whether a raw `*_PIN_GPU` value disables pinning."""
+    return (mode or "").strip().lower() in _OFF
+
+
 def plan(
     required_gib: float, mode: str | None = "auto", headroom_gib: float = HEADROOM_GIB
 ) -> Placement:
@@ -113,9 +118,9 @@ def plan(
     card that fits and otherwise leaves the model split; an integer forces that
     card and skips the estimate; "off" disables pinning entirely.
     """
-    mode = (mode or "auto").strip().lower() or "auto"
-    if mode in _OFF:
+    if pinning_off(mode):
         return Placement(None, "pinning disabled")
+    mode = (mode or "auto").strip().lower() or "auto"
 
     devices = gpus()
     if mode != "auto":

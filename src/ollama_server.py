@@ -264,6 +264,16 @@ def _environs() -> Iterator[bytes]:
 # resolution
 
 
+def _adopted(base: str, port: int, gpu: int) -> dict[str, Any]:
+    return {
+        "host": base,
+        "pinned": True,
+        "gpu": gpu,
+        "managed": False,
+        "reason": f"reusing the pinned daemon already on port {port}",
+    }
+
+
 def _resolve() -> dict[str, Any]:
     global _proc
     fallback = configured_host()
@@ -274,22 +284,23 @@ def _resolve() -> dict[str, Any]:
 
     if not _is_local(fallback):
         return unpinned(f"OLLAMA_HOST is remote ({fallback}) — left untouched")
+    if gpu_placement.pinning_off(mode):
+        return unpinned("pinning disabled")
+
+    port = _pinned_port()
+    base = f"http://127.0.0.1:{port}"
+    serving = _serving(base)
+    # A running daemon keeps its card: the model it holds makes that card look full, so a
+    # fresh plan could find no room and send every call to the shared daemon instead.
+    adopted = gpu_from_environs(_environs(), port) if serving else None
+    if adopted is not None:
+        return _adopted(base, port, adopted)
 
     placement = gpu_placement.plan(required_gib(fallback), mode)
     if placement.index is None:  # not pinned
         return unpinned(placement.reason)
-
-    port = _pinned_port()
-    base = f"http://127.0.0.1:{port}"
-    if _serving(base):
-        adopted = gpu_from_environs(_environs(), port)
-        return {
-            "host": base,
-            "pinned": True,
-            "gpu": placement.index if adopted is None else adopted,
-            "managed": False,
-            "reason": f"reusing the pinned daemon already on port {port}",
-        }
+    if serving:
+        return _adopted(base, port, placement.index)
 
     proc = _spawn(port, placement.index)
     if proc is None:
