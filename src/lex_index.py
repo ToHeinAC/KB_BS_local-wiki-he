@@ -478,6 +478,16 @@ def index_health() -> dict[str, Any]:
     return {"raw": int(counts.get("raw", 0)), "wiki": int(counts.get("wiki", 0))}
 
 
+def needs_rebuild() -> bool:
+    """Whether the active DB has chunks or wiki pages but no indexed rows — the state in which
+    `query()` is silently empty. An empty DB needs no index."""
+    if any(index_health().values()):
+        return False
+    wiki = db_context.wiki_dir()
+    pages = (*wiki.glob("*.md"), *wiki.glob("insights/*.md"))
+    return any(db_context.chunks_dir().glob("*.jsonl")) or bool(pages)
+
+
 def query(
     q: str, top_k: int = 10, scope: str | None = None, sources: Sequence[str] | None = None
 ) -> list[dict[str, Any]]:

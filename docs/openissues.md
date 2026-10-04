@@ -20,7 +20,6 @@ Track open work and resolved items here. Keep entries short; link to PRs/commits
   the app's own PID); its sidebar only has Reset. The Broadsheet frontend (the default) has one:
   *Stop server* in the user menu, admins only.
 - **Stale `postings.json` / `stats.json` in most `data/<DB>/index/`.** Dead artifacts of the JSON-postings backend retired in `d25fbe8`; nothing reads them (~4 MB in KI alone). Safe to delete, but they are inside user databases, so removal needs an explicit go-ahead.
-- **No migration hook for derived indexes.** `d25fbe8` changed the on-disk index format with no upgrade path, which silently broke retrieval on 10 of 12 databases until 2026-07-24. A startup check (`lex_index.index_health()` per DB) or a one-shot migration script would have caught it; today only the Maintenance banner does, and only once a user visits the DB.
 
 # Karpathy Wiki Knowledge System — Deep Dive & LocalWiki Implementation Review
 
@@ -280,6 +279,15 @@ This is purely additive and significantly improves wiki usability as the knowled
 The implementation captures ~70% of the Karpathy pattern's structure correctly and is a solid foundation. The missing 30% is concentrated in the knowledge-update feedback loops — the mechanics that make knowledge compound rather than merely accumulate.
 
 ## Resolved
+
+### 2026-10-04 — startup heal for missing search indexes
+
+`d25fbe8` changed the index format with no upgrade path, which silently broke retrieval on 10
+of 12 databases until 2026-07-24. `scripts/run_app.py` now runs `scripts/heal_indexes.py`
+before it starts the server: every shard whose chunks or wiki pages exist but whose index is
+missing or unreadable (`lex_index.needs_rebuild()`) is rebuilt. It is a script, not app code,
+because only tests and scripts may elevate clearance (`tests/test_security_rules.py`). Starting
+a server directly (`uv run streamlit run …`) skips it.
 
 ### 2026-07-24 — documentation budget
 

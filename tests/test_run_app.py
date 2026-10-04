@@ -97,3 +97,16 @@ def test_restart_relaunch_releases_the_scripts_output(tmp_path: Path) -> None:
     out = subprocess.run(["bash", str(runnable)], capture_output=True, text=True, timeout=10)
     assert out.stdout.strip() == "launched"
     assert time.monotonic() - started < 2
+
+
+def test_the_launcher_heals_missing_indexes_before_the_server_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load()
+    started: list[list[str]] = []
+    monkeypatch.setattr(module.subprocess, "run", lambda argv, **_k: started.append(argv))
+    monkeypatch.setattr(module.os, "execvp", lambda *_a: started.append(["exec"]))
+    monkeypatch.setattr(module.os, "chdir", lambda _p: None)
+    monkeypatch.setattr(sys, "argv", ["run_app.py"])
+    module.main()
+    assert started == [["uv", "run", "python", "scripts/heal_indexes.py"], ["exec"]]

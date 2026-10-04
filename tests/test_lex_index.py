@@ -173,3 +173,27 @@ def test_index_replace_source_adds_then_replaces(fresh_index):
     assert any(h["source"] == "Neu.md" for h in lex_index.query("Photosynthese"))
     # a replace of one source leaves the others intact
     assert lex_index.query("revenue growth")
+
+
+def test_needs_rebuild_only_when_content_exists_without_an_index(tmp_path, monkeypatch):
+    """An empty DB needs no index; chunks or wiki pages without one do (query() is silently [])."""
+    import db_context
+
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
+    assert not lex_index.needs_rebuild()
+    chunker.write_chunks("SAP.md", chunker.split(SAMPLE_ENGLISH))
+    assert lex_index.needs_rebuild()
+    lex_index.build()
+    assert not lex_index.needs_rebuild()
+
+
+def test_needs_rebuild_for_wiki_pages_alone(tmp_path, monkeypatch):
+    import db_context
+
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
+    wiki = tmp_path / "d" / "wiki"
+    wiki.mkdir(parents=True)
+    (wiki / "alpha.md").write_text("---\ntitle: Alpha\ntype: concept\n---\nBody text.")
+    assert lex_index.needs_rebuild()

@@ -14,6 +14,7 @@ Rules: [AGENTS.md](AGENTS.md). Design: [docs/architecture.md](docs/architecture.
 | Ontology detection bench | `uv run python scripts/bench_ontology_detect.py` (legal heads; `--gold bench/fixture_ontology_detect_KI.json` for KI, see [docs/ontology.md](docs/ontology.md)) |
 | Ontology export (SKOS / JSON-LD) | `uv run python scripts/export_ontology.py --db <DB> --out <dir>` |
 | Ontology search eval | `uv run python scripts/eval_ontology_search.py --root <scratch dir>` (downloads public law texts; never writes `data/`) |
+| Heal missing search indexes | `uv run python scripts/heal_indexes.py` (also run by `scripts/run_app.py` before every start) |
 | Optional reranker | `uv sync --inexact --extra rerank` (see [docs/retrieval.md](docs/retrieval.md)) |
 
 - Port 8520 (8511 belongs to another app on this host). Both frontends serve under `/wiwi` to
