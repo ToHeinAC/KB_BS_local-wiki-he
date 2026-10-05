@@ -71,6 +71,13 @@ its own sub-store ("shard"), and one gate decides whether a path into a shard re
   so the existing single-DB views — tree, search, page reader, graph, overview, stats, log, lint,
   ontology — run unchanged on it. The graph cache key contains the shard id and is computed through
   the gate.
+- **Explorer "All levels"** (Map only) draws every shard the clearance reaches in one graph, so the
+  connections between levels stay visible: `graph_export.export_levels` reads each shard under
+  `using_db` (the gate), qualifies node ids `<shard>::<id>`, stamps `level`, and joins the copies of
+  one page or source at several levels with a `same-topic` edge. Links stay inside their level. The
+  cache (`graph_widget._payload_levels`) is keyed by every shard's signature plus the shard tuple, so
+  a lower clearance never gets a higher render. Reading, Index and Find do not merge: a node opens
+  through its own shard, Index and Find stay on the normal level.
 - **Wiki Chat** "Search in" lists every reachable shard of the user's DBs (default: all levels of
   the active DB); Fast and Deep mode already fan out over the scope.
 - **Research** searches the normal level unless *Include classified levels* is ticked; the Quick
@@ -136,5 +143,6 @@ removes it below. Moving down is a plain `delete_source`. Moving up runs `purge_
 | `test_confine` | Traversal and absolute names read as missing (was a live leak) |
 | `test_classification`, `test_classification_gate`, `test_classification_shards` | Model, gate, fail-closed threads, base-DB concepts |
 | `test_classification_leaks` | Canary tokens in every store of the higher shards appear in no output and no LLM prompt of the engine, tools, fast chat and both agents; positive twins; gate-bypass meta-test; graph cache order |
+| `test_graph_levels` | All-levels payload: levels, per-level links, same-topic edges, gate refusal, cache never serves a higher level |
 | `test_classification_writes`, `test_classification_move` | High-water writes, web off, provenance; move and a byte-level scan of the lower shard after a purge |
 | `test_security_rules`, `test_audit`, `test_auth`, `test_app` | AST rules with violating inputs; audit; clearance; UI gating |

@@ -12,6 +12,7 @@ from typing import Any
 
 from nicegui import app, ui
 
+import classification
 import graph_widget
 import ui_logic
 
@@ -50,6 +51,12 @@ def register_assets() -> None:
     app.add_static_files(f"/{ASSET_URL}", ASSETS)
 
 
+def _type_label(node: dict[str, Any]) -> str:
+    label = str(node["cat"]).replace("-", " ").capitalize()
+    level = int(node.get("level", 0))
+    return f"{label} · {classification.level_label(level)}" if level else label
+
+
 def standings(payload: dict[str, Any], size_by: str, limit: int = 10) -> list[dict[str, Any]]:
     """The top pages by PageRank or connections, for the table beside the map."""
     key = _METRIC[size_by]
@@ -61,7 +68,7 @@ def standings(payload: dict[str, Any], size_by: str, limit: int = 10) -> list[di
             "rank": i,
             "id": n["id"],
             "label": n["label"],
-            "type": str(n["cat"]).replace("-", " ").capitalize(),
+            "type": _type_label(n),
             "value": f"{n[key]:.3f}" if size_by == "pagerank" else str(int(n[key])),
             "width": n[key] / top if top else 0.0,
         }
@@ -71,7 +78,9 @@ def standings(payload: dict[str, Any], size_by: str, limit: int = 10) -> list[di
 
 def caption(payload: dict[str, Any]) -> str:
     pages = sum(1 for n in payload["nodes"] if n.get("kind") == "page")
-    return f"{pages} pages, {len(payload['edges'])} links, {payload['communities']} clusters"
+    text = f"{pages} pages, {len(payload['edges'])} links, {payload['communities']} clusters"
+    levels = len(payload.get("levels") or {})
+    return f"{text}, {levels} levels" if levels > 1 else text
 
 
 def graph_click(value: dict[str, Any] | None) -> tuple[str, str] | None:
@@ -83,14 +92,20 @@ def graph_click(value: dict[str, Any] | None) -> tuple[str, str] | None:
         return "open", str(node)
     return (
         "notice",
-        f"{str(node).removeprefix('source::')} is an original document, not a wiki page.",
+        f"{str(node).rpartition('source::')[2]} is an original document, not a wiki page.",
     )
 
 
 def map_data(
-    *, overlays: list[str], size_by: str, layout: str, selected: str | None
+    *,
+    overlays: list[str],
+    size_by: str,
+    layout: str,
+    selected: str | None,
+    all_levels: bool = False,
 ) -> dict[str, Any]:
-    """Renderer arguments, standings and caption for the bound level (blocking: run in a worker)."""
+    """Renderer arguments, standings and caption for the bound level, or for every reachable
+    level merged when `all_levels` (blocking: run in a worker)."""
     args = graph_widget.render_args(
         overlays=[ui_logic.OVERLAY_LABELS[p] for p in overlays],
         size_by=size_by,
@@ -99,6 +114,7 @@ def map_data(
         paper=True,
         accent=ACCENT,
         selected=selected,
+        all_levels=all_levels,
     )
     payload = args["graph"]
     return {"args": args, "standings": standings(payload, size_by), "caption": caption(payload)}

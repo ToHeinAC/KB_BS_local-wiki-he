@@ -22,11 +22,14 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, date, datetime, timedelta
-from typing import Any, cast
+from itertools import pairwise
+from typing import Any, NamedTuple, cast
 
 import networkx as nx
 from networkx.algorithms.community import louvain_communities
 
+import classification
+import db_context
 import lang
 import wiki_engine
 
@@ -44,6 +47,11 @@ _LOUVAIN_SEED = 42
 # Top-decile cutoffs for the "hub" and "bridge" overlays.
 _HUB_QUANTILE = 0.9
 _BRIDGE_QUANTILE = 0.9
+
+
+# Edge types without a direction; the renderer draws `same-topic` (one topic at several
+# classification levels) dashed and without an arrow.
+_UNDIRECTED = ("related-to", "same-topic")
 
 
 def _quantile_threshold(values: list[float], q: float) -> float:
@@ -153,7 +161,7 @@ def _edges(typed: dict[str, Any]) -> list[dict[str, str]]:
     return sorted(
         (
             {"s": min(e["from"], e["to"]), "t": max(e["from"], e["to"]), "type": e["type"]}
-            if e["type"] == "related-to"
+            if e["type"] in _UNDIRECTED
             else {"s": e["from"], "t": e["to"], "type": e["type"]}
             for e in typed["edges"]
         ),
@@ -164,7 +172,24 @@ def _edges(typed: dict[str, Any]) -> list[dict[str, str]]:
 def export(today: date | None = None) -> dict[str, Any]:
     """Build the renderer payload from the live wiki. Deterministic."""
     typed, truncated = _cap(wiki_engine.build_typed_graph(), MAX_NODES)
-    meta = _page_meta()
+    return _assemble(
+        typed,
+        truncated,
+        _page_meta(),
+        set(wiki_engine.outdated_pages(today)),
+        wiki_engine.source_ranks(),
+        today,
+    )
+
+
+def _assemble(
+    typed: dict[str, Any],
+    truncated: bool,
+    meta: dict[str, dict[str, Any]],
+    outdated: set[str],
+    ranks: dict[str, int],
+    today: date | None,
+) -> dict[str, Any]:
     G = _to_networkx(typed)
     pagerank, betweenness, communities = _analytics(G)
     # Sort communities by their smallest member so ids are stable across runs
@@ -174,8 +199,6 @@ def export(today: date | None = None) -> dict[str, Any]:
         for i, group in enumerate(sorted(communities, key=lambda c: min(c)))
         for node in group
     }
-    outdated = set(wiki_engine.outdated_pages(today))
-    ranks = wiki_engine.source_ranks()
     cuts = {
         "hub_cut": _quantile_threshold(list(pagerank.values()), _HUB_QUANTILE),
         "bridge_cut": _quantile_threshold(list(betweenness.values()), _BRIDGE_QUANTILE),
@@ -209,6 +232,77 @@ def export(today: date | None = None) -> dict[str, Any]:
         "lang": lang.detect(" ".join(n["label"] for n in nodes)),
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
     }
+
+
+class _Part(NamedTuple):
+    """One level's contribution to the merged graph, ids qualified `<shard>::<id>`."""
+
+    typed: dict[str, Any]
+    meta: dict[str, dict[str, Any]]
+    outdated: set[str]
+    ranks: dict[str, int]
+
+
+def _shard_part(shard: str, today: date | None) -> _Part:
+    def q(ident: str) -> str:
+        return f"{shard}::{ident}"
+
+    with db_context.using_db(shard):  # the gate: a level above the clearance raises
+        typed = wiki_engine.build_typed_graph()
+        meta = _page_meta()
+        outdated = wiki_engine.outdated_pages(today)
+        ranks = wiki_engine.source_ranks()
+    nodes = [{**n, "id": q(n["id"]), "_raw": n["id"], "_shard": shard} for n in typed["nodes"]]
+    edges = [{**e, "from": q(e["from"]), "to": q(e["to"])} for e in typed["edges"]]
+    return _Part(
+        {"nodes": nodes, "edges": edges},
+        {q(k): v for k, v in meta.items()},
+        {q(o) for o in outdated},
+        {q(k): v for k, v in ranks.items()},
+    )
+
+
+def _same_topic_edges(nodes: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Link the copies of one page or source that live at several levels (lowest first)."""
+    copies: dict[str, list[tuple[int, str]]] = {}
+    for n in nodes:
+        level = classification.parse_shard(n["_shard"])[1]
+        copies.setdefault(n["_raw"], []).append((level, n["id"]))
+    edges: list[dict[str, str]] = []
+    for group in copies.values():
+        ordered = [nid for _, nid in sorted(group)]
+        edges += [{"from": a, "to": b, "type": "same-topic"} for a, b in pairwise(ordered)]
+    return edges
+
+
+def export_levels(shards: tuple[str, ...], today: date | None = None) -> dict[str, Any]:
+    """One payload over several classification levels of a DB (the Explorer's "All levels").
+
+    Node ids are `<shard>::<id>` so equal page names at two levels stay two nodes; each node
+    carries its `level`, `shard` and unqualified `name`. Links stay inside a level, and a
+    `same-topic` edge joins the copies of one page or source across levels. Every shard is
+    read through the gate: the caller passes only `db_context.reachable_shards(...)`.
+    """
+    parts = [_shard_part(shard, today) for shard in shards]
+    nodes = [n for p in parts for n in p.typed["nodes"]]
+    edges = [e for p in parts for e in p.typed["edges"]] + _same_topic_edges(nodes)
+    typed, truncated = _cap({"nodes": nodes, "edges": edges}, MAX_NODES)
+    payload = _assemble(
+        typed,
+        truncated,
+        {k: v for p in parts for k, v in p.meta.items()},
+        {o for p in parts for o in p.outdated},
+        {k: v for p in parts for k, v in p.ranks.items()},
+        today,
+    )
+    by_id = {n["id"]: n for n in typed["nodes"]}
+    for node in payload["nodes"]:
+        src = by_id[node["id"]]
+        node["shard"], node["name"] = src["_shard"], src["_raw"]
+        node["level"] = classification.parse_shard(src["_shard"])[1]
+    levels = sorted({n["level"] for n in payload["nodes"]})
+    payload["levels"] = {str(lv): classification.level_label(lv) for lv in levels}
+    return payload
 
 
 def health(payload: dict[str, Any], today: date | None = None) -> dict[str, Any]:

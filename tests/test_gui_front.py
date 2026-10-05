@@ -178,6 +178,28 @@ async def test_double_clicking_a_galaxy_node_opens_it_in_the_explorer(
     assert gui_explorer.explorer_state(_session()).selected == "hub.md"
 
 
+async def test_the_galaxy_of_a_cleared_user_includes_the_lower_and_own_levels(
+    wiki: Path, user: User
+) -> None:
+    db = db_context.DEFAULT_DB
+    strict = f"{db}@strict"
+    auth.set_clearance(auth.DEFAULT_USER, db, "strict", by="t")
+    with db_context.clearance({db: 2}):
+        db_context.ensure_shard(strict)
+        with db_context.using_db(strict):
+            wiki_engine.init_wiki()
+            _page("secret.md", "Canary Secret")
+            wiki_engine.rebuild_lex_index()
+    await _sign_in(user)
+    await _see(user, "4 pages, ")  # three normal pages plus the strict one, in one map
+    await _see(user, "2 levels")
+    assert user.client is not None
+    layout = UserInteraction(user, {user.client.layout}, None)
+    layout.trigger("graph_open", {"node": f"{strict}::secret.md", "kind": "page"})
+    await _see(user, "Canary Secret explains orbits.")
+    assert gui_explorer.explorer_state(_session()).level == gui_explorer.ALL_LEVELS
+
+
 async def test_a_reader_is_not_told_to_upload(user: User) -> None:
     await user.open("/login")
     user.find("Username").type("reader")

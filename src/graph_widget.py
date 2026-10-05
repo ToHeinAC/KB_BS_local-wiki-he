@@ -126,6 +126,28 @@ def _payload(signature: str) -> dict[str, Any]:
     return graph_export.export()
 
 
+def _levels_signature(shards: tuple[str, ...]) -> str:
+    """Per-level signatures, each read through the gate (a denied shard raises)."""
+    parts: list[str] = []
+    for shard in shards:
+        with db_context.using_db(shard):
+            parts.append(_bundle_signature())
+    return "|".join(parts)
+
+
+@st.cache_data(show_spinner=False)
+def _payload_levels(signature: str, shards: tuple[str, ...]) -> dict[str, Any]:
+    return graph_export.export_levels(shards)
+
+
+def _current_payload(all_levels: bool) -> dict[str, Any]:
+    """The bound level's payload, or every reachable level of the active DB merged."""
+    if not all_levels:
+        return _payload(_bundle_signature())
+    shards = db_context.reachable_shards(db_context.base_db())
+    return _payload_levels(_levels_signature(shards), shards)
+
+
 def render_graph(
     *,
     overlays: list[str],
@@ -171,9 +193,12 @@ def render_args(
     layout: str = "galaxy",
     height: int = 720,
     paper: bool = False,
+    all_levels: bool = False,
 ) -> dict[str, Any]:
-    """The arguments `assets/graph/index.html` renders from, for any host that embeds it."""
-    payload = _payload(_bundle_signature())
+    """The arguments `assets/graph/index.html` renders from, for any host that embeds it.
+
+    `all_levels` draws every classification level the clearance reaches in one map."""
+    payload = _current_payload(all_levels)
     return {
         "graph": payload,
         "overlays": overlays,
@@ -188,11 +213,11 @@ def render_args(
     }
 
 
-def graph_stats() -> dict[str, Any]:
+def graph_stats(all_levels: bool = False) -> dict[str, Any]:
     """Payload-level counts for captions, without re-exporting."""
-    return _payload(_bundle_signature())
+    return _current_payload(all_levels)
 
 
-def graph_health() -> dict[str, Any]:
+def graph_health(all_levels: bool = False) -> dict[str, Any]:
     """Health summary of the same cached payload the canvas is drawing."""
-    return graph_export.health(_payload(_bundle_signature()))
+    return graph_export.health(_current_payload(all_levels))

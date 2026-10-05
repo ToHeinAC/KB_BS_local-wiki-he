@@ -58,3 +58,44 @@ def test_the_shim_answers_the_component_handshake_and_forwards_double_clicks() -
     assert "streamlit:setComponentValue" in js
     assert "emitEvent('graph_open'" in js
     assert "wikiGraphRender" in js
+
+
+LEVELED = {
+    "nodes": [
+        {
+            "id": "KI::a.md",
+            "label": "Alpha",
+            "kind": "page",
+            "cat": "concept",
+            "pr": 0.4,
+            "deg": 2,
+            "level": 0,
+        },
+        {
+            "id": "KI@strict::a.md",
+            "label": "Alpha",
+            "kind": "page",
+            "cat": "concept",
+            "pr": 0.2,
+            "deg": 1,
+            "level": 2,
+        },
+    ],
+    "edges": [{"s": "KI::a.md", "t": "KI@strict::a.md", "type": "same-topic"}],
+    "communities": 1,
+    "levels": {"0": "Normal", "2": "Strictly confidential"},
+}
+
+
+def test_standings_name_the_level_of_a_classified_page() -> None:
+    rows = gui_graph.standings(LEVELED, "pagerank")
+    assert [r["type"] for r in rows] == ["Concept", "Concept · Strictly confidential"]
+
+
+def test_the_caption_counts_the_levels_of_a_merged_map() -> None:
+    assert gui_graph.caption(LEVELED) == "2 pages, 1 links, 1 clusters, 2 levels"
+
+
+def test_a_qualified_source_node_is_explained_by_its_plain_name() -> None:
+    notice = gui_graph.graph_click({"node": "KI@strict::source::x.pdf", "kind": "source"})
+    assert notice == ("notice", "x.pdf is an original document, not a wiki page.")

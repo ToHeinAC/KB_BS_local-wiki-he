@@ -153,7 +153,7 @@ async def run_turn(chat: Chat, prompt: str, on_update: Callable[[], None]) -> No
 # --- rendering ---------------------------------------------------------------------------
 
 
-def _read_source(ref: str, kind: str) -> str | None:
+def _read_source(ref: str, kind: str, shard: str | None = None) -> str | None:
     """Text of a cited original or wiki page (blocking: run in a worker).
 
     None when there is nothing to show. A denied name looks exactly like a missing one.
@@ -163,16 +163,20 @@ def _read_source(ref: str, kind: str) -> str | None:
             db, name = db_context.split_ref(ref)
             with db_context.using_db(db):
                 return wiki_engine.read_page_parsed(name)["content"] or None
-        previewable, data = ui_logic.resolve_raw_source(ref)
+        with db_context.using_db(shard or db_context.get_active_db()):
+            previewable, data = ui_logic.resolve_raw_source(ref)
     except (db_context.AccessDenied, OSError):
         return None
     return data.decode("utf-8", errors="replace") if previewable and data is not None else None
 
 
-async def open_source(session: gui_session.Session, ref: str, kind: str, label: str) -> None:
-    """Show a cited original or wiki page in a dialog (a denied name looks like a missing one)."""
+async def open_source(
+    session: gui_session.Session, ref: str, kind: str, label: str, shard: str | None = None
+) -> None:
+    """Show a cited original or wiki page in a dialog (a denied name looks like a missing one).
+    `shard` reads the original at that level instead of the bound one."""
     session.seal()
-    text = await gui_session.in_worker(_read_source, ref, kind)
+    text = await gui_session.in_worker(_read_source, ref, kind, shard)
     with ui.dialog() as dialog, ui.card().classes("w-full").style("max-width: 760px"):
         ui.label(label).classes("file")
         if text is None:

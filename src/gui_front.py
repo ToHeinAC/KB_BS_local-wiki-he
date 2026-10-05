@@ -12,6 +12,7 @@ from typing import Any
 
 from nicegui import ui
 
+import db_context
 import graph_widget
 import gui_explorer
 import gui_graph
@@ -71,16 +72,20 @@ def front_data() -> dict[str, Any]:
     """Everything the page shows, read at once (blocking: run in a worker)."""
     if not wiki_engine.list_pages():
         return {"empty": True}
+    # A cleared user sees every level they reach, so the map shows the connections between them.
+    all_levels = len(db_context.reachable_shards(db_context.base_db())) > 1
     return {
         "empty": False,
+        "all_levels": all_levels,
         "log": log_entries(wiki_engine.read_log(), _LOG_LIMIT),
         "map": gui_graph.map_data(
             overlays=["Hubs"],
             size_by="pagerank",
             layout=ui_logic.GRAPH_LAYOUTS["Galaxy"],
             selected=None,
+            all_levels=all_levels,
         ),
-        "health": graph_widget.graph_health(),
+        "health": graph_widget.graph_health(all_levels),
     }
 
 
@@ -88,6 +93,7 @@ class FrontView:
     def __init__(self, session: gui_session.Session) -> None:
         self.session = session
         self._guard = gui_session.guarded(session)
+        self.all_levels = False
 
     def build(self) -> None:
         with ui.column().classes("front w-full"):
@@ -138,6 +144,7 @@ class FrontView:
         with self.side:
             self._render_log(data["log"])
             self._render_figures(data["health"])
+        self.all_levels = data["all_levels"]
         self._render_galaxy(data["map"])
 
     def _render_log(self, entries: list[tuple[str, str, str, str]]) -> None:
@@ -175,6 +182,8 @@ class FrontView:
             return
         explorer = gui_explorer.explorer_state(self.session)
         explorer.selected, explorer.view, explorer.query = action[1], "Map", ""
+        if self.all_levels:  # the node id is `<shard>::<page>`; the Explorer must read it so
+            explorer.level = gui_explorer.ALL_LEVELS
         ui.navigate.to("/explorer")
 
     def _render_figures(self, health: dict[str, Any]) -> None:

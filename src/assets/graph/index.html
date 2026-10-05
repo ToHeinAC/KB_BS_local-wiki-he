@@ -163,6 +163,7 @@ const PALETTES = {
     orphan: "#6b7280",
     derived: "#ff922b",   // the one visually distinct edge role
     typed: "#74c0fc",     // ontology relations between documents (directed)
+    level: "#f03e3e",     // the same topic at another classification level
     label: "#e8ecff",
     bridge: "#e8ecff",
     stale: "#ffa421",
@@ -190,6 +191,7 @@ const PALETTES = {
     edge: "#3b342a",
     derived: "#7a3b2a",
     typed: "#1f3a52",
+    level: "#8f2d1a",
     label: "#1c1a15",
     bridge: "#1c1a15",
     stale: "#7a3b2a",
@@ -220,6 +222,7 @@ let S = {                    // everything that survives a Streamlit rerun
   layout: "galaxy",          // galaxy | arc | radial
   counts: null,              // payload-level totals, for the legend
   cats: [],
+  levels: null,              // level number -> name, on the all-levels map
   arcCount: 0,               // nodes the arc layout actually placed
   parents: new Map(),        // community -> bundling control point (radial)
   ring: 0,                   // ring radius (radial)
@@ -272,6 +275,7 @@ function ingest(payload) {
     communities: payload.communities, truncated: payload.truncated,
   };
   S.cats = [...new Set(payload.nodes.map((n) => n.cat))].sort();
+  S.levels = payload.levels || null;   // present only on the all-levels map
 
   S.edges = payload.edges
     .map((e) => ({ s: byId.get(e.s), t: byId.get(e.t), type: e.type, pulse: Math.random() }))
@@ -624,11 +628,13 @@ function draw() {
     const lit = !focus || (focus.has(e.s.id) && focus.has(e.t.id));
     const x1 = e.s.x, y1 = e.s.y, x2 = e.t.x, y2 = e.t.y;
     ctx.globalAlpha = lit ? (curved ? 0.5 : 0.62) : 0.05;
-    const typed = e.type !== "related-to" && e.type !== "derived-from";
+    const levelLink = e.type === "same-topic";   // one topic at several classification levels
+    const typed = e.type !== "related-to" && e.type !== "derived-from" && !levelLink;
     ctx.strokeStyle = e.type === "derived-from" ? P.derived
-      : (typed ? P.typed : (P.edge || S.accent));
-    ctx.lineWidth = (e.type === "derived-from" ? 0.5 : (typed ? 1.2 : 0.9)) / S.view.k;
+      : (levelLink ? P.level : (typed ? P.typed : (P.edge || S.accent)));
+    ctx.lineWidth = (e.type === "derived-from" ? 0.5 : (typed || levelLink ? 1.2 : 0.9)) / S.view.k;
     if (e.type === "derived-from") ctx.setLineDash([3 / S.view.k, 3 / S.view.k]);
+    if (levelLink) ctx.setLineDash([6 / S.view.k, 3 / S.view.k, 1 / S.view.k, 3 / S.view.k]);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     edgePath(e);
@@ -722,6 +728,17 @@ function draw() {
       ctx.arc(x, y, n.r + 9, 0, 7);
       ctx.stroke();
       ctx.setLineDash([]);
+    }
+    if (n.level) {
+      // Classified: one (confidential) or two (strict) concentric rings just outside the dot.
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.strokeStyle = P.level;
+      ctx.lineWidth = 1.3 / S.view.k;
+      for (let i = 0; i < n.level; i++) {
+        ctx.beginPath();
+        ctx.arc(x, y, n.r + 1.5 + 2.2 * i, 0, 7);
+        ctx.stroke();
+      }
     }
     if (n.id === S.selected) {
       ctx.globalAlpha = 1;
@@ -849,6 +866,7 @@ function showInfo(n) {
     [t.bridge, n.bridge.toFixed(4)],
     [t.community, String(n.comm)],
   ];
+  if (n.level) rows.push([t.level || "Level", (S.levels || {})[String(n.level)] || String(n.level)]);
   if (n.confidence) rows.push([t.confidence, n.confidence]);
   if (n.updated) rows.push([t.updated, n.updated + (n.stale ? " ⚠️" : "")]);
   infoEl.innerHTML =
@@ -964,7 +982,15 @@ function renderLegend() {
     : S.cats.map((cat) =>
         `<div class="row"><span class="dot" style="background:${P.cat[cat] || P.orphan}"></span>${esc(cat)}</div>`
       ).join("");
-  legendEl.innerHTML = key +
+  const levelKey = S.levels && !arc
+    ? Object.entries(S.levels).filter(([lv]) => lv !== "0").map(([lv, name]) =>
+        `<div class="row"><span class="dot" style="background:transparent;` +
+        `box-shadow:0 0 0 ${lv === "1" ? 1 : 2}px ${P.level}"></span>${esc(name)}</div>`
+      ).join("") +
+      `<div class="row"><span class="dot" style="border-radius:0;height:2px;background:${P.level}">` +
+      `</span>${esc(t.sameTopic || "same topic at another level")}</div>`
+    : "";
+  legendEl.innerHTML = key + levelKey +
     `<div class="meta">${c.nodes} ${esc(t.nodes)} · ` +
     `${c.edges} ${esc(t.edges)} · ` +
     `${c.communities} ${esc(t.clusters)}` +

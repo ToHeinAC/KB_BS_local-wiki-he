@@ -92,7 +92,11 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   one of the page's sources or a wiki page becomes a `[Source: …]`/`[Wiki: …]` tag; the page's own References and OKF
   Citations blocks are left out of the view, the stored page is unchanged), the numbered notes and then its other
   original documents (opened in a dialog through `gui_chat.open_source`), and linked pages; with nothing selected it shows the bundle health (Map) or the database overview (Index). One level
-  at a time: switching binds that shard as the active DB and the only scope. Graph data is computed in a worker and
+  at a time: switching binds that shard as the active DB and the only scope. The level control's extra **All levels**
+  choice (Map only) draws every reachable level in one map: nodes carry rings for their level (one confidential, two
+  strict), a dash-dot `same-topic` edge joins a page or source that exists at several levels, standings name the level,
+  and the reader opens a node through its own shard (`_node`, `_reader_data(page, shard)`). Index and Find stay on the
+  normal level there and say so. Details and cache rule: [security.md](security.md) §Reads. Graph data is computed in a worker and
   cached per shard by `graph_widget._payload`, the cache the classification leak suite covers.
 - **Research (`src/gui_research.py`):** a question bar (question, Quick/Deep method, "Include classified levels", Start,
   New research) above three columns (1/4, 1/2, 1/4). Left: the figures box (sub-tasks, web searches, pages read,
@@ -150,7 +154,7 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
 - **2BrAIn (`src/gui_front.py`, `/`):** the front page and the start of the user flow. A dateline (the date left, the
   tagline right; no nameplate, so the galaxy fits on screen), then three columns: recent activity parsed from the wiki's OKF `log.md` (`log_entries`; one collapsed fold, one line per entry, times converted from the log's UTC to local time by `local_time`) above the archive's
   figures and the clusters growing in the health window (`graph_widget.graph_health`); the galaxy map
-  (`gui_graph.map_data`, Hubs overlay, the same iframe renderer as the Explorer; a double-click on a page opens it in the
+  (`gui_graph.map_data`, Hubs overlay, the same iframe renderer as the Explorer; every level the user reaches is drawn merged, as in the Explorer's *All levels*; a double-click on a page opens it in the
   Explorer reader); and the upload (`gui_upload.UploadView`) for maintainers, a note for readers. While a batch is
   prepared or reviewed (`on_review`), the upload takes the galaxy's place; when it ends, the columns reload. The upload column is
   built at once, so an empty wiki still offers it.

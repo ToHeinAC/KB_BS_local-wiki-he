@@ -229,6 +229,31 @@ async def test_a_cleared_user_switches_level_and_sees_only_that_levels_pages(
     assert (_session().shard, _session().scope) == (strict, [strict])
 
 
+async def test_all_levels_shows_every_level_in_one_map_and_opens_a_classified_page(
+    wiki: Path, user: User
+) -> None:
+    strict = f"{DB}@strict"
+    auth.set_clearance("reader", DB, "strict", by="t")
+    with db_context.clearance({DB: 2}):
+        db_context.ensure_shard(strict)
+        with db_context.using_db(strict):
+            wiki_engine.init_wiki()
+            _page("secret.md", "Canary Secret", body="CANARY-strict-only")
+            wiki_engine.rebuild_lex_index()
+    await _open(user, "reader", "pw")
+    await _see(user, "Alpha")
+    await user.should_not_see("Canary Secret")
+    (level,) = user.find("level").elements
+    assert isinstance(level, ui.toggle)
+    level.set_value(gui_explorer.ALL_LEVELS)
+    await _see(user, "Canary Secret")
+    await _see(user, "Alpha")
+    assert _session().shard == DB  # reading across levels binds nothing above the normal level
+    await user.should_see("Strictly confidential")
+    user.find(f"row-{strict}::secret.md").click()
+    await _see(user, "CANARY-strict-only")
+
+
 def test_search_hits_are_reduced_to_plain_excerpts() -> None:
     assert gui_explorer.plain_excerpt("## Heading\n**bold** and `code`\n\n- item") == (
         "Heading bold and code - item"

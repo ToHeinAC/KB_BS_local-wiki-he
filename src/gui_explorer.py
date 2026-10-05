@@ -2,7 +2,9 @@
 
 A bar (level, Map/Index, layout, find, size, overlays), the map with a standings table or the
 index or search hits on the left, and the reader on the right. Everything reads one
-classification level at a time: pages of different levels are never mixed on screen.
+classification level at a time; only the Map's "All levels" choice draws every level the
+clearance reaches in one picture (nodes carry their level, copies of a topic at several levels
+are linked). Index and Find stay on the normal level there.
 """
 
 import re
@@ -23,6 +25,7 @@ import ui_logic
 import wiki_engine
 
 VIEWS = ("Map", "Index")
+ALL_LEVELS = "*"  # the level control's "every reachable level" choice (Map only)
 SIZES = {"pagerank": "PageRank", "degree": "Connections"}
 _LIST_CAP = 25
 
@@ -88,10 +91,11 @@ def cite_page(content: str, sources: list[str], titles: dict[str, str]) -> str:
     return ui_logic.tag_wiki_citations(_drop_reference_sections(content), aliases)
 
 
-def _reader_data(page: str) -> tuple[dict[str, Any], dict[str, str]]:
-    """The parsed page and every page's title (blocking)."""
-    titles = {p["filename"]: str(p.get("title") or "") for p in wiki_engine.list_pages()}
-    return wiki_engine.read_page_parsed(page), titles
+def _reader_data(page: str, shard: str) -> tuple[dict[str, Any], dict[str, str]]:
+    """The parsed page and every page's title, read at `shard` (blocking)."""
+    with db_context.using_db(shard):
+        titles = {p["filename"]: str(p.get("title") or "") for p in wiki_engine.list_pages()}
+        return wiki_engine.read_page_parsed(page), titles
 
 
 def _overview() -> str:
@@ -113,7 +117,9 @@ class ExplorerView:
 
     def build(self) -> None:
         shards = db_context.reachable_shards(self.session.active_db)
-        if self.ex.level in shards:
+        if self.ex.level == ALL_LEVELS and len(shards) > 1:
+            self.session.bind_shard(shards[0])  # reading across levels binds the normal one
+        elif self.ex.level is not None and self.ex.level in shards:
             self.session.shard, self.session.scope = self.ex.level, [self.ex.level]
             ui_logic.bind_level(self.ex.level)
         else:
@@ -137,8 +143,8 @@ class ExplorerView:
         """Level, view, layout and Find; Find runs to the map column's edge (CSS grid)."""
         if len(shards) > 1:
             ui.toggle(
-                {s: ui_logic.level_name(s) for s in shards},
-                value=self.session.shard,
+                {**{s: ui_logic.level_name(s) for s in shards}, ALL_LEVELS: "All levels"},
+                value=ALL_LEVELS if self.all_levels else self.session.shard,
                 on_change=self._guard(self._set_level),
             ).classes("toggle").mark("level")
         ui.toggle(list(VIEWS), value=self.ex.view, on_change=self._guard(self._set_view)).classes(
@@ -176,8 +182,28 @@ class ExplorerView:
                     on_change=self._guard(self._set_overlays),
                 ).mark(f"overlay-{label}")
 
+    @property
+    def all_levels(self) -> bool:
+        return self.ex.level == ALL_LEVELS
+
+    def _node(self, node: str) -> tuple[str, str]:
+        """(shard, page name) of a map node: `<shard>::<name>` while all levels are drawn."""
+        shard, sep, name = node.partition("::")
+        if self.all_levels and sep and shard in db_context.reachable_shards(self.session.active_db):
+            return shard, name
+        return self.session.shard, node
+
+    def _qualify(self, shard: str, name: str) -> str:
+        return f"{shard}::{name}" if self.all_levels else name
+
     async def _set_level(self, event: Any) -> None:
-        if event.value not in db_context.reachable_shards(self.session.active_db):
+        shards = db_context.reachable_shards(self.session.active_db)
+        if event.value == ALL_LEVELS and len(shards) > 1:
+            self.session.bind_shard(shards[0])
+            self.ex.level, self.ex.selected, self.ex.query = ALL_LEVELS, None, ""
+            await self.load()
+            return
+        if event.value not in shards:
             return
         self.session.bind_shard(event.value)
         self.ex.level, self.ex.selected, self.ex.query = event.value, None, ""
@@ -231,6 +257,10 @@ class ExplorerView:
         self.left.clear()
         self.rows = {}
         with self.left:
+            if self.all_levels and (self.ex.query or self.ex.view != "Map"):
+                ui.label(
+                    "Index and Find show the normal level; pick a level to browse it."
+                ).classes("hint")
             if self.ex.query or self.ex.view == "Map":
                 box = ui.column().classes("w-full")
             else:
@@ -292,6 +322,7 @@ class ExplorerView:
                 size_by=self.ex.size_by,
                 layout=ui_logic.GRAPH_LAYOUTS[self.ex.layout],
                 selected=self.ex.selected,
+                all_levels=self.all_levels,
             )
         except Exception as exc:
             cap.set_text(f"Graph render failed: {exc}")
@@ -380,9 +411,9 @@ class ExplorerView:
     # --- right: reader, health, overview ---------------------------------------------------------
 
     async def _render_reader(self) -> None:
-        page = self.ex.selected or ""
+        shard, page = self._node(self.ex.selected or "")
         try:
-            parsed, titles = await gui_session.in_worker(_reader_data, page)
+            parsed, titles = await gui_session.in_worker(_reader_data, page, shard)
         except Exception as exc:
             with self._reader:
                 ui.label(f"Could not load page: {exc}").classes("text-negative")
@@ -390,6 +421,8 @@ class ExplorerView:
         with self._reader:
             with ui.row().classes("top items-baseline w-full"):
                 ui.label(page).classes("file")
+                if self.all_levels:
+                    ui.label(ui_logic.level_name(shard)).classes("muted")
                 ui.space()
                 ui.button("Close", on_click=self._guard(self._close)).props("flat").classes(
                     "btn text small"
@@ -400,8 +433,8 @@ class ExplorerView:
             ui.button(
                 "Download Markdown", on_click=lambda: ui.download.content(parsed["content"], page)
             ).props("flat").classes("btn text small")
-            self._render_sources(parsed["sources"], notes)
-            self._render_related(parsed["related"])
+            self._render_sources(parsed["sources"], notes, shard)
+            self._render_related(parsed["related"], shard)
 
     async def _close(self) -> None:
         self.ex.selected = None
@@ -412,7 +445,7 @@ class ExplorerView:
             row.classes(remove="sel")
         await self.refresh_right()
 
-    def _render_sources(self, sources: list[str], notes: list[gui_cite.Note]) -> None:
+    def _render_sources(self, sources: list[str], notes: list[gui_cite.Note], shard: str) -> None:
         """Numbered notes for what the text cites (as in Chat), then the page's other sources."""
         if not sources and not notes:
             return
@@ -421,22 +454,24 @@ class ExplorerView:
             gui_chat.render_note(self.session, note)
         for ref in gui_cite.uncited(notes, sources):
             title = ui.label(ref).classes("file cursor-pointer")
-            title.on("click", self._guard(self._source_opener(ref)))
+            title.on("click", self._guard(self._source_opener(ref, shard)))
             title.mark(f"source-{ref}")
 
-    def _source_opener(self, ref: str) -> Any:
+    def _source_opener(self, ref: str, shard: str) -> Any:
         async def open_it() -> None:
-            await gui_chat.open_source(self.session, ref, "source", ref)
+            await gui_chat.open_source(self.session, ref, "source", ref, shard=shard)
 
         return open_it
 
-    def _render_related(self, related: list[str]) -> None:
+    def _render_related(self, related: list[str], shard: str) -> None:
         if not related:
             return
         ui.label("Linked pages").classes("section-label")
         with ui.row().classes("linked"):
             for name in related:
-                chip = ui.button(name, on_click=self._guard(self._page_opener(name)))
+                chip = ui.button(
+                    name, on_click=self._guard(self._page_opener(self._qualify(shard, name)))
+                )
                 chip.props("flat dense no-caps").classes("chip").mark(f"chip-{name}")
 
     def _page_opener(self, name: str) -> Any:
@@ -446,7 +481,7 @@ class ExplorerView:
         return open_it
 
     async def _render_health(self) -> None:
-        health = await gui_session.in_worker(graph_widget.graph_health)
+        health = await gui_session.in_worker(graph_widget.graph_health, self.all_levels)
         with self._reader:
             ui.label("Bundle health").classes("section-label")
             ui.label("Double-click a node to read it here.").classes("hint")
