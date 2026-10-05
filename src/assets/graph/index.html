@@ -163,7 +163,7 @@ const PALETTES = {
     orphan: "#6b7280",
     derived: "#ff922b",   // the one visually distinct edge role
     typed: "#74c0fc",     // ontology relations between documents (directed)
-    level: "#f03e3e",     // the same topic at another classification level
+    level: "#ff2d6f",     // classified levels: rings, halo and the same-topic edge
     label: "#e8ecff",
     bridge: "#e8ecff",
     stale: "#ffa421",
@@ -191,7 +191,7 @@ const PALETTES = {
     edge: "#3b342a",
     derived: "#7a3b2a",
     typed: "#1f3a52",
-    level: "#8f2d1a",
+    level: "#b0006d",     // magenta: no category (brown, navy, olive, purple) uses it
     label: "#1c1a15",
     bridge: "#1c1a15",
     stale: "#7a3b2a",
@@ -730,13 +730,20 @@ function draw() {
       ctx.setLineDash([]);
     }
     if (n.level) {
-      // Classified: one (confidential) or two (strict) concentric rings just outside the dot.
-      ctx.globalAlpha = alpha * 0.9;
+      // Classified: a faint halo and one (confidential) or two (strict) wide, heavy rings,
+      // clear of the dot and of the overlay rings, so they read at a glance among normal dots.
+      const outer = n.r + 5 + 5 * (n.level - 1);
+      ctx.globalAlpha = alpha * 0.14;
+      ctx.fillStyle = P.level;
+      ctx.beginPath();
+      ctx.arc(x, y, outer, 0, 7);
+      ctx.fill();
+      ctx.globalAlpha = alpha;
       ctx.strokeStyle = P.level;
-      ctx.lineWidth = 1.3 / S.view.k;
+      ctx.lineWidth = 2 / S.view.k;
       for (let i = 0; i < n.level; i++) {
         ctx.beginPath();
-        ctx.arc(x, y, n.r + 1.5 + 2.2 * i, 0, 7);
+        ctx.arc(x, y, n.r + 5 + 5 * i, 0, 7);
         ctx.stroke();
       }
     }
@@ -984,8 +991,9 @@ function renderLegend() {
       ).join("");
   const levelKey = S.levels && !arc
     ? Object.entries(S.levels).filter(([lv]) => lv !== "0").map(([lv, name]) =>
-        `<div class="row"><span class="dot" style="background:transparent;` +
-        `box-shadow:0 0 0 ${lv === "1" ? 1 : 2}px ${P.level}"></span>${esc(name)}</div>`
+        `<div class="row"><span class="dot" style="background:transparent;box-sizing:border-box;` +
+        `width:13px;height:13px;border:${lv === "1" ? 2 : 5}px ${lv === "1" ? "solid" : "double"} ` +
+        `${P.level}"></span>${esc(name)}</div>`
       ).join("") +
       `<div class="row"><span class="dot" style="border-radius:0;height:2px;background:${P.level}">` +
       `</span>${esc(t.sameTopic || "same topic at another level")}</div>`
