@@ -431,7 +431,10 @@ class ExplorerView:
             text, notes = gui_cite.number_citations(cited)
             ui.markdown(gui_cite.render_math(text)).classes("prose compact")
             ui.button(
-                "Download Markdown", on_click=lambda: ui.download.content(parsed["content"], page)
+                "Download Markdown",
+                on_click=lambda: gui_session.download(
+                    self.session, parsed["content"], page, "page"
+                ),
             ).props("flat").classes("btn text small")
             self._render_sources(parsed["sources"], notes, shard)
             self._render_related(parsed["related"], shard)

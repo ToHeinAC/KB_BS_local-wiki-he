@@ -1,6 +1,7 @@
 """Chat page of the Broadsheet frontend (src/gui_chat.py)."""
 
 import asyncio
+import json
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ import gui_chat
 import gui_session
 import lex_index
 import tools
+import usage
 import wiki_engine
 
 DB = db_context.DEFAULT_DB
@@ -325,3 +327,17 @@ async def test_a_cleared_user_can_open_the_same_document(
     await user.should_see("Claim")
     user.find("note-1").click()
     await user.should_see(CANARY)
+
+
+async def test_each_answer_and_its_export_are_logged_without_the_question(user: User) -> None:
+    await _open(user)
+    await _ask(user, "What is cooling?")
+    await user.should_see("Fast answer")
+    user.find("export-md").click()
+    events = usage.read_events()
+    (chat,) = [e for e in events if e["event"] == "chat"]
+    assert (chat["user"], chat["mode"], chat["db"]) == (auth.DEFAULT_USER, "Fast", DB)
+    assert chat["status"] == "ok"
+    assert chat["duration_s"] >= 0
+    assert [e["kind"] for e in events if e["event"] == "download"] == ["chat"]
+    assert "cooling" not in json.dumps(events)

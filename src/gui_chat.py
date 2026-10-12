@@ -150,6 +150,12 @@ async def run_turn(chat: Chat, prompt: str, on_update: Callable[[], None]) -> No
     on_update()
 
 
+def turn_status(messages: list[dict[str, Any]]) -> str:
+    """`error` when the last answer is an error message (Deep mode swallows errors into it)."""
+    last = messages[-1] if messages else {}
+    return "error" if str(last.get("content", "")).startswith("Error:") else "ok"
+
+
 # --- rendering ---------------------------------------------------------------------------
 
 
@@ -183,9 +189,9 @@ async def open_source(
             ui.label("This document cannot be previewed.").classes("muted")
         else:
             ui.markdown(text).classes("prose compact")
-            ui.button("Download", on_click=lambda: ui.download.content(text, ref)).props(
-                "flat"
-            ).classes("btn small")
+            ui.button(
+                "Download", on_click=lambda: gui_session.download(session, text, ref, "source")
+            ).props("flat").classes("btn small")
         ui.button("Close", on_click=dialog.close).props("flat").classes("btn text small")
     dialog.open()
 
@@ -410,7 +416,7 @@ class ChatView:
     def _export(self, msg: dict[str, Any]) -> None:
         meta = f"{msg['mode']} answer, {self.session.active_db}, {date.today().isoformat()}"
         text = gui_cite.answer_markdown(msg["question"], msg["content"], meta)
-        ui.download.content(text, gui_cite.export_name(msg["question"]))
+        gui_session.download(self.session, text, gui_cite.export_name(msg["question"]), "chat")
 
     async def _save(self, msg: dict[str, Any]) -> None:
         target = save_target(self.session)
@@ -471,7 +477,15 @@ class ChatView:
         if self.chat.live is not None:
             return
         self.follow_box.clear()
-        await run_turn(self.chat, prompt, self.refresh)
+        started, status = time.monotonic(), "error"
+        try:
+            await run_turn(self.chat, prompt, self.refresh)
+            status = turn_status(self.chat.messages)
+        finally:
+            seconds = round(time.monotonic() - started, 1)
+            gui_session.track(
+                self.session, "chat", mode=self.chat.mode, status=status, duration_s=seconds
+            )
 
     # --- margin ------------------------------------------------------------------------------
 

@@ -142,6 +142,9 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   (allowed databases, maintained databases, clearance per allowed database, a new password, Save, Delete, never your own
   account) and the security audit log. Every action goes through a function that re-checks `auth.is_admin(actor)`
   (`require_admin`) and is tested to refuse a non-admin; clearance changes are audit-logged by `auth.set_clearance`.
+  For `T. Hein` (`auth.DEFAULT_USER`) only, a **Usage statistics** section follows (`src/gui_usage.py`): a period
+  slider (All time / 1 month / 1 week), a metric select, a *Split by user* switch, KPI figures, plotly daily bars
+  (fixed colour per user, taken from the full log) and a per-user table.
 - **Ontology workbench (`src/gui_ontology.py`, Maintenance → Ontology):** a port of `ontology_ui.render` reusing its
   pure helpers (`bullets`, `when`, `fmt`, `change_line`, `class_usage`, `class_line`). Without an ontology: create
   from modules (warns when none has detection cues) or import. With one: the revision header (open proposals, last

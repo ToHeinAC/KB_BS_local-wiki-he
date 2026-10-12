@@ -41,3 +41,12 @@
 - Modifications: in SKILL.md, `${CLAUDE_PLUGIN_ROOT}` is replaced by `$(git rev-parse --show-toplevel)`
   (installed as a project skill, not a plugin); the upstream developer tests `scripts/tests/` are
   left out. Everything else is verbatim.
+
+## local_translator usage statistics
+
+- Used in: `src/usage.py`, `src/usage_stats.py`, `src/usage_chart.py`, `src/gui_usage.py` (adapted).
+- Source: the sibling project `local_translator` (same author), `src/app/usage.py`,
+  `src/app/usage_stats.py`, `src/app/usage_chart.py` and `src/app/ui_stats.py` at commit `c527e53`.
+- License: Apache-2.0, copyright Tobias Hein.
+- Modifications: log path from `db_context`, events and metrics for this app (chat, research,
+  ingest), broadsheet colours, a NiceGUI panel instead of Streamlit.

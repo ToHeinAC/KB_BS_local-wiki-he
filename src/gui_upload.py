@@ -7,6 +7,7 @@ classification level at a time, each into its own shard. A disabled button says 
 disabled. Contradictions the ingest reports feed a Resolve panel.
 """
 
+import time
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field
@@ -575,6 +576,14 @@ class UploadView:
         owner = (self.session.user, db)
         _begin(owner, state, Progress(total=len(files)))
         self._sync_ingest()
+        await self._run_ingest(pending, db, len(files))
+        _end(owner, state)
+        self._settled()
+
+    async def _run_ingest(self, pending: dict[str, Any], db: str, n_files: int) -> None:
+        """Run the batch in a worker and log it in the usage log (a count, never names)."""
+        state = self.state
+        started, failed, status = time.monotonic(), 0, "error"
         try:
             agg = await gui_session.in_worker(
                 run_ingest,
@@ -588,8 +597,16 @@ class UploadView:
             state.message = f"Ingest failed: {exc}"
         else:
             finish(state, agg)
-        _end(owner, state)
-        self._settled()
+            failed, status = len(agg["failed"]), "ok"
+        seconds = round(time.monotonic() - started, 1)
+        gui_session.track(
+            self.session,
+            "ingest",
+            status=status,
+            files=n_files,
+            failed=failed,
+            duration_s=seconds,
+        )
 
     def _render_result(self, agg: dict[str, list[str]]) -> None:
         ui.label("Ingest complete.").classes("section-label")

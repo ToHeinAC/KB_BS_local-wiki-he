@@ -17,6 +17,7 @@ import gui_app
 import gui_research
 import gui_session
 import tools
+import usage
 import wiki_engine
 
 DB = db_context.DEFAULT_DB
@@ -399,3 +400,19 @@ async def test_classified_research_searches_every_level_with_the_web_off_and_loc
     user.find("new-research").click()
     await _until(lambda: box.enabled)
     assert box.enabled
+
+
+async def test_a_research_run_is_logged_with_mode_status_and_duration(user: User) -> None:
+    await _open(user)
+    await _start(user)
+    await _see(user, "Research report")
+    await _until(lambda: any(e["event"] == "research" for e in usage.read_events()))
+    (run,) = [e for e in usage.read_events() if e["event"] == "research"]
+    assert (run["user"], run["mode"], run["db"], run["status"]) == (
+        auth.DEFAULT_USER,
+        "Quick",
+        DB,
+        "ok",
+    )
+    assert run["duration_s"] >= 0
+    assert "Who pays" not in str(usage.read_events())

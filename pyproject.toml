@@ -40,6 +40,7 @@ dependencies = [
     "pyyaml>=6.0",
     "nicegui>=3.17.1",
     "latex2mathml>=3.81.1",
+    "plotly>=7.1.0",
 ]
 
 [project.optional-dependencies]

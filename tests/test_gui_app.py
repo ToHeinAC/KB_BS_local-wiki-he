@@ -1,6 +1,7 @@
 """Smoke tests for the NiceGUI (Broadsheet) entry point: harness, routing, login page."""
 
 import asyncio
+import json
 import os
 import signal
 from pathlib import Path
@@ -15,6 +16,7 @@ import gui_app
 import gui_chrome
 import gui_session
 import gui_upload
+import usage
 
 
 @pytest.fixture(autouse=True)
@@ -217,3 +219,27 @@ def test_reset_keeps_the_model_loaded_while_an_ingest_runs(
     monkeypatch.setattr(gui_upload, "_RUNNING", {})
     assert gui_chrome.release_model() is True
     assert unloaded == [True]
+
+
+async def test_sign_ins_and_sign_outs_are_logged_without_passwords(
+    gui_env: Path, user: User
+) -> None:
+    await _sign_in(user, "reader", "wrong-secret")
+    await user.should_see("Invalid username or password.")
+    await _sign_in(user, "reader", "pw")
+    await user.should_see("Explorer")
+    user.find("user-menu").click()
+    user.find("sign-out").click()
+    await user.should_see("Sign in to continue")
+    events = usage.read_events()
+    assert [(e["event"], e["user"]) for e in events] == [
+        ("login_failed", "reader"),
+        ("login_ok", "reader"),
+        ("logout", "reader"),
+    ]
+    assert len(events[1]["session"]) == 8
+    assert events[1]["session"] == events[2]["session"]
+    assert events[1]["db"] == db_context.DEFAULT_DB
+    assert "wrong-secret" not in json.dumps(events)
+    (sid,) = [k for k in gui_session._SESSIONS] or [""]
+    assert not sid or sid[:8] != events[1]["session"]  # the bearer sid is never logged

@@ -13,6 +13,7 @@ This is the only GUI module that seals clearance or touches `storage.user`
 
 import asyncio
 import functools
+import hashlib
 import inspect
 import queue
 import secrets
@@ -26,6 +27,7 @@ from nicegui import app, run, ui
 import auth
 import db_context
 import ui_logic
+import usage
 import wiki_engine
 
 _T = TypeVar("_T")
@@ -44,6 +46,7 @@ class Session:
     scope: list[str] = field(default_factory=lambda: [])
     grants: dict[str, int] = field(default_factory=lambda: {})
     state: dict[str, Any] = field(default_factory=lambda: {})
+    usage_id: str = ""  # tags this sign-in's rows in the usage log
 
     @property
     def can_maintain(self) -> bool:
@@ -123,32 +126,53 @@ def current() -> Session | None:
         return None
     db = _stored("active_db")
     db = db if db in allowed else allowed[0]
-    return _SESSIONS.setdefault(sid, Session(user, db, db))
+    return _SESSIONS.setdefault(sid, Session(user, db, db, usage_id=_usage_id(sid)))
 
 
 def login(username: str, password: str) -> str | None:
     """Sign in. Returns the error to show, or None on success."""
     if not auth.verify(username, password):
+        usage.log_event("login_failed", username)
         return "Invalid username or password."
     dbs = auth.user_dbs(username)
     if not dbs:
+        usage.log_event("login_failed", username, reason="no_database")
         return "This account has no database access. Ask an admin."
     logout()
     sid = secrets.token_hex(16)
     _persist("sid", sid)
     _persist("user", username)
     _persist("active_db", dbs[0])
-    _SESSIONS[sid] = Session(username, dbs[0], dbs[0])
+    _SESSIONS[sid] = Session(username, dbs[0], dbs[0], usage_id=_usage_id(sid))
+    track(_SESSIONS[sid], "login_ok")
     return None
 
 
 def logout() -> None:
     """Drop this browser's session and everything it held."""
-    sid = _stored("sid")
+    sid, user = _stored("sid"), _stored("user")
+    if sid and user:
+        usage.log_event("logout", user, session=_usage_id(sid))
     if sid:
         _SESSIONS.pop(sid, None)
     for key in PERSISTED_KEYS:
         _persist(key, None)
+
+
+def _usage_id(sid: str) -> str:
+    """A short tag derived from the sid; the sid itself is a bearer secret and never logged."""
+    return hashlib.sha256(sid.encode()).hexdigest()[:8]
+
+
+def track(session: Session, event: str, **fields: Any) -> None:
+    """Log one usage event of this session (user, sign-in tag, database)."""
+    usage.log_event(event, session.user, session=session.usage_id, db=session.active_db, **fields)
+
+
+def download(session: Session, content: str, name: str, kind: str) -> None:
+    """Send `content` to the browser as a file and log that a `kind` was downloaded."""
+    ui.download.content(content, name)
+    track(session, "download", kind=kind)
 
 
 def select_db(session: Session, db: str) -> None:

@@ -190,6 +190,13 @@ async def run_research(
     if not (run.answer.strip() or run.error.strip()):
         run.error = _NO_RESULT
     run.audit, run.seconds = stream.after_result, int(time.monotonic() - started)
+    gui_session.track(
+        session,
+        "research",
+        mode="Deep" if deep else "Quick",
+        status="error" if run.error.strip() else "ok",
+        duration_s=round(time.monotonic() - started, 1),
+    )
     on_update()
 
 
@@ -399,7 +406,8 @@ class ResearchView:
                 box.on_value_change(lambda e: setattr(run, "as_source", bool(e.value)))
             name = run.report.rsplit("/", 1)[-1] if run.report else "research-answer.md"
             ui.button(
-                "Download report", on_click=lambda: ui.download.content(run.answer, name)
+                "Download report",
+                on_click=lambda: gui_session.download(self.session, run.answer, name, "report"),
             ).props("flat").classes("btn text small")
 
     def _render_history(self) -> None:

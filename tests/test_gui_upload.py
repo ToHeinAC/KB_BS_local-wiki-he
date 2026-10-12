@@ -21,6 +21,7 @@ import md_convert
 import ollama_client
 import ontology_ui
 import ui_logic
+import usage
 import wiki_engine
 
 DB = db_context.DEFAULT_DB
@@ -568,3 +569,25 @@ def test_status_text_reaches_the_progress_readout() -> None:
         assert progress.text == "Ingesting a.md (Normal)…"
     progress.tick()
     assert progress.fraction == 0.5
+
+
+async def test_an_ingest_is_logged_with_file_count_but_no_file_names(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _stub_ingest(monkeypatch, [])
+    await _open(user)
+    await _drop(user, {"secret-name.md": DOC_A})
+    await _see(user, "1 file(s) ready to ingest.")
+    _classify(user, "secret-name.md", "normal")
+    await _until(lambda: user.find("ingest-batch").elements.copy().pop().enabled)  # type: ignore[union-attr]
+    user.find("ingest-batch").click()
+    await _see(user, "Ingest complete.")
+    (run,) = [e for e in usage.read_events() if e["event"] == "ingest"]
+    assert (run["user"], run["db"], run["status"], run["files"], run["failed"]) == (
+        auth.DEFAULT_USER,
+        DB,
+        "ok",
+        1,
+        0,
+    )
+    assert "secret-name" not in str(usage.read_events())

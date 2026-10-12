@@ -14,6 +14,7 @@ import auth
 import classification
 import db_context
 import gui_session
+import gui_usage
 
 _AUDIT_COLUMNS = ("at", "user", "action", "target", "shard")
 _AUDIT_ROWS = 100
@@ -97,6 +98,8 @@ class AdminView:
             self._render_databases()
             self._render_users()
             self._render_audit()
+            if self.session.user == auth.DEFAULT_USER:
+                gui_usage.UsagePanel().build()
 
     def _act(self, action: Any, *args: Any, done: str = "") -> str:
         """Run an admin action; the message to show, or its error."""

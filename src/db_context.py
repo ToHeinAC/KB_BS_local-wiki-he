@@ -303,6 +303,10 @@ def audit_log_path() -> Path:
     return DATA_ROOT / "security_audit.jsonl"
 
 
+def usage_log_path() -> Path:
+    return DATA_ROOT / "usage.jsonl"
+
+
 def is_valid_db_name(name: str) -> bool:
     return bool(_SAFE_NAME_RE.match(name or ""))
 

@@ -1,6 +1,7 @@
 """Admin page of the Broadsheet frontend (src/gui_admin.py)."""
 
 import asyncio
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,7 @@ import db_context
 import gui_admin
 import gui_app
 import gui_session
+import usage
 
 DB = db_context.DEFAULT_DB
 ADMIN = auth.DEFAULT_USER
@@ -182,3 +184,45 @@ async def test_saving_a_user_from_the_page_changes_their_databases(user: User) -
     user.find("user-save-reader").click()
     await _until(lambda: auth.user_dbs("reader") == [DB, "Other"])
     assert auth.user_dbs("reader") == [DB, "Other"]
+
+
+def _plotly(user: User) -> Any:
+    (chart,) = user.find("usage-chart").elements
+    return chart
+
+
+async def test_usage_statistics_are_shown_to_t_hein_with_period_metric_and_split(
+    user: User,
+) -> None:
+    usage.log_event("chat", "reader", now=lambda: datetime(2026, 1, 1).astimezone(), duration_s=60)
+    usage.log_event("chat", ADMIN, duration_s=30)
+    await _open_admin(user)
+    await _see(user, "Usage statistics")
+    await _see(user, "usage-table")
+    names = [t["name"] for t in _plotly(user).figure["data"]]
+    assert names == ["reader", ADMIN]
+    (period,) = user.find("usage-period").elements
+    assert isinstance(period, ui.slider)
+    period.set_value(2)  # last week: the January chat drops out
+    await _until(lambda: [t["name"] for t in _plotly(user).figure["data"]] == [ADMIN])
+    (split,) = user.find("usage-by-user").elements
+    assert isinstance(split, ui.switch)
+    split.set_value(False)
+    await _until(lambda: [t["name"] for t in _plotly(user).figure["data"]] == ["Total"])
+    (metric,) = user.find("usage-metric").elements
+    assert isinstance(metric, ui.select)
+    metric.set_value("logins")
+    await _until(lambda: _plotly(user).figure["data"] == [])
+
+
+async def test_other_admins_do_not_see_usage_statistics(user: User) -> None:
+    auth.add_user("boss", "pw", [DB], is_admin=True)
+    usage.log_event("chat", ADMIN, duration_s=30)
+    await user.open("/login")
+    user.find("Username").type("boss")
+    user.find("Password").type("pw")
+    user.find("sign-in").click()
+    await user.should_see("2BrAIn")
+    await user.open("/admin")
+    await _see(user, "Security audit log")
+    await user.should_not_see("Usage statistics")
