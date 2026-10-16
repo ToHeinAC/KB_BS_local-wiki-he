@@ -122,7 +122,7 @@ async def test_a_deep_answer_streams_its_trace_and_shows_the_audit(
     await user.should_not_see("How this answer was made")
     (rail,) = user.find("chat-run").elements
     texts = [str(getattr(e, "text", "") or e.props.get("label", "")) for e in rail.descendants()]
-    assert {"How the answer ran", "raw_search"} <= set(texts)
+    assert {"How the answer ran", "raw_search — q: Deep question"} <= set(texts)
     await user.should_see("Why these sources")
 
 
