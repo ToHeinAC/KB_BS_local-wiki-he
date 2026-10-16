@@ -2083,16 +2083,17 @@ def _hit_sources(question: str, scope: str) -> list[str]:
     return [h.get("source") or "" for h in hits]
 
 
-def _candidate_pages_for_query(question: str) -> list[str]:
+def _candidate_pages_for_query(question: str, wiki_sources: list[str] | None = None) -> list[str]:
     """BM25 candidate wiki pages for a question (Q-1), plus 1-hop link expansion.
 
     Unions wiki-scope hits (the hit `source` IS the page filename) with raw-scope
     hits mapped to pages via `_source_to_pages()`, preserving score order, then
     appends the link-graph neighbours of the top hits (`linked_pages`) so a query
     reaches pages it never lexically matched. BM25 hits keep priority; the LLM
-    re-ranker in `_select_pages` and its 5-page cap bound what reaches synthesis.
+    order and the 5-page cap in `_select_pages` bound what reaches synthesis.
     Empty when the index has no match — the caller then falls back to index-blurb
-    LLM selection.
+    LLM selection. ``wiki_sources`` are the wiki-scope hit sources when the caller has
+    already searched (one wiki search per question).
     """
     cands: list[str] = []
     seen: set[str] = set()
@@ -2104,7 +2105,7 @@ def _candidate_pages_for_query(question: str) -> list[str]:
             seen.add(f)
             cands.append(f)
 
-    for src in _hit_sources(question, "wiki"):
+    for src in _hit_sources(question, "wiki") if wiki_sources is None else wiki_sources:
         _add(src)
     src_map = _source_to_pages()
     for src in _hit_sources(question, "raw"):
@@ -2120,38 +2121,26 @@ def _candidate_pages_for_query(question: str) -> list[str]:
     return cands
 
 
-def _index_text_for(filenames: list[str]) -> str:
-    """A minimal `index.md`-style block (title — description) for given pages."""
-    by_name = {p["filename"]: p for p in list_pages()}
-    lines: list[str] = []
-    for f in filenames:
-        p = by_name.get(f)
-        if p:
-            lines.append(f"- [{p.get('title', f)}]({f}) — {p.get('description', '')}")
-    return "\n".join(lines)
+def _select_pages(
+    question: str, system: str, index_text: str, wiki_sources: list[str] | None = None
+) -> list[str]:
+    """Pick the wiki pages to answer from (Q-1).
 
-
-def _select_pages(question: str, system: str, index_text: str) -> list[str]:
-    """Pick the wiki pages to answer from (Q-1: BM25 pre-select → LLM re-rank).
-
-    When BM25 surfaces candidates, the LLM re-ranks only those (high precision);
-    otherwise it selects from the full index (recall fallback). Always returns
-    valid existing page filenames, capped at 5.
+    When the hybrid search surfaces candidates, they are already in reranked order, so
+    the top five are taken without an LLM call; otherwise the LLM selects from the full
+    index (recall fallback). Always returns valid existing page filenames, capped at 5.
     """
-    candidates = _candidate_pages_for_query(question)
-    rank_index = _index_text_for(candidates) if candidates else index_text
-    select_prompt = SELECT_PROMPT.format(index_text=rank_index, question=question)
-    selected_raw = ollama_client.generate(
-        system, select_prompt, temperature=0.1, model_id=ollama_client.QUERY_MODEL
-    )
-    selected = [
-        ln.strip()
-        for ln in selected_raw.splitlines()
-        if ln.strip().endswith(".md") and ln.strip() not in _SYSTEM_PAGES
-    ]
-    if candidates:
-        cand_set = set(candidates)
-        selected = [s for s in selected if s in cand_set] or candidates[:5]
+    selected = _candidate_pages_for_query(question, wiki_sources)
+    if not selected:
+        select_prompt = SELECT_PROMPT.format(index_text=index_text, question=question)
+        selected_raw = ollama_client.generate(
+            system, select_prompt, temperature=0.1, model_id=ollama_client.QUERY_MODEL
+        )
+        selected = [
+            ln.strip()
+            for ln in selected_raw.splitlines()
+            if ln.strip().endswith(".md") and ln.strip() not in _SYSTEM_PAGES
+        ]
     return [s for s in selected if (p := _page_path(s)) is not None and p.exists()][:5]
 
 
@@ -2238,8 +2227,9 @@ def _gather_pages(
     `audit` is the search-ladder record of which pages were kept vs dropped below τ.
     """
     index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
-    selected = _select_pages(question, system, index_text)
     hits_by_page, wiki_hits = _wiki_hits_by_page(question)
+    wiki_sources = [h.get("source") or "" for h in wiki_hits]
+    selected = _select_pages(question, system, index_text, wiki_sources)
     selected, audit = _tau_gate(selected, hits_by_page)
     pages_text, used_sources, raw_sources_set = _page_context(selected, hits_by_page, budget)
     return pages_text, used_sources, raw_sources_set, wiki_hits, audit

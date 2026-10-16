@@ -41,11 +41,12 @@ reranker; `use_rerank` splits Fast (browsing, per-keystroke — fusion only) fro
 
 ```
 wiki_engine.query_with_sources(question)
-  → _candidate_pages_for_query(question)                     # Q-1 hybrid pre-select
-      → lex_index.query(scope="wiki")  ∪  lex_index.query(scope="raw") → _source_to_pages()
+  → _wiki_hits_by_page(question)                             # the one reranked wiki-scope search
+  → _candidate_pages_for_query(question, wiki_sources)       # Q-1 hybrid pre-select
+      → those wiki hits  ∪  retrieval.search(scope="raw") → _source_to_pages()
       → linked_pages(top _QUERY_LINK_SEEDS)                  # + 1-hop link expansion
-  → ollama_client.generate(select prompt, temperature=0.1)   # LLM re-ranks candidates, ≤5 filenames
-      (falls back to full-index selection when BM25 is empty)
+  → top 5 candidates in reranked order                       # no LLM call
+      (ollama_client.generate(select prompt) over the full index only when nothing matched)
   → inject top _QUERY_CHUNKS_PER_PAGE wiki chunks per page   # Q-3 section-level, not full pages
   → calibrate.assess(wiki_hits, db) — Stage E gate                # abstain if best rerank_score < τ
       → if not confident: return abstain message, SKIP synthesis  # no answer from weak context
@@ -95,7 +96,7 @@ Link traversal stays **inside** each DB — `related:` edges never cross databas
 
 ### Link-aware retrieval (`wiki_engine.linked_pages`)
 
-How a query reaches connected material it never lexically matched. One deterministic primitive, `linked_pages(filenames, limit)`, returns 1-hop neighbours as `{filename, title, excerpt, via, kind}` and has two consumers: `_candidate_pages_for_query` (Fast chat — neighbours are appended to the BM25 candidate set, which the LLM re-ranker then filters) and `tools._wiki_search_one` (both agents — neighbours are appended to search output as `[Wiki linked N]` entries, gated by `WIKI_LINK_EXPANSION`).
+How a query reaches connected material it never lexically matched. One deterministic primitive, `linked_pages(filenames, limit)`, returns 1-hop neighbours as `{filename, title, excerpt, via, kind}` and has two consumers: `_candidate_pages_for_query` (Fast chat — neighbours are appended to the BM25 candidate set, of which the top five in reranked order are answered from) and `tools._wiki_search_one` (both agents — neighbours are appended to search output as `[Wiki linked N]` entries, gated by `WIKI_LINK_EXPANSION`).
 
 Two edge types feed it:
 

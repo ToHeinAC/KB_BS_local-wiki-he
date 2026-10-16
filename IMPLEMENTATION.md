@@ -78,7 +78,7 @@ Tracked in [docs/openissues.md](docs/openissues.md).
 | LLM page output format | `### FILE:` / `### INDEX_UPDATE` / `### LOG_ENTRY` blocks | `=== filename.md ===` … `=== END ===` blocks |
 | `schema_loader.py` | Separate system prompts per operation (ingest/query/lint) | `get_system_prompt(mode)` — `full` (ingest/page-writing) vs `query` (read/answer/describe/lint) |
 | `file_processor.py` | Saves extracted text to `data/raw/extracted/` | Returns extracted text in memory; no write |
-| Query page selection | Title-heuristic + LLM ranking | Hybrid: BM25 candidate set (wiki + raw scope) → LLM re-rank; full-index LLM fallback when BM25 is empty |
+| Query page selection | Title-heuristic + LLM ranking | Hybrid: reranked candidate set (wiki + raw scope), top 5 taken without an LLM call; full-index LLM selection only when nothing matched |
 | Test suite | Capped at 100 tests | No cap; lean and high-signal, gated by coverage (AGENTS.md §5.4) |
 
 ## 6. Documentation map

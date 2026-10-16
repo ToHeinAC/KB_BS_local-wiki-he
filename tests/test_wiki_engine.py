@@ -510,6 +510,33 @@ def test_candidate_pages_maps_raw_hit_to_page(wiki_dir):
     assert "page.md" in cands
 
 
+def test_reranked_candidates_are_taken_without_an_llm_pick(wiki_dir, monkeypatch):
+    """The reranker already ordered the candidates: no SELECT call when there are any."""
+    for name in ("a.md", "b.md"):
+        (wiki_dir / name).write_text(f"---\ntitle: {name}\n---\nbody")
+    monkeypatch.setattr(
+        wiki_engine, "_candidate_pages_for_query", lambda q, w=None: ["b.md", "a.md"]
+    )
+    called: list[str] = []
+    monkeypatch.setattr(wiki_engine.ollama_client, "generate", lambda *a, **k: called.append("x"))
+    assert wiki_engine._select_pages("q", "sys", "index") == ["b.md", "a.md"]
+    assert called == []
+
+
+def test_a_question_searches_the_wiki_scope_once(wiki_dir, monkeypatch):
+    (wiki_dir / "a.md").write_text("---\ntitle: A\n---\nbody")
+    scopes: list[str] = []
+
+    def search(q, top_k, scope, use_rerank=False):
+        scopes.append(scope)
+        return [{"source": "a.md", "text": "ctx"}] if scope == "wiki" else []
+
+    monkeypatch.setattr(wiki_engine.retrieval, "search", search)
+    monkeypatch.setattr(wiki_engine.ollama_client, "generate", lambda *a, **k: "a.md")
+    wiki_engine._gather_pages("q", "sys", 8000)
+    assert scopes.count("wiki") == 1
+
+
 # --- Q-3: section-level synthesis ---
 
 
@@ -584,7 +611,7 @@ def _two_page_gather(wiki_dir, monkeypatch):
     (wiki_dir / "cold.md").write_text(
         '---\ntitle: Cold\ntype: concept\nsources: ["s.md"]\n---\nbody'
     )
-    monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i: ["hot.md", "cold.md"])
+    monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i, *a: ["hot.md", "cold.md"])
     monkeypatch.setattr(
         wiki_engine.retrieval,
         "search",

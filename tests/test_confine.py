@@ -70,7 +70,7 @@ def test_denied_name_reads_exactly_like_a_missing_one(sibling_secret):
 
 
 def test_llm_page_selection_cannot_escape_the_wiki(sibling_secret, monkeypatch):
-    monkeypatch.setattr(wiki_engine, "_candidate_pages_for_query", lambda _q: [])
+    monkeypatch.setattr(wiki_engine, "_candidate_pages_for_query", lambda _q, _w=None: [])
     monkeypatch.setattr(
         wiki_engine.ollama_client, "generate", lambda *_a, **_k: "../../Beta/wiki/secret.md"
     )

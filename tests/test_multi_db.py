@@ -278,7 +278,7 @@ def test_query_with_sources_fans_out_one_synthesis_call(two_dbs, monkeypatch):
 
     monkeypatch.setattr(wiki_engine.ollama_client, "generate", fake_generate)
     monkeypatch.setattr(wiki_engine.schema_loader, "get_system_prompt", lambda mode: "sys")
-    monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i: ["shielding.md"])
+    monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i, *a: ["shielding.md"])
     db_context.set_search_scope(["Alpha", "Beta"])
 
     res = wiki_engine.query_with_sources("shielding")
@@ -296,7 +296,7 @@ def test_query_with_sources_single_db_unqualified(two_dbs, monkeypatch):
         wiki_engine.ollama_client, "generate", lambda s, p, **kw: calls.append(p) or "answer"
     )
     monkeypatch.setattr(wiki_engine.schema_loader, "get_system_prompt", lambda mode: "sys")
-    monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i: ["shielding.md"])
+    monkeypatch.setattr(wiki_engine, "_select_pages", lambda q, s, i, *a: ["shielding.md"])
 
     res = wiki_engine.query_with_sources("shielding")
 
