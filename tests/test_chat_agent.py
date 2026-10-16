@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 import chat_agent
 
@@ -119,3 +119,34 @@ def test_the_deep_chat_prompt_asks_for_a_structured_answer_not_a_concise_one():
     assert "## " in prompts.CHAT_AGENT_SYSTEM
     nudge = prompts.CHAT_BUDGET_NUDGE.format(min_words=500)
     assert "500+ words" in nudge
+
+
+def _tool(name: str, content: str, call_id: str) -> ToolMessage:
+    return ToolMessage(content=content, name=name, tool_call_id=call_id)
+
+
+def test_old_tool_results_are_trimmed_so_the_answer_fits_the_window():
+    # A full window cuts the answer mid-sentence (Ollama stops at num_ctx), so bulky old
+    # results shrink to their head; notes, the question and the latest result stay whole.
+    msgs = [
+        SystemMessage(content="system"),
+        HumanMessage(content="question"),
+        _tool("raw_read", "## Raw file: a.md\n" + "a" * 50_000, "1"),
+        _tool("think_tool", "Have: fact [Source: a.md]", "2"),
+        _tool("raw_read", "## Raw file: b.md\n" + "b" * 50_000, "3"),
+        _tool("raw_read", "## Raw file: c.md\n" + "c" * 30_000, "4"),
+    ]
+    fitted = chat_agent._fit_window(msgs, budget_chars=60_000)
+    assert sum(len(str(m.content)) for m in fitted) <= 60_000
+    head = str(fitted[2].content)
+    assert head.startswith("## Raw file: a.md")
+    assert "trimmed" in head
+    assert fitted[3].content == "Have: fact [Source: a.md]"
+    assert fitted[5].content == msgs[5].content  # the latest result stays whole
+    assert [m.content for m in fitted[:2]] == ["system", "question"]
+    assert msgs[2].content.endswith("a" * 100)  # the run's history itself is untouched
+
+
+def test_a_short_history_is_sent_unchanged():
+    msgs = [HumanMessage(content="q"), _tool("raw_read", "short", "1")]
+    assert chat_agent._fit_window(msgs, budget_chars=60_000) == msgs

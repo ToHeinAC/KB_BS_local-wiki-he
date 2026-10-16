@@ -66,6 +66,15 @@ NUDGE_AT = int(os.getenv("CHAT_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 LLM_TIMEOUT = int(os.getenv("CHAT_LLM_TIMEOUT", "180"))
 FALLBACK_NOTES_CAP = int(os.getenv("CHAT_FALLBACK_NOTES_CAP", "12000"))
 
+# Ollama stops generating once prompt + answer reach num_ctx, so a long run's answer would
+# be cut mid-sentence. The history sent per turn stays under the window minus a reserve for
+# the tool schemas and the answer; 3 characters per token is conservative for German text.
+_ANSWER_RESERVE_TOKENS = 8192
+_CHARS_PER_TOKEN = 3
+WINDOW_CHARS = (ollama_client.NUM_CTX - _ANSWER_RESERVE_TOKENS) * _CHARS_PER_TOKEN
+_TRIM_HEAD = 400  # what a trimmed tool result keeps: its header names file and section
+_TRIMMED = "\n[trimmed to fit the context window — the facts noted in think_tool still hold]"
+
 _RAW_TEXT_EXTS = {".md", ".txt", ".html"}
 _RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]]+\.(?:md|txt|html))\s*\]")
 # Permissive body so a DB-qualified page ("Investing::foo.md") still parses —
@@ -79,6 +88,33 @@ def _cites(text: str, extra: list[str] | None = None) -> dict[str, Any]:
         "sources": sorted(set(_RAW_CITE_RE.findall(text)) | set(extra or [])),
         "wiki_sources": sorted(set(_WIKI_CITE_RE.findall(text))),
     }
+
+
+def _size(m: AnyMessage) -> int:
+    calls = m.tool_calls if isinstance(m, AIMessage) else []
+    return len(str(m.content)) + (len(str(calls)) if calls else 0)
+
+
+def _fit_window(msgs: list[AnyMessage], budget_chars: int = WINDOW_CHARS) -> list[AnyMessage]:
+    """The history to send, with the oldest bulky tool results cut to their head until it
+    fits. think_tool notes and the latest tool result stay whole; the run's state is unchanged."""
+    out = list(msgs)
+    excess = sum(map(_size, out)) - budget_chars
+    last_tool = max((i for i, m in enumerate(out) if isinstance(m, ToolMessage)), default=-1)
+    for i, m in enumerate(out):
+        if excess <= 0:
+            break
+        text = str(m.content)
+        if (
+            not isinstance(m, ToolMessage)
+            or i == last_tool
+            or m.name == "think_tool"
+            or len(text) <= _TRIM_HEAD + len(_TRIMMED)
+        ):
+            continue
+        out[i] = m.model_copy(update={"content": text[:_TRIM_HEAD] + _TRIMMED})
+        excess -= len(text) - len(str(out[i].content))
+    return out
 
 
 def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
@@ -99,7 +135,7 @@ def _build_graph(
     )
 
     def agent_node(state: MessagesState) -> dict[str, Any]:
-        msgs = list(state["messages"])
+        msgs = _fit_window(list(state["messages"]))
         ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
         if ai_count >= NUDGE_AT:
             msgs = [*msgs, HumanMessage(content=nudge)]
