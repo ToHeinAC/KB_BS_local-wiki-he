@@ -97,3 +97,11 @@ def test_build_llm_applies_the_per_call_timeout(monkeypatch):
     monkeypatch.setattr(chat_agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
     llm: Any = chat_agent._build_llm()
     assert llm.bound._client._client.timeout.read == chat_agent.LLM_TIMEOUT
+
+
+def test_build_llm_uses_the_app_wide_context_window(monkeypatch):
+    # Without num_ctx Ollama's default window cuts long runs, and a window that differs
+    # from the other calls' reloads the model on every switch between Fast and Deep.
+    monkeypatch.setattr(chat_agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
+    llm: Any = chat_agent._build_llm()
+    assert llm.bound.num_ctx == chat_agent.ollama_client.NUM_CTX

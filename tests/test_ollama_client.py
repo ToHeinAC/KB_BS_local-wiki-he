@@ -46,7 +46,7 @@ def test_generate_passes_correct_args(monkeypatch):
         model=ollama_client.MODEL,
         system="system",
         prompt="user prompt",
-        options={"temperature": 0.5, "num_ctx": ollama_client._NUM_CTX},
+        options={"temperature": 0.5, "num_ctx": ollama_client.NUM_CTX},
     )
 
 
@@ -83,7 +83,7 @@ def test_generate_retries_with_halved_ctx_on_server_crash(monkeypatch):
     assert ollama_client.generate("s", "p") == "recovered"
     assert mock.generate.call_count == 2
     _, kwargs = mock.generate.call_args
-    assert kwargs["options"]["num_ctx"] == ollama_client._NUM_CTX // 2
+    assert kwargs["options"]["num_ctx"] == ollama_client.NUM_CTX // 2
 
 
 def test_generate_raises_when_retry_also_crashes(monkeypatch):
@@ -137,7 +137,7 @@ def test_chat_passes_messages(monkeypatch):
     mock.chat.assert_called_once_with(
         model=ollama_client.MODEL,
         messages=msgs,
-        options={"temperature": 0.7, "num_ctx": ollama_client._NUM_CTX},
+        options={"temperature": 0.7, "num_ctx": ollama_client.NUM_CTX},
     )
 
 

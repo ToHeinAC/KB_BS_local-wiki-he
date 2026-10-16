@@ -28,7 +28,7 @@ FAST_MODEL = os.getenv("FAST_MODEL") or MODEL
 # is ample while keeping the graph small enough to stay on one GPU.
 # Note the cap is per request slot: the server allocates num_ctx * OLLAMA_NUM_PARALLEL,
 # so a parallel setting > 1 silently re-inflates the graph this cap exists to shrink.
-_NUM_CTX = int(os.getenv("INGEST_NUM_CTX", "32768"))
+NUM_CTX = int(os.getenv("INGEST_NUM_CTX", "32768"))
 
 # A crashed llama-server (not a bad request) — the ggml scheduler assert above is the
 # usual cause. Ollama restarts the worker, so one retry at half the context can succeed.
@@ -103,13 +103,13 @@ def generate(
 ) -> str:
     model = model_id or MODEL
     try:
-        return _generate_once(model, system, prompt, temperature, _NUM_CTX)
+        return _generate_once(model, system, prompt, temperature, NUM_CTX)
     except Exception as exc:
         if not any(m in str(exc) for m in _CRASH_MARKERS):
             raise RuntimeError(f"Ollama generate failed: {exc}") from exc
     time.sleep(3)  # let Ollama respawn the worker before the half-context retry
     try:
-        return _generate_once(model, system, prompt, temperature, _NUM_CTX // 2)
+        return _generate_once(model, system, prompt, temperature, NUM_CTX // 2)
     except Exception as exc:
         raise RuntimeError(f"Ollama generate failed: {exc}") from exc
 
@@ -119,7 +119,7 @@ def chat(messages: list[dict[str, Any]], temperature: float = 0.7) -> str:
         resp = _client().chat(
             model=MODEL,
             messages=messages,
-            options={"temperature": temperature, "num_ctx": _NUM_CTX},
+            options={"temperature": temperature, "num_ctx": NUM_CTX},
         )
         return resp["message"]["content"]
     except Exception as exc:

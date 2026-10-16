@@ -86,6 +86,7 @@ def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
         model=ollama_client.QUERY_MODEL,
         base_url=ollama_client.host(),
         temperature=0.3,
+        num_ctx=ollama_client.NUM_CTX,  # the app-wide window: no truncation, no model reload
         client_kwargs={"timeout": LLM_TIMEOUT},  # ChatOllama drops a bare timeout=
     ).bind_tools(tool_module.with_ontology(tool_module.CHAT_TOOLS))  # pyright: ignore[reportUnknownMemberType]  # bare Callable
 
