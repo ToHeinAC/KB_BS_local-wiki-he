@@ -42,16 +42,18 @@ reranker; `use_rerank` splits Fast (browsing, per-keystroke — fusion only) fro
 ```
 wiki_engine.query_with_sources(question)
   → _wiki_hits_by_page(question)                             # the one reranked wiki-scope search
-  → _candidate_pages_for_query(question, wiki_sources)       # Q-1 hybrid pre-select
-      → those wiki hits  ∪  retrieval.search(scope="raw") → _source_to_pages()
+  → _raw_hits(question)                                      # the one reranked raw-scope search
+  → _candidate_pages_for_query(question, wiki_sources, raw_sources)  # Q-1 hybrid pre-select
+      → those wiki hits  ∪  those raw hits → _source_to_pages()
       → linked_pages(top _QUERY_LINK_SEEDS)                  # + 1-hop link expansion
   → top 5 candidates in reranked order                       # no LLM call
       (ollama_client.generate(select prompt) over the full index only when nothing matched)
   → inject top _QUERY_CHUNKS_PER_PAGE wiki chunks per page   # Q-3 section-level, not full pages
+  → _raw_excerpts: top _QUERY_RAW_EXCERPTS original passages, τ-gated, headed [Source: file §x]
   → calibrate.assess(wiki_hits, db) — Stage E gate                # abstain if best rerank_score < τ
       → if not confident: return abstain message, SKIP synthesis  # no answer from weak context
-  → extract raw_sources from page frontmatter `sources` field
-  → ollama_client.generate(answer prompt + lang.response_directive(question), temperature=0.7)  # answer pinned to query language
+  → raw_sources = page frontmatter `sources` ∪ the quoted originals
+  → ollama_client.generate(answer prompt + lang.response_directive(question), temperature=0.3)  # direct answer, then details; cites [page title] and [Source: …]
   → return {answer, sources (wiki filenames), raw_sources (original data/raw/ filenames)}
 ```
 

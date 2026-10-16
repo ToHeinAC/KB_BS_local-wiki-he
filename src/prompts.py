@@ -383,9 +383,10 @@ User question: {question}
 
 List up to 5 most relevant page filenames (one per line, filename only). If none are relevant, reply NONE."""
 
-ANSWER_PROMPT = """Using only the wiki pages below, answer the user's question.
-Wiki pages are summarised knowledge from data/wiki/; their original sources live in data/raw/.
-Cite wiki pages inline as [page title].
+ANSWER_PROMPT = """Using only the wiki pages below and the original excerpts after them, answer the user's question.
+Wiki pages are summarised knowledge from data/wiki/; the original excerpts are verbatim passages from the source documents in data/raw/.
+Structure the answer: first the direct answer in 1-3 sentences, then the details that matter (exact figures with units, conditions, exceptions, who or what is concerned) as short paragraphs or a list.
+Take figures and exact wording from the original excerpts when they contain them. Cite wiki pages inline as [page title] and originals as [Source: ...] exactly as written in their headers. Do not add facts that are not in the material below.
 
 Wiki pages:
 {pages_text}

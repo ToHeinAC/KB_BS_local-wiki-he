@@ -116,6 +116,8 @@ _QUERY_SYNTH_MAX_CHARS = 8000  # hard cap on total synthesis context
 # scope is wide (the total may exceed the cap above rather than starve a DB).
 _QUERY_MIN_DB_SYNTH_CHARS = 2500
 _QUERY_PAGE_FALLBACK_CHARS = 1500  # body slice when a page had no BM25 chunk hit
+_QUERY_RAW_EXCERPTS = 3  # top original (data/raw/) passages quoted beside the pages
+_QUERY_RAW_EXCERPT_CHARS = 1200  # per quoted passage; all of them share half the budget
 _QUERY_LINK_SEEDS = 3  # top BM25 pages whose links are followed
 _QUERY_LINK_NEIGHBOURS = 3  # max link-expanded pages appended to the candidate set
 # A raw source feeding more pages than this yields no topical signal (StrlSchG.md
@@ -2083,7 +2085,9 @@ def _hit_sources(question: str, scope: str) -> list[str]:
     return [h.get("source") or "" for h in hits]
 
 
-def _candidate_pages_for_query(question: str, wiki_sources: list[str] | None = None) -> list[str]:
+def _candidate_pages_for_query(
+    question: str, wiki_sources: list[str] | None = None, raw_sources: list[str] | None = None
+) -> list[str]:
     """BM25 candidate wiki pages for a question (Q-1), plus 1-hop link expansion.
 
     Unions wiki-scope hits (the hit `source` IS the page filename) with raw-scope
@@ -2092,8 +2096,8 @@ def _candidate_pages_for_query(question: str, wiki_sources: list[str] | None = N
     reaches pages it never lexically matched. BM25 hits keep priority; the LLM
     order and the 5-page cap in `_select_pages` bound what reaches synthesis.
     Empty when the index has no match — the caller then falls back to index-blurb
-    LLM selection. ``wiki_sources`` are the wiki-scope hit sources when the caller has
-    already searched (one wiki search per question).
+    LLM selection. ``wiki_sources`` / ``raw_sources`` are the hit sources when the caller
+    has already searched (one search per scope and question).
     """
     cands: list[str] = []
     seen: set[str] = set()
@@ -2108,7 +2112,7 @@ def _candidate_pages_for_query(question: str, wiki_sources: list[str] | None = N
     for src in _hit_sources(question, "wiki") if wiki_sources is None else wiki_sources:
         _add(src)
     src_map = _source_to_pages()
-    for src in _hit_sources(question, "raw"):
+    for src in _hit_sources(question, "raw") if raw_sources is None else raw_sources:
         for f in src_map.get(src.strip(), []):
             _add(f)
     cands = cands[:_QUERY_MAX_CANDIDATES]
@@ -2122,7 +2126,11 @@ def _candidate_pages_for_query(question: str, wiki_sources: list[str] | None = N
 
 
 def _select_pages(
-    question: str, system: str, index_text: str, wiki_sources: list[str] | None = None
+    question: str,
+    system: str,
+    index_text: str,
+    wiki_sources: list[str] | None = None,
+    raw_sources: list[str] | None = None,
 ) -> list[str]:
     """Pick the wiki pages to answer from (Q-1).
 
@@ -2130,7 +2138,7 @@ def _select_pages(
     the top five are taken without an LLM call; otherwise the LLM selects from the full
     index (recall fallback). Always returns valid existing page filenames, capped at 5.
     """
-    selected = _candidate_pages_for_query(question, wiki_sources)
+    selected = _candidate_pages_for_query(question, wiki_sources, raw_sources)
     if not selected:
         select_prompt = SELECT_PROMPT.format(index_text=index_text, question=question)
         selected_raw = ollama_client.generate(
@@ -2159,6 +2167,34 @@ def _wiki_hits_by_page(
     except Exception:
         pass
     return hits_by_page, wiki_hits
+
+
+def _raw_hits(question: str) -> list[dict[str, Any]]:
+    """Reranked raw-scope (original document) hits; [] on error."""
+    try:
+        return retrieval.search(question, top_k=_QUERY_CANDIDATE_TOPK, scope="raw", use_rerank=True)
+    except Exception:
+        return []
+
+
+def _raw_excerpts(hits: list[dict[str, Any]], budget: int) -> tuple[str, set[str]]:
+    """The top original passages, each headed by its citation `[Source: file §anchor]`, and
+    the originals they come from: a Fast answer can take figures and wording from them.
+    Passages below the calibrated τ are left out, as their pages are in `_tau_gate`."""
+    tau = calibrate.threshold()  # τ-gated like the pages; uncalibrated keeps every hit
+    kept = [
+        h
+        for h in hits
+        if h.get("source") and (tau is None or float(h.get("rerank_score", tau)) >= tau)
+    ]
+    text, used = "", set[str]()
+    for h in kept[:_QUERY_RAW_EXCERPTS]:
+        anchor = h.get("anchor") or ""
+        source = db_context.qualify(h["source"])
+        body = (h.get("text") or "")[:_QUERY_RAW_EXCERPT_CHARS]
+        text += f"\n\n--- [Source: {source}{(' ' + anchor) if anchor else ''}] ---\n{body}"
+        used.add(source)
+    return text[:budget], used
 
 
 def _tau_gate(
@@ -2228,11 +2264,20 @@ def _gather_pages(
     """
     index_text = _index_path().read_text() if _index_path().exists() else "(empty wiki)"
     hits_by_page, wiki_hits = _wiki_hits_by_page(question)
-    wiki_sources = [h.get("source") or "" for h in wiki_hits]
-    selected = _select_pages(question, system, index_text, wiki_sources)
+    raw_hits = _raw_hits(question)
+    selected = _select_pages(
+        question,
+        system,
+        index_text,
+        [h.get("source") or "" for h in wiki_hits],
+        [h.get("source") or "" for h in raw_hits],
+    )
     selected, audit = _tau_gate(selected, hits_by_page)
     pages_text, used_sources, raw_sources_set = _page_context(selected, hits_by_page, budget)
-    return pages_text, used_sources, raw_sources_set, wiki_hits, audit
+    excerpts, excerpt_sources = _raw_excerpts(raw_hits, budget // 2)
+    if excerpts:
+        pages_text += f"\n\nOriginal excerpts:{excerpts}"
+    return pages_text, used_sources, raw_sources_set | excerpt_sources, wiki_hits, audit
 
 
 @dataclass
@@ -2305,7 +2350,7 @@ def query_with_sources(question: str) -> dict[str, Any]:
         language_directive=lang.response_directive(question),
     )
     system = f"{system}\n\n{brief}" if brief else system
-    answer = ollama_client.generate(system, answer_prompt, temperature=0.7)
+    answer = ollama_client.generate(system, answer_prompt, temperature=0.3)
     return {"answer": answer, **result}
 
 

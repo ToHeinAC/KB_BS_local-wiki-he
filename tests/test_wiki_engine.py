@@ -514,9 +514,7 @@ def test_reranked_candidates_are_taken_without_an_llm_pick(wiki_dir, monkeypatch
     """The reranker already ordered the candidates: no SELECT call when there are any."""
     for name in ("a.md", "b.md"):
         (wiki_dir / name).write_text(f"---\ntitle: {name}\n---\nbody")
-    monkeypatch.setattr(
-        wiki_engine, "_candidate_pages_for_query", lambda q, w=None: ["b.md", "a.md"]
-    )
+    monkeypatch.setattr(wiki_engine, "_candidate_pages_for_query", lambda q, *a: ["b.md", "a.md"])
     called: list[str] = []
     monkeypatch.setattr(wiki_engine.ollama_client, "generate", lambda *a, **k: called.append("x"))
     assert wiki_engine._select_pages("q", "sys", "index") == ["b.md", "a.md"]
@@ -574,6 +572,29 @@ def test_query_synthesis_injects_chunks_not_full_page(wiki_dir, monkeypatch):
     ap = captured["answer_prompt"]
     assert "20 millisievert" in ap  # the matching section is present
     assert "ZZZFILLER" not in ap  # unrelated sections are NOT injected (chunk-level, not full page)
+
+
+def test_fast_answers_read_original_excerpts_and_cite_them(wiki_dir, monkeypatch):
+    (wiki_dir / "a.md").write_text('---\ntitle: A\nsources: ["law.md"]\n---\nbody')
+
+    def search(q, top_k, scope, use_rerank=False):
+        if scope == "wiki":
+            return [{"source": "a.md", "text": "page ctx"}]
+        return [{"source": "law.md", "anchor": "§ 3", "text": "Der Grenzwert beträgt 20 mSv."}]
+
+    seen = {}
+
+    def generate(system, prompt, temperature=0.3, model_id=None):
+        seen["prompt"], seen["temperature"] = prompt, temperature
+        return "answer"
+
+    monkeypatch.setattr(wiki_engine.retrieval, "search", search)
+    monkeypatch.setattr(wiki_engine.ollama_client, "generate", generate)
+    out = wiki_engine.query_with_sources("Grenzwert")
+    assert "[Source: law.md § 3]" in seen["prompt"]
+    assert "Der Grenzwert beträgt 20 mSv." in seen["prompt"]
+    assert seen["temperature"] == 0.3  # factual answer, not creative writing
+    assert "law.md" in out["raw_sources"]
 
 
 def test_query_abstains_below_threshold_and_skips_synthesis(wiki_dir, monkeypatch):
