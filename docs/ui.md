@@ -60,7 +60,10 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   reachable level, folded into one line such as "Deep · KI" once a question is asked; then a Deep answer's timeline
   "How the answer ran", live while it runs, so it sits at the top; the conversation's questions, New conversation), the reading column (question as headline, answer, actions, the follow-up banner, the input)
   and a margin column of numbered source notes. The timeline is `src/gui_trace.py`, shared with Research: agent steps
-  stamped with their arrival time become dated items that fold open to the detail. `gui_cite.number_citations` turns `[Source: file §x]` / `[Wiki: page.md]` tags into
+  stamped with their arrival time become dated items that fold open to the detail. A tool call shows its arguments as
+  `key: value` pairs in its title; a tool result's title carries a one-line summary (`gui_trace.summarize`: hits, the
+  file read, no results, or the first line), folded open it lists each hit's file, and the complete, uncut tool output
+  folds open beneath as *Full output*. `gui_cite.number_citations` turns `[Source: file §x]` / `[Wiki: page.md]` tags into
   `<sup class="cite" data-n>` numerals plus notes (same file and section reuse a number; one bracket naming several
   sources, `[Source: a.md; Source: b.md]`, gives several numerals; Markdown escapes such as `JEN\_KOINNO.md` are undone);
   hovering a numeral lights its note (`gui_app.CITE_JS`). LaTeX in `$…$`, `$$…$$`, `\(…\)`, `\[…\]` becomes MathML
@@ -111,7 +114,8 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   tools stay off, Deep is not run) and locks the choice until New research. Everything is gated on `TAVILY_API_KEY`; a
   run that ends with neither a result nor an error says so instead of showing a blank page.
 - **Upload (`src/gui_upload.py`, the right column of 2BrAIn, maintainers only):** three steps, never automatic. *Prepare* (in a worker,
-  `prepare_batch`): duplicates at levels the user can see are skipped and named, PDF/DOCX/images are converted through
+  `prepare_batch`; every drop is its own upload, and `extend_batch` adds it to the batch under review, skipping files
+  already in it; a drop that arrives while a batch is prepared or ingested waits in `Upload.queued`): duplicates at levels the user can see are skipped and named, PDF/DOCX/images are converted through
   `md_convert` with a progress bar (Ollama must be reachable), the effective date and, in a database with an ontology,
   the class, work and other versions are detected. *Review*: one table (file, date, class, work, other versions, and a
   classification toggle per file with no default and levels only up to the uploader's clearance); a single converted
