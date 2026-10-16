@@ -352,6 +352,38 @@ async def test_a_prepared_batch_can_be_discarded_and_the_galaxy_returns(user: Us
     await _see(user, "1 file(s) ready to ingest.")
 
 
+async def test_a_second_drop_joins_the_batch_under_review(user: User) -> None:
+    await _open(user)
+    await _drop(user, {"a.md": DOC_A})
+    await _see(user, "1 file(s) ready to ingest.")
+    _classify(user, "a.md", "normal")
+    await _drop(user, {"b.md": DOC_B})
+    await _see(user, "2 file(s) ready to ingest.")
+    await _see(user, "Choose a classification for: b.md")  # a.md keeps its level
+    await _drop(user, {"a.md": DOC_A})  # a file already in the batch is not doubled
+    await user.should_not_see("3 file(s) ready to ingest.")
+    await _see(user, "2 file(s) ready to ingest.")
+
+
+async def test_a_drop_while_the_batch_is_prepared_joins_it(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gate, real = threading.Event(), gui_upload.metadata_extract.extract_effective_date
+
+    def slow(text: str) -> str | None:
+        gate.wait(5)
+        return real(text)
+
+    monkeypatch.setattr(gui_upload.metadata_extract, "extract_effective_date", slow)
+    await _open(user)
+    first = asyncio.create_task(_drop(user, {"a.md": DOC_A}))
+    await _until(lambda: gui_upload.ingest_running())
+    await _drop(user, {"b.md": DOC_B})
+    gate.set()
+    await first
+    await _see(user, "2 file(s) ready to ingest.")
+
+
 async def test_levels_above_the_uploaders_clearance_are_not_offered(user: User) -> None:
     await _open(user)
     await _drop(user, {"a.md": DOC_A})

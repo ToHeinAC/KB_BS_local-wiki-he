@@ -10,7 +10,7 @@ disabled. Contradictions the ingest reports feed a Resolve panel.
 import time
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -141,6 +141,33 @@ def prepare_batch(
     return prep
 
 
+def extend_batch(
+    prior: Prepared | None,
+    raws: dict[str, bytes],
+    active_db: str,
+    on_progress: Callable[[float, str], None],
+) -> Prepared:
+    """Prepare dropped files into the batch under review: a drop adds to it, never replaces it.
+    Files already in the batch are not prepared twice (blocking: run in a worker)."""
+    if prior is None or not prior.files:
+        return prepare_batch(raws, active_db, on_progress)
+    seen = {dedup.sha256(f["raw"]) for f in prior.files}
+    new = prepare_batch(
+        {n: b for n, b in raws.items() if dedup.sha256(b) not in seen}, active_db, on_progress
+    )
+    merged = Prepared(
+        files=[*prior.files, *new.files],
+        skipped=[*prior.skipped, *new.skipped],
+        warnings=[*prior.warnings, *new.warnings],
+        error=new.error,
+        classes=prior.classes,
+        rows={**prior.rows, **new.rows},
+    )
+    if new.files:
+        _ontology_columns(merged)  # "other versions" spans the whole batch
+    return merged
+
+
 # --- planning and ingesting ----------
 
 
@@ -223,7 +250,6 @@ def run_ingest(
 class Upload:
     """One browser's upload session; dropped with the session's content."""
 
-    key: str = ""
     prepared: Prepared | None = None
     dates: dict[str, str] = field(default_factory=lambda: {})
     classes: dict[str, str] = field(default_factory=lambda: {})
@@ -239,6 +265,7 @@ class Upload:
     message: str = ""
     progress: Progress = field(default_factory=Progress)
     shards: list[str] = field(default_factory=lambda: [])  # the levels the running batch writes
+    queued: dict[str, bytes] = field(default_factory=lambda: {})  # dropped while busy
 
 
 # The batch each (user, database) is preparing or ingesting. It outlives the page that started it:
@@ -273,18 +300,21 @@ def _resume(session: gui_session.Session) -> Upload | None:
 
 
 def adopt(state: Upload, prep: Prepared) -> None:
-    """Take a prepared batch into the review state."""
+    """Take a prepared batch into the review state; files already reviewed keep their values."""
     state.prepared = prep
     for name, row in prep.rows.items():
-        state.dates[name], state.classes[name] = row["date"], row["class"]
-        state.works[name], state.levels[name] = row["work"], None
-    if len(prep.files) == 1 and prep.files[0]["convertible"]:
+        if name not in state.levels:
+            state.dates[name], state.classes[name] = row["date"], row["class"]
+            state.works[name], state.levels[name] = row["work"], None
+    if len(prep.files) != 1:
+        state.convert_text = None
+    elif prep.files[0]["convertible"] and state.convert_text is None:
         state.convert_text = prep.files[0]["text"]
 
 
 def finish(state: Upload, agg: dict[str, list[str]]) -> None:
     """Record an ingest's outcome; the batch is done."""
-    state.prepared, state.key, state.result = None, "", agg
+    state.prepared, state.result = None, agg
     state.contradictions = agg["contradictions"]
     state.pages = list({*agg["created"], *agg["updated"]})
 
@@ -356,25 +386,39 @@ class UploadView:
     # --- receiving and preparing ----------
 
     async def _received(self, event: events.MultiUploadEventArguments) -> None:
-        raws = {f.name: await f.read() for f in event.files}
-        key = "|".join(sorted(dedup.sha256(b) for b in raws.values()))
-        if key == self.state.key or self.state.busy:
-            return
-        keep = (self.state.contradictions, self.state.pages)
-        state = self.state = self.session.state["upload"] = Upload(key=key)
-        state.contradictions, state.pages = keep
-        owner = (self.session.user, self.session.active_db)
-        _begin(owner, state, Progress())
-        self._render()
-        try:
-            prep = await gui_session.in_worker(
-                prepare_batch, raws, self.session.active_db, state.progress.set
-            )
-        except Exception as exc:
-            prep = Prepared(error=f"Preparing the files failed: {exc}")
-        adopt(state, prep)
-        _end(owner, state)
-        self._settled()
+        """Each drop is its own upload; all of them join one batch. A drop that arrives while a
+        batch is prepared or ingested waits and is prepared when that job ends."""
+        self.state.queued.update({f.name: await f.read() for f in event.files})
+        await self._prepare_queued()
+
+    async def _prepare_queued(self) -> None:
+        while self.state.queued and not self.state.busy:
+            raws, self.state.queued = self.state.queued, {}
+            state = self._batch_state()
+            owner = (self.session.user, self.session.active_db)
+            _begin(owner, state, Progress())
+            if not self.stage.is_deleted:
+                self._render()
+            try:
+                prep = await gui_session.in_worker(
+                    extend_batch, state.prepared, raws, self.session.active_db, state.progress.set
+                )
+            except Exception as exc:
+                prep = replace(
+                    state.prepared or Prepared(), error=f"Preparing the files failed: {exc}"
+                )
+            adopt(state, prep)
+            _end(owner, state)
+            self._settled()
+
+    def _batch_state(self) -> Upload:
+        """The batch under review, or a fresh one that keeps an open Resolve panel."""
+        old = self.state
+        if old.prepared is not None and old.prepared.files:
+            return old
+        state = self.state = self.session.state["upload"] = Upload(queued=old.queued)
+        state.contradictions, state.pages = old.contradictions, old.pages
+        return state
 
     # --- rendering ----------
 
@@ -442,7 +486,7 @@ class UploadView:
         """Drop the prepared batch without ingesting it (nothing has been written yet)."""
         if self.state.busy:
             return
-        self.state.prepared, self.state.key, self.state.convert_text = None, "", None
+        self.state.prepared, self.state.convert_text, self.state.queued = None, None, {}
         self.uploader.reset()
         self._render()
 
@@ -579,6 +623,7 @@ class UploadView:
         await self._run_ingest(pending, db, len(files))
         _end(owner, state)
         self._settled()
+        await self._prepare_queued()
 
     async def _run_ingest(self, pending: dict[str, Any], db: str, n_files: int) -> None:
         """Run the batch in a worker and log it in the usage log (a count, never names)."""
