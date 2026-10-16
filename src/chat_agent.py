@@ -59,9 +59,9 @@ from prompts import (
 load_dotenv()
 
 MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
-MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "300"))
-MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
-MAX_ITER = int(os.getenv("CHAT_MAX_ITERATIONS", "25"))
+MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "500"))
+MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "3"))
+MAX_ITER = int(os.getenv("CHAT_MAX_ITERATIONS", "40"))
 NUDGE_AT = int(os.getenv("CHAT_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 LLM_TIMEOUT = int(os.getenv("CHAT_LLM_TIMEOUT", "180"))
 FALLBACK_NOTES_CAP = int(os.getenv("CHAT_FALLBACK_NOTES_CAP", "12000"))
@@ -94,7 +94,9 @@ def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
 def _build_graph(
     llm: Runnable[LanguageModelInput, BaseMessage], directive: str = ""
 ) -> CompiledStateGraph[MessagesState]:
-    nudge = CHAT_BUDGET_NUDGE + (f"\n\n{directive}" if directive else "")
+    nudge = CHAT_BUDGET_NUDGE.format(min_words=MIN_WORDS) + (
+        f"\n\n{directive}" if directive else ""
+    )
 
     def agent_node(state: MessagesState) -> dict[str, Any]:
         msgs = list(state["messages"])

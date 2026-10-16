@@ -53,14 +53,14 @@ load_dotenv()
 PARALLELISM = int(os.getenv("RESEARCH_PARALLELISM", "4"))
 MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
-CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "300"))
-CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
+CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "500"))
+CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "3"))
 CONTENT_TRUNCATE = 2000
 RAW_READ_CAP = 16000  # chars per raw_read call (per file, per offset window)
 # After this many distinct byte-offset windows of one file have been read in a
 # run, the read result appends a "submit now" nudge — stops weak models from
 # paginating a whole document instead of answering.
-RAW_READ_NUDGE_AFTER = int(os.getenv("CHAT_RAW_READ_NUDGE_AFTER", "2"))
+RAW_READ_NUDGE_AFTER = int(os.getenv("CHAT_RAW_READ_NUDGE_AFTER", "3"))
 WIKI_LINK_EXPANSION = os.getenv("WIKI_LINK_EXPANSION", "1") != "0"
 WIKI_LINK_SEEDS = int(os.getenv("WIKI_LINK_SEEDS", "3"))  # top hits whose links we follow
 WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended per query

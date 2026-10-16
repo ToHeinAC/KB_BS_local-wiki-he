@@ -457,7 +457,7 @@ Citations:
 - Cite a wiki page you actually used as `[Wiki: page.md]`. It counts toward the {min_sources}-source gate, but at least one `[Source: ...]` original is always required.
 
 Required workflow:
-1. PLAN: think_tool once at the start. Identify 1-3 sub-questions and an initial raw_search plan.
+1. PLAN: think_tool once at the start. Identify 2-4 sub-questions (what applies, the exact figures, the conditions and exceptions) and an initial raw_search plan.
 2. SEARCH FIRST: your very first non-think tool call MUST be raw_search with single-stem keywords.
 3. TRIAGE: after each tool result, call think_tool with exactly these three sections:
      Have: <facts already grounded, with [Source: ...] tags>
@@ -465,10 +465,10 @@ Required workflow:
      Next: <which tool to call next and why; one of raw_read / raw_search / wiki_search / wiki_read / submit_chat_answer>
 4. AUTONOMOUS EXPANSION: based on the gaps, raw_read with offset OR raw_search with a different stem. When a gap is about which document covers a topic, or how two topics connect, use wiki_search / wiki_read to find the connection, then go back to the originals for the facts. Reflect every 2-3 tool calls.
 4.5 EVALUATE: if the question turns on whether values meet a threshold, limit, or compound rule that the sources state explicitly, you MUST call evaluate_condition exactly once before submit_chat_answer. Extract the literal `facts` from the source text (numbers, categories, labels — keep the units the law uses) and assemble the `condition` tree as the law states it (use `or` when the law says "oder", `and` when "und"). Quote the result block verbatim in the final answer.
-5. SUBMIT: when you have at least {min_searches} tool calls and at least {min_sources} unique sources (counting section suffixes), call submit_chat_answer with a concise markdown answer (>= {min_words} words). Inline-cite every factual claim.
+5. SUBMIT: when you have at least {min_searches} tool calls and at least {min_sources} unique sources (counting section suffixes), call submit_chat_answer with a structured markdown answer (>= {min_words} words): open with a direct answer in 2-3 sentences, then one `## ` section per sub-question with the exact figures, conditions and exceptions from the originals, and end with `## Open points` when gaps remain. Inline-cite every factual claim.
 
 Discipline:
-- Stay focused. This is a chat answer, not a deep research report — be concise.
+- Stay on the question, but answer it completely: every sub-question from your PLAN gets its own section.
 - Do not repeat the same query. Do not re-read the same file at the same offset.
 - Stop once the gaps list is empty."""
 
@@ -539,7 +539,7 @@ CHAT_BUDGET_NUDGE = (
     "STEP BUDGET: you have used most of your step budget. "
     "Do NOT write prose — call submit_chat_answer right now. "
     "Use `answer` = all findings gathered so far in full markdown "
-    "(aim for 300+ words, cite every source as [Source: filename]). "
+    "(aim for {min_words}+ words, cite every source as [Source: filename]). "
     "This is your only remaining action."
 )
 

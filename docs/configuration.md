@@ -46,7 +46,9 @@ Copy it to `.env` (gitignored, never committed) and adjust.
 | `DEEP_RESEARCH_MAX_TOKENS` | `8192` | Per-role `*_model_max_tokens`. **No-op on Ollama** — `ChatOllama` bounds output with `num_predict`, not `max_tokens`, and `Configuration` exposes only `model`/`max_tokens`/`api_key` as configurable. Kept for parity with upstream. |
 | `DEEP_RESEARCH_CLARIFICATION` | `false` | `allow_clarification`. Keep off: the Research page is one-shot and cannot answer a clarifying turn. |
 | `CHAT_MIN_SEARCHES` | `3` | Deep chat: minimum tool calls before submitting. |
-| `CHAT_MIN_WORDS` | `300` | Deep chat: minimum answer word count. |
-| `CHAT_MIN_SOURCES` | `2` | Deep chat: minimum unique citations (`[Source: filename]` + `[Wiki: page.md]`; at least one must be a `[Source: ...]` original). |
-| `CHAT_MAX_ITERATIONS` | `25` | Deep chat: LangGraph recursion cap (~⅝ of research; allows pagination of long docs). |
+| `CHAT_MIN_WORDS` | `500` | Deep chat: minimum answer word count. |
+| `CHAT_MIN_SOURCES` | `3` | Deep chat: minimum unique citations (`[Source: filename]` + `[Wiki: page.md]`; at least one must be a `[Source: ...]` original). |
+| `CHAT_MAX_ITERATIONS` | `40` | Deep chat: LangGraph recursion cap (each agent turn is two steps, so about 20 turns). |
+| `CHAT_NUDGE_AT` | `CHAT_MAX_ITERATIONS // 2 - 2` | Deep chat: agent turns after which every turn is told to submit now. |
+| `CHAT_RAW_READ_NUDGE_AFTER` | `3` | Deep chat: byte-offset windows of one file after which `raw_read` suggests to stop paginating (section reads are exempt). |
 | `CHAT_LLM_TIMEOUT` | `180` | Deep chat: per-LLM-call timeout in seconds. |

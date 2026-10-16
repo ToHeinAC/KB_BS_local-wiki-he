@@ -105,3 +105,17 @@ def test_build_llm_uses_the_app_wide_context_window(monkeypatch):
     monkeypatch.setattr(chat_agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
     llm: Any = chat_agent._build_llm()
     assert llm.bound.num_ctx == chat_agent.ollama_client.NUM_CTX
+
+
+def test_a_deep_chat_run_has_room_to_research_before_the_submit_nudge():
+    assert chat_agent.MAX_ITER >= 40
+    assert chat_agent.NUDGE_AT >= 18  # agent turns; each turn is two graph steps
+
+
+def test_the_deep_chat_prompt_asks_for_a_structured_answer_not_a_concise_one():
+    import prompts
+
+    assert "concise" not in prompts.CHAT_AGENT_SYSTEM
+    assert "## " in prompts.CHAT_AGENT_SYSTEM
+    nudge = prompts.CHAT_BUDGET_NUDGE.format(min_words=500)
+    assert "500+ words" in nudge

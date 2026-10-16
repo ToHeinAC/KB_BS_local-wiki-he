@@ -261,7 +261,9 @@ def test_raw_cite_regex_accepts_qualified_source():
     assert got == ["Alpha::alpha.md"]
 
 
-def test_submit_gate_counts_qualified_sources_from_distinct_dbs():
+def test_submit_gate_counts_qualified_sources_from_distinct_dbs(monkeypatch):
+    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 300)
+    monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     answer = "word " * 400 + "[Source: Alpha::alpha.md] [Source: Beta::beta.md]"
     assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
 

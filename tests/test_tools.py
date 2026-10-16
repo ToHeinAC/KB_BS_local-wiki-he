@@ -360,8 +360,10 @@ def test_raw_read_nudges_submit_after_paginating(wiki_dir):
     first = tools.raw_read.invoke({"filenames": ["big.md"], "offset": 0})
     assert "Stop paginating" not in first  # one window read, no nudge yet
     second = tools.raw_read.invoke({"filenames": ["big.md"], "offset": cap})
-    assert "Stop paginating" in second  # RAW_READ_NUDGE_AFTER=2 windows reached
-    assert "submit_chat_answer" in second
+    assert "Stop paginating" not in second  # a deep answer may read a few windows
+    third = tools.raw_read.invoke({"filenames": ["big.md"], "offset": 2 * cap})
+    assert "Stop paginating" in third  # RAW_READ_NUDGE_AFTER=3 windows reached
+    assert "submit_chat_answer" in third
 
 
 # --- think_tool -----------------------------------------------------------
@@ -379,6 +381,16 @@ def test_chat_tools_expose_wiki_search_and_read():
     names = {t.name for t in tools.CHAT_TOOLS}
     assert {"wiki_search", "wiki_read"} <= names
     assert {"raw_search", "raw_read"} <= names  # still raw-grounded
+
+
+def test_a_deep_chat_answer_needs_500_words_and_3_sources() -> None:
+    cites = "[Source: a.md] [Source: b.md] [Wiki: c.md]"
+    rejected = tools._submit_chat_impl("word " * 450 + cites)
+    assert rejected.startswith("REJECTED")
+    assert "500" in rejected
+    assert tools._submit_chat_impl("word " * 520 + "[Source: a.md] [Source: b.md]").startswith(
+        "REJECTED"
+    )
 
 
 def test_submit_chat_counts_wiki_citations(monkeypatch):
