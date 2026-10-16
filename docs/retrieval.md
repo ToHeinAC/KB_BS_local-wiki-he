@@ -53,7 +53,8 @@ wiki_engine.query_with_sources(question)
   → calibrate.assess(wiki_hits, db) — Stage E gate                # abstain if best rerank_score < τ
       → if not confident: return abstain message, SKIP synthesis  # no answer from weak context
   → raw_sources = page frontmatter `sources` ∪ the quoted originals
-  → ollama_client.generate(answer prompt + lang.response_directive(question), temperature=0.3)  # direct answer, then details; cites [page title] and [Source: …]
+  → ollama_client.generate(answer prompt + lang.response_directive(question), temperature=0.3)
+      (generate_stream with on_token when the caller streams, as the Broadsheet Chat does)  # direct answer, then details; cites [page title] and [Source: …]
   → return {answer, sources (wiki filenames), raw_sources (original data/raw/ filenames)}
 ```
 

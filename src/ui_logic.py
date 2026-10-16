@@ -330,10 +330,11 @@ def tag_wiki_citations(text: str, aliases: Mapping[str, str]) -> str:
     return _BARE_TAG_RE.sub(tag, text)
 
 
-def answer_fast(question: str) -> dict[str, Any]:
-    """One-shot wiki answer as chat-message fields; a backend error becomes the answer text."""
+def answer_fast(question: str, on_token: Callable[[str], None] | None = None) -> dict[str, Any]:
+    """One-shot wiki answer as chat-message fields; a backend error becomes the answer text.
+    `on_token` receives the answer text as it is written."""
     try:
-        res = wiki_engine.query_with_sources(question)
+        res = wiki_engine.query_with_sources(question, on_token=on_token)
     except RuntimeError as e:
         return {"content": f"Error: {e}", "sources": [], "raw_sources": [], "audit": None}
     titles = {p["filename"]: str(p.get("title") or "") for p in wiki_engine.list_pages()}

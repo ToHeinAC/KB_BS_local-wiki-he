@@ -3,7 +3,7 @@
 import contextlib
 import os
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Protocol, cast
 
 from dotenv import load_dotenv
@@ -112,6 +112,33 @@ def generate(
         return _generate_once(model, system, prompt, temperature, NUM_CTX // 2)
     except Exception as exc:
         raise RuntimeError(f"Ollama generate failed: {exc}") from exc
+
+
+def generate_stream(
+    system: str,
+    prompt: str,
+    on_token: Callable[[str], None],
+    temperature: float = 0.3,
+    model_id: str | None = None,
+) -> str:
+    """`generate`, streamed: each piece goes to `on_token` as it arrives; returns the whole
+    text. A failure before the first piece falls back to `generate` (with its crash retry)."""
+    model, parts = model_id or MODEL, list[str]()
+    try:
+        for chunk in _client().generate(
+            model=model,
+            system=system,
+            prompt=prompt,
+            stream=True,
+            options={"temperature": temperature, "num_ctx": NUM_CTX},
+        ):
+            parts.append(chunk["response"])
+            on_token(parts[-1])
+    except Exception as exc:
+        if parts:
+            raise RuntimeError(f"Ollama generate failed: {exc}") from exc
+        return generate(system, prompt, temperature, model_id)
+    return "".join(parts)
 
 
 def chat(messages: list[dict[str, Any]], temperature: float = 0.7) -> str:

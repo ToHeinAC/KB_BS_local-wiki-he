@@ -474,7 +474,7 @@ def test_fast_chat_answers_and_files_the_answer(wiki, monkeypatch):
     monkeypatch.setattr(
         wiki_engine,
         "query_with_sources",
-        lambda q: {
+        lambda q, **_: {
             "answer": f"Answer to {q}",
             "sources": ["alpha.md"],
             "raw_sources": ["doc.md §1"],
@@ -506,7 +506,7 @@ def test_chat_follow_up_is_condensed(wiki, monkeypatch):
     monkeypatch.setattr(
         wiki_engine,
         "query_with_sources",
-        lambda q: {"answer": q, "sources": [], "raw_sources": []},
+        lambda q, **_: {"answer": q, "sources": [], "raw_sources": []},
     )
     at = _go(_app(chat_followup={"q": "Q1", "a": "A1"}), "Wiki Chat")
     at.chat_input[0].set_value("and then?").run()
@@ -517,7 +517,7 @@ def test_chat_follow_up_is_condensed(wiki, monkeypatch):
 
 def test_fast_chat_shows_the_question_while_answering(wiki, monkeypatch):
     # A non-RuntimeError aborts the run mid-answer, freezing what the user sees.
-    def halt(q):
+    def halt(q, **_):
         raise ValueError("halt")
 
     monkeypatch.setattr(wiki_engine, "query_with_sources", halt)
@@ -527,7 +527,7 @@ def test_fast_chat_shows_the_question_while_answering(wiki, monkeypatch):
 
 
 def test_fast_chat_error_is_recorded(wiki, monkeypatch):
-    def boom(q):
+    def boom(q, **_):
         raise RuntimeError("ollama down")
 
     monkeypatch.setattr(wiki_engine, "query_with_sources", boom)
@@ -865,7 +865,7 @@ def _chat_answer(monkeypatch) -> None:
     monkeypatch.setattr(
         wiki_engine,
         "query_with_sources",
-        lambda q: {"answer": "A", "sources": [f"{DB}@strict::secret.md"], "raw_sources": []},
+        lambda q, **_: {"answer": "A", "sources": [f"{DB}@strict::secret.md"], "raw_sources": []},
     )
 
 
@@ -1150,7 +1150,7 @@ def test_chat_sources_say_which_version_is_in_force(wiki, monkeypatch):
         ]
     )
     answer = {"answer": "A", "sources": [], "raw_sources": ["doc.md §1"], "audit": None}
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: answer)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: answer)
     at = _go(_app(), "Wiki Chat")
     at.chat_input[0].set_value("q").run()
     assert "ontology: w-doc · 2024-10-23 · in force" in _texts(_ok(at).caption)

@@ -119,6 +119,16 @@ async def _deep_message(chat: Chat, question: str, on_update: Callable[[], None]
     }
 
 
+async def _fast_message(live: dict[str, Any], question: str) -> dict[str, Any]:
+    """The Fast answer; its text builds up in `live["partial"]` as it is written (the worker
+    appends, a timer in the reading column shows it)."""
+
+    def on_token(piece: str) -> None:
+        live["partial"] += piece
+
+    return await gui_session.in_worker(ui_logic.answer_fast, question, on_token)
+
+
 async def run_turn(chat: Chat, prompt: str, on_update: Callable[[], None]) -> None:
     """Answer `prompt` in the current mode and append the exchange to the conversation."""
     started = time.monotonic()
@@ -131,12 +141,14 @@ async def run_turn(chat: Chat, prompt: str, on_update: Callable[[], None]) -> No
     interpreted = question if (followup and question.strip() != prompt.strip()) else None
     chat.messages.append({"role": "user", "content": prompt})
     chat.live = {"question": prompt, "interpreted": interpreted, "steps": []}
+    if chat.mode != "Deep":
+        chat.live["partial"] = ""  # the Fast answer as it is written
     on_update()
     try:
         if chat.mode == "Deep":
             message = await _deep_message(chat, question, on_update)
         else:
-            message = await gui_session.in_worker(ui_logic.answer_fast, question)
+            message = await _fast_message(chat.live, question)
     finally:
         chat.live = None
     message.update(
@@ -375,7 +387,17 @@ class ChatView:
         ui.label(live["question"]).classes("headline m")
         if live["interpreted"]:
             ui.label(f"Interpreted as: {live['interpreted']}").classes("muted")
-        ui.label("Working… the steps appear on the left.").classes("muted")
+        if "partial" not in live:
+            ui.label("Working… the steps appear on the left.").classes("muted")
+            return
+        hint = ui.label("Searching the wiki and the originals…").classes("muted")
+        text = ui.markdown("").classes("prose")
+
+        def show() -> None:
+            hint.set_visibility(not live["partial"])
+            text.set_content(live["partial"])
+
+        ui.timer(0.25, show)
 
     def _render_answer(self, msg: dict[str, Any]) -> None:
         text, notes = gui_cite.number_citations(msg["content"])

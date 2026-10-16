@@ -164,12 +164,12 @@ def test_answer_fast_returns_the_message_fields_or_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     res = {"answer": "A", "sources": ["s.md"], "raw_sources": ["r.md"], "audit": {"k": 1}}
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: res)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: res)
     assert ui_logic.answer_fast("q") == {
         "content": "A", "sources": ["s.md"], "raw_sources": ["r.md"], "audit": {"k": 1},
     }  # fmt: skip
 
-    def boom(_q: str) -> dict[str, Any]:
+    def boom(_q: str, **_: Any) -> dict[str, Any]:
         raise RuntimeError("ollama down")
 
     monkeypatch.setattr(wiki_engine, "query_with_sources", boom)
@@ -213,7 +213,7 @@ def test_fast_answer_other_pages_and_originals_are_tagged_too() -> None:
 
 def test_answer_fast_tags_the_pages_it_cites(monkeypatch: pytest.MonkeyPatch) -> None:
     res = {"answer": "Orbits [Hub].", "sources": ["hub.md"], "raw_sources": [], "audit": None}
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: res)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: res)
     monkeypatch.setattr(wiki_engine, "list_pages", lambda: [{"filename": "hub.md", "title": "Hub"}])
     assert ui_logic.answer_fast("q")["content"] == "Orbits [Wiki: hub.md]."
 

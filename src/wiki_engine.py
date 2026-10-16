@@ -5,7 +5,7 @@ import json
 import os
 import re
 import shutil
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -2322,8 +2322,11 @@ def _gather_scope(question: str, system: str, scope: tuple[str, ...], budget: in
     return g
 
 
-def query_with_sources(question: str) -> dict[str, Any]:
+def query_with_sources(
+    question: str, on_token: Callable[[str], None] | None = None
+) -> dict[str, Any]:
     """Answer a question using wiki content. Returns {answer, sources, raw_sources}.
+    With `on_token` the answer is streamed: each piece goes to it as it is written.
 
     Retrieval fans out over `db_context.search_scope()` — one page-selection pass
     per DB — and the gathered context is synthesized in a single LLM call. With a
@@ -2350,7 +2353,10 @@ def query_with_sources(question: str) -> dict[str, Any]:
         language_directive=lang.response_directive(question),
     )
     system = f"{system}\n\n{brief}" if brief else system
-    answer = ollama_client.generate(system, answer_prompt, temperature=0.3)
+    if on_token is None:
+        answer = ollama_client.generate(system, answer_prompt, temperature=0.3)
+    else:
+        answer = ollama_client.generate_stream(system, answer_prompt, on_token, temperature=0.3)
     return {"answer": answer, **result}
 
 

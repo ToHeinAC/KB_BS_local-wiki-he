@@ -597,6 +597,24 @@ def test_fast_answers_read_original_excerpts_and_cite_them(wiki_dir, monkeypatch
     assert "law.md" in out["raw_sources"]
 
 
+def test_a_streamed_fast_answer_hands_its_text_on_as_it_arrives(wiki_dir, monkeypatch):
+    monkeypatch.setattr(
+        wiki_engine.retrieval, "search", lambda q, top_k, scope, use_rerank=False: []
+    )
+    monkeypatch.setattr(wiki_engine.ollama_client, "generate", lambda *a, **k: "")
+
+    def stream(system, prompt, on_token, temperature=0.3, model_id=None):
+        on_token("Teil ")
+        on_token("zwei")
+        return "Teil zwei"
+
+    monkeypatch.setattr(wiki_engine.ollama_client, "generate_stream", stream)
+    pieces: list[str] = []
+    out = wiki_engine.query_with_sources("q", on_token=pieces.append)
+    assert pieces == ["Teil ", "zwei"]
+    assert out["answer"] == "Teil zwei"
+
+
 def test_query_abstains_below_threshold_and_skips_synthesis(wiki_dir, monkeypatch):
     """Stage E: when calibrate.assess is not confident, return an abstain result and
     never call the LLM synthesis (idea.md §3.5 — no answer from weak context)."""

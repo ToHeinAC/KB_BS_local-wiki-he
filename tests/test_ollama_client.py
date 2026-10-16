@@ -50,6 +50,22 @@ def test_generate_passes_correct_args(monkeypatch):
     )
 
 
+def test_generate_stream_hands_each_piece_on_and_returns_the_whole(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.generate.return_value = iter([{"response": "Hal"}, {"response": "lo"}])
+    pieces: list[str] = []
+    assert ollama_client.generate_stream("s", "p", pieces.append) == "Hallo"
+    assert pieces == ["Hal", "lo"]
+    assert mock.generate.call_args.kwargs["stream"] is True
+    assert mock.generate.call_args.kwargs["options"]["num_ctx"] == ollama_client.NUM_CTX
+
+
+def test_generate_stream_falls_back_to_a_plain_call_when_it_cannot_start(monkeypatch):
+    mock = _make_mock(monkeypatch)
+    mock.generate.side_effect = [RuntimeError("no stream"), {"response": "whole"}]
+    assert ollama_client.generate_stream("s", "p", lambda _: None) == "whole"
+
+
 def test_generate_uses_model_id_override(monkeypatch):
     mock = _make_mock(monkeypatch)
     mock.generate.return_value = {"response": "ok"}

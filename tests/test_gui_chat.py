@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -30,7 +31,7 @@ FAST = {"answer": ANSWER, "sources": ["p.md"], "raw_sources": ["ai.md"], "audit"
 def _pages(user: User, gui_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     gui_session._SESSIONS.clear()
     monkeypatch.setattr(lex_index, "index_health", lambda: {"raw": 3, "wiki": 2})
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: FAST)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: FAST)
     gui_app.register()
 
 
@@ -51,6 +52,26 @@ async def _ask(user: User, question: str) -> None:
 def _session() -> gui_session.Session:
     (session,) = gui_session._SESSIONS.values()
     return session
+
+
+async def test_a_fast_answer_appears_while_it_is_written(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    gate = threading.Event()
+
+    def query(q: str, on_token: Any = None) -> dict[str, Any]:
+        on_token("Erster Teil der Antwort")
+        gate.wait(5)
+        return FAST
+
+    monkeypatch.setattr(wiki_engine, "query_with_sources", query)
+    await _open(user)
+    await _ask(user, "Q")
+    try:
+        await user.should_see("Erster Teil der Antwort", retries=100)
+    finally:
+        gate.set()
+    await user.should_see("Fast answer", retries=100)
 
 
 # --- pure helpers ------------------------------------------------------------------------------
@@ -130,7 +151,7 @@ async def test_latex_in_an_answer_is_rendered_as_math(
     user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     answer = {**FAST, "answer": "Plan $\\to$ act [Source: ai.md §6.1]."}
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: answer)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: answer)
     await _open(user)
     await _ask(user, "Q")
     await user.should_see('<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline">')
@@ -177,7 +198,7 @@ async def test_a_backend_error_becomes_the_answer_without_actions(
     user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     err = {"answer": "Error: model gone", "sources": [], "raw_sources": [], "audit": None}
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: err)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: err)
     await _open(user)
     await _ask(user, "Q")
     await user.should_see("Error: model gone")
@@ -189,7 +210,7 @@ async def test_a_follow_up_is_condensed_against_the_previous_turn(
     user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     asked: list[str] = []
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: asked.append(q) or FAST)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: asked.append(q) or FAST)
     monkeypatch.setattr(wiki_engine, "condense_followup", lambda q, a, f: f"{q} / {f}")
     await _open(user)
     await _ask(user, "First?")
@@ -305,7 +326,7 @@ async def test_a_reader_cannot_open_a_higher_level_document_through_a_citation(
 ) -> None:
     _plant_strict_canary()
     answer = {"answer": f"Claim {citation}.", "sources": [], "raw_sources": [], "audit": None}
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: answer)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: answer)
     await _open(user, "reader", "pw")
     await _ask(user, "Q")
     await user.should_see("Claim")
@@ -321,7 +342,7 @@ async def test_a_cleared_user_can_open_the_same_document(
     auth.set_clearance("reader", DB, "strict", by="t")
     cite = f"[Source: {DB}@strict::secret.md]"
     answer = {"answer": f"Claim {cite}.", "sources": [], "raw_sources": [], "audit": None}
-    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q: answer)
+    monkeypatch.setattr(wiki_engine, "query_with_sources", lambda q, **_: answer)
     await _open(user, "reader", "pw")
     await _ask(user, "Q")
     await user.should_see("Claim")

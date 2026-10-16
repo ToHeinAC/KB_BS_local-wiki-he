@@ -59,7 +59,9 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
 - **Chat (`src/gui_chat.py`, `src/gui_cite.py`):** three columns (1/4, 1/2, 1/4, as on Research): a rail (Fast/Deep toggle, "Search in" checkboxes per
   reachable level, folded into one line such as "Deep · KI" once a question is asked; then a Deep answer's timeline
   "How the answer ran", live while it runs, so it sits at the top; the conversation's questions, New conversation), the reading column (question as headline, answer, actions, the follow-up banner, the input)
-  and a margin column of numbered source notes. The timeline is `src/gui_trace.py`, shared with Research: agent steps
+  and a margin column of numbered source notes. A Fast answer streams: the worker appends each piece to
+  `chat.live["partial"]` (`ollama_client.generate_stream` via `query_with_sources(on_token=…)`) and a timer in the
+  reading column shows the growing text until the finished, citation-numbered answer replaces it. The timeline is `src/gui_trace.py`, shared with Research: agent steps
   stamped with their arrival time become dated items that fold open to the detail. A tool call shows its arguments as
   `key: value` pairs in its title; a tool result's title carries a one-line summary (`gui_trace.summarize`: hits, the
   file read, no results, or the first line), folded open it lists each hit's file, and the complete, uncut tool output
