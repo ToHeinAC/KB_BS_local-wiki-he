@@ -55,6 +55,7 @@ MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
 CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "500"))
 CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "3"))
+CHAT_MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
 CONTENT_TRUNCATE = 2000
 RAW_READ_CAP = 16000  # chars per raw_read call (per file, per offset window)
 # After this many distinct byte-offset windows of one file have been read in a
@@ -571,6 +572,33 @@ def _superseded_nudge(cited: set[str]) -> str | None:
     )
 
 
+def _read_bases(mem: run_memory.RunMemory) -> set[str]:
+    """The (qualified) originals this run opened with raw_read, by any section or window."""
+    keys = (k[len("raw:") :] for k in mem.reads if k.startswith("raw:"))
+    return {k.split("|sec=", 1)[0] if "|sec=" in k else k.rsplit(":", 1)[0] for k in keys}
+
+
+def _research_gap(raw_cited: set[str]) -> str | None:
+    """A rejection when the run searched too little or opened none of the originals it
+    cites: a deep answer rests on read text, not on search excerpts. None outside a run."""
+    mem = run_memory.current()
+    if mem is None:
+        return None
+    if len(mem.searches) < CHAT_MIN_SEARCHES:
+        return (
+            f"REJECTED: {len(mem.searches)} distinct searches so far, minimum is "
+            f"{CHAT_MIN_SEARCHES}. raw_search the open sub-questions with other stems first."
+        )
+    read = _read_bases(mem)
+    cited = {db_context.qualify(base, db) for db, base, _ in map(_split_ref, raw_cited)}
+    if not cited & read:
+        return (
+            "REJECTED: none of the cited originals was opened with raw_read. raw_read the "
+            "section that holds the answer, check the figures, then submit again."
+        )
+    return None
+
+
 def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     words = len(re.findall(r"\w+", answer or ""))
     cited = set(_RAW_CITE_RE.findall(answer or ""))
@@ -591,7 +619,7 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
             f"data/raw/), minimum is {CHAT_MIN_SOURCES} including at least one "
             "[Source: ...] document. Run more raw_search/raw_read and cite additional files."
         )
-    nudge = _low_confidence_nudge() or _superseded_nudge(raw_unique)
+    nudge = _research_gap(raw_unique) or _low_confidence_nudge() or _superseded_nudge(raw_unique)
     if nudge:
         return nudge
     return f"ACCEPTED: {words} words, {len(unique)} sources cited."

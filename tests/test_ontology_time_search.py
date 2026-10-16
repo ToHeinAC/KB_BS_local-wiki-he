@@ -97,7 +97,10 @@ def test_lookup_takes_a_point_in_time(versions: Path) -> None:
 def gate(versions: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 1)
-    run_memory.begin_run()
+    monkeypatch.setattr(tools, "CHAT_MIN_SEARCHES", 0)
+    mem = run_memory.begin_run()
+    for name in ("StrlSchV_A.md", "StrlSchV_B.md"):
+        mem.mark_read(f"raw:{name}:0")
 
 
 OLD_ANSWER = "Der Grenzwert beträgt 20 Millisievert [Source: StrlSchV_A.md §55]."

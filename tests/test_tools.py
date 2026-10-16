@@ -393,6 +393,33 @@ def test_a_deep_chat_answer_needs_500_words_and_3_sources() -> None:
     )
 
 
+def _gate_ready(monkeypatch) -> run_memory.RunMemory:
+    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
+    monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
+    return run_memory.begin_run()
+
+
+def test_a_deep_chat_answer_needs_the_minimum_number_of_searches(monkeypatch):
+    mem = _gate_ready(monkeypatch)
+    mem.mark_search("rsearch:grenzwert")
+    mem.mark_read("raw:a.md:0")
+    out = tools._submit_chat_impl("one two three four five six [Source: a.md] [Source: b.md]")
+    assert out.startswith("REJECTED")
+    assert "search" in out
+
+
+def test_a_deep_chat_answer_must_have_read_an_original_it_cites(monkeypatch):
+    mem = _gate_ready(monkeypatch)
+    for q in ("a", "b", "c"):
+        mem.mark_search(f"rsearch:{q}")
+    answer = "one two three four five six [Source: a.md §2] [Source: b.md]"
+    out = tools._submit_chat_impl(answer)
+    assert out.startswith("REJECTED")
+    assert "raw_read" in out
+    mem.mark_read("raw:a.md|sec=§ 2:0")
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
+
+
 def test_submit_chat_counts_wiki_citations(monkeypatch):
     monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
@@ -423,9 +450,11 @@ def test_submit_chat_low_confidence_nudges_once(monkeypatch, tmp_path):
     (idx / "calibration.json").write_text(json.dumps({"tau": -4.14}))
     monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
+    monkeypatch.setattr(tools, "CHAT_MIN_SEARCHES", 0)
     answer = "one two three four five [Source: raw.md] and [Wiki: page.md]"
     try:
         mem = run_memory.begin_run()
+        mem.mark_read("raw:raw.md:0")
         mem.note_relevance(-6.0)  # best passage below τ
         assert tools._submit_chat_impl(answer).startswith("LOW CONFIDENCE")
         assert tools._submit_chat_impl(answer).startswith("ACCEPTED")  # bounded to one fire

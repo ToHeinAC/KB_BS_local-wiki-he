@@ -429,7 +429,7 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions from the
 - wiki_read(filenames): read a full wiki page. Its `[Wiki linked N]` cross-references point to connected pages — follow them when the question spans more than one topic.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
-- submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words, or fewer than {min_sources} unique sources, or if no [Source: ...] document is cited.
+- submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words, or fewer than {min_sources} unique sources, or if no [Source: ...] document is cited, or after fewer than {min_searches} distinct searches, or if none of the cited originals was opened with raw_read.
 
 Wiki vs raw (critical):
 - The wiki is a MAP, the originals are the TERRITORY. Use the wiki to orient and to discover connections; take every fact, number, and exact wording from data/raw/.
@@ -492,7 +492,7 @@ RAW_READ_DESCRIPTION = (
 
 SUBMIT_CHAT_DESCRIPTION = (
     "Submit the final chat answer. Validates >= min_words and >= min_sources unique [Source: filename] "
-    "citations. On accept, returns the answer to the UI (no file is written; the user saves manually)."
+    "citations, >= min_searches distinct searches, and that a cited original was raw_read. On accept, returns the answer to the UI (no file is written; the user saves manually)."
 )
 
 EVALUATE_CONDITION_DESCRIPTION = (
