@@ -88,7 +88,15 @@ classes:
 relations:
   based_on: {domain: legal-instrument, range: legal-instrument, inverse: basis_for,
              target: work, eli: based_on}
+terms:                                 # optional: the user's words -> the sources' words
+  rueckstaende:
+    pref: Rückstände                   # the sources' word (required)
+    alt: [NORM, natürliche Radioaktivität]   # labels a question may use instead
+    expand: [Rückstand, Überwachungsgrenze, Entlassung]  # extra words to search
 ```
+
+Terms (SKOS `prefLabel`/`altLabel`) are used by search only, never by facts: see
+[retrieval.md](retrieval.md) §Query vocabulary. A local extension may define them too.
 
 Optional keys: classes `applies_to` (`source`|`page`), relations `transitive`,
 `attributes` (name → allowed values), `labels`, `definition`, `dct`, `lint`; both
@@ -107,6 +115,7 @@ schema is `None`:
   a relation's `inverse` is itself a relation, that one's `inverse` points back.
 - Classes have `labels` in `de` and `en` and a one-line `definition` (≤ 200 chars).
 - Cues compile, are ≤ 200 chars and do not match the empty string.
+- A term has a `pref`; `alt` and `expand` are lists of words or phrases.
 - A deprecated id has a `replaced_by` that exists.
 
 ## Binding (`data/<DB>/ontology.yaml`)
@@ -284,6 +293,9 @@ today's results (tested byte-for-byte).
   `lex_index.query(question, sources=<the classes' sources>)`. Wiki scope maps sources to
   the pages that cite them. Only lexical hits, so the lexical arm stays the citation
   truth; RRF bounds the arm's influence. Reranking (Deep paths) runs after fusion.
+- **Terms** (`match_terms`, `term_query`, `term_briefing`): a question using a term label adds
+  a lexical list for the sources' words and a briefing line; see
+  [retrieval.md](retrieval.md) §Query vocabulary.
 - **S2, briefing** (`retrieval.ontology_briefing`): before the first LLM call, Deep chat
   and Quick research append it to the system prompt (and yield an `ontology` step);
   Quick chat appends it to the synthesis system prompt. It holds only ids, source file

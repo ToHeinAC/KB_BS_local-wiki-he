@@ -40,7 +40,7 @@ One row per PRD milestone. Status: `planned`, `in progress`, `done`.
 | 6 | M6: Ontology ([plan](docs/_plan-ontology.md) phases 1–8) | done (plan phases 1–8; §-level validity not built) | `test_ontology`, `test_ontology_store`, `test_ontology_bundle`, `test_ontology_detect`, `test_ontology_ingest`, `test_ontology_query`, `test_ontology_search`, `test_ontology_time`, `test_ontology_time_search`, `test_ontology_merge`, `test_ontology_outdated`, `test_ontology_relations`, `test_ontology_relations_flow`, `test_ontology_evolution`, `test_ontology_evolution_flow`, `test_ontology_export`, `test_ontology_pages`, `test_delete_source`, `test_app`; `scripts/bench_ontology_detect.py`, `scripts/eval_ontology_search.py` |
 | 7 | M7: Classification ([design](docs/security.md)) | done | `test_confine`, `test_classification`, `test_classification_gate`, `test_classification_shards`, `test_classification_leaks`, `test_classification_writes`, `test_classification_move`, `test_security_rules`, `test_audit`, `test_auth`, `test_app` |
 | 8 | M8: Broadsheet GUI ([plan](docs/_plan-gui-broadsheet.md)) | done (default frontend; browser walk-through pending) | `test_gui_app`, `test_gui_session`, `test_gui_chrome`, `test_gui_chat`, `test_gui_cite`, `test_gui_trace`, `test_gui_classes`, `test_gui_explorer`, `test_gui_graph`, `test_gui_research`, `test_gui_upload`, `test_gui_maint`, `test_gui_admin`, `test_gui_ontology`, `test_gui_front`, `test_run_app`, `test_ui_logic`, `test_security_rules` |
-| – | Extensions beyond the original spec (no PRD milestone): hybrid retrieval stages A–F, multi-DB + auth, OKF bundle, language pinning, GPU pinning | done | `test_lex_index`, `test_embed_index`, `test_rerank`, `test_calibrate`, `test_multi_db`, `test_auth`, `test_lang`, `test_page_language`, `test_gpu_placement` |
+| – | Extensions beyond the original spec (no PRD milestone): hybrid retrieval stages A–F, multi-DB + auth, OKF bundle, language pinning, GPU pinning | done | `test_lex_index`, `test_query_vocabulary`, `test_embed_index`, `test_rerank`, `test_calibrate`, `test_multi_db`, `test_auth`, `test_lang`, `test_page_language`, `test_gpu_placement` |
 
 ## 3. Module map
 
@@ -52,7 +52,7 @@ Full responsibilities per module: [docs/architecture.md](docs/architecture.md) �
 | `app.py`, `theme.py`, `gpu_widget.py`, `graph_widget.py` | Streamlit UI shell, skins, GPU monitor, graph component ([docs/ui.md](docs/ui.md)) |
 | `wiki_engine.py` | The only wiki writer: three-stage ingest, merge, query, lint, delete, link graph |
 | `dedup.py`, `file_processor.py`, `md_convert.py`, `metadata_extract.py`, `template_loader.py` | Upload path: hash dedup, text extraction, PDF/DOCX/image → Markdown, effective date |
-| `chunker.py`, `lex_index.py`, `embed_index.py`, `retrieval.py`, `rerank.py`, `calibrate.py`, `qa_gen.py` | Retrieval layer ([docs/retrieval.md](docs/retrieval.md)) |
+| `chunker.py`, `lex_index.py`, `gloss.py`, `embed_index.py`, `retrieval.py`, `rerank.py`, `calibrate.py`, `qa_gen.py` | Retrieval layer ([docs/retrieval.md](docs/retrieval.md)) |
 | `ollama_client.py`, `ollama_server.py`, `gpu_placement.py` | Model access and single-GPU pinning ([docs/gpu.md](docs/gpu.md)) |
 | `agent.py`, `chat_agent.py`, `tools.py`, `run_memory.py`, `refs.py` | LangGraph agents (Quick research, Deep chat), their tools, loop guard and the reference resolver of `raw_read` footers |
 | `deep_research_agent.py`, `vendor/` | Web-only Deep research over vendored `open_deep_research` ([docs/deep_research.md](docs/deep_research.md)) |
