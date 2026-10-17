@@ -545,6 +545,7 @@ class OntologyView:
             for r in rows:
                 self._fact_proposal(r)
         self._page_classes()
+        self._relations()
         self._suggestions()
 
     def _fact_proposal(self, r: dict[str, Any]) -> None:
@@ -582,6 +583,28 @@ class OntologyView:
             "Asks the model for a class for up to 10 unclassified concept/entity pages."
         ).classes("hint")
         self._button("Classify concept pages", "onto-classify-pages", self._classify_pages)
+
+    def _relations(self) -> None:
+        if not self.session.can_maintain:
+            return
+        ui.label("Relations").classes("section-label q-mt-md")
+        ui.label(
+            "Re-reads every original for the relations it states (§ citations of known works, "
+            "standards, repeals). New ones are added here for review; decided ones are never "
+            "proposed again."
+        ).classes("hint")
+        self._button("Re-detect relations", "onto-redetect", self._redetect)
+
+    async def _redetect(self) -> None:
+        try:
+            found, _ = await gui_session.in_worker(
+                wiki_engine.redetect_relations, self.session.user, apply=True
+            )
+        except _WRITE_ERRORS as exc:
+            ui.notify(str(exc), type="negative")
+            return
+        self._done(f"{len(found)} new relation(s) proposed for review." if found else
+                   "No new relations found.")  # fmt: skip
 
     async def _classify_pages(self) -> None:
         made = await gui_session.in_worker(

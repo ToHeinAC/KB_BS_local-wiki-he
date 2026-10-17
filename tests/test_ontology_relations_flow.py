@@ -142,3 +142,33 @@ def test_lint_includes_the_ontology_findings(legal: Path) -> None:
     report = wiki_engine.lint()
     assert "Ontology consistency" in report
     assert "cycle in based_on" in report
+
+
+def test_re_detecting_relations_proposes_new_citations_once(legal: Path) -> None:
+    """Sources uploaded before `cites` was detected gain the edge on re-detection; a
+    proposal the maintainer rejected is never proposed again."""
+    laws = {
+        "strlschv.md": ("de-strlschv-2018", "ordinance", "Die Pflichten nach § 12 des StrlSchG."),
+        "strlschg.md": ("de-strlschg-2017", "federal-act", "Gesetz ohne Verweise."),
+    }
+    for name, (work, cls, text) in laws.items():
+        dedup.register_file(text.encode(), name)
+        ontology_store.append_rows(
+            [
+                ontology.assertion(f"src:{name}", "class", cls, by="rule"),
+                ontology.assertion(f"src:{name}", "work", work, by="rule"),
+            ]
+        )
+    ontology_store.append_rows(
+        [ontology.assertion("work:de-strlschg-2017", "aliases", "StrlSchG", by="rule")]
+    )
+    found, row = wiki_engine.redetect_relations("maint")  # dry run
+    assert [(r["subject"], r["predicate"], r["object"]) for r in found] == [
+        ("work:de-strlschv-2018", "cites", "de-strlschg-2017")
+    ]
+    assert row is None
+    assert not ontology_store.proposals()
+    wiki_engine.redetect_relations("maint", apply=True)
+    [proposal] = ontology_store.proposals()
+    wiki_engine.decide_proposal(proposal["id"], accept=False, user="maint")
+    assert wiki_engine.redetect_relations("maint") == ([], None)

@@ -370,6 +370,7 @@ target, only for classes in the relation's domain):
 | `transposes` | "… der Umsetzung der Richtlinie 2013/59/Euratom …" (first 20,000 chars) | fact (`rule`) |
 | `based_on` | Eingangsformel "Auf Grund des … des Bundes-Immissionsschutzgesetzes … verordnet" naming a known work (genitive handled) | fact (`rule`) |
 | `repeals` | "… außer Kraft" / "… wird aufgehoben" in a sentence naming a known work | proposal |
+| `cites` | a § reference followed by a known work ("nach § 12 der StrlSchV"), one per target, ≤ 25 per document, not for a target that already has another relation; at most 500 § mentions scanned | proposal |
 | `incorporates` | "DIN [EN] [ISO] n[-part]" / "KTA n", edition from ":2013-06" or "(Ausgabe März 2017)" → `static`, "in der jeweils geltenden Fassung" → `dynamic`; "gilt als erfüllt" → `presumption`, "einzuhalten/muss/…" → `mandatory`; ≤ 25 per document | proposal |
 
 Evidence is the sentence or clause, verbatim (a period after a number or an abbreviation
@@ -378,6 +379,12 @@ clause; 19 static DIN references in TA Luft; one mandatory DIN EN 15376 referenc
 BImSchG. Limits: consolidated texts from gesetze-im-internet.de carry no Eingangsformel
 (it is in the Federal Law Gazette version), and footnote notes such as "Umsetzung der
 EARL 59/2013" are not recognised.
+
+**Re-detect relations** (Ontology → *Proposals*, maintainers): `wiki_engine.redetect_relations`
+re-runs `detect_relations` over every original with ontology facts and appends only the rows
+the ledger has never held (a decided or rejected proposal is never proposed again; nothing is
+retracted), as a `redetect` revision. This is how sources uploaded before `cites` was detected
+gain the edges; `ontology_lookup` then lists them as `cites →` / `cites ←`.
 
 **Binding** (`binding_of(view, work, as_of)`, report §9): a standard is binding only
 through an `incorporates` edge from a document that is itself binding — class `norm`

@@ -126,6 +126,28 @@ def test_the_eingangsformel_yields_based_on_to_a_known_work(schema: ontology.Sch
     ]
 
 
+def test_a_section_reference_to_a_known_work_is_a_proposed_citation(
+    schema: ontology.Schema,
+) -> None:
+    text = (
+        "Die Pflichten nach § 12 Absatz 2 der StrlSchV gelten entsprechend. "
+        "Die StrlSchV ist zu beachten. § 3 des StrlSchG bleibt unberührt."
+    )
+    found = od.detect_relations(
+        text, _view(schema), self_work="de-strlschg-2017", cls="federal-act"
+    )
+    assert [(f.rel, f.target, f.status) for f in found] == [
+        ("cites", "de-strlschv-2018", "proposed")
+    ]  # once per target, never the document itself
+    assert found[0].evidence.startswith("Die Pflichten nach § 12 Absatz 2 der StrlSchV")
+
+
+def test_a_work_with_a_stronger_relation_is_not_also_cited(schema: ontology.Schema) -> None:
+    text = "Verordnung über Anlagen (Anlagenverordnung - AnlV)\n\n" + EINGANG
+    found = od.detect_relations(text, _view(schema), self_work="de-anlv-2013", cls="ordinance")
+    assert [f.rel for f in found] == ["based_on"]
+
+
 def test_repeal_needs_a_named_known_work_and_is_only_proposed(schema: ontology.Schema) -> None:
     text = (
         "Artikel 3\nDie StrlSchV tritt am Tag nach der Verkündung außer Kraft.\n"

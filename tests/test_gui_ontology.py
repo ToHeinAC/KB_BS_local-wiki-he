@@ -355,3 +355,26 @@ async def test_concept_pages_can_be_sent_for_classification(
     (await _find(user, "onto-classify-pages")).click()
     await _see(user, "2 page class proposal(s)")
     assert {r["subject"] for r in ontology_store.proposals()} == {"page:alpha.md", "page:beta.md"}
+
+
+async def test_relations_can_be_re_detected_into_proposals(user: User) -> None:
+    _create(["core", "legal-de"])
+    for name, work, cls, text in (
+        ("strlschv.md", "de-strlschv-2018", "ordinance", "Pflichten nach § 12 des StrlSchG."),
+        ("strlschg.md", "de-strlschg-2017", "federal-act", "Gesetz."),
+    ):
+        dedup.register_file(text.encode(), name)
+        ontology_store.append_rows(
+            [
+                ontology.assertion(f"src:{name}", "class", cls, by="rule"),
+                ontology.assertion(f"src:{name}", "work", work, by="rule"),
+            ]
+        )
+    ontology_store.append_rows(
+        [ontology.assertion("work:de-strlschg-2017", "aliases", "StrlSchG", by="rule")]
+    )
+    await _open(user)
+    await _view(user, "Proposals")
+    (await _find(user, "onto-redetect")).click()
+    await _see(user, "1 new relation(s) proposed for review.")
+    assert [r["predicate"] for r in ontology_store.proposals()] == ["cites"]

@@ -1681,6 +1681,39 @@ def _relation_rows(text: str, source: str, values: dict[str, str]) -> list[dict[
     return ontology_detect.relation_rows(subject, findings)
 
 
+def _triple(row: dict[str, Any]) -> tuple[str, str, str]:
+    return str(row.get("subject")), str(row.get("predicate")), repr(row.get("object"))
+
+
+def redetect_relations(
+    user: str, apply: bool = False
+) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    """Re-run relation detection over every original with ontology facts (dry run unless
+    ``apply``): the rows the ledger has never held, e.g. `cites` for sources uploaded before
+    it was detected. A decided or rejected proposal is never proposed again; nothing is
+    retracted. Applying records a `redetect` revision."""
+    if ontology_store.view() is None:
+        return [], None
+    known = {_triple(r) for r in ontology_store.read_rows() if not r.get("retracts")}
+    new: list[dict[str, Any]] = []
+    for source in sorted(dedup.list_sources()):
+        data = read_raw_source(source)
+        facts = ontology_store.source_facts(source)
+        if data is None or not facts:
+            continue
+        values = {k: str(facts.get(k) or "") for k in ("work", "class")}
+        text = data.decode("utf-8", errors="replace")
+        new += [r for r in _relation_rows(text, source, values) if _triple(r) not in known]
+    if not apply or not new:
+        return new, None
+    if not auth.is_maintainer(user, db_context.base_db()):
+        raise PermissionError(f"{user!r} does not maintain this database")
+    ontology_store.append_rows(new)
+    row = ontology_store.record_change("redetect", user)
+    _log_ontology_change(row)
+    return new, row
+
+
 def reclassify(
     user: str, apply: bool = False
 ) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:

@@ -357,6 +357,27 @@ def _repeals(text: str, view: ontology_query.View, self_work: str | None) -> lis
     return out
 
 
+_SECTION_REF_RE = re.compile(r"§§?\s*\d+")
+MAX_CITE_SCAN = 500  # § mentions examined per document (a statute has thousands)
+
+
+def _cites(text: str, view: ontology_query.View, self_work: str | None) -> list[RelationFinding]:
+    """A § reference followed by a known work ("nach § 12 der StrlSchV") → a proposed
+    `cites`, one per target, evidence the sentence."""
+    found: dict[str, RelationFinding] = {}
+    seen: set[str] = set()
+    for i, m in enumerate(_SECTION_REF_RE.finditer(text)):
+        if i >= MAX_CITE_SCAN or len(found) >= MAX_REFERENCES:
+            break
+        sentence = _sentence(text, *m.span())
+        if sentence in seen:
+            continue
+        seen.add(sentence)
+        for w in _named_works(sentence, view, self_work):
+            found.setdefault(w, RelationFinding("cites", w, sentence, "proposed"))
+    return list(found.values())
+
+
 def _standard(m: re.Match[str], text: str) -> RelationFinding:
     org, en, iso, number, part, edition = m.groups()
     target = "-".join(p for p in (org.lower(), en and "en", iso and "iso", number, part) if p)
@@ -390,14 +411,17 @@ def detect_relations(
     text: str, view: ontology_query.View, *, self_work: str | None, cls: str | None
 ) -> list[RelationFinding]:
     """Relations a document states in its own words (report §7.2): transposition clause and
-    Eingangsformel → confirmed; repeals (a named known work) and references to standards →
-    proposed. Only relations whose domain covers the document's class, one per target."""
+    Eingangsformel → confirmed; repeals (a named known work), references to standards and
+    § citations of known works → proposed. Only relations whose domain covers the document's
+    class, one per target; a target with a stronger relation is not also cited."""
     found = [
         *_transposes(text),
         *_based_on(text, view, self_work),
         *_repeals(text, view, self_work),
         *_incorporates(text),
     ]
+    stronger = {f.target for f in found}
+    found += [f for f in _cites(text, view, self_work) if f.target not in stronger]
     unique: dict[tuple[str, str], RelationFinding] = {}
     for f in found:
         if _allowed(view, f.rel, cls):
