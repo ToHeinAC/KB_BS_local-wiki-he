@@ -262,9 +262,11 @@ class ResearchView:
     def _render_bar(self) -> None:
         with ui.column().classes("grow gap-0"):
             ui.label("Question").classes("label")
-            self.question = ui.input(placeholder="e.g. What are the latest advances in RAG?")
-            self.question.props("borderless").classes("field w-full").mark("research-question")
-            self.question.on("keydown.enter", self._guard(self._start))
+            # Grows and wraps like the chat field; Enter starts, Shift+Enter adds a line break.
+            self.question = ui.textarea(placeholder="e.g. What are the latest advances in RAG?")
+            self.question.props("borderless autogrow rows=1").classes("field w-full")
+            self.question.mark("research-question")
+            self.question.on("keydown.enter.exact.prevent", self._guard(self._start))
         with ui.column().classes("gap-0"):
             ui.label("Method").classes("label")
             self.method = ui.toggle(
@@ -445,7 +447,8 @@ class ResearchView:
 
     def _render_follow_up(self) -> None:
         with ui.expansion("Ask a follow-up").classes("fold w-full"):
-            field_ = ui.input(placeholder="A follow-up about this research").classes("w-full")
+            field_ = ui.textarea(placeholder="A follow-up about this research")
+            field_.props("autogrow rows=1").classes("w-full")
             field_.mark("followup")
             ui.button("Ask follow-up", on_click=self._guard(lambda: self._follow_up(field_))).props(
                 "flat"

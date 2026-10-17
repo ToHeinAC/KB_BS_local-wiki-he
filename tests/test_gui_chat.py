@@ -362,3 +362,18 @@ async def test_each_answer_and_its_export_are_logged_without_the_question(user: 
     assert chat["duration_s"] >= 0
     assert [e["kind"] for e in events if e["event"] == "download"] == ["chat"]
     assert "cooling" not in json.dumps(events)
+
+
+def assert_wrapping_query_field(element: Any) -> None:
+    """A query field shows a long question in full: it wraps and grows, and Enter submits
+    instead of adding a line break (Shift+Enter still adds one)."""
+    assert isinstance(element, ui.textarea)
+    assert "autogrow" in element.props
+    types = {listener.type for listener in element._event_listeners.values()}
+    assert "keydown.enter.exact.prevent" in types
+
+
+async def test_a_long_question_wraps_in_the_chat_field(user: User) -> None:
+    await _open(user)
+    (field,) = user.find("chat-input").elements
+    assert_wrapping_query_field(field)

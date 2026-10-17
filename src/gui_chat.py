@@ -467,9 +467,11 @@ class ChatView:
     def _ask_row(self) -> None:
         self.follow_box = ui.row().classes("items-center w-full")
         with ui.row().classes("ask items-end no-wrap w-full"):
-            self.field = ui.input(placeholder="Ask something…").props("borderless").classes("field")
-            self.field.mark("chat-input")
-            self.field.on("keydown.enter", self._guard(self._ask))
+            # A textarea that grows, so a long question wraps instead of scrolling out of
+            # view; Enter asks, Shift+Enter adds a line break.
+            self.field = ui.textarea(placeholder="Ask something…")
+            self.field.props("borderless autogrow rows=1").classes("field").mark("chat-input")
+            self.field.on("keydown.enter.exact.prevent", self._guard(self._ask))
             ui.button("Ask", on_click=self._guard(self._ask)).props("flat").classes(
                 "btn primary"
             ).mark("ask")

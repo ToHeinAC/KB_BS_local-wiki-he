@@ -416,3 +416,23 @@ async def test_a_research_run_is_logged_with_mode_status_and_duration(user: User
     )
     assert run["duration_s"] >= 0
     assert "Who pays" not in str(usage.read_events())
+
+
+async def test_long_questions_wrap_in_the_research_fields(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from test_gui_chat import assert_wrapping_query_field
+
+    monkeypatch.setattr(
+        agent,
+        "run_research_agent",
+        lambda q, ctx: iter([{"type": "final_answer", "content": ANSWER}]),
+    )
+    await _open(user)
+    (question,) = user.find("research-question").elements
+    assert_wrapping_query_field(question)
+    await _start(user, "First?")
+    await _see(user, "Research report")
+    (follow_up,) = user.find("followup").elements
+    assert isinstance(follow_up, ui.textarea)
+    assert "autogrow" in follow_up.props
