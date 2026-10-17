@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, cast
 
+import gloss
 import ontology
 import ontology_detect
 import ontology_time
@@ -27,6 +28,8 @@ from prompts import (
     ONTOLOGY_BRIEFING_HEADER,
     ONTOLOGY_BRIEFING_RELATIONS,
     ONTOLOGY_BRIEFING_RULE,
+    ONTOLOGY_BRIEFING_TERM,
+    ONTOLOGY_BRIEFING_TERMS_HEADER,
     ONTOLOGY_BRIEFING_TIME,
     ONTOLOGY_BRIEFING_VERSIONS,
     ONTOLOGY_BRIEFING_WORK,
@@ -62,6 +65,9 @@ class View:
     domains: dict[str, tuple[str, ...]] | None = None  # relation -> domain classes
     broader: dict[str, str | None] | None = None  # class -> broader class
     class_pages: dict[str, tuple[str, ...]] | None = None  # class -> pages of it (Phase 8)
+    # Terms: label tokens -> (term id, label as written); the term definitions by id.
+    term_labels: dict[Key, tuple[str, str]] | None = None
+    terms: dict[str, ontology.TermDef] | None = None
 
 
 @dataclass(frozen=True)
@@ -209,6 +215,16 @@ def _page_map(pages: dict[str, list[str]]) -> dict[str, tuple[str, ...]]:
     return {s: tuple(sorted(p)) for s, p in by_source.items()}
 
 
+def _term_labels(schema: ontology.Schema) -> dict[Key, tuple[str, str]]:
+    """Label tokens of every term's `pref` and `alt` labels; the first term wins a label."""
+    labels: dict[Key, tuple[str, str]] = {}
+    for t in sorted(schema.terms.values(), key=lambda t: t.id):
+        for label in (t.pref, *t.alt):
+            if tokens(label):
+                labels.setdefault(tokens(label), (t.id, label))
+    return labels
+
+
 def build_view(schema: ontology.Schema, facts: dict[str, Any], pages: dict[str, list[str]]) -> View:
     """Everything search needs from one DB's ontology (a derived cache: rebuildable)."""
     sources = {s: _as_map(f) for s, f in _as_map(facts.get("sources")).items()}
@@ -234,6 +250,8 @@ def build_view(schema: ontology.Schema, facts: dict[str, Any], pages: dict[str, 
         domains={r.id: r.domain for r in schema.relations.values()},
         broader={c.id: c.broader for c in schema.classes.values()},
         class_pages=class_pages,
+        term_labels=_term_labels(schema),
+        terms=dict(schema.terms),
     )
 
 
@@ -322,6 +340,63 @@ def resolve(q: str, view: View, today: date | None = None) -> QueryFrame | None:
         past=intent.past,
         class_pages=_unique([p for c in classes for p in (view.class_pages or {}).get(c, ())]),
     )
+
+
+# --- terms ---------------------------------------------------------------------------
+
+
+def _term_at(
+    q: str, spans: list[re.Match[str]], i: int, labels: dict[Key, tuple[str, str]]
+) -> tuple[int, str] | None:
+    """(length, term id) of the longest term label at word ``i``; an acronym label
+    ("NORM") matches only as written, so the word "Norm" does not."""
+    toks = tuple(m.group(0).casefold() for m in spans)
+    for n in range(min(max(map(len, labels)), len(toks) - i), 0, -1):
+        entry = labels.get(toks[i : i + n])
+        surface = q[spans[i].start() : spans[i + n - 1].end()]
+        if entry and (not gloss.is_acronym(entry[1]) or surface == entry[1]):
+            return n, entry[0]
+    return None
+
+
+def match_terms(q: str, view: View) -> list[tuple[str, str]]:
+    """(words as typed, term id) for every term label ``q`` contains, longest first."""
+    labels = view.term_labels or {}
+    spans = list(_WORD_RE.finditer(q)) if labels else []
+    found: list[tuple[str, str]] = []
+    i = 0
+    while i < len(spans):
+        match = _term_at(q, spans, i, labels)
+        if match is None:
+            i += 1
+            continue
+        n, tid = match
+        found.append((q[spans[i].start() : spans[i + n - 1].end()], tid))
+        i += n
+    return list(dict.fromkeys(found))
+
+
+def _term_words(term: ontology.TermDef) -> list[str]:
+    return list(dict.fromkeys([term.pref, *term.expand]))
+
+
+def term_query(view: View, matches: list[tuple[str, str]]) -> str:
+    """The sources' words for the matched terms, as one lexical query ("" for none)."""
+    terms = view.terms or {}
+    ids = dict.fromkeys(tid for _, tid in matches)
+    return " ".join(w for tid in ids for w in _term_words(terms[tid]))
+
+
+def term_briefing(q: str, view: View) -> str:
+    """System-prompt lines naming the sources' word for each term ``q`` uses ("" for none)."""
+    terms = view.terms or {}
+    lines = [
+        ONTOLOGY_BRIEFING_TERM.format(
+            matched=surface, pref=terms[tid].pref, words=", ".join(_term_words(terms[tid]))
+        )
+        for surface, tid in match_terms(q, view)
+    ]
+    return "\n".join([ONTOLOGY_BRIEFING_TERMS_HEADER, *lines]) if lines else ""
 
 
 def audit(frame: QueryFrame | None) -> dict[str, Any]:

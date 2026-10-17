@@ -32,7 +32,16 @@ LOCAL_ID = "local"
 _ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,63}$")
 _SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 _REQUIRES_RE = re.compile(r"^([a-z][a-z0-9_-]*)@\^(\d+)(?:\.(\d+))?(?:\.(\d+))?$")
-_MODULE_KEYS = {"id", "version", "requires", "description", "change_note", "classes", "relations"}
+_MODULE_KEYS = {
+    "id",
+    "version",
+    "requires",
+    "description",
+    "change_note",
+    "classes",
+    "relations",
+    "terms",
+}
 _COMMON_KEYS = {"labels", "definition", "deprecated", "replaced_by", "note", "change_note"}
 _CLASS_KEYS = _COMMON_KEYS | {"broader", "rank", "norm", "cues", "applies_to"}
 _RELATION_KEYS = _COMMON_KEYS | {
@@ -47,7 +56,8 @@ _RELATION_KEYS = _COMMON_KEYS | {
     "lint",
 }
 _BINDING_KEYS = {"modules", "local"}
-_LOCAL_KEYS = {"version", "classes", "relations", "change_note"}
+_LOCAL_KEYS = {"version", "classes", "relations", "terms", "change_note"}
+_TERM_KEYS = {"pref", "alt", "expand", "note", "change_note"}
 _BINDING = "ontology.yaml"
 
 
@@ -88,10 +98,24 @@ class RelationDef:
 
 
 @dataclass(frozen=True)
+class TermDef:
+    """A concept the user may call differently than the sources (SKOS pref/altLabel):
+    `alt` labels in a question stand for `pref`; `expand` are extra words to search."""
+
+    id: str
+    module: str
+    pref: str
+    alt: tuple[str, ...] = ()
+    expand: tuple[str, ...] = ()
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class Schema:
     modules: dict[str, str]  # module id -> version
     classes: dict[str, ClassDef]
     relations: dict[str, RelationDef]
+    terms: dict[str, TermDef] = field(default_factory=lambda: {})
 
     def multi_valued(self) -> set[str]:
         """Predicates that hold a set of objects (relations, aliases), not one value."""
@@ -266,7 +290,25 @@ def _relation_errors(label: str, spec: dict[str, Any]) -> list[str]:
     return errors + _attribute_errors(label, spec.get("attributes", {}))
 
 
-_KINDS = {"classes": "class", "relations": "relation"}
+def _text_list_errors(label: str, key: str, value: object) -> list[str]:
+    items = _as_list(value)
+    if items is None or not all(isinstance(v, str) and v.strip() for v in items):
+        return [f"{label}: `{key}` must be a list of words or phrases"]
+    return []
+
+
+def _term_errors(label: str, spec: dict[str, Any]) -> list[str]:
+    errors = _unknown_keys(label, spec, _TERM_KEYS)
+    pref = spec.get("pref")
+    if not (isinstance(pref, str) and pref.strip()):
+        errors.append(f"{label}: `pref` (the sources' word) is required")
+    errors += [e for k in ("alt", "expand") for e in _text_list_errors(label, k, spec.get(k, []))]
+    if not _opt_str(spec.get("note")):
+        errors.append(f"{label}: `note` must be text")
+    return errors
+
+
+_KINDS = {"classes": "class", "relations": "relation", "terms": "term"}
 
 
 def _section_errors(
@@ -309,6 +351,7 @@ def validate_module(data: object) -> list[str]:
         errors.append(f"{where}: `version` must be MAJOR.MINOR.PATCH")
     errors += _requires_errors(where, module.get("requires", []))
     errors += _section_errors(where, module, "classes", _class_errors)
+    errors += _section_errors(where, module, "terms", _term_errors)
     return errors + _section_errors(where, module, "relations", _relation_errors)
 
 
@@ -323,7 +366,7 @@ def _duplicate_errors(modules: list[dict[str, Any]]) -> list[str]:
         if m["id"] in seen_modules:
             errors.append(f"module {m['id']!r} is bound twice")
         seen_modules.add(m["id"])
-        for kind in ("classes", "relations"):
+        for kind in ("classes", "relations", "terms"):
             for item_id in m.get(kind, {}):
                 first = owner.setdefault((kind, item_id), m["id"])
                 if first != m["id"]:
@@ -393,16 +436,32 @@ def _relation_def(rid: str, module: str, s: dict[str, Any]) -> RelationDef:
     )
 
 
+def _term_def(tid: str, module: str, s: dict[str, Any]) -> TermDef:
+    return TermDef(
+        id=tid,
+        module=module,
+        pref=str(s["pref"]).strip(),
+        alt=tuple(str(v).strip() for v in s.get("alt", [])),
+        expand=tuple(str(v).strip() for v in s.get("expand", [])),
+        note=s.get("note") or "",
+    )
+
+
 def _merge(modules: list[dict[str, Any]]) -> Schema:
     classes: dict[str, ClassDef] = {}
     relations: dict[str, RelationDef] = {}
+    terms = {
+        tid: _term_def(tid, m["id"], spec)
+        for m in modules
+        for tid, spec in m.get("terms", {}).items()
+    }
     for m in modules:
         for cid, spec in m.get("classes", {}).items():
             classes[cid] = _class_def(cid, m["id"], spec)
         for rid, spec in m.get("relations", {}).items():
             relations[rid] = _relation_def(rid, m["id"], spec)
     versions = {m["id"]: str(m["version"]) for m in modules}
-    return Schema(modules=versions, classes=classes, relations=relations)
+    return Schema(modules=versions, classes=classes, relations=relations, terms=terms)
 
 
 def _cycle_errors(classes: dict[str, ClassDef]) -> list[str]:
@@ -492,6 +551,7 @@ def _local_module(value: object) -> tuple[dict[str, Any] | None, list[str]]:
         "version": local.get("version", "0.1.0"),
         "classes": local.get("classes", {}),
         "relations": local.get("relations", {}),
+        "terms": local.get("terms", {}),
     }
     return module, _unknown_keys(f"{_BINDING}: local", local, _LOCAL_KEYS)
 

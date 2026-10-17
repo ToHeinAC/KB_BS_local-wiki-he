@@ -208,6 +208,48 @@ def test_binding_selects_modules_and_adds_a_local_extension() -> None:
     assert schema.classes["market-report"].module == "local"
 
 
+def _terms(spec: Any) -> dict[str, Any]:
+    return {"id": "terms", "version": "1.0.0", "terms": {"rueckstaende": spec}}
+
+
+def test_terms_build_with_labels_and_expansion() -> None:
+    spec = {"pref": "Rückstände", "alt": ["NORM"], "expand": ["Rückstand", "Entlassung"]}
+    schema, errors = ontology.build_schema([_core(), _terms(spec)])
+    assert errors == []
+    assert schema is not None
+    term = schema.terms["rueckstaende"]
+    assert (term.pref, term.alt, term.expand) == (
+        "Rückstände",
+        ("NORM",),
+        ("Rückstand", "Entlassung"),
+    )
+    assert ontology.build_schema([_core()])[0].terms == {}  # type: ignore[union-attr]
+
+
+@pytest.mark.parametrize(
+    ("spec", "needle"),
+    [
+        ({"alt": ["NORM"]}, "pref"),
+        ({"pref": "Rückstände", "alt": "NORM"}, "alt"),
+        ({"pref": "Rückstände", "expand": [1]}, "expand"),
+        ({"pref": "Rückstände", "color": "red"}, "color"),
+    ],
+)
+def test_bad_terms_are_rejected(spec: dict[str, Any], needle: str) -> None:
+    assert _has(ontology.validate_module(_terms(spec)), needle)
+
+
+def test_local_extension_may_define_terms() -> None:
+    binding = {"modules": ["core"], "local": {"terms": {"x": {"pref": "Rückstände"}}}}
+    _, local, errors = ontology.read_binding(binding, available={"core"})
+    assert errors == []
+    assert local is not None
+    schema, errors = ontology.build_schema([_core(), local])
+    assert errors == []
+    assert schema is not None
+    assert schema.terms["x"].module == "local"
+
+
 def test_binding_rejects_unknown_modules_and_keys() -> None:
     _, _, errors = ontology.read_binding({"modules": ["nope"], "extra": 1}, available={"core"})
     assert _has(errors, "nope")

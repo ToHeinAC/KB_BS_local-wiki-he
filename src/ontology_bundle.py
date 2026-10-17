@@ -323,7 +323,7 @@ def merge3(
 def _ids(local: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
     return {
         (kind, item_id): as_map(spec)
-        for kind in ("classes", "relations")
+        for kind in ("classes", "relations", "terms")
         for item_id, spec in as_map(local.get(kind)).items()
     }
 
@@ -478,12 +478,15 @@ def migrate_deprecated(
     return out, warnings
 
 
+_KIND_NAMES = {"classes": "class", "relations": "relation", "terms": "term"}
+
+
 def _removed_errors(current: object, merged: object, referenced: set[str]) -> list[str]:
     def local_ids(state: object) -> set[tuple[str, str]]:
         return set(_ids(as_map(as_map(as_map(state).get("schema")).get("local"))))
 
     return [
-        f"{kind[:-2] if kind == 'classes' else 'relation'} {item_id!r} is used by ledger facts; "
+        f"{_KIND_NAMES[kind]} {item_id!r} is used by ledger facts; "
         "mark it `deprecated: true` with `replaced_by` instead of removing it"
         for kind, item_id in sorted(local_ids(current) - local_ids(merged))
         if item_id in referenced

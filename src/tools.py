@@ -1017,18 +1017,20 @@ def _chunks(t: _Target) -> list[dict[str, Any]]:
 
 
 def _run_query(mem: run_memory.RunMemory) -> str:
-    """The run's question plus its distinct searches: what a file's sections are ranked by."""
+    """The run's question, the sources' words for it (ontology terms, the user's glosses)
+    and its distinct searches: what a file's sections are ranked by."""
     asked = [k.split(":", 1)[1] for k in mem.searches if k.startswith(("raw_search:", "wiki_"))]
-    return " ".join([mem.question, *asked]).strip()[:2000]
+    words = retrieval.vocabulary(" ".join([mem.question, *asked]))
+    return " ".join([mem.question, words, *asked]).strip()[:2000]
 
 
 def _ranked_unread(mem: run_memory.RunMemory, t: _Target) -> list[dict[str, Any]]:
     """Unread sections of `t`, best match for the run first ([] without an index or a hit)."""
-    q = _run_query(mem)
-    if not q:
-        return []
     with db_context.using_db(t.db):
-        hits = lex_index.query(q, top_k=RANK_TOP_K, scope="raw", sources=[t.base])
+        q = _run_query(mem)
+        hits = lex_index.query(q, top_k=RANK_TOP_K, scope="raw", sources=[t.base]) if q else []
+    if not hits:
+        return []
     by_id = {c["chunk_id"]: c for c in _chunks(t)}
     out: list[dict[str, Any]] = []
     for h in hits:

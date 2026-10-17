@@ -283,6 +283,13 @@ ONTOLOGY_BRIEFING_CLASS = (
     '- "{matched}" is the document class {cls} ({count} source(s) in this database).'
 )
 ONTOLOGY_BRIEFING_RULE = "Prefer these documents when they answer the question. Prefer the version in force at the point in time; if you cite a superseded version, say so. For versions and related documents, call ontology_lookup."
+ONTOLOGY_BRIEFING_TERMS_HEADER = "Terminology (from this database's ontology):"
+ONTOLOGY_BRIEFING_TERM = '- "{matched}" is called "{pref}" in the sources. Search with: {words}.'
+GLOSS_BRIEFING_HEADER = "Abbreviations the question explains itself:"
+GLOSS_BRIEFING = (
+    '- "{acronym}" means "{meaning}" (the user\'s own explanation). Search with "{meaning}"; '
+    'a text where "{word}" is another word spelled the same is off-topic.'
+)
 ONTOLOGY_LOOKUP_DESCRIPTION = "Look up a document, law abbreviation or document class in this database's ontology: its versions (newest first) and which one is in force, its class, and related documents (based on, transposes, amends, ...). Use it when the question names a document and you need its versions or related documents. Args: term (e.g. 'StrlSchV'); optional as_of (a date such as '2017-06-01' or a year) for the point in time."
 ONTOLOGY_SUPERSEDED_NUDGE = "REJECTED: every document you cite is a superseded version ({cited}). The version in force is {current}. Cite it, or state explicitly that your answer describes the old version, then submit again."
 

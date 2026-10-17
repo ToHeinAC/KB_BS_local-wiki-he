@@ -22,12 +22,14 @@ from typing import Any
 
 import db_context
 import embed_index
+import gloss
 import lex_index
 import ontology_query
 import ontology_store
 import ontology_time
 import rerank
 import run_memory
+from prompts import GLOSS_BRIEFING, GLOSS_BRIEFING_HEADER
 
 RRF_K = 60
 _CANDIDATES = 40  # per-arm depth fed into fusion (idea.md: fuse deep, return shallow)
@@ -44,6 +46,10 @@ W_SEMANTIC = 2.0
 # restricted to the sources of the works/classes a question names. RRF bounds its
 # influence, so a wrong resolution can move a hit but never swamp the other arms.
 W_ONTOLOGY = 1.0
+# The vocabulary arms (docs/retrieval.md §Query vocabulary): lexical hits for the sources'
+# words of an ontology term the query uses, and for the explanation the user gave an
+# acronym. Same RRF bound: they add candidates, they never remove one.
+W_VOCABULARY = 1.0
 
 Ranked = list[dict[str, Any]]
 _last_frame: ContextVar[dict[str, Any] | None] = ContextVar("ontology_frame", default=None)
@@ -165,6 +171,29 @@ def _ontology_lists(
     return [(arm, W_ONTOLOGY)] if arm else []
 
 
+def _glosses(q: str) -> list[tuple[str, str]]:
+    """(acronym, explanation) pairs from ``q`` and the run's question whose acronym ``q`` uses."""
+    mem = run_memory.current()
+    pairs = gloss.find(q) + (gloss.find(mem.question) if mem is not None else [])
+    return [p for p in dict.fromkeys(pairs) if gloss.mentions(q, p[0])]
+
+
+def vocabulary(q: str, view: ontology_query.View | None = None) -> str:
+    """The sources' words for ``q``: matched ontology terms, then the user's own glosses."""
+    view = view if view is not None else ontology_store.view()
+    terms = ontology_query.term_query(view, ontology_query.match_terms(q, view)) if view else ""
+    return " ".join([terms, *(e for _, e in _glosses(q))]).strip()
+
+
+def _vocabulary_lists(
+    q: str, scope: str | None, view: ontology_query.View | None
+) -> list[tuple[Ranked, float]]:
+    """One more lexical list for the query's vocabulary; [] when it has none."""
+    text = vocabulary(q, view) if view is not None else " ".join(e for _, e in _glosses(q))
+    hits = lex_index.query(text, _CANDIDATES, scope) if text else []
+    return [(hits, W_VOCABULARY)] if hits else []
+
+
 def last_frame() -> dict[str, Any] | None:
     """Audit record of the last search's ontology stage in this context (None: no match)."""
     return _last_frame.get()
@@ -173,8 +202,16 @@ def last_frame() -> dict[str, Any] | None:
 def ontology_rerank(q: str, hits: Ranked, scope: str | None, top_k: int) -> Ranked:
     """Run the ontology stage on an already-ranked lexical list (the Explorer's wiki search)."""
     view = ontology_store.view()
-    extra = _ontology_lists(q, scope, view)
+    extra = _ontology_lists(q, scope, view) + _vocabulary_lists(q, scope, view)
     return _validity_step(q, _rrf_fuse(hits, [], top_k, extra) if extra else hits, view, scope)
+
+
+def _gloss_briefing(question: str) -> str:
+    lines = [
+        GLOSS_BRIEFING.format(acronym=a, meaning=m, word=a.capitalize())
+        for a, m in gloss.find(question)
+    ]
+    return "\n".join([GLOSS_BRIEFING_HEADER, *lines]) if lines else ""
 
 
 def ontology_briefing(question: str) -> tuple[str, list[dict[str, Any]]]:
@@ -189,10 +226,13 @@ def ontology_briefing(question: str) -> tuple[str, list[dict[str, Any]]]:
             view = ontology_store.view()
             frame = ontology_query.resolve(question, view) if view is not None else None
         text = ontology_query.briefing(frame, view) if view is not None else ""
+        terms = ontology_query.term_briefing(question, view) if view is not None else ""
+        text = "\n".join(t for t in (text, terms) if t)
         if text:
             blocks.append(text if len(scope) == 1 else f"Database {db}:\n{text}")
             records.append({"db": db, **ontology_query.audit(frame)})
-    return "\n\n".join(blocks), records
+    glossed = _gloss_briefing(question)
+    return "\n\n".join([*blocks, glossed] if glossed else blocks), records
 
 
 def search(
@@ -215,7 +255,7 @@ def search(
     depth = max(top_k, rerank.candidates()) if reranking else top_k
     lex_hits = lex_index.query(q, top_k=_CANDIDATES, scope=scope)
     view = ontology_store.view() if use_ontology else None
-    extra = _ontology_lists(q, scope, view)
+    extra = _ontology_lists(q, scope, view) + _vocabulary_lists(q, scope, view)
     sem_hits = (
         embed_index.query(q, top_k=_CANDIDATES, scope=scope) if embed_index.available() else []
     )

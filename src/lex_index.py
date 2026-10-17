@@ -36,6 +36,7 @@ import frontmatter  # pyright: ignore[reportMissingTypeStubs]
 
 import chunker
 import db_context
+import gloss
 import qa_gen
 
 
@@ -48,6 +49,8 @@ def _fts5_path() -> Path:
 
 
 MIN_TOKEN_LEN = 2
+# FTS5 rows scanned for chunks that write a query's acronym in capitals (gloss.acronyms).
+ACRONYM_FETCH = 200
 
 _STOPWORDS = {
     # German function words
@@ -516,7 +519,11 @@ def _expand_query(q: str) -> list[str]:
 
 
 def _fts5_rows(
-    expanded: list[str], scope: str | None, top_k: int, sources: Sequence[str] | None = None
+    expanded: list[str],
+    scope: str | None,
+    top_k: int,
+    sources: Sequence[str] | None = None,
+    limit: int | None = None,
 ) -> list[tuple[Any, ...]]:
     """Best-first FTS5 rows matching any expanded token; [] on a SQLite error."""
     match = " OR ".join(f'"{v}"' for v in expanded)
@@ -533,7 +540,7 @@ def _fts5_rows(
         sql += f" AND source IN ({', '.join('?' * len(sources))})"
         params.extend(sources)
     sql += " ORDER BY score LIMIT ?"
-    params.append(top_k * 2 + 8)  # over-fetch; dedup by chunk_id then trim to top_k
+    params.append(limit or top_k * 2 + 8)  # over-fetch; dedup by chunk_id then trim to top_k
 
     con = sqlite3.connect(str(_fts5_path()))
     try:
@@ -574,6 +581,48 @@ def _fts5_hit(row: tuple[Any, ...], text: str, expanded: set[str]) -> dict[str, 
     }
 
 
+def _collect(rows: list[tuple[Any, ...]], expanded: set[str], top_k: int) -> list[dict[str, Any]]:
+    """Hits of best-first rows, deduplicated by chunk_id (the first, best row wins)."""
+    text_cache: dict[str, dict[str, str]] = {}
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in rows:
+        cid, source, inline = row[0], row[1], row[8]
+        if cid in seen:
+            continue
+        seen.add(cid)
+        out.append(_fts5_hit(row, _chunk_text(cid, source, inline, text_cache), expanded))
+        if len(out) >= top_k:
+            break
+    return out
+
+
+def _query_acronyms(
+    caps: list[str],
+    expanded: list[str],
+    top_k: int,
+    scope: str | None,
+    sources: Sequence[str] | None,
+) -> list[dict[str, Any]]:
+    """Hits that write an acronym in capitals first, then the rest ranked without the
+    acronym's forms: the index is lowercase, so "NORM" would otherwise score every "Norm"."""
+    forms = {v for a in caps for v in variants(a)}
+    rows = _fts5_rows(expanded, scope, top_k, sources, limit=ACRONYM_FETCH)
+    true = [
+        h
+        for h in _collect(rows, set(expanded), ACRONYM_FETCH)
+        if any(gloss.mentions(h["text"], a) for a in caps)
+    ]
+    rest_terms = [v for v in expanded if v not in forms]
+    rest = (
+        _collect(_fts5_rows(rest_terms, scope, top_k, sources), set(rest_terms), top_k)
+        if rest_terms
+        else []
+    )
+    seen = {h["chunk_id"] for h in true}
+    return (true + [h for h in rest if h["chunk_id"] not in seen])[:top_k]
+
+
 def _query_fts5(
     q: str, top_k: int = 10, scope: str | None = None, sources: Sequence[str] | None = None
 ) -> list[dict[str, Any]]:
@@ -584,21 +633,13 @@ def _query_fts5(
     time. FTS5's `bm25()` returns lower=better, so it is negated into the usual
     higher=better score. Results are deduplicated by chunk_id (a chunk shared by
     two sources can appear twice after incremental updates); the higher-scored row
-    wins since rows arrive best-first.
+    wins since rows arrive best-first. A capitalised acronym in a mixed-case query
+    counts only where the text writes it in capitals (`gloss.acronyms`).
     """
     expanded = _expand_query(q)
     if not expanded:
         return []
-    exp_set = set(expanded)
-    text_cache: dict[str, dict[str, str]] = {}
-    out: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for row in _fts5_rows(expanded, scope, top_k, sources):
-        cid, source, inline = row[0], row[1], row[8]
-        if cid in seen:
-            continue
-        seen.add(cid)
-        out.append(_fts5_hit(row, _chunk_text(cid, source, inline, text_cache), exp_set))
-        if len(out) >= top_k:
-            break
-    return out
+    caps = gloss.acronyms(q)
+    if caps:
+        return _query_acronyms(caps, expanded, top_k, scope, sources)
+    return _collect(_fts5_rows(expanded, scope, top_k, sources), set(expanded), top_k)

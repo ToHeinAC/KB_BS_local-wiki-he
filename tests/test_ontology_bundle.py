@@ -287,6 +287,16 @@ def test_bump_follows_semver_rules() -> None:
     assert ob.bump("junk", old, minor) == "0.2.0"
 
 
+def test_bump_counts_terms_like_classes() -> None:
+    old = _state()["schema"]["local"]
+    added = copy.deepcopy(old)
+    added["terms"] = {"rueckstaende": {"pref": "Rückstände", "alt": ["NORM"]}}
+    edited = copy.deepcopy(added)
+    edited["terms"]["rueckstaende"]["alt"] = ["NORM", "TENORM"]
+    assert ob.bump("0.1.0", old, added) == "0.2.0"
+    assert ob.bump("0.2.0", added, edited) == "0.2.1"
+
+
 def test_fact_rows_turn_edits_into_user_assertions() -> None:
     old = _state()["facts"]
     new = copy.deepcopy(old)
