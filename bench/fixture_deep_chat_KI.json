@@ -1,0 +1,48 @@
+{
+  "_note": "Gold for scripts/bench_deep_chat.py. Ingest StrlSchG.md and StrlSchV.md (public law, gesetze-im-internet.de) into KI first. Each gold section names the heading it must carry; the bench checks it against the ingested text and reports a mismatch instead of scoring it. Labels are drafted from the statutes' tables of contents: verify q6/q7 (StrlSchV) on first run.",
+  "db": "KI",
+  "files": ["StrlSchG.md", "StrlSchV.md"],
+  "questions": [
+    {
+      "id": "q1",
+      "question": "Wie können Rückstände aus der Überwachung entlassen werden?",
+      "gold": [{"file": "StrlSchG.md", "section": "§ 62", "heading": "Entlassung von Rückständen"}]
+    },
+    {
+      "id": "q2",
+      "question": "Was ist nach dem Strahlenschutzgesetz eine Tätigkeit?",
+      "gold": [{"file": "StrlSchG.md", "section": "§ 4", "heading": "Tätigkeiten"}]
+    },
+    {
+      "id": "q3",
+      "question": "Welcher Grenzwert der effektiven Dosis gilt für Einzelpersonen der Bevölkerung?",
+      "gold": [{"file": "StrlSchG.md", "section": "§ 80", "heading": "Bevölkerung"}]
+    },
+    {
+      "id": "q4",
+      "question": "Welche Grenzwerte gelten für beruflich exponierte Personen?",
+      "gold": [{"file": "StrlSchG.md", "section": "§ 78", "heading": "beruflich exponierte"}]
+    },
+    {
+      "id": "q5",
+      "question": "Was gilt für überwachungsbedürftige Rückstände von ihrem Anfall bis zur Entlassung aus der Überwachung?",
+      "gold": [
+        {"file": "StrlSchG.md", "section": "§ 61", "heading": "Rückstände"},
+        {"file": "StrlSchG.md", "section": "§ 62", "heading": "Entlassung von Rückständen"}
+      ]
+    },
+    {
+      "id": "q6",
+      "question": "Welches Dosiskriterium gilt für die Freigabe radioaktiver Stoffe?",
+      "gold": [{"file": "StrlSchV.md", "section": "§ 31", "heading": "Dosiskriterium"}]
+    },
+    {
+      "id": "q7",
+      "question": "Welche Vorschriften der Strahlenschutzverordnung konkretisieren die Entlassung von Rückständen aus der Überwachung nach § 62 StrlSchG?",
+      "gold": [
+        {"file": "StrlSchG.md", "section": "§ 62", "heading": "Entlassung von Rückständen"},
+        {"file": "StrlSchV.md", "section": "§ 98", "heading": "Entlassung"}
+      ]
+    }
+  ]
+}
