@@ -72,3 +72,8 @@ def test_duplicates_are_listed_once_in_order_of_first_mention():
 def test_section_numbers_tolerate_letter_suffixes_and_no_space():
     out = _find("Vgl. §8 und § 7a.")
     assert [r.anchor for r in out] == ["§ 8", "§ 7a"]
+
+
+def test_every_spelling_of_annex_and_article_is_a_reference():
+    out = _find("Nach Art. 5, Artikel 6, Anlagen 2 und Anlage 3 der RichtlinieC.")
+    assert [r.anchor for r in out] == ["Artikel 5", "Artikel 6", "Anlage 2", "Anlage 3"]

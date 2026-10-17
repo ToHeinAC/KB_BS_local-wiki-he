@@ -1093,7 +1093,10 @@ def _ref_footer(mem: run_memory.RunMemory, t: _Target, anchor: str | None, text:
     """Fix F: the references a read text makes, resolved in code, with their status."""
     key = f"{t.qbase}|sec={_norm_anchor(anchor)}" if anchor else ""
     depth = mem.ref_depth.get(key, 0)
-    found = refs.find_refs(text, t.qbase, anchor, _resolve_work, lambda f, a: True)
+    try:
+        found = refs.find_refs(text, t.qbase, anchor, _resolve_work, lambda f, a: True)
+    except Exception:  # the footer is a hint: an odd text shape must never cost the read
+        return ""
     if not found:
         return ""
     entries: list[str] = []

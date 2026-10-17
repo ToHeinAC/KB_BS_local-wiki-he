@@ -34,7 +34,12 @@ _LAWLIKE_RE = re.compile(
     re.IGNORECASE,
 )
 _ABBR_RE = re.compile(r"^[A-ZÄÖÜ][A-Za-zäöüß]{0,8}[A-ZÄÖÜ][A-Za-zäöüß]{0,4}$")
-_KIND = {"§": "§", "§§": "§", "Anlage": "Anlage", "Anlagen": "Anlage", "Artikel": "Artikel"}
+
+
+def _kind(word: str) -> str:
+    """The anchor prefix of a matched mention: "§§" → "§", "Anlagen" → "Anlage",
+    "Art." → "Artikel" (every spelling `_REF_RE` accepts)."""
+    return "§" if word.startswith("§") else "Anlage" if word.startswith("Anl") else "Artikel"
 
 
 @dataclass(frozen=True)
@@ -93,7 +98,7 @@ def find_refs(
     for m in _REF_RE.finditer(text):
         work, target, kind = _target(_work_after(text, m.end()), self_file, resolve)
         for num in _numbers(m["a"], m["sep"], m["b"]):
-            anchor = f"{_KIND[m['kind']]} {num}"
+            anchor = f"{_kind(m['kind'])} {num}"
             if kind == SAME and anchor == self_anchor:
                 continue
             found = target is None or has_anchor(target, anchor)

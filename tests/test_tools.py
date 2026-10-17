@@ -726,3 +726,16 @@ def test_a_work_name_resolves_through_the_ontology_to_the_version_in_force(wiki_
     run_memory.begin_run()
     assert tools._resolve_work("StrlSchV") == "StrlSchV_2018.md"
     assert tools._resolve_work("Strahlenschutzgesetzes") is None
+
+
+def test_a_broken_reference_footer_never_costs_the_read(wiki_dir, monkeypatch):
+    _chain(2)
+    run_memory.begin_run()
+
+    def boom(*_a, **_k):
+        raise KeyError("Art.")
+
+    monkeypatch.setattr(tools.refs, "find_refs", boom)
+    out = tools.raw_read.invoke({"filenames": ["L0.md § 1"]})
+    assert out.startswith("## Raw file: L0.md § 1")
+    assert "References:" not in out
