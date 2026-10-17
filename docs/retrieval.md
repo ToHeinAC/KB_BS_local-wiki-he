@@ -113,3 +113,31 @@ Two edge types feed it:
 **Shared-source edges are clique-guarded.** A source backing many pages carries no topical signal (`StrlSchG.md` alone backs 25 pages, `BImSchG.md` 22), so `_shared_source_siblings()` skips any source feeding more than `_SHARED_SOURCE_MAX_CLIQUE` (8) pages rather than flooding results with "both mention the big law".
 
 Ranking is tiered: explicit `link` edges outrank `shared-source` ones, then neighbours reached from more seeds win, with insertion order breaking ties (stable sort). Measured effect on real databases (neighbours reachable, out-links-only → undirected + shared-source): Strahlenschutz 153 → 220, Investing 37 → 166, KI 77 → 298 (KI: every page now reaches at least one neighbour, up from 26 of 44).
+
+### Reading originals in Deep chat (`raw_read` under run memory)
+
+Inside a Deep chat run, `tools.raw_read` decides *what* to serve in code, so a weak model cannot
+loop on the table of contents (memo: [ideas/deep-chat-read-memory-and-section-grounding.md](../ideas/deep-chat-read-memory-and-section-grounding.md)).
+Every served unit is marked in the visited-set under its usual key; a section's key uses the
+anchor it resolves to (`§62` and `§ 62` are one entry).
+
+| Request | Served |
+|---|---|
+| `file § N` / `file ## heading` | That section, with a `References:` footer. |
+| Bare name of a long law (`§` anchors, > 16,000 chars), offset 0 | **Section map:** the 1–2 unread sections that best match the run's question plus its searches (`lex_index.query(…, scope="raw", sources=[file])`) in full, and the section titles ±5 around them. Without an index or a hit: byte window 0. |
+| Bare name, other files / explicit `offset` | That byte window (pagination honoured). |
+| A repeat of anything already read | **Auto-advance:** an unread section a footer offered, else the best-ranked unread section, else the next unread byte window, labelled `[memory: repeat of step N → …]`. Only a fully read file gets the stub `[memory] … fully explored for this question`. |
+| An offset past the end | Clamped: the next unread window, labelled with the file's length; the bad offset is not remembered. |
+
+**Reference footers (`src/refs.py`, pure).** `find_refs` finds `§ N` / `§§ N bis M` (expanded,
+≤ 5) / `Anlage N` / `Artikel N` and the work named right after them (`der StrlSchV`, `des
+Atomgesetzes`, `AtG`). `tools._resolve_work` maps the name to a file **inside the search scope
+only** (a file of a level out of scope is never named): the version in force by the DB's
+ontology (`ontology_query.resolve` + `ontology_time.current_expression`), else a raw file whose
+stem or first heading names it. A § without a work name points into the same file; an
+unresolved law-like name is `(not in scope)`; a missing anchor is flagged, never guessed. The
+footer shows each reference's status (`unread`, `read`, `same file, …`, `hop limit reached`)
+and the exact call to follow the first unread one. **Hop budget:** a section reached through a
+cross-file reference is one hop deeper (same-file references are free); after 3 hops, footers
+stop offering cross-file references; each followed cross-file reference earns 2 agent turns,
+capped by `CHAT_REF_BONUS_MAX` ([configuration.md](configuration.md)).

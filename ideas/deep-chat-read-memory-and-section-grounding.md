@@ -1,6 +1,7 @@
 # Deep chat: missing § text and redundant reads — analysis and fix plan
 
-Status: memo, nothing implemented. Date: 2026-10-16.
+Status: implemented 2026-10-17 (Fixes A–G; live bench written, not yet run). Date: 2026-10-16.
+Current behaviour: [docs/retrieval.md](../docs/retrieval.md) §Reading originals in Deep chat, [docs/architecture.md](../docs/architecture.md) §Deep chat.
 Trigger: Deep chat run on `StrlSch_DE` + `StrlSch_DE · Confidential`,
 question *"Wie können Rückstände aus der Überwachung entlassen werden?"* (51 s, "5 cited").
 Analysis is from the code and the UI trace only; the StrlSch_DE databases were not opened

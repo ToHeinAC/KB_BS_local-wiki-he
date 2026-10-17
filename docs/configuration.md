@@ -48,7 +48,9 @@ Copy it to `.env` (gitignored, never committed) and adjust.
 | `CHAT_MIN_SEARCHES` | `3` | Deep chat: minimum distinct searches (`raw_search`/`wiki_search` queries) before the submit gate accepts. The gate also requires that at least one cited original was opened with `raw_read`. |
 | `CHAT_MIN_WORDS` | `500` | Deep chat: minimum answer word count. |
 | `CHAT_MIN_SOURCES` | `3` | Deep chat: minimum unique citations (`[Source: filename]` + `[Wiki: page.md]`; at least one must be a `[Source: ...]` original). |
-| `CHAT_MAX_ITERATIONS` | `40` | Deep chat: LangGraph recursion cap (each agent turn is two steps, so about 20 turns). |
+| `CHAT_MAX_ITERATIONS` | `40` | Deep chat: step cap (each agent turn is two steps, so about 20 turns), raised by turns earned through `CHAT_REF_BONUS_MAX`. |
 | `CHAT_NUDGE_AT` | `CHAT_MAX_ITERATIONS // 2 - 2` | Deep chat: agent turns after which every turn is told to submit now. |
 | `CHAT_RAW_READ_NUDGE_AFTER` | `3` | Deep chat: byte-offset windows of one file after which `raw_read` suggests to stop paginating (section reads are exempt). |
+| `CHAT_PROSE_RETRIES` | `2` | Deep chat: an answer written as prose runs the submit gate; this many rejections are sent back before it is shown labelled best-effort. |
+| `CHAT_REF_BONUS_MAX` | `6` | Deep chat: extra agent turns a run may earn by following cross-file references in `raw_read` footers (+2 per followed reference). |
 | `CHAT_LLM_TIMEOUT` | `180` | Deep chat: per-LLM-call timeout in seconds. |
