@@ -150,3 +150,73 @@ def test_old_tool_results_are_trimmed_so_the_answer_fits_the_window():
 def test_a_short_history_is_sent_unchanged():
     msgs = [HumanMessage(content="q"), _tool("raw_read", "short", "1")]
     assert chat_agent._fit_window(msgs, budget_chars=60_000) == msgs
+
+
+# --- prose exit gate (ideas/deep-chat-read-memory-and-section-grounding.md Fix A) ---
+
+
+def _gate(monkeypatch) -> None:
+    """The submit gate accepts exactly the answers that contain GOOD."""
+    monkeypatch.setattr(
+        chat_agent.tool_module,
+        "_submit_chat_impl",
+        lambda answer, sources=None: (
+            "ACCEPTED: ok" if "GOOD" in answer else "REJECTED: you cite § 62 but never read it."
+        ),
+    )
+
+
+def test_a_prose_exit_that_fails_the_gate_is_sent_back_with_the_reason(monkeypatch):
+    _gate(monkeypatch)
+    fake = _patch_llm(monkeypatch, [AIMessage(content="weak prose"), AIMessage(content="GOOD")])
+    steps = list(chat_agent.run_chat_agent("q?"))
+    assert "REJECTED: you cite § 62" in str(fake.calls[1][-1].content)
+    final = steps[-1]
+    assert final["type"] == "final_answer"
+    assert final["content"] == "GOOD"
+    gates = [s["content"] for s in steps if s["type"] == "gate"]
+    assert gates[0].startswith("rejected (retry 1/")
+    assert gates[-1] == "accepted"
+
+
+def test_a_prose_exit_after_the_retries_is_labelled_best_effort_with_the_reason(monkeypatch):
+    _gate(monkeypatch)
+    monkeypatch.setattr(chat_agent, "PROSE_RETRIES", 2)
+    fake = _patch_llm(monkeypatch, [])  # always answers "done" in prose
+    steps = list(chat_agent.run_chat_agent("q?"))
+    assert len(fake.calls) == 3  # the first prose plus two retries, then the run ends
+    final = steps[-1]
+    assert final["content"].startswith(
+        "(best-effort — quality gate not met: REJECTED: you cite § 62 but never read it.)"
+    )
+    assert final["content"].endswith("done")
+
+
+def test_section_citations_are_counted_like_the_gate_counts_them():
+    out = chat_agent._cites("a [Source: StrlSchG.md §62] b [Source: StrlSchG.md §61]")
+    assert out["sources"] == ["StrlSchG.md §61", "StrlSchG.md §62"]
+
+
+def _looping(bonus: int):
+    class LoopingLLM:
+        calls = 0
+
+        def invoke(self, messages):
+            LoopingLLM.calls += 1
+            mem = chat_agent.run_memory.current()
+            assert mem is not None
+            mem.bonus = bonus  # as if references were followed
+            return _ai_with_tool("think_tool", {"reflection": "still working"})
+
+    return LoopingLLM
+
+
+def test_followed_references_extend_the_step_limit(monkeypatch):
+    monkeypatch.setattr(chat_agent, "MAX_ITER", 4)
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda *a, **k: "")
+    for bonus, calls in ((0, 2), (2, 4)):
+        llm = _looping(bonus)
+        monkeypatch.setattr(chat_agent, "_build_llm", llm)
+        steps = list(chat_agent.run_chat_agent("q?"))
+        assert llm.calls == calls
+        assert any("Recursion limit" in s.get("content", "") for s in steps)

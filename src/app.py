@@ -1681,6 +1681,8 @@ elif page == "Wiki Chat":
                     elif stype == "ontology":
                         with st.expander("Ontology frame", expanded=False):
                             st.code(step["content"], language=None)
+                    elif stype == "gate":
+                        st.warning(f"Quality gate — {step['content']}")
                     elif stype == "final_answer":
                         answer = step["content"]
                         raw_sources = step.get("sources", []) or []

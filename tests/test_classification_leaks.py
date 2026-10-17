@@ -22,6 +22,7 @@ import graph_export
 import graph_widget
 import lex_index
 import ollama_client
+import run_memory
 import tools
 import wiki_engine
 
@@ -216,6 +217,34 @@ def test_the_gate_is_what_blocks_the_tools(classified_db, monkeypatch):
         assert STRICT in _tool_reads()
     finally:
         db_context.set_search_scope([])
+
+
+def _footer_probe() -> str:
+    """A public original that names both secret files as works: the raw_read reference
+    footer resolves work names to files, so it must only ever resolve inside the scope."""
+    text = (
+        "## § 1 Pflichten\nSiehe § 1 der Marmotcobalt5510-plan und § 1 der Lynxbasalt6620-plan.\n"
+        "## § 2 Weiteres\n" + "Text. " * 30 + "\n## § 3 Ende\n" + "Text. " * 30 + "\n"
+    )
+    with db_context.using_db(DB):
+        (db_context.raw_dir() / "public-refs.md").write_text(text)
+        chunker.write_chunks("public-refs.md", chunker.split(text))
+    run_memory.begin_run()
+    return tools.raw_read.invoke({"filenames": ["public-refs.md § 1"]})
+
+
+@pytest.mark.parametrize("level", [0, 1])
+def test_reference_footers_never_name_a_file_above_clearance(classified_db, level):
+    with session(level):
+        out = _footer_probe()
+    hidden = ["KI@confidential::", "KI@strict::"][level:]
+    assert [h for h in hidden if h in out] == []
+
+
+def test_reference_footers_name_files_of_every_cleared_level(classified_db):
+    with session(2):
+        out = _footer_probe()
+    assert "KI@strict::lynxbasalt6620-plan.md § 1" in out
 
 
 # --- fast chat (query_with_sources) --------------------------------------------

@@ -26,6 +26,11 @@ class TraceItem:
 _HIT = re.compile(r"^(?:\[(?:Raw hit|Wiki hit|Wiki linked) \d+|Result \d+: )", re.M)
 _OUTLINE = re.compile(r"^(?:file: (.+)|Result \d+: (.+))$", re.M)
 _READ = re.compile(r"^## (?:Raw file|Wiki page): (.+)$", re.M)
+# Run-memory markers of Deep chat's raw_read (src/tools.py): a repeat served something new,
+# a long law was answered with a section map, or a file has nothing left to read.
+_ADVANCED = re.compile(r"^## Raw file: (.+?) \[memory: (.+?) → serving", re.M)
+_MAP = re.compile(r"^## Raw file: (.+?) — section map", re.M)
+_EXPLORED = re.compile(r"^\[memory\] (.+?) fully explored", re.M)
 
 
 def _value(value: Any) -> str:
@@ -38,11 +43,27 @@ def _args_text(args: dict[str, Any]) -> str:
     return " · ".join(f"{k}: {_value(v)}" for k, v in args.items())
 
 
+def _memory_summary(result: str) -> str | None:
+    """The run-memory label of a raw_read result, or None when it carries no marker."""
+    advanced = _ADVANCED.findall(result)
+    if advanced:
+        return "; ".join(f"{why} → served {what}" for what, why in advanced)
+    mapped = _MAP.search(result)
+    if mapped:
+        served = [r.removeprefix(mapped[1]).strip() for r in _READ.findall(result)[1:]]
+        return f"section map of {mapped[1]} → read " + ", ".join(served)
+    explored = _EXPLORED.search(result)
+    return f"{explored[1]} fully explored" if explored else None
+
+
 def summarize(result: str) -> str:
     """One line on what a tool returned: hits, the files read, no results, or its first line."""
     hits = len(_HIT.findall(result))
     if hits:
         return f"{hits} hit(s)"
+    memory = _memory_summary(result)
+    if memory:
+        return memory
     reads = _READ.findall(result)
     if reads:
         return "read " + ", ".join(reads)
@@ -67,6 +88,8 @@ def _item(step: dict[str, Any]) -> TraceItem | None:
         return TraceItem("thought", step.get("label") or "Thought", step["content"], at)
     if kind == "notice":
         return TraceItem("notice", "Notice", step["content"], at)
+    if kind == "gate":  # Deep chat's prose answer went through the submit gate
+        return TraceItem("notice", f"Quality gate — {step['content']}", "", at)
     if kind == "ontology":
         return TraceItem("thought", "Ontology frame", step["content"], at)
     if kind == "error":

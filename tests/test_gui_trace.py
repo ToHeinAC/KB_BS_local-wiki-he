@@ -68,3 +68,23 @@ def test_reads_misses_and_other_results_get_a_one_line_summary() -> None:
         "Result: t — ACCEPTED: 120 words, 2 sources cited."
     )
     assert title("Result 1: Title A\nCite as: [Source: https://a]\n---") == ("Result: t — 1 hit(s)")
+
+
+def test_memory_hits_section_maps_and_the_gate_are_labelled() -> None:
+    def title(result: str) -> str:
+        return gui_trace.summarize(result)
+
+    advanced = (
+        "## Raw file: StrlSchG.md § 62 [memory: repeat of step 3 → serving the next unread "
+        "best match]\nEntlassung …"
+    )
+    assert title(advanced) == "repeat of step 3 → served StrlSchG.md § 62"
+    mapped = (
+        "## Raw file: StrlSchG.md — section map (218 sections; best matches read in full)\n\n"
+        "## Raw file: StrlSchG.md § 62\nText\n\n## Raw file: StrlSchG.md § 61\nText"
+    )
+    assert title(mapped) == "section map of StrlSchG.md → read § 62, § 61"
+    explored = "## Raw file: a.md\n[memory] a.md fully explored for this question — submit"
+    assert title(explored) == "a.md fully explored"
+    (gate,) = gui_trace.trace_items([{"type": "gate", "content": "rejected (retry 1/2): R"}])
+    assert (gate.kind, gate.title) == ("notice", "Quality gate — rejected (retry 1/2): R")

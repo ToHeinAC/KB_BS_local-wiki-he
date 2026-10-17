@@ -35,6 +35,23 @@ class RunMemory:
     as_of: str | None = None
     time_past: bool = False
     validity_nudged: bool = False  # the S4 superseded-citation check fired once
+    # The run's question: ranks a long legal file's sections on a bare or repeated read.
+    question: str = ""
+    # Prose-exit gate: answers written as prose instead of submitted, and the reason the
+    # last one failed (None once one passed). `gate_events` feeds the trace.
+    prose_rejections: int = 0
+    gate_reason: str | None = None
+    gate_events: list[str] = field(default_factory=list[str])
+    prose_section_nudged: bool = False  # an unread § named in the prose was rejected once
+    open_refs_nudged: bool = False  # an out-of-scope reference missing from Open points
+    # Reference chains: a section a footer offered ("<qbase>|sec=<canon>" → (depth, cross)),
+    # the depth of each read section, out-of-scope work names per read section, and the
+    # extra agent turns earned by following cross-file references.
+    ref_offers: dict[str, tuple[int, bool]] = field(default_factory=dict[str, tuple[int, bool]])
+    ref_depth: dict[str, int] = field(default_factory=dict[str, int])
+    out_of_scope: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
+    bonus: int = 0
+    work_files: dict[str, str | None] = field(default_factory=dict[str, str | None])  # name → file
 
     def tick(self) -> int:
         self.step += 1
@@ -71,8 +88,8 @@ _current: contextvars.ContextVar[RunMemory | None] = contextvars.ContextVar(
 )
 
 
-def begin_run() -> RunMemory:
-    m = RunMemory()
+def begin_run(question: str = "") -> RunMemory:
+    m = RunMemory(question=question)
     _current.set(m)
     return m
 

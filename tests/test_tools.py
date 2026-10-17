@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import chunker
+import lex_index
 import run_memory
 import tools
 
@@ -322,34 +323,32 @@ def test_raw_read_section_memory_keys_distinct(wiki_dir):
     run_memory.begin_run()
     a = tools.raw_read.invoke({"filenames": ["StrlSchG.md § 61"]})
     b = tools.raw_read.invoke({"filenames": ["StrlSchG.md § 62"]})
-    assert "[memory] Already read" not in a
-    assert "[memory] Already read" not in b  # different section is a fresh read
-    again = tools.raw_read.invoke({"filenames": ["StrlSchG.md § 61"]})
-    assert "[memory] Already read this section" in again
-    # menu lists only sections not yet read this run (§61, §62 already read)
-    assert "§ 63" in again
-    assert "§ 62" not in again
+    assert "[memory" not in a
+    assert "[memory" not in b  # different section is a fresh read
+    again = tools.raw_read.invoke(
+        {"filenames": ["StrlSchG.md §61"]}
+    )  # same section, other spelling
+    assert "[memory: repeat of step 1 → serving the next unread" in again
+    assert "Regelungen zum Anfall" not in again.split("\n", 1)[0]  # not § 61 served twice
 
 
-def test_raw_read_duplicate_offset_names_next_unread_window(wiki_dir):
+def test_a_repeated_read_serves_the_next_unread_window(wiki_dir):
     cap = tools.RAW_READ_CAP
     (tools.db_context.raw_dir() / "big.md").write_text("x" * (cap * 3), encoding="utf-8")
     run_memory.begin_run()
     first = tools.raw_read.invoke({"filenames": ["big.md"], "offset": 0})
     assert "[memory] Already read" not in first
     dup = tools.raw_read.invoke({"filenames": ["big.md"], "offset": 0})
-    assert "[memory] Already read" in dup
-    assert f"offset={cap}" in dup  # concrete next window, not generic advice
+    assert f"(bytes {cap}-{2 * cap} of {3 * cap}) [memory: repeat of step 1" in dup  # served
 
 
-def test_raw_read_duplicate_offset_after_full_read_has_no_offset_hint(wiki_dir):
+def test_a_repeated_read_of_a_fully_read_file_says_so(wiki_dir):
     cap = tools.RAW_READ_CAP
     (tools.db_context.raw_dir() / "small.md").write_text("y" * (cap // 2), encoding="utf-8")
     run_memory.begin_run()
     tools.raw_read.invoke({"filenames": ["small.md"], "offset": 0})  # whole file in one window
     dup = tools.raw_read.invoke({"filenames": ["small.md"], "offset": 0})
-    assert "[memory] Already read" in dup
-    assert "Whole file already read" in dup
+    assert "[memory] small.md fully explored for this question" in dup
     assert "offset=" not in dup
 
 
@@ -542,3 +541,188 @@ def test_wiki_search_labels_shared_source_neighbours(monkeypatch):
     )
     out = tools._wiki_search_impl(query="x")
     assert "shares a source with a.md" in out
+
+
+# --- section-level grounding (ideas/deep-chat-read-memory-… Fix B) ---------
+
+_LONG_LAW = (
+    "# StrlSchG\n\n## § 1 Anwendungsbereich\n"
+    + "Dieses Gesetz regelt den Schutz vor ionisierender Strahlung.\n\n" * 320
+    + _LEGAL_DOC.split("\n\n", 1)[1]
+)
+
+
+def _grounding_run(monkeypatch) -> run_memory.RunMemory:
+    _ingest_source("StrlSchG.md", _LONG_LAW)
+    mem = _gate_ready(monkeypatch)
+    for q in ("a", "b", "c"):
+        mem.mark_search(f"raw_search:{q}")
+    return mem
+
+
+_TAGGED = "one two three four five six [Source: StrlSchG.md §62] [Source: StrlSchG.md §1]"
+
+
+def test_a_cited_section_that_was_never_read_is_rejected_with_the_exact_call(wiki_dir, monkeypatch):
+    _grounding_run(monkeypatch)
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md § 1"]})  # the file, not § 62
+    out = tools._submit_chat_impl(_TAGGED)
+    assert out.startswith("REJECTED: you cite § 62 of StrlSchG.md")
+    assert "raw_read(['StrlSchG.md § 62'])" in out
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md §62"]})
+    assert tools._submit_chat_impl(_TAGGED).startswith("ACCEPTED")
+
+
+def test_a_byte_window_that_covers_the_cited_section_counts_as_reading_it(wiki_dir, monkeypatch):
+    mem = _grounding_run(monkeypatch)
+    start = _LONG_LAW.index("## § 62")
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md § 1"]})
+    mem.mark_read(f"raw:StrlSchG.md:{start - 100}")
+    assert tools._submit_chat_impl(_TAGGED).startswith("ACCEPTED")
+
+
+def test_an_unread_section_named_only_in_the_prose_is_rejected_once(wiki_dir, monkeypatch):
+    _grounding_run(monkeypatch)
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md § 1"]})
+    answer = "Nach § 63 bleiben sie in der Ueberwachung [Source: StrlSchG.md §1] [Source: b.md]"
+    out = tools._submit_chat_impl(answer)
+    assert out.startswith("REJECTED: you cite § 63 of StrlSchG.md")
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")  # bounded: once per run
+
+
+def test_a_section_of_a_law_that_is_not_cited_is_ignored(wiki_dir, monkeypatch):
+    _grounding_run(monkeypatch)
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md § 1"]})
+    answer = "Kernbrennstoff ist in § 2 AtG definiert [Source: StrlSchG.md §1] [Source: b.md]"
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
+
+
+# --- section map, auto-advance (Fix C, D) ----------------------------------
+
+
+def _indexed_law(monkeypatch, question: str) -> run_memory.RunMemory:
+    _ingest_source("StrlSchG.md", _LONG_LAW)
+    lex_index.build()
+    return run_memory.begin_run(question)
+
+
+def test_a_bare_read_of_a_long_law_serves_the_best_sections_and_a_map(wiki_dir, monkeypatch):
+    mem = _indexed_law(monkeypatch, "Entlassung von Rueckstaenden aus der Ueberwachung")
+    out = tools.raw_read.invoke({"filenames": ["StrlSchG.md"]})
+    assert out.startswith("## Raw file: StrlSchG.md — section map (")
+    assert "## Raw file: StrlSchG.md § 62\nEntlassung" in out.replace("## § 62 ", "")
+    assert "Map near the matches:" in out
+    assert "Dieses Gesetz regelt" not in out  # not window 0
+    assert "raw:StrlSchG.md|sec=62:0" in mem.reads  # served sections count as read
+
+
+def test_a_bare_read_without_an_index_keeps_byte_window_zero(wiki_dir, monkeypatch):
+    _ingest_source("StrlSchG.md", _LONG_LAW)
+    run_memory.begin_run("Entlassung von Rueckstaenden")
+    out = tools.raw_read.invoke({"filenames": ["StrlSchG.md"]})
+    assert out.startswith("## Raw file: StrlSchG.md (bytes 0-")
+
+
+def test_a_repeated_section_read_serves_the_next_best_unread_section(wiki_dir, monkeypatch):
+    _indexed_law(monkeypatch, "Rueckstaende Ueberwachung Entlassung")
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md § 62"]})
+    again = tools.raw_read.invoke({"filenames": ["StrlSchG.md § 62"]})
+    head = again.split("\n", 1)[0]
+    assert head.endswith("[memory: repeat of step 1 → serving the next unread best match]")
+    assert "§ 61" in head or "§ 63" in head
+
+
+def test_a_past_end_offset_is_clamped_and_not_remembered(wiki_dir):
+    cap = tools.RAW_READ_CAP
+    (tools.db_context.raw_dir() / "big.md").write_text("x" * (cap * 2), encoding="utf-8")
+    mem = run_memory.begin_run()
+    out = tools.raw_read.invoke({"filenames": ["big.md"], "offset": 1048576})
+    assert "requested offset 1048576 is past the end; file has 32000 chars" in out
+    assert "(bytes 0-16000 of 32000)" in out
+    assert "raw:big.md:1048576" not in mem.reads
+
+
+# --- reference footers and hop budget (Fix F) ------------------------------
+
+
+def _chain(n: int) -> None:
+    """Files L0…L{n-1}: § 1 of Lk says "nach § 1 der L{k+1}"; L0 § 1 also names § 2 (same
+    file) and § 9 AtG (a law not in the database)."""
+    for k in range(n):
+        nxt = f" Die Pflichten folgen aus § 1 der L{k + 1}." if k + 1 < n else ""
+        extra = " Abweichend gilt § 2. Kernbrennstoffe regelt § 9 AtG." if k == 0 else ""
+        body = "".join(
+            f"## § {i} Pflichten {i}\n" + "Text der Vorschrift ohne Bezug. " * 4 + "\n\n"
+            for i in (1, 2, 3)
+        )
+        body = body.replace("Text der Vorschrift ohne Bezug. \n", f"Text.{nxt}{extra}\n", 1)
+        _ingest_source(f"L{k}.md", f"# L{k}\n\n{body}")
+
+
+def test_a_footer_lists_resolved_references_and_their_status(wiki_dir):
+    _chain(2)
+    run_memory.begin_run()
+    out = tools.raw_read.invoke({"filenames": ["L0.md § 1"]})
+    footer = out.rsplit("References: ", 1)[1]
+    assert "L1.md § 1 (unread)" in footer
+    assert "L0.md § 2 (same file, unread)" in footer
+    assert "AtG § 9 (not in scope)" in footer
+    assert "follow with raw_read(['L1.md § 1'])" in footer
+    tools.raw_read.invoke({"filenames": ["L1.md § 1"]})
+    again = tools.raw_read.invoke({"filenames": ["L0.md § 3"]})  # unrelated section: no refs
+    assert "References:" not in again
+
+
+def test_a_same_file_reference_takes_no_hop_and_earns_no_turns(wiki_dir):
+    _chain(2)
+    mem = run_memory.begin_run()
+    tools.raw_read.invoke({"filenames": ["L0.md § 1"]})
+    tools.raw_read.invoke({"filenames": ["L0.md § 2"]})
+    assert mem.ref_depth["L0.md|sec=2"] == 0
+    assert mem.bonus == 0
+    tools.raw_read.invoke({"filenames": ["L1.md § 1"]})
+    assert mem.ref_depth["L1.md|sec=1"] == 1
+    assert mem.bonus == 2
+
+
+def test_the_fourth_cross_file_hop_is_shown_as_the_hop_limit(wiki_dir):
+    _chain(5)
+    mem = run_memory.begin_run()
+    outs = [tools.raw_read.invoke({"filenames": [f"L{k}.md § 1"]}) for k in range(4)]
+    assert "L4.md § 1 (hop limit reached)" in outs[3]
+    assert "follow with" not in outs[3].rsplit("References: ", 1)[1]
+    assert mem.bonus == tools.REF_BONUS_MAX  # 3 followed hops, capped
+
+
+def test_an_out_of_scope_reference_must_be_named_under_open_points_once(wiki_dir, monkeypatch):
+    _chain(1)
+    mem = _gate_ready(monkeypatch)
+    for q in ("a", "b", "c"):
+        mem.mark_search(f"raw_search:{q}")
+    tools.raw_read.invoke({"filenames": ["L0.md § 1"]})
+    tools.raw_read.invoke({"filenames": ["L0.md § 2"]})
+    answer = "one two three four five six [Source: L0.md §1] [Source: L0.md §2]"
+    out = tools._submit_chat_impl(answer)
+    assert out.startswith("REJECTED")
+    assert "AtG" in out
+    assert "## Open points" in out
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")  # bounded: once per run
+    mem.open_refs_nudged = False
+    named = answer + "\n\n## Offene Punkte\n- § 9 AtG liegt nicht vor."
+    assert tools._submit_chat_impl(named).startswith("ACCEPTED")
+
+
+def test_a_work_name_resolves_through_the_ontology_to_the_version_in_force(wiki_dir, monkeypatch):
+    _chain(1)
+    _ingest_source("StrlSchV_2018.md", "# StrlSchV\n\n## § 12 Pflichten\n" + "Text. " * 30)
+    view, frame = object(), type("F", (), {"works": ("strlschv",)})()
+    monkeypatch.setattr(tools.ontology_store, "view", lambda: view)
+    monkeypatch.setattr(
+        tools.ontology_query, "resolve", lambda q, v: frame if "StrlSchV" in q else None
+    )
+    monkeypatch.setattr(
+        tools.ontology_time, "current_expression", lambda v, w, d: "StrlSchV_2018.md"
+    )
+    run_memory.begin_run()
+    assert tools._resolve_work("StrlSchV") == "StrlSchV_2018.md"
+    assert tools._resolve_work("Strahlenschutzgesetzes") is None

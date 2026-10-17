@@ -425,12 +425,12 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions from the
 
 {raw_block}Tools available:
 - raw_search(query OR queries): full-text search over data/raw/. Pass 1-3 sub-queries in parallel. Cite hits as [Source: filename].
-- raw_read(filenames, offset=0): read up to 16000 chars from one or more original files. For long files, paginate: the result footer tells you the next offset.
+- raw_read(filenames): read original files. Append a section to read just that part (`StrlSchG.md § 62`). A bare name of a long law returns its best-matching §§ in full plus a map of the sections around them. `offset=` is only for long files without sections; the footer tells you the next offset.
 - wiki_search(query OR queries): full-text search over the local wiki — short summarized pages ABOUT the originals. Use it to find WHICH originals matter and how topics connect. Each hit's `sources:` names the originals behind it. Cite as [Wiki: filename.md].
-- wiki_read(filenames): read a full wiki page. Its `[Wiki linked N]` cross-references point to connected pages — follow them when the question spans more than one topic.
+- wiki_read(filenames): read a full wiki page. Connected pages come from wiki_search as `[Wiki linked N]` entries — read them when the question spans more than one topic.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
-- submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words, or fewer than {min_sources} unique sources, or if no [Source: ...] document is cited, or after fewer than {min_searches} distinct searches, or if none of the cited originals was opened with raw_read.
+- submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer < {min_words} words, or fewer than {min_sources} unique sources, or if no [Source: ...] document is cited, or after fewer than {min_searches} distinct searches, or if none of the cited originals was opened with raw_read, or if a § you cite was never read. An answer written as prose instead of submitted goes through the same checks.
 
 Wiki vs raw (critical):
 - The wiki is a MAP, the originals are the TERRITORY. Use the wiki to orient and to discover connections; take every fact, number, and exact wording from data/raw/.
@@ -448,6 +448,7 @@ Search strategy (critical):
 Reading long documents (critical):
 - To read a specific part of a long file, call `raw_read` with a section taken VERBATIM from a raw_search hit (e.g. `StrlSchG.md § 62`, `guide.md ## Overview`). That returns just that section, and its footer names the next section to read. Prefer this over byte offsets — read §61, then §62, then §63 as distinct reads.
 - Byte `offset` is only a fallback for files that have no `§`/`#` sections. The footer `[truncated; pass offset=N to continue]` tells you where to resume.
+- When a raw_read footer lists `References:` that the question depends on, follow the unread ones (raw_read with the given ref); list `(not in scope)` ones under `## Open points`.
 
 Definitional questions (critical):
 - For "Ist X ein Y?" / "Was gilt als …?" / "Zählt … als …?" questions, the deciding rule lives in the law's DEFINITION section — usually § 1 or § 2, often titled "Begriffsbestimmungen". A first raw_search on the term usually surfaces the OPERATIVE sections (possession, permits, procedures), NOT the definition. raw_read § 1 / § 2 of the governing law before you answer.
@@ -464,7 +465,7 @@ Required workflow:
      Have: <facts already grounded, with [Source: ...] tags>
      Gaps vs original question: <bullet list, each gap referencing the original question verbatim>
      Next: <which tool to call next and why; one of raw_read / raw_search / wiki_search / wiki_read / submit_chat_answer>
-4. AUTONOMOUS EXPANSION: based on the gaps, raw_read with offset OR raw_search with a different stem. When a gap is about which document covers a topic, or how two topics connect, use wiki_search / wiki_read to find the connection, then go back to the originals for the facts. Reflect every 2-3 tool calls.
+4. AUTONOMOUS EXPANSION: based on the gaps, raw_read the next section OR raw_search with a different stem. When a gap is about which document covers a topic, or how two topics connect, use wiki_search / wiki_read to find the connection, then go back to the originals for the facts. Reflect every 2-3 tool calls.
 4.5 EVALUATE: if the question turns on whether values meet a threshold, limit, or compound rule that the sources state explicitly, you MUST call evaluate_condition exactly once before submit_chat_answer. Extract the literal `facts` from the source text (numbers, categories, labels — keep the units the law uses) and assemble the `condition` tree as the law states it (use `or` when the law says "oder", `and` when "und"). Quote the result block verbatim in the final answer.
 5. SUBMIT: when you have at least {min_searches} tool calls and at least {min_sources} unique sources (counting section suffixes), call submit_chat_answer with a structured markdown answer (>= {min_words} words): open with a direct answer in 2-3 sentences, then one `## ` section per sub-question with the exact figures, conditions and exceptions from the originals, and end with `## Open points` when gaps remain. Inline-cite every factual claim.
 
@@ -484,16 +485,18 @@ RAW_SEARCH_DESCRIPTION = (
 
 RAW_READ_DESCRIPTION = (
     "Read from one or more original files in data/raw/. Pass a list of filenames. To read a "
-    "specific part of a long document, append a section taken verbatim from a raw_search hit "
-    "(e.g. 'StrlSchG.md § 62' or 'guide.md ## Overview') — that section's text is returned "
-    "directly, and each distinct section counts as a fresh read. For files without sections, "
-    "pass the bare filename plus an optional `offset` (default 0) for byte-pagination; the "
-    "result footer tells you the next offset to use."
+    "specific part, append a section taken verbatim from a raw_search hit (e.g. "
+    "'StrlSchG.md § 62' or 'guide.md ## Overview'); each distinct section is a fresh read. A "
+    "bare name of a long law returns its best-matching sections in full plus a map of the "
+    "sections around them. `offset` (default 0) is only for long files without sections; the "
+    "footer tells you the next offset. A footer `References:` lists the sections the text "
+    "refers to, resolved to files, with the exact call to follow an unread one."
 )
 
 SUBMIT_CHAT_DESCRIPTION = (
     "Submit the final chat answer. Validates >= min_words and >= min_sources unique [Source: filename] "
-    "citations, >= min_searches distinct searches, and that a cited original was raw_read. On accept, returns the answer to the UI (no file is written; the user saves manually)."
+    "citations, >= min_searches distinct searches, that a cited original was raw_read, and that "
+    "every cited § was read. On accept, returns the answer to the UI (no file is written; the user saves manually)."
 )
 
 EVALUATE_CONDITION_DESCRIPTION = (
@@ -542,6 +545,28 @@ CHAT_BUDGET_NUDGE = (
     "Use `answer` = all findings gathered so far in full markdown "
     "(aim for {min_words}+ words, cite every source as [Source: filename]). "
     "This is your only remaining action."
+)
+
+# Section grounding (tools._unread_sections): a cited § must have been read this run.
+CHAT_SECTION_UNREAD = (
+    "REJECTED: you cite {cited} but never read {pronoun}. Call raw_read({calls}), take the "
+    "conditions from its text, then submit again."
+)
+
+# Reference chains (tools._open_refs_missing): a cited section relies on a law that is not
+# among the searchable originals; the answer must say so instead of filling the gap.
+CHAT_OPEN_REFS_MISSING = (
+    "REJECTED: the sections you cite rely on {works}, which is not among the searchable "
+    "originals. Name it under `## Open points` (what is missing and why it matters for the "
+    "answer), do not fill the gap from memory, then submit again."
+)
+
+# Prose-exit gate (chat_agent._gate_prose): an answer written as prose instead of submitted
+# runs the submit gate; a rejection comes back as this user turn.
+CHAT_PROSE_GATE_RETRY = (
+    "Your answer was written as prose instead of being submitted, so it went through the "
+    "quality gate and failed:\n{verdict}\n"
+    "Call the tool it names, then call submit_chat_answer with the corrected answer."
 )
 
 RESEARCH_BUDGET_NUDGE = (

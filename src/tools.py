@@ -12,6 +12,7 @@ import os
 import re
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from functools import partial
 from typing import Any, cast
@@ -24,15 +25,19 @@ import calibrate
 import chunker
 import classification
 import db_context
+import lex_index
 import okf
 import ontology_graph
 import ontology_query
 import ontology_store
 import ontology_time
+import refs
 import retrieval
 import run_memory
 import wiki_engine
 from prompts import (
+    CHAT_OPEN_REFS_MISSING,
+    CHAT_SECTION_UNREAD,
     EVALUATE_CONDITION_DESCRIPTION,
     FETCH_WEBPAGE_DESCRIPTION,
     LOW_CONFIDENCE_NUDGE,
@@ -62,6 +67,12 @@ RAW_READ_CAP = 16000  # chars per raw_read call (per file, per offset window)
 # run, the read result appends a "submit now" nudge — stops weak models from
 # paginating a whole document instead of answering.
 RAW_READ_NUDGE_AFTER = int(os.getenv("CHAT_RAW_READ_NUDGE_AFTER", "3"))
+# Reference chains (raw_read footers): cross-file hops a run may follow, and the extra agent
+# turns it may earn by following them (+2 per followed cross-file reference).
+REF_MAX_HOPS = 3
+REF_BONUS_MAX = int(os.getenv("CHAT_REF_BONUS_MAX", "6"))
+RANK_TOP_K = 12  # sections ranked per file for the section map and auto-advance
+MAP_RADIUS = 5  # section-map entries shown on each side of a served section
 WIKI_LINK_EXPANSION = os.getenv("WIKI_LINK_EXPANSION", "1") != "0"
 WIKI_LINK_SEEDS = int(os.getenv("WIKI_LINK_SEEDS", "3"))  # top hits whose links we follow
 WIKI_LINK_MAX = int(os.getenv("WIKI_LINK_MAX", "5"))  # max neighbours appended per query
@@ -421,6 +432,13 @@ def _read_key(base: str, canon: str, offset: int) -> str:
     return f"raw:{base}:{int(offset or 0)}"
 
 
+def _canon(base: str, section: str) -> str:
+    """A section's visited-memory form: the anchor it resolves to, so "§62" and "§ 62" share
+    one entry; the normalized request when it resolves to nothing. Caller binds the DB."""
+    ch = _resolve_section(base, section) if section else None
+    return _norm_anchor(ch["anchor"]) if ch else _norm_anchor(section)
+
+
 def _read_canons(mem: run_memory.RunMemory, base: str) -> set[str]:
     """Normalized section anchors of `base` already read this run."""
     prefix = f"raw:{base}|sec="
@@ -578,6 +596,155 @@ def _read_bases(mem: run_memory.RunMemory) -> set[str]:
     return {k.split("|sec=", 1)[0] if "|sec=" in k else k.rsplit(":", 1)[0] for k in keys}
 
 
+def _section_read(mem: run_memory.RunMemory, qbase: str, ch: dict[str, Any]) -> bool:
+    """Whether this run read the chunk `ch` of `qbase`: by its section, or by a byte window
+    that overlaps it (an honest pagination read counts)."""
+    if _norm_anchor(ch.get("anchor", "")) in {_norm_anchor(c) for c in _read_canons(mem, qbase)}:
+        return True
+    start, end = int(ch.get("char_start", 0)), int(ch.get("char_end", 0))
+    return any(o < end and o + RAW_READ_CAP > start for o in _read_offsets(mem, qbase))
+
+
+def _legal_chunk(base: str, anchor: str) -> dict[str, Any] | None:
+    """The chunk of `base` whose anchor is exactly `anchor` (or its first part), else None:
+    stricter than `_resolve_section`, so a "§ 6" in prose never resolves to § 60."""
+    want = _norm_anchor(anchor)
+    for ch in chunker.load_chunks(base):
+        a = _norm_anchor(ch.get("anchor", ""))
+        if a == want or a.startswith(f"{want} (teil"):
+            return ch
+    return None
+
+
+def _named_raw_file(name: str) -> str | None:
+    """A raw file in the active DB whose stem or first heading names `name` (genitive-
+    tolerant: "Atomgesetzes" → "Atomgesetz")."""
+    raw = db_context.raw_dir()
+    if not raw.exists():
+        return None
+    n = name.casefold()
+    forms = {n, n[:-1], n[:-2]} if len(n) > 5 else {n}
+    for p in sorted(raw.iterdir()):
+        if p.suffix.lower() not in (".md", ".txt", ".html"):
+            continue
+        if p.stem.casefold() in forms:
+            return p.name
+        head = _first_heading(p).casefold()
+        if any(re.search(rf"\b{re.escape(f)}\b", head) for f in forms):
+            return p.name
+    return None
+
+
+def _first_heading(p: Any) -> str:
+    with contextlib.suppress(OSError), p.open("r", errors="replace") as fh:
+        for _, line in zip(range(40), fh, strict=False):
+            if line.startswith("#"):
+                return line.lstrip("# ").strip()
+    return ""
+
+
+def _ontology_work_file(name: str) -> str | None:
+    """The version in force of the work `name` names, by the active DB's ontology."""
+    view = ontology_store.view()
+    frame = ontology_query.resolve(name, view) if view is not None else None
+    if view is None or frame is None or not frame.works:
+        return None
+    return ontology_time.current_expression(view, frame.works[0], date.today())
+
+
+def _resolve_work(name: str) -> str | None:
+    """The (qualified) raw file a work name points to, searched only inside the search
+    scope (a file of a level out of scope is never named); cached per run."""
+    mem = run_memory.current()
+    if mem is not None and name in mem.work_files:
+        return mem.work_files[name]
+    found = None
+    for db in db_context.search_scope():
+        with db_context.using_db(db):
+            hit = _ontology_work_file(name) or _named_raw_file(name)
+        if hit:
+            found = db_context.qualify(hit, db)
+            break
+    if mem is not None:
+        mem.work_files[name] = found
+    return found
+
+
+def _tagged_unread(mem: run_memory.RunMemory, raw_cited: set[str]) -> list[tuple[str, str]]:
+    """(qualified file, anchor) of each `[Source: file §N]` whose section was not read."""
+    out: list[tuple[str, str]] = []
+    for ref in sorted(raw_cited):
+        db, base, section = _split_ref(ref)
+        with db_context.using_db(db):
+            ch = _resolve_section(base, section) if section else None
+        qbase = db_context.qualify(base, db)
+        if ch is not None and not _section_read(mem, qbase, ch):
+            out.append((qbase, ch["anchor"]))
+    return out
+
+
+def _prose_unread(mem: run_memory.RunMemory, answer: str, cited: set[str]) -> list[tuple[str, str]]:
+    """(file, anchor) of each § the prose names in a cited original but that was not read.
+    A § naming another work counts only when that work's file is cited."""
+    out: list[tuple[str, str]] = []
+    for r in refs.find_refs(answer, "", None, _resolve_work, lambda _f, _a: True):
+        files = sorted(cited) if r.kind == refs.SAME else [r.target] if r.target in cited else []
+        held: list[tuple[str, dict[str, Any]]] = []
+        for qbase in files:
+            db, base = db_context.split_ref(qbase)
+            with db_context.using_db(db):
+                ch = _legal_chunk(base, r.anchor)
+            if ch is not None:
+                held.append((qbase, ch))
+        if held and not any(_section_read(mem, q, ch) for q, ch in held):
+            out.append((held[0][0], r.anchor))
+    return out
+
+
+def _unread_sections(answer: str, raw_cited: set[str]) -> str | None:
+    """Fix B: a rejection naming the exact read for each cited § whose text this run never
+    opened. Tagged citations always count; a § named only in the prose is checked once."""
+    mem = run_memory.current()
+    if mem is None:
+        return None
+    unread = _tagged_unread(mem, raw_cited)
+    if not unread and not mem.prose_section_nudged:
+        cited = {db_context.qualify(b, d) for d, b, _ in map(_split_ref, raw_cited)}
+        unread = _prose_unread(mem, answer, cited)
+        mem.prose_section_nudged = bool(unread)
+    if not unread:
+        return None
+    unread = list(dict.fromkeys(unread))[:3]
+    return CHAT_SECTION_UNREAD.format(
+        cited=", ".join(f"{a} of {f}" for f, a in unread),
+        pronoun="it" if len(unread) == 1 else "them",
+        calls="[" + ", ".join(f"'{f} {a}'" for f, a in unread) + "]",
+    )
+
+
+_OPEN_POINTS_RE = re.compile(r"^#{2,3}\s*(?:Open points|Offene Punkte)\b", re.I | re.M)
+
+
+def _open_refs_missing(answer: str, raw_cited: set[str]) -> str | None:
+    """Once per run: reject when a cited section relies on a law not in scope that the
+    answer does not name under `## Open points`."""
+    mem = run_memory.current()
+    if mem is None or mem.open_refs_nudged or not mem.out_of_scope:
+        return None
+    m = _OPEN_POINTS_RE.search(answer)
+    open_points = answer[m.end() :].casefold() if m else ""
+    missing: list[str] = []
+    for ref in sorted(raw_cited):
+        t = _target(ref)
+        for work in mem.out_of_scope.get(f"{t.qbase}|sec={t.canon}", []) if t.section else []:
+            if work.casefold() not in open_points and work not in missing:
+                missing.append(work)
+    if not missing:
+        return None
+    mem.open_refs_nudged = True
+    return CHAT_OPEN_REFS_MISSING.format(works=", ".join(missing[:5]))
+
+
 def _research_gap(raw_cited: set[str]) -> str | None:
     """A rejection when the run searched too little or opened none of the originals it
     cites: a deep answer rests on read text, not on search excerpts. None outside a run."""
@@ -619,7 +786,13 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
             f"data/raw/), minimum is {CHAT_MIN_SOURCES} including at least one "
             "[Source: ...] document. Run more raw_search/raw_read and cite additional files."
         )
-    nudge = _research_gap(raw_unique) or _low_confidence_nudge() or _superseded_nudge(raw_unique)
+    nudge = (
+        _research_gap(raw_unique)
+        or _unread_sections(answer or "", raw_unique)
+        or _open_refs_missing(answer or "", raw_unique)
+        or _low_confidence_nudge()
+        or _superseded_nudge(raw_unique)
+    )
     if nudge:
         return nudge
     return f"ACCEPTED: {words} words, {len(unique)} sources cited."
@@ -812,53 +985,254 @@ def raw_search(query: str = "", queries: list[str] | None = None, max_results: i
     return "\n\n".join([*stubs, body]) if stubs else body
 
 
-def _duplicate_read_stub(mem: run_memory.RunMemory, f: str, prior: int, offset: int) -> str:
-    """The visited-memory reply for a read already done this run: names what is left."""
-    db, base, section = _split_ref(f)
-    canon = _norm_anchor(section) if section else ""
-    qbase = db_context.qualify(base, db)
-    if canon:
-        with db_context.using_db(db):
-            anchors = _section_anchors(base)
-        unread = [a for a in anchors if _norm_anchor(a) not in _read_canons(mem, qbase)]
-        menu = ", ".join(unread[:6]) if unread else "none left — pick a different file"
-        return (
-            f"## Raw file: {qbase} {section}\n"
-            f"[memory] Already read this section at step {prior}. "
-            f"Unread sections in {qbase}: {menu}. "
-            "Read one of those, pick a different file, or call think_tool."
-        )
+@dataclass(frozen=True)
+class _Target:
+    """One raw_read request, resolved: `base` addresses the stores inside `db`, `qbase` is
+    the (qualified) name the run memory and the model use, `canon` the section's key form."""
+
+    ref: str
+    db: str
+    base: str
+    section: str
+    qbase: str
+    canon: str
+
+
+def _target(ref: str) -> _Target:
+    db, base, section = _split_ref(ref)
     with db_context.using_db(db):
-        nxt = _next_unread_offset(mem, base, qbase)
-    hint = (
-        f"Next unread window: call raw_read(['{qbase}'], offset={nxt})."
-        if nxt is not None
-        else "Whole file already read — pick a different file or call think_tool."
-    )
-    return (
-        f"## Raw file: {qbase} (offset {int(offset or 0)})\n"
-        f"[memory] Already read at step {prior} — do not re-fetch. {hint}"
-    )
+        canon = _canon(base, section)
+    return _Target(ref, db, base, section, db_context.qualify(base, db), canon)
 
 
-def _mark_reads(mem: run_memory.RunMemory, fresh: list[str], offset: int) -> str | None:
-    """Record fresh reads; return the stop-paginating nudge once a file hits the limit."""
-    nudge_bases: list[str] = []
-    for f in fresh:
-        db, base, section = _split_ref(f)
-        canon = _norm_anchor(section) if section else ""
-        qbase = db_context.qualify(base, db)
-        mem.mark_read(_read_key(qbase, canon, offset))
-        # Section-less (byte-offset) reads are the pagination death-spiral
-        # path: once enough windows of one file are read, tell the model to
-        # stop paginating and answer.
-        if not canon and len(_read_offsets(mem, qbase)) >= RAW_READ_NUDGE_AFTER:
-            nudge_bases.append(qbase)
-    if not nudge_bases:
+def _raw_len(t: _Target) -> int | None:
+    with db_context.using_db(t.db):
+        data = wiki_engine.read_raw_source(t.base)
+    return None if data is None else len(data.decode("utf-8", errors="replace"))
+
+
+def _chunks(t: _Target) -> list[dict[str, Any]]:
+    with db_context.using_db(t.db):
+        return chunker.load_chunks(t.base)
+
+
+def _run_query(mem: run_memory.RunMemory) -> str:
+    """The run's question plus its distinct searches: what a file's sections are ranked by."""
+    asked = [k.split(":", 1)[1] for k in mem.searches if k.startswith(("raw_search:", "wiki_"))]
+    return " ".join([mem.question, *asked]).strip()[:2000]
+
+
+def _ranked_unread(mem: run_memory.RunMemory, t: _Target) -> list[dict[str, Any]]:
+    """Unread sections of `t`, best match for the run first ([] without an index or a hit)."""
+    q = _run_query(mem)
+    if not q:
+        return []
+    with db_context.using_db(t.db):
+        hits = lex_index.query(q, top_k=RANK_TOP_K, scope="raw", sources=[t.base])
+    by_id = {c["chunk_id"]: c for c in _chunks(t)}
+    out: list[dict[str, Any]] = []
+    for h in hits:
+        ch = by_id.get(h["chunk_id"])
+        if ch and float(h["score"]) > 0 and ch not in out and not _section_read(mem, t.qbase, ch):
+            out.append(ch)
+    return out
+
+
+def _offered_unread(mem: run_memory.RunMemory, t: _Target) -> list[dict[str, Any]]:
+    """Unread sections of `t` that a reference footer listed this run, in offer order."""
+    prefix = f"{t.qbase}|sec="
+    out: list[dict[str, Any]] = []
+    for key in mem.ref_offers:
+        if key.startswith(prefix):
+            with db_context.using_db(t.db):
+                ch = _resolve_section(t.base, key[len(prefix) :])
+            if ch is not None and not _section_read(mem, t.qbase, ch):
+                out.append(ch)
+    return out
+
+
+def _note_follow(mem: run_memory.RunMemory, qbase: str, canon: str) -> int:
+    """Record a section read's chain depth; following a listed cross-file reference earns
+    extra turns. Returns the depth (0 when no footer led here)."""
+    key = f"{qbase}|sec={canon}"
+    if key not in mem.ref_depth:
+        depth, cross = mem.ref_offers.get(key, (0, False))
+        mem.ref_depth[key] = depth
+        if cross:
+            mem.bonus = min(mem.bonus + 2, REF_BONUS_MAX)
+    return mem.ref_depth[key]
+
+
+def _find_anchor(file: str, anchor: str) -> dict[str, Any] | None:
+    db, base = db_context.split_ref(file)
+    with db_context.using_db(db):
+        if anchor.startswith("§"):
+            return _legal_chunk(base, anchor)
+        return _resolve_section(base, anchor)
+
+
+def _ref_entry(mem: run_memory.RunMemory, r: refs.Ref, depth: int) -> tuple[str, str | None]:
+    """(footer entry, raw_read argument to follow it or None) for one reference."""
+    if r.kind == refs.OUT or r.target is None:
+        return f"{r.work} {r.anchor} (not in scope)", None
+    label = f"{r.target} {r.anchor}"
+    ch = _find_anchor(r.target, r.anchor) if r.found else None
+    if ch is None:
+        return f"{label} ({r.anchor} not found in file)", None
+    same = r.kind == refs.SAME
+    if not same and depth >= REF_MAX_HOPS:
+        return f"{label} (hop limit reached)", None
+    read = _section_read(mem, r.target, ch)
+    status = ("same file, " if same else "") + ("read" if read else "unread")
+    key = f"{r.target}|sec={_norm_anchor(ch['anchor'])}"
+    mem.ref_offers.setdefault(key, (depth if same else depth + 1, not same))
+    return f"{label} ({status})", None if read else label
+
+
+def _ref_footer(mem: run_memory.RunMemory, t: _Target, anchor: str | None, text: str) -> str:
+    """Fix F: the references a read text makes, resolved in code, with their status."""
+    key = f"{t.qbase}|sec={_norm_anchor(anchor)}" if anchor else ""
+    depth = mem.ref_depth.get(key, 0)
+    found = refs.find_refs(text, t.qbase, anchor, _resolve_work, lambda f, a: True)
+    if not found:
+        return ""
+    entries: list[str] = []
+    follow: str | None = None
+    for r in found:
+        entry, call = _ref_entry(mem, r, depth)
+        entries.append(entry)
+        follow = follow or call
+        if r.kind == refs.OUT and key and r.work not in mem.out_of_scope.get(key, []):
+            mem.out_of_scope.setdefault(key, []).append(r.work)
+    hint = f"  — follow with raw_read(['{follow}'])" if follow else ""
+    return "\n\nReferences: " + " · ".join(entries) + hint
+
+
+def _with_marker(text: str, marker: str) -> str:
+    """`text` with a run-memory marker appended to its header line."""
+    if not marker:
+        return text
+    head, _, rest = text.partition("\n")
+    return f"{head} {marker}\n{rest}"
+
+
+def _serve_section(
+    mem: run_memory.RunMemory, t: _Target, ch: dict[str, Any], marker: str = ""
+) -> str:
+    """One section in full, marked read under its own key, with its reference footer."""
+    canon = _norm_anchor(ch["anchor"])
+    _note_follow(mem, t.qbase, canon)
+    mem.mark_read(_read_key(t.qbase, canon, 0))
+    with db_context.using_db(t.db):
+        text = _format_section(t.base, ch, t.qbase)
+    return _with_marker(text, marker) + _ref_footer(mem, t, ch["anchor"], ch["text"])
+
+
+def _serve_window(mem: run_memory.RunMemory, t: _Target, offset: int, marker: str = "") -> str:
+    """One byte window, marked read, with the references it makes."""
+    text = _raw_read_one(t.qbase, offset=offset)
+    mem.mark_read(_read_key(t.qbase, "", offset))
+    body = text.partition("\n")[2]
+    return _with_marker(text, marker) + _ref_footer(mem, t, None, body)
+
+
+_TEIL_RE = re.compile(r"\s*\(Teil \d+\)$")
+
+
+def _map_line(t: _Target, served: list[dict[str, Any]]) -> str:
+    """The sections around the served ones (±MAP_RADIUS), with their titles."""
+    entries: list[tuple[str, str]] = []
+    for ch in _chunks(t):
+        a = _TEIL_RE.sub("", ch.get("anchor", ""))
+        if a and all(a != e[0] for e in entries):
+            entries.append((a, ((ch.get("heading_path") or [a])[0])[:60]))
+    index = {a: i for i, (a, _) in enumerate(entries)}
+    keep: set[int] = set()
+    for ch in served:
+        i = index.get(_TEIL_RE.sub("", ch["anchor"]), 0)
+        keep |= set(range(max(0, i - MAP_RADIUS), min(len(entries), i + MAP_RADIUS + 1)))
+    shown = " · ".join(entries[i][1] for i in sorted(keep))
+    return f"Map near the matches: {shown}. Read another with raw_read(['{t.qbase} § N'])."
+
+
+def _section_map_read(mem: run_memory.RunMemory, t: _Target) -> str | None:
+    """Fix C: a bare read of a long legal file serves its best-matching sections in full
+    plus a map around them, instead of byte window 0 (the table of contents)."""
+    best = _offered_unread(mem, t) + _ranked_unread(mem, t)
+    if not best:
         return None
-    files = ", ".join(sorted(set(nudge_bases)))
+    served: list[dict[str, Any]] = []
+    bodies: list[str] = []
+    for ch in best[:2]:
+        if bodies and sum(map(len, bodies)) + len(ch.get("text", "")) > RAW_READ_CAP:
+            break
+        served.append(ch)
+        bodies.append(_serve_section(mem, t, ch))
+    n = len({_TEIL_RE.sub("", c.get("anchor", "")) for c in _chunks(t)})
+    head = f"## Raw file: {t.qbase} — section map ({n} sections; best matches read in full)"
+    return "\n\n".join([head, *bodies, _map_line(t, served)])
+
+
+def _is_law(t: _Target) -> bool:
+    return any(c.get("anchor", "").startswith("§") for c in _chunks(t))
+
+
+def _advance(mem: run_memory.RunMemory, t: _Target, why: str) -> str:
+    """Fix D: instead of a stub, serve the next unread unit — a listed reference or the best
+    unread section, else the next unread byte window; a stub only when nothing is left."""
+    best = _offered_unread(mem, t) + _ranked_unread(mem, t)
+    if best:
+        marker = f"[memory: {why} → serving the next unread best match]"
+        return _serve_section(mem, t, best[0], marker)
+    with db_context.using_db(t.db):
+        nxt = _next_unread_offset(mem, t.base, t.qbase)
+    if nxt is not None:
+        return _serve_window(mem, t, nxt, f"[memory: {why} → serving the next unread window]")
     return (
-        f"[memory] You have now read {RAW_READ_NUDGE_AFTER}+ windows of {files}. "
+        f"## Raw file: {t.qbase}\n[memory] {t.qbase} fully explored for this question — "
+        "submit_chat_answer or search another file."
+    )
+
+
+def _fresh_read(mem: run_memory.RunMemory, t: _Target, offset: int) -> str:
+    if not t.section:
+        return _serve_window(mem, t, offset)
+    text = _raw_read_one(t.ref, offset=offset)
+    mem.mark_read(_read_key(t.qbase, t.canon, offset))
+    with db_context.using_db(t.db):
+        ch = _resolve_section(t.base, t.section)
+    if ch is None:
+        return text
+    _note_follow(mem, t.qbase, t.canon)
+    return text + _ref_footer(mem, t, ch["anchor"], ch["text"])
+
+
+def _memory_read(mem: run_memory.RunMemory, ref: str, offset: int) -> tuple[str, str]:
+    """(output, qualified file) of one raw_read request under the run memory."""
+    t = _target(ref)
+    total = _raw_len(t)
+    if total is None:
+        return _raw_read_one(ref, offset=offset), t.qbase
+    if not t.section and offset >= total > 0:
+        why = f"requested offset {offset} is past the end; file has {total} chars"
+        return _advance(mem, t, why), t.qbase
+    prior = mem.seen_read(_read_key(t.qbase, t.canon, offset))
+    if prior is not None:
+        return _advance(mem, t, f"repeat of step {prior}"), t.qbase
+    if not t.section and offset == 0 and total > RAW_READ_CAP and _is_law(t):
+        mapped = _section_map_read(mem, t)
+        if mapped is not None:
+            return mapped, t.qbase
+    return _fresh_read(mem, t, offset), t.qbase
+
+
+def _pagination_nudge(mem: run_memory.RunMemory, files: list[str]) -> str | None:
+    """The stop-paginating nudge once a file has RAW_READ_NUDGE_AFTER windows read."""
+    over = sorted({f for f in files if len(_read_offsets(mem, f)) >= RAW_READ_NUDGE_AFTER})
+    if not over:
+        return None
+    return (
+        f"[memory] You have now read {RAW_READ_NUDGE_AFTER}+ windows of {', '.join(over)}. "
         "Stop paginating — if you have enough to answer, call submit_chat_answer "
         "now; otherwise raw_search a different file or call think_tool."
     )
@@ -873,24 +1247,10 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
     filenames = _names(filenames)
     if not filenames:
         return _raw_read_impl(filenames, offset=offset)
-    out: list[str] = []
-    fresh: list[str] = []
-    for f in filenames:
-        db, base, section = _split_ref(f)
-        canon = _norm_anchor(section) if section else ""
-        # Key on the qualified name: two DBs can hold same-named files, and the
-        # guard must not collapse them into one visited entry.
-        prior = mem.seen_read(_read_key(db_context.qualify(base, db), canon, offset))
-        if prior is None:
-            fresh.append(f)
-        else:
-            out.append(_duplicate_read_stub(mem, f, prior, offset))
-    if fresh:
-        out.append(_raw_read_impl(fresh, offset=offset))
-        nudge = _mark_reads(mem, fresh, offset)
-        if nudge:
-            out.append(nudge)
-    return "\n\n".join(out)
+    results = [_memory_read(mem, f, int(offset or 0)) for f in filenames]
+    out = [text for text, _ in results]
+    nudge = _pagination_nudge(mem, [qbase for _, qbase in results])
+    return "\n\n".join([*out, nudge] if nudge else out)
 
 
 @tool(description=SUBMIT_CHAT_DESCRIPTION)

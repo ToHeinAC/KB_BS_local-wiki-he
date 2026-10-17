@@ -32,6 +32,7 @@ from langchain_core.messages import (
 )
 from langchain_core.runnables import Runnable, RunnableConfig
 from langchain_ollama import ChatOllama
+from langgraph.errors import GraphRecursionError  # pyright: ignore[reportMissingTypeStubs]
 from langgraph.graph import (  # pyright: ignore[reportMissingTypeStubs]
     END,
     START,
@@ -54,6 +55,7 @@ from prompts import (
     CHAT_BUDGET_NUDGE,
     CHAT_FALLBACK_PROMPT,
     CHAT_FALLBACK_SYSTEM,
+    CHAT_PROSE_GATE_RETRY,
 )
 
 load_dotenv()
@@ -65,6 +67,9 @@ MAX_ITER = int(os.getenv("CHAT_MAX_ITERATIONS", "40"))
 NUDGE_AT = int(os.getenv("CHAT_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 LLM_TIMEOUT = int(os.getenv("CHAT_LLM_TIMEOUT", "180"))
 FALLBACK_NOTES_CAP = int(os.getenv("CHAT_FALLBACK_NOTES_CAP", "12000"))
+# A prose answer (no submit call) runs the submit gate too; this many rejections are fed
+# back before the run ends with a labelled best-effort answer.
+PROSE_RETRIES = int(os.getenv("CHAT_PROSE_RETRIES", "2"))
 
 # Ollama stops generating once prompt + answer reach num_ctx, so a long run's answer would
 # be cut mid-sentence. The history sent per turn stays under the window minus a reserve for
@@ -76,7 +81,8 @@ _TRIM_HEAD = 400  # what a trimmed tool result keeps: its header names file and 
 _TRIMMED = "\n[trimmed to fit the context window — the facts noted in think_tool still hold]"
 
 _RAW_TEXT_EXTS = {".md", ".txt", ".html"}
-_RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]]+\.(?:md|txt|html))\s*\]")
+# The gate's own pattern, so "N cited" and the sources panel count `[Source: file §N]` as it does.
+_RAW_CITE_RE = tool_module._RAW_CITE_RE  # pyright: ignore[reportPrivateUsage]
 # Permissive body so a DB-qualified page ("Investing::foo.md") still parses —
 # DB names may contain spaces, so this can't be a \w-class.
 _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([^\]\n]+?\.md)\s*\]")
@@ -117,6 +123,40 @@ def _fit_window(msgs: list[AnyMessage], budget_chars: int = WINDOW_CHARS) -> lis
     return out
 
 
+def _text(m: AnyMessage) -> str:
+    return m.content if isinstance(m.content, str) else str(m.content or "")
+
+
+def _verdict_reason(verdict: str) -> str:
+    """The first line of a gate verdict, short enough for a label."""
+    return verdict.strip().splitlines()[0][:300] if verdict.strip() else verdict
+
+
+def _gate_prose(text: str) -> dict[str, Any]:
+    """Run the submit gate on a prose answer. A rejection with retries left goes back to
+    the agent as a user turn; otherwise the run ends (labelled best-effort if rejected)."""
+    verdict = tool_module._submit_chat_impl(text)  # pyright: ignore[reportPrivateUsage]
+    mem = run_memory.current()
+    if mem is None or verdict.startswith("ACCEPTED"):
+        if mem is not None:
+            mem.gate_reason = None
+            mem.gate_events.append("accepted")
+        return {"messages": []}
+    mem.gate_reason = _verdict_reason(verdict)
+    if mem.prose_rejections >= PROSE_RETRIES:
+        mem.gate_events.append(f"rejected, retries used up: {mem.gate_reason}")
+        return {"messages": []}
+    mem.prose_rejections += 1
+    mem.gate_events.append(
+        f"rejected (retry {mem.prose_rejections}/{PROSE_RETRIES}): {mem.gate_reason}"
+    )
+    return {"messages": [HumanMessage(content=CHAT_PROSE_GATE_RETRY.format(verdict=verdict))]}
+
+
+def _after_gate(state: MessagesState) -> str:
+    return "agent" if isinstance(state["messages"][-1], HumanMessage) else END
+
+
 def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
     return ChatOllama(
         model=ollama_client.QUERY_MODEL,
@@ -134,17 +174,24 @@ def _build_graph(
         f"\n\n{directive}" if directive else ""
     )
 
-    def agent_node(state: MessagesState) -> dict[str, Any]:
+    def agent_node(state: MessagesState, config: RunnableConfig) -> dict[str, Any]:
+        mem = run_memory.current()
+        bonus = mem.bonus if mem is not None else 0
+        # The graph's own limit leaves room for the reference bonus; the run's real limit
+        # is MAX_ITER plus two steps per earned turn (an agent step and a tool step).
+        step = int((config.get("metadata") or {}).get("langgraph_step", 0))
+        if step > MAX_ITER + 2 * bonus:
+            raise GraphRecursionError(f"Recursion limit of {MAX_ITER} reached")
         msgs = _fit_window(list(state["messages"]))
         ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
-        if ai_count >= NUDGE_AT:
+        if ai_count >= NUDGE_AT + bonus:
             msgs = [*msgs, HumanMessage(content=nudge)]
         return {"messages": [llm.invoke(msgs)]}
 
     def should_continue(state: MessagesState) -> str:
         last = state["messages"][-1]
         if not (isinstance(last, AIMessage) and last.tool_calls):
-            return END
+            return "prose_gate" if _text(last).strip() else END
         for m in reversed(state["messages"]):
             if (
                 isinstance(m, ToolMessage)
@@ -155,12 +202,19 @@ def _build_graph(
                 return END
         return "tools"
 
+    def prose_gate(state: MessagesState) -> dict[str, Any]:
+        return _gate_prose(_text(state["messages"][-1]))
+
     g: StateGraph[MessagesState] = StateGraph(MessagesState)
     # langgraph leaves CachePolicy/BaseCheckpointSaver generics unsolved in these signatures.
     g.add_node("agent", agent_node)  # pyright: ignore[reportUnknownMemberType]
     g.add_node("tools", ToolNode(tool_module.with_ontology(tool_module.CHAT_TOOLS)))  # pyright: ignore[reportUnknownMemberType]
+    g.add_node("prose_gate", prose_gate)  # pyright: ignore[reportUnknownMemberType]
     g.add_edge(START, "agent")
-    g.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
+    g.add_conditional_edges(
+        "agent", should_continue, {"tools": "tools", "prose_gate": "prose_gate", END: END}
+    )
+    g.add_conditional_edges("prose_gate", _after_gate, {"agent": "agent", END: END})
     g.add_edge("tools", "agent")
     return g.compile()  # pyright: ignore[reportUnknownMemberType]
 
@@ -321,8 +375,9 @@ class _Run:
 def _stream(graph: Any, init: MessagesState, run: _Run) -> Generator[dict[str, Any], None, bool]:
     """Run the graph, yielding live steps. Returns False when it died on a real error
     (already reported); a recursion-limit stop is recorded and returns True."""
-    config: RunnableConfig = {"recursion_limit": MAX_ITER}
-    seen = 0
+    config: RunnableConfig = {"recursion_limit": MAX_ITER + 2 * tool_module.REF_BONUS_MAX}
+    seen = gates = 0
+    mem = run_memory.current()
     try:
         for chunk in graph.stream(init, config=config, stream_mode="values"):
             run.messages = chunk.get("messages", [])
@@ -334,6 +389,9 @@ def _stream(graph: Any, init: MessagesState, run: _Run) -> Generator[dict[str, A
                     yield from _tool_to_result(msg)
                     run.final_msg = msg
             seen = len(run.messages)
+            events = mem.gate_events if mem is not None else []
+            yield from ({"type": "gate", "content": e} for e in events[gates:])
+            gates = len(events)
     except Exception as exc:
         err = str(exc)
         if "recursion" not in err.lower() and "GRAPH_RECURSION_LIMIT" not in err:
@@ -372,6 +430,14 @@ def _best_effort_draft(messages: list[AnyMessage]) -> tuple[str, list[str]] | No
             text = m.content if isinstance(m.content, str) else str(m.content or "")
             if text.strip():
                 return text, []
+    return None
+
+
+def _last_rejection(messages: list[AnyMessage]) -> str | None:
+    """The reason the latest submit_chat_answer was turned down, if one was."""
+    for m in reversed(messages):
+        if isinstance(m, ToolMessage) and m.name == "submit_chat_answer":
+            return _verdict_reason(_text(m))
     return None
 
 
@@ -414,19 +480,23 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
             **_cites(answer, sources),
         }
     direct = _direct_answer(run.final_msg)
+    mem = run_memory.current()
     if direct:
+        reason = mem.gate_reason if mem is not None else None
+        label = f"(best-effort — quality gate not met: {reason})\n\n" if reason else ""
         return {
             "type": "final_answer",
-            "content": _with_iter_hint(direct, run.recursion_hit),
+            "content": _with_iter_hint(label + direct, run.recursion_hit),
             **_cites(direct),
         }
     draft = _best_effort_draft(run.messages)
     if draft is None:
         return _last_resort(question, directive, run)
+    reason = _last_rejection(run.messages)
     prefix = (
         "(partial — recursion limit hit)"
         if run.recursion_hit
-        else "(best-effort — quality gate not met)"
+        else f"(best-effort — quality gate not met{f': {reason}' if reason else ''})"
     )
     return {
         "type": "final_answer",
@@ -436,7 +506,7 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
 
 
 def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
-    run_memory.begin_run()
+    run_memory.begin_run(question)
     directive = lang.response_directive(question)
     try:
         graph = _build_graph(_build_llm(), directive)
