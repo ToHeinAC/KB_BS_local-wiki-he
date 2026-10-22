@@ -136,7 +136,7 @@ def test_old_tool_results_are_trimmed_so_the_answer_fits_the_window():
         _tool("raw_read", "## Raw file: b.md\n" + "b" * 50_000, "3"),
         _tool("raw_read", "## Raw file: c.md\n" + "c" * 30_000, "4"),
     ]
-    fitted = chat_agent._fit_window(msgs, budget_chars=60_000)
+    fitted, _ = chat_agent._fit_window(msgs, budget_chars=60_000)
     assert sum(len(str(m.content)) for m in fitted) <= 60_000
     head = str(fitted[2].content)
     assert head.startswith("## Raw file: a.md")
@@ -149,7 +149,40 @@ def test_old_tool_results_are_trimmed_so_the_answer_fits_the_window():
 
 def test_a_short_history_is_sent_unchanged():
     msgs = [HumanMessage(content="q"), _tool("raw_read", "short", "1")]
-    assert chat_agent._fit_window(msgs, budget_chars=60_000) == msgs
+    assert chat_agent._fit_window(msgs, budget_chars=60_000) == (msgs, frozenset())
+
+
+def test_a_trim_cuts_deep_so_the_next_turns_send_the_same_prefix():
+    # Ollama reuses its prompt cache only up to the first changed token. Trimming just
+    # enough each turn would cut one more early result per turn and re-prefill everything
+    # after it; one deep cut, then reused verbatim, keeps the prefix stable.
+    msgs: list[Any] = [HumanMessage(content="q")] + [
+        _tool("raw_read", f"## Raw file: {i}.md\n" + "x" * 20_000, str(i)) for i in range(5)
+    ]
+    first, trimmed = chat_agent._fit_window(msgs, budget_chars=90_000)
+    assert sum(len(str(m.content)) for m in first) <= 90_000 * chat_agent._TRIM_TO
+    grown = [*msgs, _tool("raw_read", "## Raw file: 9.md\n" + "y" * 20_000, "9")]
+    second, again = chat_agent._fit_window(grown, trimmed, budget_chars=90_000)
+    assert again == trimmed
+    assert second[: len(first)] == first
+
+
+def test_the_wrap_up_nudge_is_stored_once_in_the_history(monkeypatch):
+    # A nudge re-added at the tail of every turn's prompt changes the prompt behind the
+    # last answer, so each turn re-prefills; stored once, it is just more history.
+    monkeypatch.setattr(chat_agent, "NUDGE_AT", 1)
+    fake = _patch_llm(
+        monkeypatch,
+        [_ai_with_tool("think_tool", {"reflection": f"note {i}"}, f"c{i}") for i in range(3)],
+    )
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    list(chat_agent.run_chat_agent("q?"))
+    nudges = [
+        [i for i, m in enumerate(call) if isinstance(m, HumanMessage) and "500+ words" in m.content]
+        for call in fake.calls
+    ]
+    assert nudges[1]
+    assert all(n == nudges[1] for n in nudges[2:])
 
 
 # --- prose exit gate (ideas/deep-chat-read-memory-and-section-grounding.md Fix A) ---

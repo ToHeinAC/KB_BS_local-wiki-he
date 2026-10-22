@@ -78,6 +78,9 @@ _ANSWER_RESERVE_TOKENS = 8192
 _CHARS_PER_TOKEN = 3
 WINDOW_CHARS = (ollama_client.NUM_CTX - _ANSWER_RESERVE_TOKENS) * _CHARS_PER_TOKEN
 _TRIM_HEAD = 400  # what a trimmed tool result keeps: its header names file and section
+# A trim cuts the history down to this share of the budget, so the following turns resend
+# the same prefix and Ollama's prompt cache holds until the next trim.
+_TRIM_TO = 0.6
 _TRIMMED = "\n[trimmed to fit the context window — the facts noted in think_tool still hold]"
 
 _RAW_TEXT_EXTS = {".md", ".txt", ".html"}
@@ -101,26 +104,38 @@ def _size(m: AnyMessage) -> int:
     return len(str(m.content)) + (len(str(calls)) if calls else 0)
 
 
-def _fit_window(msgs: list[AnyMessage], budget_chars: int = WINDOW_CHARS) -> list[AnyMessage]:
-    """The history to send, with the oldest bulky tool results cut to their head until it
-    fits. think_tool notes and the latest tool result stay whole; the run's state is unchanged."""
-    out = list(msgs)
+def _trim(m: AnyMessage) -> AnyMessage:
+    return m.model_copy(update={"content": str(m.content)[:_TRIM_HEAD] + _TRIMMED})
+
+
+def _fit_window(
+    msgs: list[AnyMessage], trimmed: frozenset[int] = frozenset(), budget_chars: int = WINDOW_CHARS
+) -> tuple[list[AnyMessage], frozenset[int]]:
+    """The history to send and the indexes of its trimmed tool results. Earlier trims
+    (`trimmed`) are reapplied as they were; once over budget, the oldest bulky results are
+    cut to their head down to `_TRIM_TO` of it. think_tool notes and the latest tool result
+    stay whole; the run's state is unchanged."""
+    out = [_trim(m) if i in trimmed else m for i, m in enumerate(msgs)]
+    cut = set(trimmed)
     excess = sum(map(_size, out)) - budget_chars
+    if excess > 0:
+        excess += int(budget_chars * (1 - _TRIM_TO))
     last_tool = max((i for i, m in enumerate(out) if isinstance(m, ToolMessage)), default=-1)
     for i, m in enumerate(out):
         if excess <= 0:
             break
-        text = str(m.content)
         if (
-            not isinstance(m, ToolMessage)
+            i in cut
+            or not isinstance(m, ToolMessage)
             or i == last_tool
             or m.name == "think_tool"
-            or len(text) <= _TRIM_HEAD + len(_TRIMMED)
+            or len(str(m.content)) <= _TRIM_HEAD + len(_TRIMMED)
         ):
             continue
-        out[i] = m.model_copy(update={"content": text[:_TRIM_HEAD] + _TRIMMED})
-        excess -= len(text) - len(str(out[i].content))
-    return out
+        out[i] = _trim(m)
+        cut.add(i)
+        excess -= len(str(m.content)) - len(str(out[i].content))
+    return out, frozenset(cut)
 
 
 def _text(m: AnyMessage) -> str:
@@ -167,14 +182,25 @@ def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
     ).bind_tools(tool_module.with_ontology(tool_module.CHAT_TOOLS))  # pyright: ignore[reportUnknownMemberType]  # bare Callable
 
 
+def _new_nudge(msgs: list[AnyMessage], nudge: str, bonus: int) -> list[AnyMessage]:
+    """The wrap-up nudge to store, once it is due and only once: re-added at the tail every
+    turn, it would change the prompt behind the last answer and defeat Ollama's cache."""
+    due = sum(1 for m in msgs if isinstance(m, AIMessage)) >= NUDGE_AT + bonus
+    if due and not any(isinstance(m, HumanMessage) and m.content == nudge for m in msgs):
+        return [HumanMessage(content=nudge)]
+    return []
+
+
 def _build_graph(
     llm: Runnable[LanguageModelInput, BaseMessage], directive: str = ""
 ) -> CompiledStateGraph[MessagesState]:
     nudge = CHAT_BUDGET_NUDGE.format(min_words=MIN_WORDS) + (
         f"\n\n{directive}" if directive else ""
     )
+    trimmed: frozenset[int] = frozenset()
 
     def agent_node(state: MessagesState, config: RunnableConfig) -> dict[str, Any]:
+        nonlocal trimmed
         mem = run_memory.current()
         bonus = mem.bonus if mem is not None else 0
         # The graph's own limit leaves room for the reference bonus; the run's real limit
@@ -182,11 +208,9 @@ def _build_graph(
         step = int((config.get("metadata") or {}).get("langgraph_step", 0))
         if step > MAX_ITER + 2 * bonus:
             raise GraphRecursionError(f"Recursion limit of {MAX_ITER} reached")
-        msgs = _fit_window(list(state["messages"]))
-        ai_count = sum(1 for m in msgs if isinstance(m, AIMessage))
-        if ai_count >= NUDGE_AT + bonus:
-            msgs = [*msgs, HumanMessage(content=nudge)]
-        return {"messages": [llm.invoke(msgs)]}
+        msgs, trimmed = _fit_window(list(state["messages"]), trimmed)
+        new = _new_nudge(msgs, nudge, bonus)
+        return {"messages": [*new, llm.invoke([*msgs, *new])]}
 
     def should_continue(state: MessagesState) -> str:
         last = state["messages"][-1]
