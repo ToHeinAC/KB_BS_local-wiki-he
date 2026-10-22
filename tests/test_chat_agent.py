@@ -288,3 +288,51 @@ def test_a_failing_pre_flight_search_leaves_the_run_to_the_model(monkeypatch):
     monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
     list(chat_agent.run_chat_agent("q?"))
     assert not any(isinstance(m, ToolMessage) for m in fake.calls[0])
+
+
+# --- auto-read of the top original (report tweak 7) ---
+
+RAW_HITS = (
+    "## Raw query: q\n[Raw hit 1]\nfile: strl.md §5\nchunk_id: c1\n---\n[Raw hit 2]\nfile: b.md\n"
+)
+
+
+def _stub_search(monkeypatch, reads):
+    tm = chat_agent.tool_module
+    monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: RAW_HITS)
+    monkeypatch.setattr(tm, "_wiki_search_impl", lambda queries, **kw: "WIKI HITS")
+    monkeypatch.setattr(
+        tm, "_memory_read", lambda mem, f, offset: (reads.append([f]) or "READ TEXT", f)
+    )
+    monkeypatch.setattr(tm, "_pagination_nudge", lambda mem, qbases: None)
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+
+
+def test_code_opens_the_top_hit_when_the_model_has_read_no_original(monkeypatch):
+    # Small models answer from search excerpts; the gate wants a read original, so by the
+    # third turn code opens the best hit's section for the model.
+    reads: list = []
+    _stub_search(monkeypatch, reads)
+    fake = _patch_llm(
+        monkeypatch,
+        [_ai_with_tool("think_tool", {"reflection": f"n{i}"}, f"t{i}") for i in range(2)],
+    )
+    list(chat_agent.run_chat_agent("q?"))
+    assert reads == [["strl.md §5"]]
+    third = fake.calls[2]
+    assert any(isinstance(m, ToolMessage) and m.content == "READ TEXT" for m in third)
+
+
+def test_no_auto_read_once_the_model_opened_an_original_itself(monkeypatch):
+    reads: list = []
+    _stub_search(monkeypatch, reads)
+    _patch_llm(
+        monkeypatch,
+        [
+            _ai_with_tool("raw_read", {"filenames": ["b.md"]}, "r1"),
+            _ai_with_tool("think_tool", {"reflection": "n"}, "t1"),
+            _ai_with_tool("think_tool", {"reflection": "m"}, "t2"),
+        ],
+    )
+    list(chat_agent.run_chat_agent("q?"))
+    assert reads == [["b.md"]]

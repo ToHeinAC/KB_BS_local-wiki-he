@@ -71,6 +71,9 @@ FALLBACK_NOTES_CAP = int(os.getenv("CHAT_FALLBACK_NOTES_CAP", "12000"))
 # A prose answer (no submit call) runs the submit gate too; this many rejections are fed
 # back before the run ends with a labelled best-effort answer.
 PROSE_RETRIES = int(os.getenv("CHAT_PROSE_RETRIES", "2"))
+# Agent turns (the pre-flight search counts as one) after which code opens the best raw
+# hit if the model has read no original yet.
+AUTO_READ_AT = 3
 
 # Ollama stops generating once prompt + answer reach num_ctx, so a long run's answer would
 # be cut mid-sentence. The history sent per turn stays under the window minus a reserve for
@@ -85,6 +88,7 @@ _TRIM_TO = 0.6
 _TRIMMED = "\n[trimmed to fit the context window — the facts noted in think_tool still hold]"
 
 _RAW_TEXT_EXTS = {".md", ".txt", ".html"}
+_FILE_LINE_RE = re.compile(r"^file: (.+)$", re.MULTILINE)  # a raw_search hit's file and §
 # The gate's own pattern, so "N cited" and the sources panel count `[Source: file §N]` as it does.
 _RAW_CITE_RE = tool_module._RAW_CITE_RE  # pyright: ignore[reportPrivateUsage]
 # Permissive body so a DB-qualified page ("Investing::foo.md") still parses —
@@ -192,6 +196,36 @@ def _new_nudge(msgs: list[AnyMessage], nudge: str, bonus: int) -> list[AnyMessag
     return []
 
 
+def _auto_read(msgs: list[AnyMessage]) -> AIMessage | None:
+    """A `raw_read` of the best raw hit's section, made for the model once it has taken
+    `AUTO_READ_AT` turns without opening any original: small models answer from search
+    excerpts, and the gate rejects an answer whose cited originals were never read."""
+    calls = [c for m in msgs if isinstance(m, AIMessage) for c in m.tool_calls]
+    if len([m for m in msgs if isinstance(m, AIMessage)]) < AUTO_READ_AT or any(
+        c["name"] == "raw_read" for c in calls
+    ):
+        return None
+    hits = (_text(m) for m in msgs if isinstance(m, ToolMessage) and m.name == "raw_search")
+    top = next((h.group(1).strip() for h in map(_FILE_LINE_RE.search, hits) if h), None)
+    if top is None:
+        return None
+    read: ToolCall = {
+        "name": "raw_read",
+        "args": {"filenames": [top]},
+        "id": "auto-read",
+        "type": "tool_call",
+    }
+    return AIMessage(content="", tool_calls=[read])
+
+
+def _step_guard(config: RunnableConfig, bonus: int) -> None:
+    """The graph's own limit leaves room for the reference bonus; the run's real limit is
+    MAX_ITER plus two steps per earned turn (an agent step and a tool step)."""
+    step = int((config.get("metadata") or {}).get("langgraph_step", 0))
+    if step > MAX_ITER + 2 * bonus:
+        raise GraphRecursionError(f"Recursion limit of {MAX_ITER} reached")
+
+
 def _build_graph(
     llm: Runnable[LanguageModelInput, BaseMessage], directive: str = ""
 ) -> CompiledStateGraph[MessagesState]:
@@ -204,11 +238,10 @@ def _build_graph(
         nonlocal trimmed
         mem = run_memory.current()
         bonus = mem.bonus if mem is not None else 0
-        # The graph's own limit leaves room for the reference bonus; the run's real limit
-        # is MAX_ITER plus two steps per earned turn (an agent step and a tool step).
-        step = int((config.get("metadata") or {}).get("langgraph_step", 0))
-        if step > MAX_ITER + 2 * bonus:
-            raise GraphRecursionError(f"Recursion limit of {MAX_ITER} reached")
+        _step_guard(config, bonus)
+        auto = _auto_read(list(state["messages"]))
+        if auto is not None:
+            return {"messages": [auto]}
         msgs, trimmed = _fit_window(list(state["messages"]), trimmed)
         new = _new_nudge(msgs, nudge, bonus)
         return {"messages": [*new, llm.invoke([*msgs, *new])]}
