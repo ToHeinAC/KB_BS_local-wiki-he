@@ -62,6 +62,9 @@ MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
 CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "500"))
 CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "3"))
 CHAT_MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
+# Deep chat's word floor per cited source, capped at CHAT_MIN_WORDS: a flat floor makes a
+# small model pad thin evidence with uncited text.
+CHAT_WORDS_PER_SOURCE = int(os.getenv("CHAT_WORDS_PER_SOURCE", "100"))
 CONTENT_TRUNCATE = 2000
 RAW_READ_CAP = 16000  # chars per raw_read call (per file, per offset window)
 # After this many distinct byte-offset windows of one file have been read in a
@@ -834,10 +837,11 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     wiki_cited = {f"wiki:{w}" for w in _WIKI_CITE_RE.findall(answer or "")}
     raw_unique = cited | extra
     unique = raw_unique | wiki_cited
-    if words < CHAT_MIN_WORDS:
+    floor = min(CHAT_MIN_WORDS, CHAT_WORDS_PER_SOURCE * len(unique))
+    if words < floor:
         return (
-            f"REJECTED: answer has {words} words, minimum is {CHAT_MIN_WORDS}. "
-            "Continue researching and expand the answer."
+            f"REJECTED: answer has {words} words; with {len(unique)} cited sources the minimum "
+            f"is {floor}. Continue researching and expand the answer."
         )
     if len(unique) < CHAT_MIN_SOURCES or not raw_unique:
         return (

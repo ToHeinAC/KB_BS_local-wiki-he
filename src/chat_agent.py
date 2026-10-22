@@ -347,6 +347,7 @@ def _system_prompt(directive: str = "") -> str:
         min_searches=MIN_SEARCHES,
         min_words=MIN_WORDS,
         min_sources=MIN_SOURCES,
+        words_per_source=tool_module.CHAT_WORDS_PER_SOURCE,
     )
 
 

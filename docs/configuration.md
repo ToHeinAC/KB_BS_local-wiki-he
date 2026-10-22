@@ -48,7 +48,8 @@ Copy it to `.env` (gitignored, never committed) and adjust.
 | `DEEP_RESEARCH_MAX_TOKENS` | `8192` | Per-role `*_model_max_tokens`. **No-op on Ollama** — `ChatOllama` bounds output with `num_predict`, not `max_tokens`, and `Configuration` exposes only `model`/`max_tokens`/`api_key` as configurable. Kept for parity with upstream. |
 | `DEEP_RESEARCH_CLARIFICATION` | `false` | `allow_clarification`. Keep off: the Research page is one-shot and cannot answer a clarifying turn. |
 | `CHAT_MIN_SEARCHES` | `3` | Deep chat: minimum distinct searches (`raw_search`/`wiki_search` queries) before the submit gate accepts. The gate also requires that at least one cited original was opened with `raw_read`. |
-| `CHAT_MIN_WORDS` | `500` | Deep chat: minimum answer word count. |
+| `CHAT_MIN_WORDS` | `500` | Deep chat: the highest word floor an answer must meet. |
+| `CHAT_WORDS_PER_SOURCE` | `100` | Deep chat: word floor per cited source, capped at `CHAT_MIN_WORDS` (3 sources → 300 words). A flat floor makes a small model pad thin evidence with uncited text. |
 | `CHAT_MIN_SOURCES` | `3` | Deep chat: minimum unique citations (`[Source: filename]` + `[Wiki: page.md]`; at least one must be a `[Source: ...]` original). |
 | `CHAT_MAX_ITERATIONS` | `40` | Deep chat: step cap (each agent turn is two steps, so about 20 turns), raised by turns earned through `CHAT_REF_BONUS_MAX`. |
 | `CHAT_NUDGE_AT` | `CHAT_MAX_ITERATIONS // 2 - 2` | Deep chat: agent turns after which the agent is told once (stored in the history) to submit now. |

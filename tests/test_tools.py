@@ -382,14 +382,24 @@ def test_chat_tools_expose_wiki_search_and_read():
     assert {"raw_search", "raw_read"} <= names  # still raw-grounded
 
 
-def test_a_deep_chat_answer_needs_500_words_and_3_sources() -> None:
-    cites = "[Source: a.md] [Source: b.md] [Wiki: c.md]"
-    rejected = tools._submit_chat_impl("word " * 450 + cites)
-    assert rejected.startswith("REJECTED")
-    assert "500" in rejected
+def test_a_deep_chat_answer_needs_3_sources() -> None:
     assert tools._submit_chat_impl("word " * 520 + "[Source: a.md] [Source: b.md]").startswith(
         "REJECTED"
     )
+
+
+def test_the_word_floor_grows_with_the_cited_sources() -> None:
+    # A flat floor makes a small model pad thin evidence with uncited text; the floor is
+    # ~100 words per cited source, never above CHAT_MIN_WORDS.
+    three = "[Source: a.md] [Source: b.md] [Wiki: c.md]"
+    short = tools._submit_chat_impl("word " * 280 + three)
+    assert short.startswith("REJECTED")
+    assert "300" in short
+    assert tools._submit_chat_impl("word " * 320 + three).startswith("ACCEPTED")
+    six = three + " [Source: d.md] [Source: e.md] [Source: f.md]"
+    capped = tools._submit_chat_impl("word " * 450 + six)
+    assert capped.startswith("REJECTED")
+    assert "500" in capped
 
 
 def _gate_ready(monkeypatch) -> run_memory.RunMemory:
