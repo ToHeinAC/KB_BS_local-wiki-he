@@ -78,6 +78,7 @@ def test_iteration_limit_appends_end_hint(monkeypatch):
 
 def test_no_notes_no_prose_yields_error_without_synth_call(monkeypatch):
     # Empty first completion, no tool calls -> no notes -> no synthesis, plain error.
+    monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])  # pre-flight hits are notes
     _patch_llm(monkeypatch, [AIMessage(content="", tool_calls=[])])
     called = {"n": 0}
 
@@ -253,3 +254,37 @@ def test_followed_references_extend_the_step_limit(monkeypatch):
         steps = list(chat_agent.run_chat_agent("q?"))
         assert llm.calls == calls
         assert any("Recursion limit" in s.get("content", "") for s in steps)
+
+
+# --- pre-flight search (report tweak 2) ---
+
+
+def test_code_runs_the_first_raw_and_wiki_search_before_the_model_acts(monkeypatch):
+    # A small model's weakest step is starting retrieval at all; the question itself is
+    # the first query, so code runs it and the model starts from the hits.
+    tm = chat_agent.tool_module
+    monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: "RAW HITS for " + queries[0])
+    monkeypatch.setattr(tm, "_wiki_search_impl", lambda queries, **kw: "WIKI HITS")
+    fake = _patch_llm(monkeypatch, [])
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    list(chat_agent.run_chat_agent("Wer genehmigt NORM-Rückstände?"))
+    first = fake.calls[0]
+    results = {m.name: m.content for m in first if isinstance(m, ToolMessage)}
+    assert results == {
+        "raw_search": "RAW HITS for Wer genehmigt NORM-Rückstände?",
+        "wiki_search": "WIKI HITS",
+    }
+    calls = next(m for m in first if isinstance(m, AIMessage)).tool_calls
+    assert [c["name"] for c in calls] == ["raw_search", "wiki_search"]
+    assert len(chat_agent.run_memory.current().searches) == 2  # they count toward the gate
+
+
+def test_a_failing_pre_flight_search_leaves_the_run_to_the_model(monkeypatch):
+    def boom(*_a, **_k):
+        raise RuntimeError("no index")
+
+    monkeypatch.setattr(chat_agent.tool_module, "_raw_search_impl", boom)
+    fake = _patch_llm(monkeypatch, [])
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    list(chat_agent.run_chat_agent("q?"))
+    assert not any(isinstance(m, ToolMessage) for m in fake.calls[0])

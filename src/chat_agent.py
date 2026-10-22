@@ -28,6 +28,7 @@ from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     SystemMessage,
+    ToolCall,
     ToolMessage,
 )
 from langchain_core.runnables import Runnable, RunnableConfig
@@ -529,6 +530,29 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
     }
 
 
+def _preflight(question: str) -> list[AnyMessage]:
+    """The run's first raw and wiki search, run by code on the question: a small model's
+    weakest step is starting retrieval at all. They count toward the gate's searches; on
+    any failure the model starts the search itself."""
+    tools = {"raw_search": tool_module.raw_search, "wiki_search": tool_module.wiki_search}
+    calls: list[ToolCall] = [
+        {"name": name, "args": {"query": question}, "id": f"preflight-{name}", "type": "tool_call"}
+        for name in tools
+    ]
+    try:
+        results: list[AnyMessage] = [
+            ToolMessage(
+                content=str(tools[c["name"]].invoke(c["args"])),
+                name=c["name"],
+                tool_call_id=c["id"],
+            )
+            for c in calls
+        ]
+    except Exception:
+        return []
+    return [AIMessage(content="", tool_calls=calls), *results]
+
+
 def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
     run_memory.begin_run(question)
     directive = lang.response_directive(question)
@@ -548,6 +572,7 @@ def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
         "messages": [
             SystemMessage(content=system),
             HumanMessage(content=question),
+            *_preflight(question),
         ]
     }
     run = _Run()
