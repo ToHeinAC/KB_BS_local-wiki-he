@@ -244,3 +244,12 @@ def test_rrf_weights_semantic_arm_over_lexical_only():
     sem = [{"chunk_id": "sem_correct", "source": "s", "matched_terms": [], "text": "c"}]
     fused = retrieval._rrf_fuse(lex, sem, top_k=5)
     assert fused[0]["chunk_id"] == "sem_correct"  # dense arm weighted (W_SEMANTIC>W_LEXICAL)
+
+
+def test_raw_chunks_are_embedded_with_their_documents_title(tmp_path, monkeypatch):
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
+    ch = {"source": "StrlSchG.md", "scope": "raw", "text": "## § 61 Anfall\nText."}
+    db_context.raw_dir().mkdir(parents=True, exist_ok=True)
+    (db_context.raw_dir() / "StrlSchG.md").write_text("# Strahlenschutzgesetz\n\n## § 61 Anfall\n")
+    assert embed_index._embed_text(ch, {}) == "Strahlenschutzgesetz\n\n## § 61 Anfall\nText."

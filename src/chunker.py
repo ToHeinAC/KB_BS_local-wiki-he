@@ -17,6 +17,7 @@ Output:
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import re
@@ -33,6 +34,31 @@ load_dotenv()
 
 def _chunks_dir() -> Path:
     return db_context.chunks_dir()
+
+
+_H1_RE = re.compile(r"^#\s+(.+?)\s*$")
+_titles: dict[tuple[str, int], str] = {}  # (raw path, mtime_ns) -> title
+
+
+def doc_title(source: str) -> str:
+    """The original's title for contextual index headers: its first `# ` heading within the
+    first 40 lines, else the file name without extension (underscores as spaces)."""
+    path = db_context.raw_dir() / source
+    fallback = Path(source).stem.replace("_", " ")
+    try:
+        key = (str(path), path.stat().st_mtime_ns)
+    except OSError:
+        return fallback
+    if key not in _titles:
+        title = fallback
+        with contextlib.suppress(OSError), path.open("r", errors="replace") as fh:
+            for _, line in zip(range(40), fh, strict=False):
+                m = _H1_RE.match(line)
+                if m:
+                    title = m.group(1)
+                    break
+        _titles[key] = title
+    return _titles[key]
 
 
 MAX_CHUNK_CHARS = 4000

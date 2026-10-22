@@ -197,3 +197,30 @@ def test_needs_rebuild_for_wiki_pages_alone(tmp_path, monkeypatch):
     wiki.mkdir(parents=True)
     (wiki / "alpha.md").write_text("---\ntitle: Alpha\ntype: concept\n---\nBody text.")
     assert lex_index.needs_rebuild()
+
+
+def test_a_section_is_found_by_the_title_of_its_document(tmp_path, monkeypatch):
+    # A § 61 chunk never names its law; the original's first heading is indexed with every
+    # chunk, so "Strahlenschutzgesetz Anfall" finds § 61 of that law (contextual headers).
+    import db_context
+
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
+    text = "# Strahlenschutzgesetz\n\n## § 61 Anfall\nRückstände fallen bei Tätigkeiten an.\n"
+    db_context.raw_dir().mkdir(parents=True, exist_ok=True)
+    (db_context.raw_dir() / "StrlSchG.md").write_text(text)
+    chunker.write_chunks("StrlSchG.md", [c for c in chunker.split(text) if "§ 61" in c["anchor"]])
+    lex_index.build()
+    hits = lex_index.query("Strahlenschutzgesetz", top_k=3, scope="raw")
+    assert [h["anchor"] for h in hits] == ["§ 61 Anfall"]
+
+
+def test_doc_title_falls_back_to_the_file_name(tmp_path, monkeypatch):
+    import db_context
+
+    monkeypatch.setattr(db_context, "DATA_ROOT", tmp_path)
+    db_context.set_active_db("d")
+    db_context.raw_dir().mkdir(parents=True, exist_ok=True)
+    (db_context.raw_dir() / "Radon_Leitfaden.txt").write_text("plain text without heading\n")
+    assert chunker.doc_title("Radon_Leitfaden.txt") == "Radon Leitfaden"
+    assert chunker.doc_title("missing.md") == "missing"

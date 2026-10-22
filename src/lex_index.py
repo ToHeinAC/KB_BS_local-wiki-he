@@ -340,15 +340,18 @@ def _row_for_chunk(ch: dict[str, Any], qa_by_chunk: dict[str, Any]) -> tuple[Any
     body_tokens = [
         t for t in tokenize(ch.get("text", "")) if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN
     ]
+    scope = ch.get("scope", "raw")
+    # Contextual header: a raw chunk is also found by its original's title ("§ 61" alone
+    # never names its law).
+    title = chunker.doc_title(ch.get("source", "")) if scope == "raw" else ""
     qa_tokens = [
         t
-        for t in tokenize(" ".join(qa_by_chunk.get(cid, [])))
+        for t in tokenize(" ".join([*qa_by_chunk.get(cid, []), title]))
         if t not in _STOPWORDS and len(t) >= MIN_TOKEN_LEN
     ]
     terms: list[str] = []
     for tok in body_tokens + qa_tokens:
         terms.extend(variants(tok))
-    scope = ch.get("scope", "raw")
     # Wiki pseudo-chunks aren't in data/chunks/; keep their text inline so the
     # hit dict can supply it without a JSONL lookup.
     inline = ch.get("text", "") if scope != "raw" else ""

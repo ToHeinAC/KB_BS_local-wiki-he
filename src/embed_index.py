@@ -152,7 +152,9 @@ def _embed_text(ch: dict[str, Any], prefix_map: dict[str, str]) -> str:
         prefix = prefix_map.get(ch.get("source", ""))
         if prefix:
             return f"{prefix}\n\n{text}"
-    return text
+        return text
+    title = chunker.doc_title(ch.get("source", ""))  # contextual header, as in lex_index
+    return f"{title}\n\n{text}" if title else text
 
 
 def _row_meta(ch: dict[str, Any]) -> dict[str, Any]:

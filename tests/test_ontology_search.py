@@ -11,6 +11,7 @@ from langchain_core.messages import AIMessage, SystemMessage
 import agent
 import chat_agent
 import chunker
+import db_context
 import lex_index
 import ollama_client
 import ontology
@@ -62,6 +63,10 @@ def _facts() -> None:
 def corpus(wiki_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Two laws; the statute mentions "StrlSchV" often, the ordinance never names itself."""
     monkeypatch.setenv("RERANK_ENABLED", "0")  # never load a local cross-encoder in tests
+    raw = db_context.raw_dir()
+    raw.mkdir(parents=True, exist_ok=True)  # titles for the index headers, not abbreviations
+    (raw / "StrlSchG.md").write_text("# Strahlenschutzgesetz\n\n" + STRLSCHG)
+    (raw / "StrlSchV.md").write_text("# Strahlenschutzverordnung\n\n" + STRLSCHV)
     chunker.write_chunks("StrlSchG.md", chunker.split(STRLSCHG))
     chunker.write_chunks("StrlSchV.md", chunker.split(STRLSCHV))
     _page(wiki_dir, "grenzwerte-g.md", ["StrlSchG.md"], "Grenzwerte: StrlSchV StrlSchV StrlSchV.")
