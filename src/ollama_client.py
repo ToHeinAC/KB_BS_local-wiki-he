@@ -51,6 +51,7 @@ class _Api(Protocol):
     pydantic models and the tests' plain dicts are both read by subscript."""
 
     def ps(self) -> Any: ...
+    def show(self, model: str) -> Any: ...
     def embed(self, *, model: str, input: list[str]) -> Any: ...
     def generate(self, *, model: str, prompt: str, **kwargs: Any) -> Any: ...
     def chat(
@@ -63,6 +64,15 @@ def _client() -> _Api:
     import ollama
 
     return cast(_Api, ollama.Client(host=host()))
+
+
+def thinks(model_id: str) -> bool:
+    """Whether the model can think (Ollama `capabilities`). False when the daemon cannot
+    say: asking a model without the capability to think makes Ollama reject the call."""
+    try:
+        return "thinking" in (_client().show(model_id)["capabilities"] or [])
+    except Exception:
+        return False
 
 
 def is_available() -> bool:
