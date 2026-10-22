@@ -1,7 +1,7 @@
 # Deep chat: NORM question answered from DIN lab standards — analysis and solution
 
 Status: S1, S2b, S2c implemented 2026-10-17 (see [docs/retrieval.md](../docs/retrieval.md) §Query vocabulary); S2a, S3–S5 open. Date: 2026-10-17.
-Trigger: [test_deepchat.md](test_deepchat.md) — Deep chat on `StrlSch_DE` + `StrlSch_DE · Confidential`,
+Trigger: `test_deepchat.md` (not committed) — Deep chat on `StrlSch_DE` + `StrlSch_DE · Confidential`,
 question *"Wie kann NORM (natürliche Radioaktivität) sicher entsorgt werden? Was ist in DE zu beachten?"*
 (188 s, "3 cited"). Model: `gemma4:e4b`.
 Predecessor: [deep-chat-read-memory-and-section-grounding.md](deep-chat-read-memory-and-section-grounding.md)

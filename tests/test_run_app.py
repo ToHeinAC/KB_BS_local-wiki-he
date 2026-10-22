@@ -92,7 +92,8 @@ def test_restart_relaunch_releases_the_scripts_output(tmp_path: Path) -> None:
         .replace('"$APP_LOG"', str(tmp_path / "app.log"))
     )
     runnable = tmp_path / "launch.sh"
-    runnable.write_text(block + "\necho launched\n")
+    # The script defines say(); without it macOS runs /usr/bin/say (speech, ~2.5 s).
+    runnable.write_text("say() { :; }\n" + block + "\necho launched\n")
     started = time.monotonic()
     out = subprocess.run(["bash", str(runnable)], capture_output=True, text=True, timeout=10)
     assert out.stdout.strip() == "launched"
