@@ -45,6 +45,11 @@ class RunMemory:
     prose_section_nudged: bool = False  # an unread § named in the prose was rejected once
     open_refs_nudged: bool = False  # an out-of-scope reference missing from Open points
     quote_nudged: bool = False  # a quoted span the cited originals lack was rejected once
+    # Evidence ledger (src/evidence.py): (citation ref, sentence) from every raw_read; and
+    # how many turns in a row added none (chat_agent's stop rule).
+    ledger: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
+    ledger_seen: int = -1  # -1: the run's first turn always counts as progress
+    stale_turns: int = 0
     # Reference chains: a section a footer offered ("<qbase>|sec=<canon>" → (depth, cross)),
     # the depth of each read section, out-of-scope work names per read section, and the
     # extra agent turns earned by following cross-file references.

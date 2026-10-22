@@ -628,6 +628,26 @@ Source notes (tool results):
 
 Write a concise markdown answer. Inline-cite every claim with the [Source: filename] tags exactly as they appear in the notes. If the notes are insufficient to answer fully, state what is known and list the remaining gaps explicitly."""
 
+# Deep chat's final answer from the evidence ledger (chat_agent._ledger_answer): code
+# collected the quotes; the model only writes them up.
+CHAT_LEDGER_SYSTEM = (
+    "You write answers strictly from the numbered quotes you are given. Every statement "
+    "rests on a quote; never add facts, sources or figures that are not in them."
+)
+
+CHAT_LEDGER_PROMPT = """Question: {question}
+
+Quotes from the original documents (the only facts you may use):
+{evidence}
+
+Write the answer in markdown from these quotes only:
+- Start with a direct answer in 2-3 sentences.
+- Then one `## ` section per sub-question, with the exact figures, conditions and exceptions from the quotes.
+- End with `## Open points` for what the quotes do not settle.
+- After every claim put the citation tag of its quote exactly as given, e.g. [Source: file.md § 5]. Never cite anything else.
+- Put quotation marks only around wording copied exactly from a quote; otherwise paraphrase.
+- Write at least {words} words, without padding."""
+
 RESEARCH_FALLBACK_PROMPT = """The research agent gathered the notes below but stopped without assembling a report. Using ONLY these notes, write the best possible answer to the question.
 
 Question: {question}

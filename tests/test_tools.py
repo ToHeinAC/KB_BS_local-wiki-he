@@ -821,3 +821,18 @@ def test_the_best_raw_hit_survives_even_below_tau(monkeypatch):
     monkeypatch.setattr(tools.retrieval, "search", lambda *a, **k: [_hit("a.md", "", "c1", 0.1)])
     monkeypatch.setattr(tools.calibrate, "threshold", lambda db=None: 0.5)
     assert len(tools._raw_search_db("q", 6)) == 1
+
+
+# --- evidence ledger (answer tweak 1) ---------------------------------------------------
+
+
+def test_every_raw_read_adds_its_matching_sentences_to_the_run_ledger(monkeypatch):
+    mem = run_memory.begin_run("Grenzwert für Radon in Aufenthaltsräumen")
+    text = "## Raw file: a.md § 5\nDer Grenzwert für Radon in Aufenthaltsräumen beträgt 300 Bq."
+    monkeypatch.setattr(tools, "_memory_read", lambda m, f, offset: (text, f))
+    monkeypatch.setattr(tools, "_pagination_nudge", lambda m, q: None)
+    tools.raw_read.invoke({"filenames": ["a.md § 5"]})
+    tools.raw_read.invoke({"filenames": ["a.md § 5"]})  # the same sentence is noted once
+    assert mem.ledger == [
+        ("a.md § 5", "Der Grenzwert für Radon in Aufenthaltsräumen beträgt 300 Bq.")
+    ]

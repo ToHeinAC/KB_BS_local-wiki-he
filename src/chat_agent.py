@@ -47,6 +47,7 @@ from langgraph.prebuilt import ToolNode
 from langgraph.prebuilt.tool_node import ToolInvocationError
 
 import db_context
+import evidence
 import lang
 import ollama_client
 import retrieval
@@ -57,6 +58,8 @@ from prompts import (
     CHAT_BUDGET_NUDGE,
     CHAT_FALLBACK_PROMPT,
     CHAT_FALLBACK_SYSTEM,
+    CHAT_LEDGER_PROMPT,
+    CHAT_LEDGER_SYSTEM,
     CHAT_PROSE_GATE_RETRY,
     CHAT_TOOL_ERROR,
 )
@@ -76,6 +79,9 @@ PROSE_RETRIES = int(os.getenv("CHAT_PROSE_RETRIES", "2"))
 # Agent turns (the pre-flight search counts as one) after which code opens the best raw
 # hit if the model has read no original yet.
 AUTO_READ_AT = 3
+# Turns in a row without a new quote in the evidence ledger after which a covered run
+# (enough searches and quoted sources for the gate) stops and is answered from the ledger.
+STALL_TURNS = 3
 
 # Ollama stops generating once prompt + answer reach num_ctx, so a long run's answer would
 # be cut mid-sentence. The history sent per turn stays under the window minus a reserve for
@@ -220,6 +226,34 @@ def _auto_read(msgs: list[AnyMessage]) -> AIMessage | None:
     return AIMessage(content="", tool_calls=[read])
 
 
+def _covered(mem: run_memory.RunMemory) -> bool:
+    """Enough searches and quoted sources for the gate to accept a ledger answer."""
+    refs = {ref for ref, _ in mem.ledger}
+    return len(mem.searches) >= MIN_SEARCHES and len(refs) >= MIN_SOURCES
+
+
+def _evidence_stalled(mem: run_memory.RunMemory | None) -> bool:
+    """Count this turn as stale unless the ledger grew; True once a covered run has gone
+    STALL_TURNS turns without a new quote (retrieval thrash)."""
+    if mem is None:
+        return False
+    grew = len(mem.ledger) > mem.ledger_seen
+    mem.ledger_seen = len(mem.ledger)
+    mem.stale_turns = 0 if grew else mem.stale_turns + 1
+    return mem.stale_turns >= STALL_TURNS and _covered(mem)
+
+
+def _code_turn(msgs: list[AnyMessage], mem: run_memory.RunMemory | None) -> AIMessage | None:
+    """A turn code takes instead of the model: the auto-read, or the stop of a stalled run
+    (an empty message, which ends the graph; the answer is then written from the ledger)."""
+    stalled = _evidence_stalled(mem)
+    auto = _auto_read(msgs)
+    if auto is not None or not stalled or mem is None:
+        return auto
+    mem.gate_events.append(f"stopped: no new evidence in {STALL_TURNS} turns")
+    return AIMessage(content="")
+
+
 def _tool_error(e: Exception) -> str:
     """What a raising tool returns instead of ending the run (ToolNode re-raises anything
     but bad arguments by default); bad arguments keep their own explanation."""
@@ -255,9 +289,9 @@ def _build_graph(
         mem = run_memory.current()
         bonus = mem.bonus if mem is not None else 0
         _step_guard(config, bonus)
-        auto = _auto_read(list(state["messages"]))
-        if auto is not None:
-            return {"messages": [auto]}
+        forced = _code_turn(list(state["messages"]), mem)
+        if forced is not None:
+            return {"messages": [forced]}
         msgs, trimmed = _fit_window(list(state["messages"]), trimmed)
         new = _new_nudge(msgs, nudge, bonus)
         return {"messages": [*new, llm.invoke([*msgs, *new])]}
@@ -544,8 +578,41 @@ def _last_resort(question: str, directive: str, run: _Run) -> dict[str, Any]:
     }
 
 
+def _ledger_answer(question: str, directive: str) -> str | None:
+    """The answer written from the run's evidence ledger in a fresh, short prompt, if it
+    passes the submit gate; None without enough quoted sources or on any failure."""
+    mem = run_memory.current()
+    if mem is None or len({ref for ref, _ in mem.ledger}) < MIN_SOURCES:
+        return None
+    refs = len({ref for ref, _ in mem.ledger})
+    words = min(MIN_WORDS, tool_module.CHAT_WORDS_PER_SOURCE * refs)
+    prompt = CHAT_LEDGER_PROMPT.format(
+        question=question, evidence=evidence.render(mem.ledger), words=words
+    )
+    try:
+        answer = ollama_client.generate(
+            CHAT_LEDGER_SYSTEM,
+            prompt + (f"\n\n{directive}" if directive else ""),
+            temperature=0.3,
+            model_id=ollama_client.QUERY_MODEL,
+        ).strip()
+    except Exception:
+        return None
+    verdict = tool_module._submit_chat_impl(answer)  # pyright: ignore[reportPrivateUsage]
+    return answer if verdict.startswith("ACCEPTED") else None
+
+
 def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
-    """The one closing step: accepted submission, clean answer, draft, or fallback."""
+    """The one closing step: the ledger answer, accepted submission, clean answer, draft,
+    or fallback."""
+    ledgered = _ledger_answer(question, directive)
+    if ledgered is not None:
+        return {
+            "type": "final_answer",
+            "content": _with_iter_hint(ledgered, run.recursion_hit),
+            **_cites(ledgered),
+            "note": "Written from the quotes collected from the originals.",
+        }
     submitted = _extract_submitted_answer(run.messages)
     if submitted is not None:
         answer, sources = submitted

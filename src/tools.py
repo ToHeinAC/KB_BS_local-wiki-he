@@ -25,6 +25,7 @@ import calibrate
 import chunker
 import classification
 import db_context
+import evidence
 import lex_index
 import okf
 import ontology_graph
@@ -75,6 +76,7 @@ RAW_READ_NUDGE_AFTER = int(os.getenv("CHAT_RAW_READ_NUDGE_AFTER", "3"))
 # turns it may earn by following them (+2 per followed cross-file reference).
 REF_MAX_HOPS = 3
 REF_BONUS_MAX = int(os.getenv("CHAT_REF_BONUS_MAX", "6"))
+LEDGER_MAX = 40  # quotes a run's evidence ledger keeps (first come; ~24K chars at most)
 RANK_TOP_K = 12  # sections ranked per file for the section map and auto-advance
 MAP_RADIUS = 5  # section-map entries shown on each side of a served section
 WIKI_LINK_EXPANSION = os.getenv("WIKI_LINK_EXPANSION", "1") != "0"
@@ -1318,8 +1320,20 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
         return _raw_read_impl(filenames, offset=offset)
     results = [_memory_read(mem, f, int(offset or 0)) for f in filenames]
     out = [text for text, _ in results]
+    _note_evidence(mem, out)
     nudge = _pagination_nudge(mem, [qbase for _, qbase in results])
     return "\n\n".join([*out, nudge] if nudge else out)
+
+
+def _note_evidence(mem: run_memory.RunMemory, outputs: list[str]) -> None:
+    """Add each read's sentences that match the run's query to its evidence ledger."""
+    query = _run_query(mem)
+    have = {s for _, s in mem.ledger}
+    for text in outputs:
+        for ref, sentence in evidence.extract(text, query):
+            if sentence not in have and len(mem.ledger) < LEDGER_MAX:
+                mem.ledger.append((ref, sentence))
+                have.add(sentence)
 
 
 @tool(description=SUBMIT_CHAT_DESCRIPTION)

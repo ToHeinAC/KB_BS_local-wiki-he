@@ -34,7 +34,7 @@ One row per PRD milestone. Status: `planned`, `in progress`, `done`.
 |---|---|---|---|
 | 1 | M1: Foundations | done | `test_dedup`, `test_file_processor`, `test_ollama_client`, `test_schema_loader` |
 | 2 | M2: Wiki engine | done | `test_wiki_engine`, `test_integration`, `test_consolidate`, `test_okf` |
-| 3 | M3: Research and chat agents | done | `test_agent`, `test_chat_agent`, `test_tools`, `test_refs`, `test_deep_research_agent`, `test_bench_deep_chat`; `scripts/bench_deep_chat.py` |
+| 3 | M3: Research and chat agents | done | `test_agent`, `test_chat_agent`, `test_tools`, `test_refs`, `test_evidence`, `test_deep_research_agent`, `test_bench_deep_chat`; `scripts/bench_deep_chat.py` |
 | 4 | M4: Web UI | done | `test_app` |
 | 5 | M5: Quality gate (claude-dev-schema) | done | `uv run pre-commit run --all-files` green (3.11, 3.13) |
 | 6 | M6: Ontology ([plan](docs/_plan-ontology.md) phases 1–8) | done (plan phases 1–8; §-level validity not built) | `test_ontology`, `test_ontology_store`, `test_ontology_bundle`, `test_ontology_detect`, `test_ontology_ingest`, `test_ontology_query`, `test_ontology_search`, `test_ontology_time`, `test_ontology_time_search`, `test_ontology_merge`, `test_ontology_outdated`, `test_ontology_relations`, `test_ontology_relations_flow`, `test_ontology_evolution`, `test_ontology_evolution_flow`, `test_ontology_export`, `test_ontology_pages`, `test_delete_source`, `test_app`; `scripts/bench_ontology_detect.py`, `scripts/eval_ontology_search.py` |
@@ -54,7 +54,7 @@ Full responsibilities per module: [docs/architecture.md](docs/architecture.md) �
 | `dedup.py`, `file_processor.py`, `md_convert.py`, `metadata_extract.py`, `template_loader.py` | Upload path: hash dedup, text extraction, PDF/DOCX/image → Markdown, effective date |
 | `chunker.py`, `lex_index.py`, `gloss.py`, `embed_index.py`, `retrieval.py`, `rerank.py`, `calibrate.py`, `qa_gen.py` | Retrieval layer ([docs/retrieval.md](docs/retrieval.md)) |
 | `ollama_client.py`, `ollama_server.py`, `gpu_placement.py` | Model access and single-GPU pinning ([docs/gpu.md](docs/gpu.md)) |
-| `agent.py`, `chat_agent.py`, `tools.py`, `run_memory.py`, `refs.py` | LangGraph agents (Quick research, Deep chat), their tools, loop guard and the reference resolver of `raw_read` footers |
+| `agent.py`, `chat_agent.py`, `tools.py`, `run_memory.py`, `refs.py`, `evidence.py` | LangGraph agents (Quick research, Deep chat), their tools, loop guard, the reference resolver of `raw_read` footers and Deep chat's evidence ledger |
 | `deep_research_agent.py`, `vendor/` | Web-only Deep research over vendored `open_deep_research` ([docs/deep_research.md](docs/deep_research.md)) |
 | `okf.py`, `lang.py`, `page_lang.py`, `graph_export.py` | OKF stamping, language pinning, graph analytics |
 | `ontology.py`, `ontology_bundle.py`, `ontology_store.py`, `ontology_detect.py`, `ontology_query.py`, `ontology_time.py`, `ontology_graph.py`, `ontology_evolution.py`, `ontology_export.py`, `ontology_ui.py`, `ontology/*.yaml` | Ontology schema modules, validation, per-DB fact ledger, export/import with revisions, detection at upload, page stamping, the ontology stage in every search, valid time, relations/binding/lint, editor/cue tester/re-classify/suggestions, SKOS/JSON-LD export, Maintenance → Ontology ([docs/ontology.md](docs/ontology.md)) |

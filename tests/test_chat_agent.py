@@ -360,3 +360,66 @@ def test_a_failing_tool_reports_an_error_line_instead_of_ending_the_run(monkeypa
     result = next(m for m in fake.calls[1] if isinstance(m, ToolMessage))
     assert str(result.content).startswith("ERROR:")
     assert "strict" not in str(result.content)
+
+
+# --- answer from the evidence ledger (answer tweaks 1 and 3) ---
+
+
+def _ledger_run(n_refs: int = 3) -> Any:
+    mem = chat_agent.run_memory.begin_run("q?")
+    for q in ("a", "b", "c"):
+        mem.mark_search(f"raw_search:{q}")
+    mem.ledger = [(f"f{i}.md § {i}", f"Satz {i} mit Inhalt und Zahl {i}.") for i in range(n_refs)]
+    return mem
+
+
+def test_the_final_answer_is_written_from_the_ledger_when_it_passes_the_gate(monkeypatch):
+    # A small model writes better from a short list of quotes than from a 30K history.
+    _ledger_run()
+    prompts_seen: list = []
+    monkeypatch.setattr(
+        chat_agent.ollama_client,
+        "generate",
+        lambda system, prompt, **kw: (
+            prompts_seen.append(prompt) or "FROM QUOTES [Source: f0.md § 0]"
+        ),
+    )
+    monkeypatch.setattr(chat_agent.tool_module, "_submit_chat_impl", lambda a, s=None: "ACCEPTED")
+    run = chat_agent._Run()
+    run.messages = [_ai_with_tool("submit_chat_answer", {"answer": "AGENT ANSWER"})]
+    final = chat_agent._final_step("q?", "", run)
+    assert final["content"] == "FROM QUOTES [Source: f0.md § 0]"
+    assert '[1] [Source: f0.md § 0] "Satz 0' in prompts_seen[0]
+    assert final["sources"] == ["f0.md § 0"]
+
+
+def test_a_ledger_answer_the_gate_rejects_leaves_the_agents_answer(monkeypatch):
+    _ledger_run()
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "bad")
+    monkeypatch.setattr(chat_agent.tool_module, "_submit_chat_impl", lambda a, s=None: "REJECTED")
+    monkeypatch.setattr(chat_agent, "_extract_submitted_answer", lambda m: ("AGENT ANSWER", []))
+    final = chat_agent._final_step("q?", "", chat_agent._Run())
+    assert final["content"] == "AGENT ANSWER"
+
+
+def test_no_ledger_answer_without_enough_quoted_sources(monkeypatch):
+    _ledger_run(n_refs=2)  # the gate needs 3 sources; a call that cannot pass is skipped
+    calls: list = []
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda *a, **k: calls.append(1))
+    assert chat_agent._ledger_answer("q?", "") is None
+    assert calls == []
+
+
+def test_the_run_stops_once_covered_and_no_new_evidence_arrives(monkeypatch):
+    # Retrieval thrash: a covered run that keeps searching without new quotes ends after
+    # STALL_TURNS turns, and the answer is written from the ledger.
+    monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
+    monkeypatch.setattr(chat_agent, "_covered", lambda mem: True)
+    fake = _patch_llm(
+        monkeypatch,
+        [_ai_with_tool("think_tool", {"reflection": f"n{i}"}, f"t{i}") for i in range(20)],
+    )
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    steps = list(chat_agent.run_chat_agent("q?"))
+    assert len(fake.calls) == chat_agent.STALL_TURNS
+    assert any(s["type"] == "gate" and "no new evidence" in s["content"] for s in steps)
