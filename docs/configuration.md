@@ -41,8 +41,10 @@ Copy it to `.env` (gitignored, never committed) and adjust.
 | `RESEARCH_LLM_TIMEOUT` | `300` | Deep researcher: per-LLM-call timeout in seconds. |
 | `DEEP_RESEARCH_MODEL` | `QUERY_MODEL` | Deep Research (web): Ollama tag used for **all four** upstream roles (research / report / compression / summarization). |
 | `DEEP_RESEARCH_CONCURRENCY` | `1` | `max_concurrent_research_units`. Ollama serialises requests on one model, so raising this costs VRAM without buying speed. |
-| `DEEP_RESEARCH_MAX_ITERATIONS` | `4` | `max_researcher_iterations` — supervisor reflection rounds. |
-| `DEEP_RESEARCH_MAX_TOOL_CALLS` | `6` | `max_react_tool_calls` per researcher subgraph. |
+| `DEEP_RESEARCH_MAX_ITERATIONS` | `3` | `max_researcher_iterations` — supervisor reflection rounds. |
+| `DEEP_RESEARCH_MAX_TOOL_CALLS` | `5` | `max_react_tool_calls` per researcher subgraph. |
+| `DEEP_RESEARCH_MAX_CONTENT_LENGTH` | `16000` | `max_content_length` — page characters per result URL handed to the summarisation model (upstream 50000). Every URL of every search is summarised, so this is the run's biggest latency lever. |
+| `DEEP_RESEARCH_STRUCTURED_RETRIES` | `4` | `max_structured_output_retries` (upstream 3) — a small model misses the schema more often. |
 | `DEEP_RESEARCH_MAX_TOKENS` | `8192` | Per-role `*_model_max_tokens`. **No-op on Ollama** — `ChatOllama` bounds output with `num_predict`, not `max_tokens`, and `Configuration` exposes only `model`/`max_tokens`/`api_key` as configurable. Kept for parity with upstream. |
 | `DEEP_RESEARCH_CLARIFICATION` | `false` | `allow_clarification`. Keep off: the Research page is one-shot and cannot answer a clarifying turn. |
 | `CHAT_MIN_SEARCHES` | `3` | Deep chat: minimum distinct searches (`raw_search`/`wiki_search` queries) before the submit gate accepts. The gate also requires that at least one cited original was opened with `raw_read`. |

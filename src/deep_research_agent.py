@@ -59,8 +59,13 @@ load_dotenv()
 
 MODEL = os.getenv("DEEP_RESEARCH_MODEL") or ollama_client.QUERY_MODEL
 CONCURRENCY = int(os.getenv("DEEP_RESEARCH_CONCURRENCY", "1"))
-MAX_ITERATIONS = int(os.getenv("DEEP_RESEARCH_MAX_ITERATIONS", "4"))
-MAX_TOOL_CALLS = int(os.getenv("DEEP_RESEARCH_MAX_TOOL_CALLS", "6"))
+MAX_ITERATIONS = int(os.getenv("DEEP_RESEARCH_MAX_ITERATIONS", "3"))
+MAX_TOOL_CALLS = int(os.getenv("DEEP_RESEARCH_MAX_TOOL_CALLS", "5"))
+# Page text per result URL handed to the summarisation model (upstream: 50000). Every URL
+# of every search is summarised, so this is the run's biggest latency lever.
+MAX_CONTENT_LENGTH = int(os.getenv("DEEP_RESEARCH_MAX_CONTENT_LENGTH", "16000"))
+# Structured-output retries (upstream: 3); a small model misses the schema more often.
+STRUCTURED_RETRIES = int(os.getenv("DEEP_RESEARCH_STRUCTURED_RETRIES", "4"))
 MAX_TOKENS = int(os.getenv("DEEP_RESEARCH_MAX_TOKENS", "8192"))
 CLARIFICATION = os.getenv("DEEP_RESEARCH_CLARIFICATION", "false").lower() == "true"
 
@@ -129,6 +134,8 @@ def _configurable() -> dict[str, Any]:
         "max_concurrent_research_units": CONCURRENCY,
         "max_researcher_iterations": MAX_ITERATIONS,
         "max_react_tool_calls": MAX_TOOL_CALLS,
+        "max_content_length": MAX_CONTENT_LENGTH,
+        "max_structured_output_retries": STRUCTURED_RETRIES,
     }
 
 

@@ -68,8 +68,10 @@ pumps the graph, and maps its events onto the Research page's step-dict contract
 | `search_api` | `TAVILY` | `TAVILY` (reuses `TAVILY_API_KEY`) |
 | `allow_clarification` | `True` | **`False`** |
 | `max_concurrent_research_units` | 5 | `DEEP_RESEARCH_CONCURRENCY` (1) |
-| `max_researcher_iterations` | 6 | `DEEP_RESEARCH_MAX_ITERATIONS` (4) |
-| `max_react_tool_calls` | 10 | `DEEP_RESEARCH_MAX_TOOL_CALLS` (6) |
+| `max_researcher_iterations` | 6 | `DEEP_RESEARCH_MAX_ITERATIONS` (3) |
+| `max_react_tool_calls` | 10 | `DEEP_RESEARCH_MAX_TOOL_CALLS` (5) |
+| `max_content_length` | 50000 | `DEEP_RESEARCH_MAX_CONTENT_LENGTH` (16000) |
+| `max_structured_output_retries` | 3 | `DEEP_RESEARCH_STRUCTURED_RETRIES` (4) |
 | `*_model_max_tokens` | 8192–10000 | `DEEP_RESEARCH_MAX_TOKENS` (8192) |
 
 All `DEEP_RESEARCH_*` vars are registered in [configuration.md](configuration.md) and `.env.example`.

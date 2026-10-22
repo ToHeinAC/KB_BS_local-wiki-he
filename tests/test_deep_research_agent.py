@@ -466,6 +466,17 @@ def test_all_model_roles_point_at_local_ollama():
     assert cfg["allow_clarification"] is False
 
 
+def test_budgets_suit_a_small_local_model():
+    # Every result URL is summarised by the local model, so the page text it reads per URL
+    # is the run's biggest latency lever (upstream: 50000); a small model also needs more
+    # tries at structured output (upstream: 3).
+    cfg = dra._configurable()
+    assert cfg["max_content_length"] <= 20_000
+    assert cfg["max_structured_output_retries"] >= 4
+    assert cfg["max_researcher_iterations"] <= 3
+    assert cfg["max_react_tool_calls"] <= 5
+
+
 def test_ollama_host_is_wired_before_the_graph_runs(monkeypatch, wiki_dir):
     monkeypatch.setenv("OLLAMA_HOST", "http://wrong:1")
     monkeypatch.setattr(dra.ollama_client, "host", lambda: "http://gpu-box:11434")
