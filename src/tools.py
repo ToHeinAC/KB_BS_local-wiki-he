@@ -37,6 +37,7 @@ import run_memory
 import wiki_engine
 from prompts import (
     CHAT_OPEN_REFS_MISSING,
+    CHAT_QUOTE_UNMATCHED,
     CHAT_SECTION_UNREAD,
     EVALUATE_CONDITION_DESCRIPTION,
     FETCH_WEBPAGE_DESCRIPTION,
@@ -722,6 +723,47 @@ def _unread_sections(answer: str, raw_cited: set[str]) -> str | None:
     )
 
 
+# A quoted span in an answer: „…“ (German), “…” or "…" on one line.
+_QUOTE_RE = re.compile(r'[„“"]([^„“”"\n]+)[“”"]')
+QUOTE_MIN_WORDS = 6  # shorter quoted spans are terms, not quotations
+_ELLIPSIS_RE = re.compile(r"…|\.\.\.|\[…\]|\[\.\.\.\]")
+
+
+def _plain(text: str) -> str:
+    """`text` for a word-for-word comparison: no markdown emphasis, one space, casefolded."""
+    return re.sub(r"\s+", " ", re.sub(r"[*_`]", "", text)).casefold().strip()
+
+
+def _raw_text(ref: str) -> str:
+    db, base, _ = _split_ref(ref)
+    with db_context.using_db(db):
+        data = wiki_engine.read_raw_source(base)
+    return data.decode("utf-8", errors="replace") if data else ""
+
+
+def _unmatched_quotes(answer: str, raw_cited: set[str]) -> str | None:
+    """Once per run: reject quotes that are not word for word in any cited original. An
+    ellipsis splits a quote into parts that must each be found."""
+    mem = run_memory.current()
+    quotes = [q for q in _QUOTE_RE.findall(answer) if len(q.split()) >= QUOTE_MIN_WORDS]
+    if mem is None or mem.quote_nudged or not quotes:
+        return None
+    corpus = " ".join(_plain(_raw_text(ref)) for ref in sorted(raw_cited))
+    missing = [
+        q
+        for q in quotes
+        if any(
+            _plain(part).strip(" .,;:") not in corpus
+            for part in _ELLIPSIS_RE.split(q)
+            if len(part.split()) >= 3
+        )
+    ]
+    if not missing:
+        return None
+    mem.quote_nudged = True
+    return CHAT_QUOTE_UNMATCHED.format(quotes="; ".join(f'"{q}"' for q in missing[:3]))
+
+
 _OPEN_POINTS_RE = re.compile(r"^#{2,3}\s*(?:Open points|Offene Punkte)\b", re.I | re.M)
 
 
@@ -789,6 +831,7 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     nudge = (
         _research_gap(raw_unique)
         or _unread_sections(answer or "", raw_unique)
+        or _unmatched_quotes(answer or "", raw_unique)
         or _open_refs_missing(answer or "", raw_unique)
         or _low_confidence_nudge()
         or _superseded_nudge(raw_unique)

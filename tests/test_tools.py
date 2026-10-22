@@ -739,3 +739,38 @@ def test_a_broken_reference_footer_never_costs_the_read(wiki_dir, monkeypatch):
     out = tools.raw_read.invoke({"filenames": ["L0.md § 1"]})
     assert out.startswith("## Raw file: L0.md § 1")
     assert "References:" not in out
+
+
+# --- quote check in the Deep chat gate (report tweak 5) ---------------------------------
+
+
+def test_a_quote_the_cited_originals_do_not_contain_is_rejected_once(monkeypatch, raw_dir):
+    # A small model "quotes" from memory; a quoted span is checkable in code, word for word,
+    # against the originals it cites (line breaks and markdown emphasis aside).
+    mem = _gate_ready(monkeypatch)
+    for q in ("a", "b", "c"):
+        mem.mark_search(f"rsearch:{q}")
+    mem.mark_read("raw:a.md:0")
+    (raw_dir / "a.md").write_text(
+        "§ 62\nRückstände dürfen nur mit **Genehmigung** der\nzuständigen Behörde verwertet werden."
+    )
+    cite = " [Source: a.md] [Source: b.md]"
+    good = "one two three „Rückstände dürfen nur mit Genehmigung der zuständigen Behörde“" + cite
+    assert tools._submit_chat_impl(good).startswith("ACCEPTED")
+    bad = 'one two three "Rückstände dürfen ohne jede Genehmigung verwertet werden"' + cite
+    out = tools._submit_chat_impl(bad)
+    assert out.startswith("REJECTED")
+    assert "Rückstände dürfen ohne jede Genehmigung" in out
+    assert tools._submit_chat_impl(bad).startswith("ACCEPTED")  # once: a weak model can't loop
+
+
+def test_short_quoted_terms_are_not_checked(monkeypatch, raw_dir):
+    mem = _gate_ready(monkeypatch)
+    for q in ("a", "b", "c"):
+        mem.mark_search(f"rsearch:{q}")
+    mem.mark_read("raw:a.md:0")
+    (raw_dir / "a.md").write_text("Text ohne den Begriff.")
+    answer = (
+        'one two three the term "überwachungsbedürftige Rückstände" [Source: a.md] [Source: b.md]'
+    )
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")

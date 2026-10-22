@@ -560,6 +560,14 @@ CHAT_SECTION_UNREAD = (
     "conditions from its text, then submit again."
 )
 
+# Quote check (tools._unmatched_quotes): a quoted span that is not word for word in the
+# cited originals.
+CHAT_QUOTE_UNMATCHED = (
+    "REJECTED: these quotes are not word for word in the originals you cite: {quotes}. "
+    "Copy the wording from the raw_read text, or drop the quotation marks and paraphrase, "
+    "then submit again."
+)
+
 # Reference chains (tools._open_refs_missing): a cited section relies on a law that is not
 # among the searchable originals; the answer must say so instead of filling the gap.
 CHAT_OPEN_REFS_MISSING = (

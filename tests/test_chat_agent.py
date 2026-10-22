@@ -276,7 +276,9 @@ def test_code_runs_the_first_raw_and_wiki_search_before_the_model_acts(monkeypat
     }
     calls = next(m for m in first if isinstance(m, AIMessage)).tool_calls
     assert [c["name"] for c in calls] == ["raw_search", "wiki_search"]
-    assert len(chat_agent.run_memory.current().searches) == 2  # they count toward the gate
+    mem = chat_agent.run_memory.current()
+    assert mem is not None
+    assert len(mem.searches) == 2  # they count toward the gate
 
 
 def test_a_failing_pre_flight_search_leaves_the_run_to_the_model(monkeypatch):
