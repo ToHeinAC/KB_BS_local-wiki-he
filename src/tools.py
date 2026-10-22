@@ -281,6 +281,22 @@ def _wiki_read_impl(filenames: str | list[str] | None) -> str:
     return "\n\n".join(outs)
 
 
+def _clean_hits(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The hits worth a small model's context: one chunk per file and section, and with a
+    calibrated τ none below it but the best (the low-confidence nudge covers that case)."""
+    tau = calibrate.threshold()
+    seen: set[tuple[str, str]] = set()
+    out: list[dict[str, Any]] = []
+    for h in hits:
+        key = (h["source"], h.get("anchor") or h["chunk_id"])
+        below = tau is not None and "rerank_score" in h and float(h["rerank_score"]) < tau
+        if key in seen or (out and below):
+            continue
+        seen.add(key)
+        out.append(h)
+    return out
+
+
 def _raw_search_db(query: str, max_results: int) -> list[str]:
     """Formatted raw-chunk hits for the *active* DB; [] when nothing matched.
 
@@ -290,11 +306,12 @@ def _raw_search_db(query: str, max_results: int) -> list[str]:
     mem = run_memory.current()
     view = ontology_store.view()
     as_of = retrieval.point_in_time(query)
-    parts: list[str] = []
-    for i, h in enumerate(hits, 1):
+    for h in hits:
         if mem is not None and "rerank_score" in h:  # Stage E: track best passage seen
             mem.note_relevance(float(h["rerank_score"]))
             mem.note_source_relevance(db_context.qualify(h["source"]), float(h["rerank_score"]))
+    parts: list[str] = []
+    for i, h in enumerate(_clean_hits(hits), 1):
         anchor = h.get("anchor") or ""
         cite_suffix = f" {anchor}" if anchor else ""
         badge = ontology_query.badge(view, h["source"], as_of) if view is not None else ""

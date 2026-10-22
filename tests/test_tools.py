@@ -774,3 +774,40 @@ def test_short_quoted_terms_are_not_checked(monkeypatch, raw_dir):
         'one two three the term "überwachungsbedürftige Rückstände" [Source: a.md] [Source: b.md]'
     )
     assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
+
+
+# --- raw_search hit hygiene (report tweak 6) --------------------------------------------
+
+
+def _hit(source: str, anchor: str, cid: str, rerank: float) -> dict:
+    return {
+        "source": source,
+        "anchor": anchor,
+        "chunk_id": cid,
+        "rerank_score": rerank,
+        "score": 1.0,
+        "matched_terms": ["x"],
+        "preview": f"text of {cid}",
+    }
+
+
+def test_raw_hits_keep_one_chunk_per_section_and_drop_those_below_tau(monkeypatch):
+    # Near-duplicate and off-topic passages are distractors a small model cannot ignore;
+    # the calibrated tau already marks "not relevant", so only the best hit may sit below it.
+    hits = [
+        _hit("a.md", "§ 62", "c1", 0.9),
+        _hit("a.md", "§ 62", "c2", 0.8),  # second part of the same section
+        _hit("b.md", "§ 3", "c3", 0.7),
+        _hit("c.md", "§ 9", "c4", 0.1),  # below tau
+    ]
+    monkeypatch.setattr(tools.retrieval, "search", lambda *a, **k: hits)
+    monkeypatch.setattr(tools.calibrate, "threshold", lambda db=None: 0.5)
+    parts = tools._raw_search_db("q", 6)
+    assert [p.split("chunk_id: ")[1].split("\n")[0] for p in parts] == ["c1", "c3"]
+    assert parts[1].startswith("[Raw hit 2]")
+
+
+def test_the_best_raw_hit_survives_even_below_tau(monkeypatch):
+    monkeypatch.setattr(tools.retrieval, "search", lambda *a, **k: [_hit("a.md", "", "c1", 0.1)])
+    monkeypatch.setattr(tools.calibrate, "threshold", lambda db=None: 0.5)
+    assert len(tools._raw_search_db("q", 6)) == 1
