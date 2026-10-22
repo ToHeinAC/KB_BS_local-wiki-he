@@ -338,3 +338,25 @@ def test_no_auto_read_once_the_model_opened_an_original_itself(monkeypatch):
     )
     list(chat_agent.run_chat_agent("q?"))
     assert reads == [["b.md"]]
+
+
+# --- tool errors (report tweak 9) ---
+
+
+def test_a_failing_tool_reports_an_error_line_instead_of_ending_the_run(monkeypatch):
+    # LangGraph's ToolNode re-raises tool exceptions by default, which ended the whole run
+    # at one bad read. The model gets a plain ERROR line and carries on; the exception text
+    # stays out of it, so a denied name reads exactly like a missing one.
+    monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
+
+    def boom(*_a, **_k):
+        raise KeyError("Strahlenschutz@strict")
+
+    monkeypatch.setattr(chat_agent.tool_module, "_raw_search_impl", boom)
+    fake = _patch_llm(monkeypatch, [_ai_with_tool("raw_search", {"query": "x"})])
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    steps = list(chat_agent.run_chat_agent("q?"))
+    assert all(s["type"] != "error" for s in steps)
+    result = next(m for m in fake.calls[1] if isinstance(m, ToolMessage))
+    assert str(result.content).startswith("ERROR:")
+    assert "strict" not in str(result.content)

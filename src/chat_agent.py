@@ -44,6 +44,7 @@ from langgraph.graph.state import (  # pyright: ignore[reportMissingTypeStubs]
     CompiledStateGraph,
 )
 from langgraph.prebuilt import ToolNode
+from langgraph.prebuilt.tool_node import ToolInvocationError
 
 import db_context
 import lang
@@ -57,6 +58,7 @@ from prompts import (
     CHAT_FALLBACK_PROMPT,
     CHAT_FALLBACK_SYSTEM,
     CHAT_PROSE_GATE_RETRY,
+    CHAT_TOOL_ERROR,
 )
 
 load_dotenv()
@@ -218,6 +220,20 @@ def _auto_read(msgs: list[AnyMessage]) -> AIMessage | None:
     return AIMessage(content="", tool_calls=[read])
 
 
+def _tool_error(e: Exception) -> str:
+    """What a raising tool returns instead of ending the run (ToolNode re-raises anything
+    but bad arguments by default); bad arguments keep their own explanation."""
+    if isinstance(e, ToolInvocationError):
+        return e.message
+    return CHAT_TOOL_ERROR
+
+
+def _tool_node() -> ToolNode:
+    return ToolNode(
+        tool_module.with_ontology(tool_module.CHAT_TOOLS), handle_tool_errors=_tool_error
+    )
+
+
 def _step_guard(config: RunnableConfig, bonus: int) -> None:
     """The graph's own limit leaves room for the reference bonus; the run's real limit is
     MAX_ITER plus two steps per earned turn (an agent step and a tool step)."""
@@ -266,7 +282,7 @@ def _build_graph(
     g: StateGraph[MessagesState] = StateGraph(MessagesState)
     # langgraph leaves CachePolicy/BaseCheckpointSaver generics unsolved in these signatures.
     g.add_node("agent", agent_node)  # pyright: ignore[reportUnknownMemberType]
-    g.add_node("tools", ToolNode(tool_module.with_ontology(tool_module.CHAT_TOOLS)))  # pyright: ignore[reportUnknownMemberType]
+    g.add_node("tools", _tool_node())  # pyright: ignore[reportUnknownMemberType]
     g.add_node("prose_gate", prose_gate)  # pyright: ignore[reportUnknownMemberType]
     g.add_edge(START, "agent")
     g.add_conditional_edges(

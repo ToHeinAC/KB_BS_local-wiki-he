@@ -560,6 +560,13 @@ CHAT_SECTION_UNREAD = (
     "conditions from its text, then submit again."
 )
 
+# A Deep chat tool that raised (chat_agent._tool_error). Deliberately without the exception
+# text: a denied name must read exactly like a missing one.
+CHAT_TOOL_ERROR = (
+    "ERROR: this tool call failed. Check the arguments (copy file names from raw_search "
+    "hits), try another tool, or go on with what you have."
+)
+
 # Quote check (tools._unmatched_quotes): a quoted span that is not word for word in the
 # cited originals.
 CHAT_QUOTE_UNMATCHED = (
