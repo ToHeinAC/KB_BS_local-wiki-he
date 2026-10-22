@@ -41,7 +41,8 @@
       "question": "Welche Vorschriften der Strahlenschutzverordnung konkretisieren die Entlassung von Rückständen aus der Überwachung nach § 62 StrlSchG?",
       "gold": [
         {"file": "StrlSchG.md", "section": "§ 62", "heading": "Entlassung von Rückständen"},
-        {"file": "StrlSchV.md", "section": "§ 98", "heading": "Entlassung"}
+        {"file": "StrlSchV.md", "section": "§ 29", "heading": "Entlassung überwachungsbedürftiger Rückstände"},
+        {"file": "StrlSchV.md", "section": "§ 30", "heading": "Entlassung überwachungsbedürftiger Rückstände"}
       ]
     }
   ]
