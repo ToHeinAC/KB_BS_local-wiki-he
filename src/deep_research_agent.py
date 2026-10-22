@@ -85,6 +85,10 @@ _SEARCH_CALL_RE = re.compile(r"^(Search results:|No valid search results found)"
 # `[n] Title: URL`). Trailing sentence punctuation is stripped by the caller.
 _URL_RE = re.compile(r"https?://[^\s<>\])}\"']+")
 
+# Appended to a URL the report cites that none of the run's searches returned: the final
+# writer invented or misremembered it. The vendored report cannot be checked inside.
+UNVERIFIED_MARK = "(unverified: not among the searched pages)"
+
 # `final_report_generation` swallows its own exceptions into the report string
 # rather than raising, so a failed run looks like a successful one.
 _REPORT_ERROR_PREFIX = "Error generating final report"
@@ -149,6 +153,20 @@ def _report_urls(report: str) -> set[str]:
     plus any inline links). Trailing sentence punctuation is stripped so
     `…example.org/x.` and `…example.org/x` count once."""
     return {u.rstrip(".,;:") for u in _URL_RE.findall(report or "")}
+
+
+def _mark_unverified(report: str, sources: list[dict[str, str]]) -> tuple[str, int]:
+    """The report with each cited URL that no search returned marked, and the number of
+    cited URLs a search did return. A URL is matched whole, before trailing punctuation."""
+    known = {s["url"].rstrip("/") for s in sources}
+    verified = 0
+    for url in sorted(_report_urls(report)):
+        if url.rstrip("/") in known:
+            verified += 1
+            continue
+        whole = re.escape(url) + r"(?=[.,;:]*(?:[\s<>\])}\"']|$))"
+        report = re.sub(whole, f"{url} {UNVERIFIED_MARK}", report)
+    return report, verified
 
 
 def _slug(text: str) -> str:
@@ -363,6 +381,11 @@ def _run_graph(question: str, directive: str) -> Generator[dict[str, Any], None,
         yield {"type": "notice", "content": DEEP_RESEARCH_FALLBACK_NOTICE.format(reason=reason)}
         return
     uniq = _unique_by_url(tally.sources)
+    if not uniq:  # written from model knowledge: the prose supervisor or failed researchers
+        reason = "the graph gathered no web source, so the report rests on none"
+        yield {"type": "notice", "content": DEEP_RESEARCH_FALLBACK_NOTICE.format(reason=reason)}
+        return
+    report, verified = _mark_unverified(report, uniq)
     yield {
         "type": "final_answer",
         "content": report,
@@ -373,6 +396,7 @@ def _run_graph(question: str, directive: str) -> Generator[dict[str, Any], None,
             "searches": tally.searches,
             "sources_checked": len(uniq),
             "sources_cited": len(_report_urls(report)),
+            "sources_verified": verified,
         },
     }
 

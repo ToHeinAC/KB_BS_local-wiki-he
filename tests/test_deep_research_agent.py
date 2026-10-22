@@ -203,6 +203,7 @@ def test_final_report_node_messages_are_not_echoed_as_a_thought(monkeypatch, wik
     _script(
         monkeypatch,
         [
+            ("research_supervisor", {"raw_notes": [TAVILY_RESULT]}),
             (
                 "final_report_generation",
                 {"final_report": report, "messages": [AIMessage(content=report)]},
@@ -210,8 +211,8 @@ def test_final_report_node_messages_are_not_echoed_as_a_thought(monkeypatch, wik
         ],
     )
     steps = list(dra.run_deep_research("q?"))
-    assert [s["type"] for s in steps] == ["final_answer"]
-    assert steps[0]["content"] == report
+    assert [s["type"] for s in steps] == ["tool_result", "final_answer"]
+    assert steps[-1]["content"] == report
 
 
 def test_compressed_research_becomes_a_thought(monkeypatch, wiki_dir):
@@ -384,7 +385,13 @@ def test_metrics_counted_across_the_run(monkeypatch, wiki_dir):
         ],
     )
     m = list(dra.run_deep_research("q?"))[-1]["metrics"]
-    assert m == {"tasks": 2, "searches": 2, "sources_checked": 3, "sources_cited": 2}
+    assert m == {
+        "tasks": 2,
+        "searches": 2,
+        "sources_checked": 3,
+        "sources_cited": 2,
+        "sources_verified": 2,
+    }
 
 
 def test_report_urls_dedupe_and_strip_trailing_punctuation():
@@ -392,12 +399,32 @@ def test_report_urls_dedupe_and_strip_trailing_punctuation():
     assert dra._report_urls("") == set()
 
 
-def test_metrics_zero_when_the_graph_did_no_research(monkeypatch, wiki_dir):
-    """The observed small-model failure mode: a report written straight from
-    model knowledge. The run still succeeds, so the metrics are the only tell."""
+def test_a_report_without_any_web_source_falls_back_to_quick(monkeypatch, wiki_dir):
+    """The observed small-model failure mode: a report written straight from model
+    knowledge (the supervisor answered in prose, or every researcher failed). Deep mode
+    is web-only, so a run that gathered no web source has nothing to stand on."""
+    _capture_quick(monkeypatch)
     _script(monkeypatch, [_report_event("A report with no sources at all.")])
-    m = list(dra.run_deep_research("q?"))[-1]["metrics"]
-    assert m == {"tasks": 0, "searches": 0, "sources_checked": 0, "sources_cited": 0}
+    steps = list(dra.run_deep_research("q?"))
+    assert steps[0]["type"] == "notice"
+    assert "no web source" in steps[0]["content"]
+    assert steps[-1]["content"] == "quick answer"
+
+
+def test_a_cited_url_no_search_returned_is_marked(monkeypatch, wiki_dir):
+    tm = ToolMessage(content=TAVILY_RESULT, name="web_search", tool_call_id="1")
+    report = (
+        "Body [1](https://example.org/a), more [2](https://made.up/x).\n\n### Sources\n"
+        "[1] A: https://example.org/a\n[2] B: https://made.up/x."
+    )
+    _script(
+        monkeypatch, [("researcher_tools", {"researcher_messages": [tm]}), _report_event(report)]
+    )
+    final = list(dra.run_deep_research("q?"))[-1]
+    assert final["type"] == "final_answer"
+    assert final["content"].count(dra.UNVERIFIED_MARK) == 2
+    assert f"https://example.org/a {dra.UNVERIFIED_MARK}" not in final["content"]
+    assert final["metrics"]["sources_verified"] == 1
 
 
 # --- fall back to Quick ----------------------------------------------------

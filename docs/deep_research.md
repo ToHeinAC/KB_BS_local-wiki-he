@@ -135,9 +135,16 @@ All `DEEP_RESEARCH_*` vars are registered in [configuration.md](configuration.md
 
 - **Failure falls back to Quick, it does not error.** Small local models are weak at the
   structured output and tool calling this graph leans on. On any graph exception, an
-  empty report, or the error-prefix above, `run_deep_research` emits a `notice` step and
+  empty report, the error-prefix above, or a run that gathered no web source at all
+  (the supervisor answered in prose, or every researcher failed — upstream's
+  `supervisor_tools` ends research normally on a child exception), `run_deep_research` emits a `notice` step and
   then delegates to `agent.run_research_agent`, so the user still gets an answer. The
   Research page renders `notice` as `st.warning`.
+
+- **Cited URLs are checked against the searched pages.** A URL in the report that no
+  search returned is marked `(unverified: not among the searched pages)` in the text
+  (`_mark_unverified`), and `metrics.sources_verified` counts the cited URLs a search did
+  return. The vendored report cannot be checked inside the graph, so this runs after it.
 
 ## Integration seams
 
@@ -226,10 +233,8 @@ local Ollama throughout (`ollama_client.loaded_model()`).
 - **Concurrency is not speedup.** Ollama serialises requests on a single model; raising
   `DEEP_RESEARCH_CONCURRENCY` costs VRAM without buying wall-clock.
 - **The supervisor sometimes skips research entirely** on a small model, writing the
-  report from model knowledge with no web sources (observed on `gemma4:e4b`). The run
-  still succeeds, so the fallback does not trigger — an all-zero metrics row
-  (0 sub-tasks, 0 searches, 0 sources cited) is the tell. A stronger tool-calling tag is
-  the mitigation.
+  report from model knowledge with no web sources (observed on `gemma4:e4b`). Such a run
+  falls back to Quick (see above); a stronger tool-calling tag is the real mitigation.
 - **The vendored tree emits deprecation warnings** under LangChain/LangGraph 1.x
   (`config_schema`, `input`/`output`, pydantic `Field(metadata=…)`). Functional today;
   it will break at LangGraph 2.0 and need a re-vendor.
