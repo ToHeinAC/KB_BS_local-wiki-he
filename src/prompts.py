@@ -628,6 +628,18 @@ Source notes (tool results):
 
 Write a concise markdown answer. Inline-cite every claim with the [Source: filename] tags exactly as they appear in the notes. If the notes are insufficient to answer fully, state what is known and list the remaining gaps explicitly."""
 
+# HyDE in Deep chat's pre-flight (chat_agent._hyde_search): a passage shaped like the answer,
+# used only as a search query — never shown as an answer or cited.
+CHAT_HYDE_SYSTEM = (
+    "You write short passages in the style of official legal and technical documents."
+)
+
+CHAT_HYDE_PROMPT = """Write the passage of an official document that would answer this question: 3-4 sentences in the document's own wording, with the terms such a text would use. Plain text, no preamble, no citations.
+
+Question: {question}
+
+{language_directive}"""
+
 # Deep chat's final answer from the evidence ledger (chat_agent._ledger_answer): code
 # collected the quotes; the model only writes them up.
 CHAT_LEDGER_SYSTEM = (

@@ -297,6 +297,7 @@ def test_code_runs_the_first_raw_and_wiki_search_before_the_model_acts(monkeypat
     # A small model's weakest step is starting retrieval at all; the question itself is
     # the first query, so code runs it and the model starts from the hits.
     tm = chat_agent.tool_module
+    monkeypatch.setattr(chat_agent, "_hyde_search", lambda q: [])  # tested on its own
     monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: "RAW HITS for " + queries[0])
     monkeypatch.setattr(tm, "_wiki_search_impl", lambda queries, **kw: "WIKI HITS")
     fake = _patch_llm(monkeypatch, [])
@@ -457,3 +458,44 @@ def test_the_run_stops_once_covered_and_no_new_evidence_arrives(monkeypatch):
     steps = list(chat_agent.run_chat_agent("q?"))
     assert len(fake.calls) == chat_agent.STALL_TURNS
     assert any(s["type"] == "gate" and "no new evidence" in s["content"] for s in steps)
+
+
+# --- HyDE in the pre-flight (answer tweak 5) ---
+
+
+def test_the_pre_flight_also_searches_with_a_hypothetical_answer_passage(monkeypatch):
+    # HyDE: a passage shaped like the answer matches the originals better than a question
+    # (the one query-side transform that helped in Wang et al. 2024). It does not count
+    # toward the gate's searches, so the agent still has to search itself.
+    seen: list = []
+    tm = chat_agent.tool_module
+    monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: seen.append(queries) or "RAW")
+    monkeypatch.setattr(tm, "_wiki_search_impl", lambda queries, **kw: "WIKI")
+    monkeypatch.setattr(
+        chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "Rückstände dürfen nur"
+    )
+    chat_agent.run_memory.begin_run("q?")
+    msgs = chat_agent._preflight("Wann dürfen Rückstände verwertet werden?")
+    assert seen == [["Wann dürfen Rückstände verwertet werden?"], ["Rückstände dürfen nur"]]
+    assert [m.name for m in msgs if isinstance(m, ToolMessage)] == [
+        "raw_search",
+        "wiki_search",
+        "raw_search",
+    ]
+    mem = chat_agent.run_memory.current()
+    assert mem is not None
+    assert len(mem.searches) == 2
+
+
+def test_a_failed_hypothetical_passage_leaves_the_plain_pre_flight(monkeypatch):
+    tm = chat_agent.tool_module
+    monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: "RAW")
+    monkeypatch.setattr(tm, "_wiki_search_impl", lambda queries, **kw: "WIKI")
+
+    def down(*_a, **_k):
+        raise ConnectionError("down")
+
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", down)
+    chat_agent.run_memory.begin_run("q?")
+    msgs = chat_agent._preflight("q?")
+    assert len([m for m in msgs if isinstance(m, ToolMessage)]) == 2

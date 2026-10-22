@@ -58,6 +58,8 @@ from prompts import (
     CHAT_BUDGET_NUDGE,
     CHAT_FALLBACK_PROMPT,
     CHAT_FALLBACK_SYSTEM,
+    CHAT_HYDE_PROMPT,
+    CHAT_HYDE_SYSTEM,
     CHAT_LEDGER_PROMPT,
     CHAT_LEDGER_SYSTEM,
     CHAT_PROSE_GATE_RETRY,
@@ -82,6 +84,7 @@ AUTO_READ_AT = 3
 # Turns in a row without a new quote in the evidence ledger after which a covered run
 # (enough searches and quoted sources for the gate) stops and is answered from the ledger.
 STALL_TURNS = 3
+HYDE_CAP = 600  # characters of the hypothetical passage used as a query
 
 # Ollama stops generating once prompt + answer reach num_ctx, so a long run's answer would
 # be cut mid-sentence. The history sent per turn stays under the window minus a reserve for
@@ -689,7 +692,37 @@ def _preflight(question: str) -> list[AnyMessage]:
         ]
     except Exception:
         return []
-    return [AIMessage(content="", tool_calls=calls), *results]
+    return [AIMessage(content="", tool_calls=calls), *results, *_hyde_search(question)]
+
+
+def _hyde_search(question: str) -> list[AnyMessage]:
+    """HyDE: one raw search with a short passage the model writes as if it were the answer
+    (it matches the originals' wording better than a question). Not counted toward the
+    gate's searches; [] on any failure."""
+    try:
+        passage = ollama_client.generate(
+            CHAT_HYDE_SYSTEM,
+            CHAT_HYDE_PROMPT.format(
+                question=question, language_directive=lang.response_directive(question)
+            ),
+            temperature=0.3,
+            model_id=ollama_client.QUERY_MODEL,
+        ).strip()[:HYDE_CAP]
+        hits = tool_module._raw_search_impl(queries=[passage])  # pyright: ignore[reportPrivateUsage]
+    except Exception:
+        return []
+    if not passage:
+        return []
+    call: ToolCall = {
+        "name": "raw_search",
+        "args": {"query": passage},
+        "id": "preflight-hyde",
+        "type": "tool_call",
+    }
+    return [
+        AIMessage(content="", tool_calls=[call]),
+        ToolMessage(content=str(hits), name="raw_search", tool_call_id=call["id"]),
+    ]
 
 
 def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
