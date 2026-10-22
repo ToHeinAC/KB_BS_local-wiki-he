@@ -188,6 +188,10 @@ def _spawn(port: int, gpu_index: int) -> subprocess.Popen[bytes] | None:
         "OLLAMA_VULKAN": "0",
         # Each slot allocates INGEST_NUM_CTX; >1 re-inflates the compute graph.
         "OLLAMA_NUM_PARALLEL": "1",
+        # The app-wide window (ollama_client.NUM_CTX) for callers that send no num_ctx —
+        # the vendored Deep Research graph's ChatOllama — instead of Ollama's 4K default;
+        # a matching window also spares the model a reload between Deep and other calls.
+        "OLLAMA_CONTEXT_LENGTH": os.getenv("INGEST_NUM_CTX", "32768"),
     }
     models_dir = find_models_dir()
     if models_dir:

@@ -92,6 +92,12 @@ All `DEEP_RESEARCH_*` vars are registered in [configuration.md](configuration.md
   config fields (which feed upstream's token-limit retry logic) but does not bound
   generation. Don't "fix" this by patching the vendored tree.
 
+- **No `num_ctx` reaches Ollama either.** `init_chat_model` builds `ChatOllama` without it,
+  so Ollama would use its own default window (4K below 24 GiB of VRAM) and truncate the
+  prompt silently, which also means upstream's token-limit retries never fire. The pinned
+  daemon is therefore started with `OLLAMA_CONTEXT_LENGTH=$INGEST_NUM_CTX`
+  (`src/ollama_server.py`). On the shared-daemon fallback the window stays Ollama's default.
+
 - **Web citations arrive via `raw_notes`, not via tool messages.** `supervisor_tools`
   runs the researcher subgraphs with `researcher_subgraph.ainvoke(...)` — they are not
   wired as graph nodes — so their `web_search` `ToolMessage`s never reach the parent

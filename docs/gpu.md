@@ -78,7 +78,10 @@ or `Ollama · shared daemon` with the reason on hover).
 
 **What the child gets:** `CUDA_VISIBLE_DEVICES` + `CUDA_DEVICE_ORDER` from
 `cuda_env()`, `OLLAMA_VULKAN=0`, `OLLAMA_NUM_PARALLEL=1`,
-`OLLAMA_HOST=127.0.0.1:<port>`, and `OLLAMA_MODELS` from `find_models_dir()`.
+`OLLAMA_CONTEXT_LENGTH=$INGEST_NUM_CTX` (the window for callers that send no `num_ctx`,
+such as the vendored Deep Research graph), `OLLAMA_HOST=127.0.0.1:<port>`, and
+`OLLAMA_MODELS` from `find_models_dir()`. An adopted daemon keeps the environment it was
+started with, so a new variable takes effect only after `ollama_server.stop()` or a box reboot.
 
 **Finding the model store** is deliberately "the candidate with the most
 manifests", not "the first that exists": `~/.ollama/models` is created empty by

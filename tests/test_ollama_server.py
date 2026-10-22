@@ -392,6 +392,20 @@ def test_spawn_pins_the_daemon(monkeypatch, tmp_path):
     assert started["start_new_session"] is True
 
 
+def test_spawn_sets_the_app_window_for_callers_that_send_none(monkeypatch):
+    # ChatOllama from init_chat_model (the vendored Deep Research graph) sends no num_ctx,
+    # so Ollama would fall back to its own default (4K below 24 GiB of VRAM).
+    started = {}
+    monkeypatch.setenv("INGEST_NUM_CTX", "32768")
+    monkeypatch.setattr(ollama_server.shutil, "which", lambda name: "/usr/bin/ollama")
+    monkeypatch.setattr(ollama_server, "find_models_dir", lambda: None)
+    monkeypatch.setattr(
+        ollama_server.subprocess, "Popen", lambda cmd, **kw: started.update(**kw) or "proc"
+    )
+    ollama_server._spawn(11435, 1)
+    assert started["env"]["OLLAMA_CONTEXT_LENGTH"] == "32768"
+
+
 def test_spawn_os_error_returns_none(monkeypatch):
     def boom(*a, **k):
         raise OSError("exec format error")
