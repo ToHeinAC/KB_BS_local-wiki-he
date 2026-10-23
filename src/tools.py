@@ -864,6 +864,28 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     return f"ACCEPTED: {words} words, {len(unique)} sources cited."
 
 
+# The gate's one-time nudges: each rejects once per run, then lets the answer pass.
+_ONCE_FLAGS = (
+    "prose_section_nudged",
+    "quote_nudged",
+    "open_refs_nudged",
+    "low_conf_nudged",
+    "validity_nudged",
+)
+
+
+def chat_verdict(answer: str) -> str:
+    """The gate's verdict on an answer code wrote (the ledger answer), without using up the
+    one-time nudges the agent's own answers are owed."""
+    mem = run_memory.current()
+    saved = {f: getattr(mem, f) for f in _ONCE_FLAGS} if mem is not None else {}
+    try:
+        return _submit_chat_impl(answer)
+    finally:
+        for flag, value in saved.items():
+            setattr(mem, flag, value)
+
+
 def _submit_final_impl(title: str, answer: str) -> str:
     words = len(re.findall(r"\w+", answer or ""))
     urls = set(_URL_RE.findall(answer or ""))

@@ -414,6 +414,15 @@ def test_a_ledger_answer_the_gate_rejects_leaves_the_agents_answer(monkeypatch):
     assert final["content"] == "AGENT ANSWER"
 
 
+def test_every_written_ledger_answer_is_kept_for_the_trace(monkeypatch):
+    # A rejected ledger answer is not shown, so its text is kept to see why it failed.
+    mem = _ledger_run()
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "bad")
+    monkeypatch.setattr(chat_agent.tool_module, "_submit_chat_impl", lambda a, s=None: "REJECTED")
+    assert chat_agent._ledger_answer("q?", "") is None
+    assert mem.ledger_drafts == ["bad"]
+
+
 def test_no_ledger_answer_without_enough_quoted_sources(monkeypatch):
     _ledger_run(n_refs=2)  # the gate needs 3 sources; a call that cannot pass is skipped
     calls: list = []

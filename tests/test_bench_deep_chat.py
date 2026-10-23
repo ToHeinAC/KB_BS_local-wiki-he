@@ -52,6 +52,17 @@ def test_each_row_keeps_the_runs_gate_events():
     ]
 
 
+def test_each_row_keeps_the_ledger_and_the_answers_written_from_it():
+    import run_memory
+
+    bench = _bench()
+    mem = run_memory.RunMemory(ledger=[("a.md § 1", "Satz.")], ledger_drafts=["draft"])
+    assert bench.ledger_record(mem) == {
+        "ledger": '[1] [Source: a.md § 1] "Satz."',
+        "ledger_answers": ["draft"],
+    }
+
+
 def test_memory_counts_tell_auto_advances_from_empty_stubs():
     bench = _bench()
     steps = [

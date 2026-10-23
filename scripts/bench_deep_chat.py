@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import chat_agent
 import chunker
 import db_context
+import evidence
 import run_memory
 import tools
 
@@ -52,6 +53,11 @@ def exit_path(steps: list[dict[str, Any]]) -> str:
     if any(s["type"] == "gate" and s.get("content") == "accepted" for s in steps):
         return "prose-gated-accepted"
     return "best-effort"
+
+
+def ledger_record(mem: run_memory.RunMemory) -> dict[str, Any]:
+    """The run's evidence ledger and every answer written from it (shown or not)."""
+    return {"ledger": evidence.render(mem.ledger), "ledger_answers": list(mem.ledger_drafts)}
 
 
 def gate_events(steps: list[dict[str, Any]]) -> list[str]:
@@ -129,6 +135,7 @@ def _run(item: dict[str, Any]) -> dict[str, Any]:
         **memory_counts(steps),
         "exit": exit_path(steps),
         "gates": gate_events(steps),
+        **ledger_record(mem),
         "cited_unread": [f"{f} {a}" for f, a in tools._tagged_unread(mem, cited)],  # pyright: ignore[reportPrivateUsage]
         **_score_gold(mem, answer, item["gold"]),
         "hops": max(mem.ref_depth.values(), default=0),
@@ -170,7 +177,7 @@ def main() -> None:
         rows.append(_run(item))
         _print(rows[-1])
     if args.out:
-        args.out.write_text(json.dumps(rows, ensure_ascii=False, indent=2), encoding="utf-8")
+        args.out.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 if __name__ == "__main__":

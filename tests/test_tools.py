@@ -431,6 +431,21 @@ def test_one_query_in_both_scopes_is_one_search(monkeypatch):
     assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
 
 
+def test_judging_code_written_answers_keeps_the_gates_one_time_nudges(monkeypatch):
+    # The ledger answer is judged by the same gate, but must not use up a nudge (quote
+    # check, unread § named in prose, ...) the agent's own answer would get.
+    mem = run_memory.begin_run()
+
+    def gate(answer, sources=None):
+        mem.quote_nudged = mem.prose_section_nudged = True
+        return "REJECTED: quote"
+
+    monkeypatch.setattr(tools, "_submit_chat_impl", gate)
+    assert tools.chat_verdict("x") == "REJECTED: quote"
+    assert not mem.quote_nudged
+    assert not mem.prose_section_nudged
+
+
 def test_a_deep_chat_answer_must_have_read_an_original_it_cites(monkeypatch):
     mem = _gate_ready(monkeypatch)
     for q in ("a", "b", "c"):

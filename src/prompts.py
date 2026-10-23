@@ -663,6 +663,7 @@ Write the answer in markdown from these quotes only:
 - Then one `## ` section per sub-question, with the exact figures, conditions and exceptions from the quotes.
 - End with `## Open points` for what the quotes do not settle.
 - After every claim put the citation tag of its quote exactly as given, e.g. [Source: file.md § 5]. Never cite anything else.
+- Name no section (§) that is not in one of the tags, not even where a quote refers to one: write "a further provision" instead.
 - Put quotation marks only around wording copied exactly from a quote; otherwise paraphrase.
 - Write at least {words} words, without padding."""
 

@@ -628,7 +628,8 @@ def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: st
         mem.ledger_verdict = ""
         mem.gate_events.append(f"ledger answer failed: {exc}")
         return None
-    verdict = tool_module._submit_chat_impl(answer)  # pyright: ignore[reportPrivateUsage]
+    mem.ledger_drafts.append(answer)
+    verdict = tool_module.chat_verdict(answer)
     if verdict.startswith("ACCEPTED"):
         mem.ledger_verdict = ""
         mem.gate_events.append("ledger answer accepted")

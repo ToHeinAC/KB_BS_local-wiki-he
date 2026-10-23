@@ -55,6 +55,7 @@ class RunMemory:
     ledger_answer: str | None = None
     ledger_verdict: str = ""
     ledger_tried: int = -1
+    ledger_drafts: list[str] = field(default_factory=list[str])  # every one written, for the trace
     # Reference chains: a section a footer offered ("<qbase>|sec=<canon>" → (depth, cross)),
     # the depth of each read section, out-of-scope work names per read section, and the
     # extra agent turns earned by following cross-file references.
