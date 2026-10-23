@@ -1,0 +1,34 @@
+[
+  {
+    "id": "q1",
+    "tool_calls": 7,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      0.6
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 529.7
+  },
+  {
+    "id": "q2",
+    "tool_calls": 15,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "0/1",
+    "quote_overlap": [
+      null
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 809.6
+  }
+]
