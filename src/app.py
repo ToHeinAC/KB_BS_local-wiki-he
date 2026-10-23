@@ -1565,6 +1565,7 @@ elif page == "Wiki Chat":
                     st.session_state["chat_followup"] = {
                         "q": msg["question"],
                         "a": msg["content"],
+                        "refs": msg.get("evidence_refs") or None,
                     }
                     st.rerun()
                 if msg["role"] == "assistant" and msg.get("steps"):
@@ -1666,7 +1667,9 @@ elif page == "Wiki Chat":
             answer = ""
             raw_sources: list[str] = []
             wiki_pages: list[str] = []
-            for step in chat_agent.run_chat_agent(q_to_ask):
+            evidence_refs: list[str] = []
+            carry = fu.get("refs") if fu else None
+            for step in chat_agent.run_chat_agent(q_to_ask, carry):
                 steps.append(step)
                 stype = step["type"]
                 with _live:
@@ -1687,6 +1690,7 @@ elif page == "Wiki Chat":
                         answer = step["content"]
                         raw_sources = step.get("sources", []) or []
                         wiki_pages = step.get("wiki_sources", []) or []
+                        evidence_refs = step.get("evidence_refs", []) or []
                     elif stype == "error" and not answer:
                         answer = f"Error: {step['content']}"
             # Deep chat: audit-log only (loop/abstention unchanged) — read the per-source
@@ -1699,6 +1703,7 @@ elif page == "Wiki Chat":
                     "question": prompt,
                     "sources": wiki_pages,
                     "raw_sources": raw_sources,
+                    "evidence_refs": evidence_refs,
                     "steps": steps,
                     "interpreted": interpreted,
                     "audit": _audit,

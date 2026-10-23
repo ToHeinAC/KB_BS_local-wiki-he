@@ -79,7 +79,7 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   standalone file (`gui_cite.answer_markdown`: question as title, a meta line, citations as Markdown footnotes under
   Sources), named after the question. Deep consumes `chat_agent.run_chat_agent` through
   `stream_steps` (steps appear live, the audit is read in the same worker). Follow-ups go through
-  `wiki_engine.condense_followup`; Save (maintainers) files at the highest level searched via `ui_logic.save_answer`.
+  `wiki_engine.condense_followup`, and a Deep follow-up hands the previous answer's `evidence_refs` to the agent (re-read, see [architecture.md](architecture.md) §Deep chat); Save (maintainers) files at the highest level searched via `ui_logic.save_answer`.
   Opening a note reads the document in a worker; a denied name looks exactly like a missing one. The conversation is a
   `Chat` in `Session.state`, so it is dropped with the session's content. Each page starts at the base level with no
   widened scope (`guard`); Chat sets its own scope for its handlers.

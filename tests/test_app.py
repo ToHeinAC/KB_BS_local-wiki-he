@@ -549,7 +549,7 @@ def test_deep_chat_streams_the_agent(wiki, monkeypatch):
             "wiki_sources": ["alpha.md"],
         },
     ]
-    monkeypatch.setattr(chat_agent, "run_chat_agent", lambda q: iter(steps))
+    monkeypatch.setattr(chat_agent, "run_chat_agent", lambda q, carry=None: iter(steps))
     at = _go(_app(), "Wiki Chat")
     at.segmented_control(key="chat_mode").set_value("Deep").run()
     at.chat_input[0].set_value("deep q").run()
@@ -557,6 +557,22 @@ def test_deep_chat_streams_the_agent(wiki, monkeypatch):
     assert last["content"] == "Deep answer"
     assert last["raw_sources"] == ["doc.md"]
     assert len(last["steps"]) == 5
+
+
+def test_a_deep_follow_up_re_reads_the_previous_answers_sections(wiki, monkeypatch):
+    carried: list = []
+
+    def agent(q, carry=None):
+        carried.append(carry)
+        yield {"type": "final_answer", "content": "A2", "evidence_refs": ["doc.md § 2"]}
+
+    monkeypatch.setattr(chat_agent, "run_chat_agent", agent)
+    monkeypatch.setattr(wiki_engine, "condense_followup", lambda q, a, f: "standalone?")
+    at = _go(_app(chat_followup={"q": "Q1", "a": "A1", "refs": ["doc.md § 1"]}), "Wiki Chat")
+    at.segmented_control(key="chat_mode").set_value("Deep").run()
+    at.chat_input[0].set_value("and?").run()
+    assert carried == [["doc.md § 1"]]
+    assert _ok(at).session_state["messages"][-1]["evidence_refs"] == ["doc.md § 2"]
 
 
 def test_chat_new_chat_and_history(wiki):
@@ -1128,7 +1144,7 @@ def test_deep_chat_shows_the_ontology_frame_and_why_line(wiki, monkeypatch):
         {"type": "ontology", "content": "Ontology frame (built by code …)"},
         {"type": "final_answer", "content": "Deep answer", "sources": ["doc.md"]},
     ]
-    monkeypatch.setattr(chat_agent, "run_chat_agent", lambda q: iter(steps))
+    monkeypatch.setattr(chat_agent, "run_chat_agent", lambda q, carry=None: iter(steps))
     audit = {"tau": None, "kept": [], "below_tau": [], "over_cap": [], "ontology": [frame]}
     monkeypatch.setattr(tools, "current_run_audit", lambda db=None: audit)
     at = _go(_app(), "Wiki Chat")

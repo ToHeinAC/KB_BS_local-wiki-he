@@ -487,6 +487,45 @@ def test_the_final_ledger_answer_reports_its_verdict_as_a_gate_step(monkeypatch)
     assert steps[-1]["type"] == "final_answer"
 
 
+# --- follow-up: re-read the previous run's ledger sections ---
+
+
+def test_the_final_answer_names_its_ledger_sections_most_quoted_first(monkeypatch):
+    # What a follow-up carries over: section names only, never the quoted text.
+    _, steps = _stalling_run(monkeypatch, "REJECTED: x", covered=False)
+    final = steps[-1]
+    assert final["type"] == "final_answer"
+    assert final["evidence_refs"] == ["f0.md § 0", "f1.md § 1", "f2.md § 2"]
+
+
+def test_most_quoted_sections_lead_and_are_capped():
+    mem = chat_agent.run_memory.RunMemory(
+        ledger=[("a § 1", "x"), ("b § 2", "y"), ("b § 2", "z"), *((f"c{i}", "w") for i in range(9))]
+    )
+    refs = chat_agent._carry_refs(mem)
+    assert refs[:2] == ["b § 2", "a § 1"]
+    assert len(refs) == chat_agent.CARRY_MAX
+
+
+def test_a_follow_up_re_reads_the_previous_runs_sections_before_the_model_acts(monkeypatch):
+    # The follow-up runs on a new question, so code re-reads the sections the last answer
+    # rested on: the quotes are taken again against the new question, and the gate sees
+    # them read in this run.
+    monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
+    monkeypatch.setattr(
+        chat_agent.tool_module, "_memory_read", lambda mem, f, offset: (f"TEXT {f}", f)
+    )
+    fake = _patch_llm(monkeypatch, [])
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    list(chat_agent.run_chat_agent("und bei 2 mSv?", ["StrlSchG.md § 61"]))
+    first = fake.calls[0]
+    calls = next(m for m in first if isinstance(m, AIMessage)).tool_calls
+    assert calls[0]["name"] == "raw_read"
+    assert calls[0]["args"] == {"filenames": ["StrlSchG.md § 61"]}
+    reads = [m.content for m in first if isinstance(m, ToolMessage)]
+    assert reads == ["TEXT StrlSchG.md § 61"]
+
+
 # --- HyDE in the pre-flight (answer tweak 5) ---
 
 

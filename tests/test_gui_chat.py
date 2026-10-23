@@ -84,7 +84,20 @@ def test_deep_steps_collect_the_final_answer_and_its_sources() -> None:
         acc,
         {"type": "final_answer", "content": "A", "sources": ["r.md"], "wiki_sources": ["p.md"]},
     )
-    assert acc == {"answer": "A", "raw_sources": ["r.md"], "wiki_pages": ["p.md"]}
+    assert acc == {
+        "answer": "A",
+        "raw_sources": ["r.md"],
+        "wiki_pages": ["p.md"],
+        "evidence_refs": [],
+    }
+
+
+def test_deep_steps_keep_the_sections_a_follow_up_re_reads() -> None:
+    acc = gui_chat.new_deep()
+    gui_chat.apply_deep_step(
+        acc, {"type": "final_answer", "content": "A", "evidence_refs": ["r.md § 1"]}
+    )
+    assert acc["evidence_refs"] == ["r.md § 1"]
 
 
 def test_an_error_step_is_the_answer_only_when_there_is_none_yet() -> None:
@@ -126,7 +139,7 @@ async def test_a_fast_answer_shows_numbered_citations_and_margin_notes(user: Use
 async def test_a_deep_answer_streams_its_trace_and_shows_the_audit(
     user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def agent(q: str) -> Iterator[dict[str, Any]]:
+    def agent(q: str, carry: list[str] | None = None) -> Iterator[dict[str, Any]]:
         yield {"type": "tool_call", "name": "raw_search", "args": {"q": q}}
         yield {"type": "final_answer", "content": ANSWER, "sources": ["ai.md"], "wiki_sources": []}
 
@@ -167,7 +180,7 @@ def _options(user: User) -> ui.expansion:
 async def test_asking_folds_the_options_so_the_timeline_comes_first(
     user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def agent(q: str) -> Iterator[dict[str, Any]]:
+    def agent(q: str, carry: list[str] | None = None) -> Iterator[dict[str, Any]]:
         yield {"type": "tool_call", "name": "raw_search", "args": {"q": q}}
         yield {"type": "final_answer", "content": ANSWER, "sources": ["ai.md"], "wiki_sources": []}
 
@@ -220,6 +233,29 @@ async def test_a_follow_up_is_condensed_against_the_previous_turn(
     await _ask(user, "and more")
     await user.should_see("Interpreted as")
     assert asked == ["First?", "First? / and more"]
+
+
+async def test_a_deep_follow_up_hands_the_previous_answers_sections_to_the_agent(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    carried: list[Any] = []
+
+    def agent(q: str, carry: list[str] | None = None) -> Iterator[dict[str, Any]]:
+        carried.append(carry)
+        yield {"type": "final_answer", "content": ANSWER, "evidence_refs": ["ai.md § 6"]}
+
+    monkeypatch.setattr(chat_agent, "run_chat_agent", agent)
+    monkeypatch.setattr(wiki_engine, "condense_followup", lambda q, a, f: f"{q} / {f}")
+    await _open(user)
+    (toggle,) = user.find("mode").elements
+    assert isinstance(toggle, ui.toggle)
+    toggle.set_value("Deep")
+    await _ask(user, "First?")
+    await user.should_see("Follow up")
+    user.find("follow-up").click()
+    await _ask(user, "and more")
+    await user.should_see("Interpreted as")
+    assert carried == [None, ["ai.md § 6"]]
 
 
 async def test_maintainers_can_save_the_answer_at_the_searched_level(

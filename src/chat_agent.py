@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections import Counter
 from collections.abc import Generator, Iterator
 from dataclasses import dataclass, field
 from typing import Any
@@ -89,6 +90,8 @@ STALL_TURNS = 3
 # The note on a final answer written from the evidence ledger (it passed the gate).
 LEDGER_NOTE = "Written from the quotes collected from the originals."
 HYDE_CAP = 600  # characters of the hypothetical passage used as a query
+# Sections a follow-up re-reads from the previous run's evidence ledger, most-quoted first.
+CARRY_MAX = 4
 
 # Ollama stops generating once prompt + answer reach num_ctx, so a long run's answer would
 # be cut mid-sentence. The history sent per turn stays under the window minus a reserve for
@@ -737,7 +740,39 @@ def _hyde_search(question: str) -> list[AnyMessage]:
     ]
 
 
-def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
+def _carry_refs(mem: run_memory.RunMemory) -> list[str]:
+    """The ledger's sections, most-quoted first: what a follow-up re-reads. Names only, so
+    no document text outlives the run."""
+    return [ref for ref, _ in Counter(ref for ref, _ in mem.ledger).most_common(CARRY_MAX)]
+
+
+def _carried_read(refs: list[str]) -> list[AnyMessage]:
+    """A follow-up's code-made `raw_read` of the previous answer's sections: their quotes are
+    taken again against the new question, and the gate sees them read in this run. [] on
+    any failure."""
+    if not refs:
+        return []
+    call: ToolCall = {
+        "name": "raw_read",
+        "args": {"filenames": refs[:CARRY_MAX]},
+        "id": "carried-read",
+        "type": "tool_call",
+    }
+    try:
+        text = str(tool_module.raw_read.invoke(call["args"]))
+    except Exception:
+        return []
+    return [
+        AIMessage(content="", tool_calls=[call]),
+        ToolMessage(content=text, name="raw_read", tool_call_id=call["id"]),
+    ]
+
+
+def run_chat_agent(
+    question: str, carry: list[str] | None = None
+) -> Generator[dict[str, Any], None, None]:
+    """Answer `question`; `carry` names the sections a follow-up's previous answer rested on
+    (its final step's `evidence_refs`), which code re-reads before the model's first turn."""
     run_memory.begin_run(question)
     directive = lang.response_directive(question)
     try:
@@ -757,6 +792,7 @@ def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
             SystemMessage(content=system),
             HumanMessage(content=question),
             *_preflight(question),
+            *_carried_read(carry or []),
         ]
     }
     run = _Run()
@@ -766,4 +802,4 @@ def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
         final = _final_step(question, directive, run)
         events = mem.gate_events[logged:] if mem is not None else []
         yield from ({"type": "gate", "content": e} for e in events)
-        yield final
+        yield {**final, "evidence_refs": _carry_refs(mem)} if mem is not None else final

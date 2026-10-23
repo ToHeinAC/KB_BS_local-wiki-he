@@ -39,7 +39,7 @@ class Chat:
     messages: list[dict[str, Any]] = field(default_factory=lambda: [])
     mode: str = "Fast"
     scope: list[str] = field(default_factory=lambda: [])
-    followup: dict[str, str] | None = None
+    followup: dict[str, Any] | None = None  # q, a, and a Deep answer's `refs`
     live: dict[str, Any] | None = None
     pending: str | None = None  # asked on another page (Front page); run when Chat opens
 
@@ -81,7 +81,7 @@ def save_target(session: gui_session.Session) -> str | None:
 
 
 def new_deep() -> dict[str, Any]:
-    return {"answer": "", "raw_sources": [], "wiki_pages": []}
+    return {"answer": "", "raw_sources": [], "wiki_pages": [], "evidence_refs": []}
 
 
 def apply_deep_step(acc: dict[str, Any], step: dict[str, Any]) -> None:
@@ -91,15 +91,18 @@ def apply_deep_step(acc: dict[str, Any], step: dict[str, Any]) -> None:
         acc["answer"] = step["content"]
         acc["raw_sources"] = step.get("sources", []) or []
         acc["wiki_pages"] = step.get("wiki_sources", []) or []
+        acc["evidence_refs"] = step.get("evidence_refs", []) or []
     elif kind == "error" and not acc["answer"]:
         acc["answer"] = f"Error: {step['content']}"
 
 
-async def _deep_message(chat: Chat, question: str, on_update: Callable[[], None]) -> dict[str, Any]:
+async def _deep_message(
+    chat: Chat, question: str, carry: list[str] | None, on_update: Callable[[], None]
+) -> dict[str, Any]:
     acc = new_deep()
     steps: list[dict[str, Any]] = []
     stream = gui_session.stream_steps(
-        chat_agent.run_chat_agent, question, after=tools.current_run_audit
+        chat_agent.run_chat_agent, question, carry, after=tools.current_run_audit
     )
     try:
         async for step in stream:
@@ -114,6 +117,7 @@ async def _deep_message(chat: Chat, question: str, on_update: Callable[[], None]
         "content": acc["answer"] or "(no answer)",
         "sources": acc["wiki_pages"],
         "raw_sources": acc["raw_sources"],
+        "evidence_refs": acc["evidence_refs"],
         "steps": steps,
         "audit": stream.after_result,
     }
@@ -146,7 +150,8 @@ async def run_turn(chat: Chat, prompt: str, on_update: Callable[[], None]) -> No
     on_update()
     try:
         if chat.mode == "Deep":
-            message = await _deep_message(chat, question, on_update)
+            carry = followup.get("refs") if followup else None
+            message = await _deep_message(chat, question, carry, on_update)
         else:
             message = await _fast_message(chat.live, question)
     finally:
@@ -459,7 +464,11 @@ class ChatView:
         self.refresh()
 
     def _follow(self, msg: dict[str, Any]) -> None:
-        self.chat.followup = {"q": msg["question"], "a": msg["content"]}
+        self.chat.followup = {
+            "q": msg["question"],
+            "a": msg["content"],
+            "refs": msg.get("evidence_refs") or None,
+        }
         self._render_followup()
 
     # --- ask row ----------------------------------------------------------------------------
