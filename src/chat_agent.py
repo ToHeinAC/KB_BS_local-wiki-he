@@ -117,56 +117,40 @@ def _cites(text: str, extra: list[str] | None = None) -> dict[str, Any]:
 
 def _size(m: AnyMessage) -> int:
     calls = m.tool_calls if isinstance(m, AIMessage) else []
-    thought = str(m.additional_kwargs.get("reasoning_content") or "")  # sent back as well
-    return len(str(m.content)) + (len(str(calls)) if calls else 0) + len(thought)
+    return len(str(m.content)) + (len(str(calls)) if calls else 0)
 
 
 def _trim(m: AnyMessage) -> AnyMessage:
-    """A tool result cut to its head; an agent turn without its thinking."""
-    if isinstance(m, AIMessage):
-        kwargs = {k: v for k, v in m.additional_kwargs.items() if k != "reasoning_content"}
-        return m.model_copy(update={"additional_kwargs": kwargs})
     return m.model_copy(update={"content": str(m.content)[:_TRIM_HEAD] + _TRIMMED})
-
-
-def _trimmable(m: AnyMessage, latest: bool) -> bool:
-    """Bulky old history: a tool result (never a think_tool note) or an agent turn's thinking.
-    The latest of each kind stays whole."""
-    if latest:
-        return False
-    if isinstance(m, AIMessage):
-        return bool(m.additional_kwargs.get("reasoning_content"))
-    return (
-        isinstance(m, ToolMessage)
-        and m.name != "think_tool"
-        and len(str(m.content)) > _TRIM_HEAD + len(_TRIMMED)
-    )
 
 
 def _fit_window(
     msgs: list[AnyMessage], trimmed: frozenset[int] = frozenset(), budget_chars: int = WINDOW_CHARS
 ) -> tuple[list[AnyMessage], frozenset[int]]:
-    """The history to send and the indexes of its trimmed messages. Earlier trims
-    (`trimmed`) are reapplied as they were; once over budget, the oldest bulky tool results
-    are cut to their head and old thinking dropped, down to `_TRIM_TO` of it. think_tool
-    notes and the latest tool result and turn stay whole; the run's state is unchanged."""
+    """The history to send and the indexes of its trimmed tool results. Earlier trims
+    (`trimmed`) are reapplied as they were; once over budget, the oldest bulky results are
+    cut to their head down to `_TRIM_TO` of it. think_tool notes and the latest tool result
+    stay whole; the run's state is unchanged."""
     out = [_trim(m) if i in trimmed else m for i, m in enumerate(msgs)]
     cut = set(trimmed)
     excess = sum(map(_size, out)) - budget_chars
     if excess > 0:
         excess += int(budget_chars * (1 - _TRIM_TO))
-    last = {
-        kind: max((i for i, m in enumerate(out) if isinstance(m, kind)), default=-1)
-        for kind in (ToolMessage, AIMessage)
-    }
+    last_tool = max((i for i, m in enumerate(out) if isinstance(m, ToolMessage)), default=-1)
     for i, m in enumerate(out):
         if excess <= 0:
             break
-        if i in cut or not _trimmable(m, i in last.values()):
+        if (
+            i in cut
+            or not isinstance(m, ToolMessage)
+            or i == last_tool
+            or m.name == "think_tool"
+            or len(str(m.content)) <= _TRIM_HEAD + len(_TRIMMED)
+        ):
             continue
         out[i] = _trim(m)
         cut.add(i)
-        excess -= _size(m) - _size(out[i])
+        excess -= len(str(m.content)) - len(str(out[i].content))
     return out, frozenset(cut)
 
 
@@ -212,9 +196,8 @@ def _build_llm() -> Runnable[LanguageModelInput, BaseMessage]:
         temperature=1.0,
         top_p=0.95,
         top_k=64,
-        # Small models call tools more reliably thinking. ChatOllama sends the thinking
-        # back with the history, so the prompt stays append-only for Ollama's cache.
-        reasoning=True if ollama_client.thinks(ollama_client.QUERY_MODEL) else None,
+        # No thinking (`reasoning` unset), even for a model that can: on the KI bench it cited
+        # unread sections and far overran the time budget (bench/results/deep_chat_2026-10-22.md).
         num_ctx=ollama_client.NUM_CTX,  # the app-wide window: no truncation, no model reload
         client_kwargs={"timeout": LLM_TIMEOUT},  # ChatOllama drops a bare timeout=
     ).bind_tools(tool_module.with_ontology(tool_module.CHAT_TOOLS))  # pyright: ignore[reportUnknownMemberType]  # bare Callable

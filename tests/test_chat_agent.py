@@ -108,38 +108,15 @@ def test_build_llm_uses_the_app_wide_context_window(monkeypatch):
     assert llm.bound.num_ctx == chat_agent.ollama_client.NUM_CTX
 
 
-def test_build_llm_samples_as_recommended_for_gemma_and_thinks_when_the_model_can(monkeypatch):
-    # Google, Ollama and Unsloth give 1.0 / 0.95 / 64 for every use; small models call tools
-    # more reliably with thinking on. ChatOllama sends the thinking back with the history,
-    # so the prompt stays append-only for Ollama's cache.
+def test_build_llm_samples_as_recommended_for_gemma_and_does_not_think(monkeypatch):
+    # Google, Ollama and Unsloth give 1.0 / 0.95 / 64 for every use. Thinking stays off even
+    # for a model that can: on the KI bench it cited 5 unread sections on q1 and ran q2 past
+    # 4.8x the baseline (bench/results/deep_chat_2026-10-22.md).
     monkeypatch.setattr(chat_agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
-    monkeypatch.setattr(chat_agent.ollama_client, "thinks", lambda model: True)
+    monkeypatch.setattr(chat_agent.ollama_client, "thinks", lambda model: True, raising=False)
     llm: Any = chat_agent._build_llm()
     assert (llm.bound.temperature, llm.bound.top_p, llm.bound.top_k) == (1.0, 0.95, 64)
-    assert llm.bound.reasoning is True
-    monkeypatch.setattr(chat_agent.ollama_client, "thinks", lambda model: False)
-    assert chat_agent._build_llm().bound.reasoning is None  # type: ignore[attr-defined]
-
-
-def test_thinking_counts_toward_the_context_budget():
-    thought = AIMessage(content="", additional_kwargs={"reasoning_content": "t" * 5000})
-    assert chat_agent._size(thought) >= 5000
-
-
-def test_a_trim_also_drops_the_thinking_of_old_turns():
-    def turn(i: int) -> AIMessage:
-        return AIMessage(
-            content="",
-            additional_kwargs={"reasoning_content": "t" * 20_000},
-            tool_calls=[{"name": "think_tool", "args": {}, "id": f"c{i}", "type": "tool_call"}],
-        )
-
-    msgs: list[Any] = [HumanMessage(content="q")]
-    for i in range(5):
-        msgs += [turn(i), _tool("think_tool", "note", f"c{i}")]
-    fitted, _ = chat_agent._fit_window(msgs, budget_chars=60_000)
-    assert sum(map(chat_agent._size, fitted)) <= 60_000
-    assert fitted[-2].additional_kwargs["reasoning_content"]  # the latest turn keeps it
+    assert llm.bound.reasoning is None
 
 
 def test_a_deep_chat_run_has_room_to_research_before_the_submit_nudge():

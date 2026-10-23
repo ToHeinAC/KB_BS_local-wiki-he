@@ -13,24 +13,6 @@ def _make_mock(monkeypatch):
     return mock
 
 
-# --- thinks ---
-
-
-def test_thinks_reads_the_models_capabilities(monkeypatch):
-    mock = _make_mock(monkeypatch)
-    mock.show.return_value = {"capabilities": ["completion", "tools", "thinking"]}
-    assert ollama_client.thinks("gemma4:e4b") is True
-    mock.show.return_value = {"capabilities": ["completion", "tools"]}
-    assert ollama_client.thinks("llama3.2:3b") is False
-
-
-def test_thinks_is_false_when_the_daemon_cannot_say(monkeypatch):
-    # Asking a model without the capability to think makes Ollama reject the request.
-    mock = _make_mock(monkeypatch)
-    mock.show.side_effect = ConnectionRefusedError("down")
-    assert ollama_client.thinks("gemma4:e4b") is False
-
-
 # --- is_available ---
 
 
