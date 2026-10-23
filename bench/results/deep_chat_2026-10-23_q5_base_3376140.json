@@ -1,0 +1,19 @@
+[
+  {
+    "id": "q5",
+    "tool_calls": 12,
+    "advances": 1,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "1/2",
+    "quote_overlap": [
+      0.7142857142857143,
+      0.25
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 873.8
+  }
+]
