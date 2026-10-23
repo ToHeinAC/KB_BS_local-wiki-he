@@ -815,9 +815,9 @@ def _research_gap(raw_cited: set[str]) -> str | None:
     mem = run_memory.current()
     if mem is None:
         return None
-    if len(mem.searches) < CHAT_MIN_SEARCHES:
+    if mem.search_count() < CHAT_MIN_SEARCHES:
         return (
-            f"REJECTED: {len(mem.searches)} distinct searches so far, minimum is "
+            f"REJECTED: {mem.search_count()} distinct searches so far, minimum is "
             f"{CHAT_MIN_SEARCHES}. raw_search the open sub-questions with other stems first."
         )
     read = _read_bases(mem)

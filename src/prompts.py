@@ -642,6 +642,12 @@ Question: {question}
 
 # Deep chat's final answer from the evidence ledger (chat_agent._ledger_answer): code
 # collected the quotes; the model only writes them up.
+CHAT_LEDGER_REJECTED = (
+    "No new quotes came in for a while, so code wrote an answer from the quotes collected "
+    "so far, and the quality gate rejected it:\n{verdict}\n"
+    "Search or read what is missing, then call submit_chat_answer."
+)
+
 CHAT_LEDGER_SYSTEM = (
     "You write answers strictly from the numbered quotes you are given. Every statement "
     "rests on a quote; never add facts, sources or figures that are not in them."

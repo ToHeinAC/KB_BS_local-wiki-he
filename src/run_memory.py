@@ -50,6 +50,11 @@ class RunMemory:
     ledger: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
     ledger_seen: int = -1  # -1: the run's first turn always counts as progress
     stale_turns: int = 0
+    # The answer written from the ledger, its gate verdict, and the ledger size it was
+    # written at (-1: none yet), so an unchanged ledger is not written up twice.
+    ledger_answer: str | None = None
+    ledger_verdict: str = ""
+    ledger_tried: int = -1
     # Reference chains: a section a footer offered ("<qbase>|sec=<canon>" → (depth, cross)),
     # the depth of each read section, out-of-scope work names per read section, and the
     # extra agent turns earned by following cross-file references.
@@ -87,6 +92,10 @@ class RunMemory:
 
     def mark_search(self, key: str) -> None:
         self.searches.setdefault(key, self.step)
+
+    def search_count(self) -> int:
+        """Distinct queries searched: one query in the raw and the wiki scope is one search."""
+        return len({key.split(":", 1)[-1] for key in self.searches})
 
 
 _current: contextvars.ContextVar[RunMemory | None] = contextvars.ContextVar(

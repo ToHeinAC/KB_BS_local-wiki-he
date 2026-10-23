@@ -290,7 +290,7 @@ def test_code_runs_the_first_raw_and_wiki_search_before_the_model_acts(monkeypat
     assert [c["name"] for c in calls] == ["raw_search", "wiki_search"]
     mem = chat_agent.run_memory.current()
     assert mem is not None
-    assert len(mem.searches) == 2  # they count toward the gate
+    assert mem.search_count() == 1  # one query in two scopes: one search for the gate
 
 
 def test_a_failing_pre_flight_search_leaves_the_run_to_the_model(monkeypatch):
@@ -422,19 +422,60 @@ def test_no_ledger_answer_without_enough_quoted_sources(monkeypatch):
     assert calls == []
 
 
-def test_the_run_stops_once_covered_and_no_new_evidence_arrives(monkeypatch):
-    # Retrieval thrash: a covered run that keeps searching without new quotes ends after
-    # STALL_TURNS turns, and the answer is written from the ledger.
+def _stalling_run(monkeypatch, verdict: str, covered: bool = True) -> tuple[FakeLLM, list]:
+    # A covered run whose model keeps thinking without new quotes, and a ledger answer the
+    # gate judges with `verdict`.
     monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
-    monkeypatch.setattr(chat_agent, "_covered", lambda mem: True)
+    monkeypatch.setattr(chat_agent, "_covered", lambda mem: covered)
+    monkeypatch.setattr(chat_agent.evidence, "render", lambda ledger: "QUOTES")
     fake = _patch_llm(
         monkeypatch,
-        [_ai_with_tool("think_tool", {"reflection": f"n{i}"}, f"t{i}") for i in range(20)],
+        [_ai_with_tool("think_tool", {"reflection": f"n{i}"}, f"t{i}") for i in range(6)],
     )
-    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
-    steps = list(chat_agent.run_chat_agent("q?"))
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "LEDGER")
+    monkeypatch.setattr(chat_agent.tool_module, "_submit_chat_impl", lambda a, s=None: verdict)
+    real_begin = chat_agent.run_memory.begin_run
+
+    def begin(question: str = ""):
+        mem = real_begin(question)
+        mem.ledger = [(f"f{i}.md § {i}", f"Satz {i}.") for i in range(3)]
+        return mem
+
+    monkeypatch.setattr(chat_agent.run_memory, "begin_run", begin)
+    return fake, list(chat_agent.run_chat_agent("q?"))
+
+
+def test_a_stalled_run_stops_when_its_ledger_answer_passes_the_gate(monkeypatch):
+    # Retrieval thrash: a covered run that goes STALL_TURNS turns without a new quote ends,
+    # and the user gets the ledger answer that passed (written once, not again at the end).
+    fake, steps = _stalling_run(monkeypatch, "ACCEPTED")
     assert len(fake.calls) == chat_agent.STALL_TURNS
-    assert any(s["type"] == "gate" and "no new evidence" in s["content"] for s in steps)
+    gates = [s["content"] for s in steps if s["type"] == "gate"]
+    assert gates == ["ledger answer accepted", "stopped: no new evidence in 3 turns"]
+    final = steps[-1]
+    assert final["content"] == "LEDGER"
+    assert final["note"] == chat_agent.LEDGER_NOTE
+
+
+def test_a_stalled_run_whose_ledger_answer_fails_goes_on_with_the_verdict(monkeypatch):
+    # Stopping on a ledger answer the gate rejects would ship a best-effort draft: the run
+    # goes on instead, with the verdict as feedback, and is judged again STALL_TURNS later.
+    fake, steps = _stalling_run(monkeypatch, "REJECTED: too short\nmore")
+    assert len(fake.calls) > chat_agent.STALL_TURNS
+    feedback = fake.calls[chat_agent.STALL_TURNS][-1]
+    assert isinstance(feedback, HumanMessage)
+    assert "REJECTED: too short" in feedback.content
+    gates = [s["content"] for s in steps if s["type"] == "gate"]
+    assert gates[0] == "ledger answer rejected: REJECTED: too short"
+    assert not any(g.startswith("stopped") for g in gates)
+
+
+def test_the_final_ledger_answer_reports_its_verdict_as_a_gate_step(monkeypatch):
+    # Why a ledger answer did not ship must show in the trace and the bench rows.
+    _, steps = _stalling_run(monkeypatch, "REJECTED: unread § 6", covered=False)
+    gates = [s["content"] for s in steps if s["type"] == "gate"]
+    assert gates[-1] == "ledger answer rejected: REJECTED: unread § 6"
+    assert steps[-1]["type"] == "final_answer"
 
 
 # --- HyDE in the pre-flight (answer tweak 5) ---
@@ -461,7 +502,7 @@ def test_the_pre_flight_also_searches_with_a_hypothetical_answer_passage(monkeyp
     ]
     mem = chat_agent.run_memory.current()
     assert mem is not None
-    assert len(mem.searches) == 2
+    assert mem.search_count() == 1
 
 
 def test_a_failed_hypothetical_passage_leaves_the_plain_pre_flight(monkeypatch):

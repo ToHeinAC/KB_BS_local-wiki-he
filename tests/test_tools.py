@@ -417,6 +417,20 @@ def test_a_deep_chat_answer_needs_the_minimum_number_of_searches(monkeypatch):
     assert "search" in out
 
 
+def test_one_query_in_both_scopes_is_one_search(monkeypatch):
+    # The pre-flight runs the question as a raw and a wiki search: one query, so the model
+    # still has two searches of its own to make before the gate (minimum 3) accepts.
+    mem = _gate_ready(monkeypatch)
+    for key in ("raw_search:frage", "wiki_search:frage", "raw_search:b"):
+        mem.mark_search(key)
+    mem.mark_read("raw:a.md:0")
+    answer = "one two three four five six [Source: a.md] [Source: b.md]"
+    out = tools._submit_chat_impl(answer)
+    assert out.startswith("REJECTED: 2 distinct searches")
+    mem.mark_search("raw_search:c")
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
+
+
 def test_a_deep_chat_answer_must_have_read_an_original_it_cites(monkeypatch):
     mem = _gate_ready(monkeypatch)
     for q in ("a", "b", "c"):

@@ -61,6 +61,7 @@ from prompts import (
     CHAT_HYDE_PROMPT,
     CHAT_HYDE_SYSTEM,
     CHAT_LEDGER_PROMPT,
+    CHAT_LEDGER_REJECTED,
     CHAT_LEDGER_SYSTEM,
     CHAT_PROSE_GATE_RETRY,
     CHAT_TOOL_ERROR,
@@ -82,7 +83,8 @@ PROSE_RETRIES = int(os.getenv("CHAT_PROSE_RETRIES", "2"))
 # hit if the model has read no original yet.
 AUTO_READ_AT = 3
 # Turns in a row without a new quote in the evidence ledger after which a covered run
-# (enough searches and quoted sources for the gate) stops and is answered from the ledger.
+# (enough searches and quoted sources for the gate) is answered from the ledger: it stops
+# if that answer passes the gate, else goes on with the verdict as feedback.
 STALL_TURNS = 3
 # The note on a final answer written from the evidence ledger (it passed the gate).
 LEDGER_NOTE = "Written from the quotes collected from the originals."
@@ -239,7 +241,7 @@ def _auto_read(msgs: list[AnyMessage]) -> AIMessage | None:
 def _covered(mem: run_memory.RunMemory) -> bool:
     """Enough searches and quoted sources for the gate to accept a ledger answer."""
     refs = {ref for ref, _ in mem.ledger}
-    return len(mem.searches) >= MIN_SEARCHES and len(refs) >= MIN_SOURCES
+    return mem.search_count() >= MIN_SEARCHES and len(refs) >= MIN_SOURCES
 
 
 def _evidence_stalled(mem: run_memory.RunMemory | None) -> bool:
@@ -253,15 +255,23 @@ def _evidence_stalled(mem: run_memory.RunMemory | None) -> bool:
     return mem.stale_turns >= STALL_TURNS and _covered(mem)
 
 
-def _code_turn(msgs: list[AnyMessage], mem: run_memory.RunMemory | None) -> AIMessage | None:
-    """A turn code takes instead of the model: the auto-read, or the stop of a stalled run
-    (an empty message, which ends the graph; the answer is then written from the ledger)."""
+def _code_turn(
+    msgs: list[AnyMessage], mem: run_memory.RunMemory | None, directive: str
+) -> AIMessage | HumanMessage | None:
+    """A turn code takes instead of the model: the auto-read, or a stalled run's ledger
+    answer. If that passes the gate the run stops (an empty message ends the graph and the
+    final step ships it); else the verdict goes to the model as feedback."""
     stalled = _evidence_stalled(mem)
     auto = _auto_read(msgs)
     if auto is not None or not stalled or mem is None:
         return auto
-    mem.gate_events.append(f"stopped: no new evidence in {STALL_TURNS} turns")
-    return AIMessage(content="")
+    mem.stale_turns = 0  # judged again only after STALL_TURNS more turns without a quote
+    if _ledger_answer(mem.question, directive) is not None:
+        mem.gate_events.append(f"stopped: no new evidence in {STALL_TURNS} turns")
+        return AIMessage(content="")
+    if not mem.ledger_verdict:
+        return None
+    return HumanMessage(content=CHAT_LEDGER_REJECTED.format(verdict=mem.ledger_verdict))
 
 
 def _tool_error(e: Exception) -> str:
@@ -299,11 +309,11 @@ def _build_graph(
         mem = run_memory.current()
         bonus = mem.bonus if mem is not None else 0
         _step_guard(config, bonus)
-        forced = _code_turn(list(state["messages"]), mem)
-        if forced is not None:
+        forced = _code_turn(list(state["messages"]), mem, directive)
+        if isinstance(forced, AIMessage):
             return {"messages": [forced]}
         msgs, trimmed = _fit_window(list(state["messages"]), trimmed)
-        new = _new_nudge(msgs, nudge, bonus)
+        new = [*([forced] if forced is not None else []), *_new_nudge(msgs, nudge, bonus)]
         return {"messages": [*new, llm.invoke([*msgs, *new])]}
 
     def should_continue(state: MessagesState) -> str:
@@ -589,11 +599,19 @@ def _last_resort(question: str, directive: str, run: _Run) -> dict[str, Any]:
 
 
 def _ledger_answer(question: str, directive: str) -> str | None:
-    """The answer written from the run's evidence ledger in a fresh, short prompt, if it
-    passes the submit gate; None without enough quoted sources or on any failure."""
+    """The answer written from the run's evidence ledger, if it passes the submit gate;
+    None without enough quoted sources or on any failure. Written once per ledger size."""
     mem = run_memory.current()
     if mem is None or len({ref for ref, _ in mem.ledger}) < MIN_SOURCES:
         return None
+    if mem.ledger_tried != len(mem.ledger):
+        mem.ledger_tried = len(mem.ledger)
+        mem.ledger_answer = _write_ledger_answer(mem, question, directive)
+    return mem.ledger_answer
+
+
+def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: str) -> str | None:
+    """The ledger answer in a fresh, short prompt; its gate verdict goes to the gate events."""
     refs = len({ref for ref, _ in mem.ledger})
     words = min(MIN_WORDS, tool_module.CHAT_WORDS_PER_SOURCE * refs)
     prompt = CHAT_LEDGER_PROMPT.format(
@@ -606,10 +624,18 @@ def _ledger_answer(question: str, directive: str) -> str | None:
             temperature=0.3,
             model_id=ollama_client.QUERY_MODEL,
         ).strip()
-    except Exception:
+    except Exception as exc:
+        mem.ledger_verdict = ""
+        mem.gate_events.append(f"ledger answer failed: {exc}")
         return None
     verdict = tool_module._submit_chat_impl(answer)  # pyright: ignore[reportPrivateUsage]
-    return answer if verdict.startswith("ACCEPTED") else None
+    if verdict.startswith("ACCEPTED"):
+        mem.ledger_verdict = ""
+        mem.gate_events.append("ledger answer accepted")
+        return answer
+    mem.ledger_verdict = verdict
+    mem.gate_events.append(f"ledger answer rejected: {_verdict_reason(verdict)}")
+    return None
 
 
 def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
@@ -659,8 +685,8 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
 
 def _preflight(question: str) -> list[AnyMessage]:
     """The run's first raw and wiki search, run by code on the question: a small model's
-    weakest step is starting retrieval at all. They count toward the gate's searches; on
-    any failure the model starts the search itself."""
+    weakest step is starting retrieval at all. One query in two scopes, they count as one
+    of the gate's searches; on any failure the model starts the search itself."""
     tools = {"raw_search": tool_module.raw_search, "wiki_search": tool_module.wiki_search}
     calls: list[ToolCall] = [
         {"name": name, "args": {"query": question}, "id": f"preflight-{name}", "type": "tool_call"}
@@ -734,4 +760,9 @@ def run_chat_agent(question: str) -> Generator[dict[str, Any], None, None]:
     }
     run = _Run()
     if (yield from _stream(graph, init, run)):
-        yield _final_step(question, directive, run)
+        mem = run_memory.current()
+        logged = len(mem.gate_events) if mem is not None else 0
+        final = _final_step(question, directive, run)
+        events = mem.gate_events[logged:] if mem is not None else []
+        yield from ({"type": "gate", "content": e} for e in events)
+        yield final
