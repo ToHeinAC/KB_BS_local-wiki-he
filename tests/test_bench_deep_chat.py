@@ -28,6 +28,30 @@ def test_the_exit_path_names_how_the_answer_got_out():
     )
 
 
+def test_an_answer_written_from_the_ledger_counts_as_accepted():
+    # The ledger answer is kept only when it passes the gate, and it replaces whatever the
+    # agent submitted, so it is the exit even after an accepted submission.
+    import chat_agent
+
+    bench = _bench()
+    submit = {"type": "tool_result", "name": "submit_chat_answer", "result": "ACCEPTED: 9"}
+    final = {"type": "final_answer", "content": "x", "note": chat_agent.LEDGER_NOTE}
+    assert bench.exit_path([submit, final]) == "ledger-accepted"
+
+
+def test_each_row_keeps_the_runs_gate_events():
+    bench = _bench()
+    steps = [
+        {"type": "gate", "content": "stopped: no new evidence in 3 turns"},
+        {"type": "tool_call", "name": "raw_read"},
+        {"type": "gate", "content": "rejected (retry 1/2): too short"},
+    ]
+    assert bench.gate_events(steps) == [
+        "stopped: no new evidence in 3 turns",
+        "rejected (retry 1/2): too short",
+    ]
+
+
 def test_memory_counts_tell_auto_advances_from_empty_stubs():
     bench = _bench()
     steps = [

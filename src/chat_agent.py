@@ -84,6 +84,8 @@ AUTO_READ_AT = 3
 # Turns in a row without a new quote in the evidence ledger after which a covered run
 # (enough searches and quoted sources for the gate) stops and is answered from the ledger.
 STALL_TURNS = 3
+# The note on a final answer written from the evidence ledger (it passed the gate).
+LEDGER_NOTE = "Written from the quotes collected from the originals."
 HYDE_CAP = 600  # characters of the hypothetical passage used as a query
 
 # Ollama stops generating once prompt + answer reach num_ctx, so a long run's answer would
@@ -619,7 +621,7 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
             "type": "final_answer",
             "content": _with_iter_hint(ledgered, run.recursion_hit),
             **_cites(ledgered),
-            "note": "Written from the quotes collected from the originals.",
+            "note": LEDGER_NOTE,
         }
     submitted = _extract_submitted_answer(run.messages)
     if submitted is not None:

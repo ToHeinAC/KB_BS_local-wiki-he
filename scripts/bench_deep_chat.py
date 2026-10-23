@@ -2,10 +2,10 @@
 
 Runs `chat_agent.run_chat_agent` with the real QUERY_MODEL on each question of a gold file
 and reports, per run: tool calls, repeat reads served as empty stubs (target ≤ 1), auto-
-advances, exit path (submit-accepted / prose-gated-accepted / best-effort), cited sections
-never read (target 0), gold sections read, quote overlap (share of the answer's sentences
-citing a gold § that share a ≥ 6-word n-gram with its text; no LLM judge), chain hops and
-bonus turns, and wall time.
+advances, exit path (ledger-accepted / submit-accepted / prose-gated-accepted / best-effort),
+the run's gate events, cited sections never read (target 0), gold sections read, quote
+overlap (share of the answer's sentences citing a gold § that share a ≥ 6-word n-gram with
+its text; no LLM judge), chain hops and bonus turns, and wall time.
 
 Gold sections are hand-labelled with the heading each one must carry; the bench checks it
 against the ingested text and flags a mismatch instead of scoring against a wrong label.
@@ -41,7 +41,10 @@ NGRAM = 6
 
 
 def exit_path(steps: list[dict[str, Any]]) -> str:
-    """How the answer left the agent loop."""
+    """How the answer left the agent loop. An answer written from the evidence ledger passed
+    the gate and replaces any submission, so it wins."""
+    if any(s["type"] == "final_answer" and s.get("note") == chat_agent.LEDGER_NOTE for s in steps):
+        return "ledger-accepted"
     for s in steps:
         submit = s["type"] == "tool_result" and s.get("name") == "submit_chat_answer"
         if submit and str(s.get("result", "")).startswith("ACCEPTED"):
@@ -49,6 +52,11 @@ def exit_path(steps: list[dict[str, Any]]) -> str:
     if any(s["type"] == "gate" and s.get("content") == "accepted" for s in steps):
         return "prose-gated-accepted"
     return "best-effort"
+
+
+def gate_events(steps: list[dict[str, Any]]) -> list[str]:
+    """The run's gate events in order: stop rule, prose-gate verdicts."""
+    return [str(s.get("content", "")) for s in steps if s["type"] == "gate"]
 
 
 def memory_counts(steps: list[dict[str, Any]]) -> dict[str, int]:
@@ -120,6 +128,7 @@ def _run(item: dict[str, Any]) -> dict[str, Any]:
         "id": item["id"],
         **memory_counts(steps),
         "exit": exit_path(steps),
+        "gates": gate_events(steps),
         "cited_unread": [f"{f} {a}" for f, a in tools._tagged_unread(mem, cited)],  # pyright: ignore[reportPrivateUsage]
         **_score_gold(mem, answer, item["gold"]),
         "hops": max(mem.ref_depth.values(), default=0),
@@ -136,6 +145,8 @@ def _print(row: dict[str, Any]) -> None:
         f"overlap={row['quote_overlap']} hops={row['hops']} bonus={row['bonus']} "
         f"{row['seconds']}s"
     )
+    for g in row.get("gates", []):
+        print(f"     · {g}")
     for p in row["problems"]:
         print(f"     ! {p}")
 
