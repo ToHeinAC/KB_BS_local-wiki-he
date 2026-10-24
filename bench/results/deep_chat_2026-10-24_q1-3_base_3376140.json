@@ -1,0 +1,52 @@
+[
+  {
+    "id": "q1",
+    "tool_calls": 12,
+    "advances": 4,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      0.3333333333333333
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 850.9
+  },
+  {
+    "id": "q2",
+    "tool_calls": 9,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      0.6666666666666666
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 643.9
+  },
+  {
+    "id": "q3",
+    "tool_calls": 3,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "best-effort",
+    "cited_unread": [
+      "StrlSchG.md § 93"
+    ],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      1.0
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 231.3
+  }
+]
