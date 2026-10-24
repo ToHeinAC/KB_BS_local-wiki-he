@@ -63,6 +63,13 @@ def test_each_row_keeps_the_ledger_and_the_answers_written_from_it():
     }
 
 
+def test_each_row_names_the_path_that_closed_the_run():
+    bench = _bench()
+    steps = [{"type": "gate", "content": "x"}, {"type": "final_answer", "closing": "draft"}]
+    assert bench.closing(steps) == "draft"
+    assert bench.closing([{"type": "error", "content": "boom"}]) == "none"
+
+
 def test_memory_counts_tell_auto_advances_from_empty_stubs():
     bench = _bench()
     steps = [

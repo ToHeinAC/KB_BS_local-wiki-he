@@ -50,6 +50,7 @@ class RunMemory:
     ledger: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])
     ledger_seen: int = -1  # -1: the run's first turn always counts as progress
     stale_turns: int = 0
+    empty_nudged: bool = False  # an empty model turn was sent back once
     # The answer written from the ledger, its gate verdict, and the ledger size it was
     # written at (-1: none yet), so an unchanged ledger is not written up twice.
     ledger_answer: str | None = None

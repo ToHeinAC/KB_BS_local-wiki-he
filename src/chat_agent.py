@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 import re
 from collections import Counter
-from collections.abc import Generator, Iterator
+from collections.abc import Generator, Hashable, Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -57,6 +57,7 @@ import tools as tool_module
 from prompts import (
     CHAT_AGENT_SYSTEM,
     CHAT_BUDGET_NUDGE,
+    CHAT_EMPTY_TURN,
     CHAT_FALLBACK_PROMPT,
     CHAT_FALLBACK_SYSTEM,
     CHAT_HYDE_PROMPT,
@@ -192,6 +193,46 @@ def _gate_prose(text: str) -> dict[str, Any]:
     return {"messages": [HumanMessage(content=CHAT_PROSE_GATE_RETRY.format(verdict=verdict))]}
 
 
+def _should_continue(state: MessagesState) -> str:
+    last = state["messages"][-1]
+    if not (isinstance(last, AIMessage) and last.tool_calls):
+        if _text(last).strip():
+            return "prose_gate"
+        return "empty_turn" if _empty_turn_due() else END
+    for m in reversed(state["messages"]):
+        if (
+            isinstance(m, ToolMessage)
+            and m.name == "submit_chat_answer"
+            and isinstance(m.content, str)
+            and m.content.startswith("ACCEPTED")
+        ):
+            return END
+    return "tools"
+
+
+def _empty_turn_due() -> bool:
+    """An empty model turn (no text, no tool call) of a run that lacks the gate's searches
+    or sources is sent back once; otherwise it ends the run (the stop rule's empty turn
+    comes only on a covered run)."""
+    mem = run_memory.current()
+    return mem is not None and not mem.empty_nudged and not _covered(mem)
+
+
+def _empty_turn(state: MessagesState) -> dict[str, Any]:
+    mem = run_memory.current()
+    assert mem is not None  # routed here only inside a run
+    mem.empty_nudged = True
+    mem.gate_events.append("empty turn: sent back to search and read")
+    refs = len({ref for ref, _ in mem.ledger})
+    nudge = CHAT_EMPTY_TURN.format(
+        searches=mem.search_count(),
+        min_searches=MIN_SEARCHES,
+        sources=refs,
+        min_sources=MIN_SOURCES,
+    )
+    return {"messages": [HumanMessage(content=nudge)]}
+
+
 def _after_gate(state: MessagesState) -> str:
     return "agent" if isinstance(state["messages"][-1], HumanMessage) else END
 
@@ -320,20 +361,6 @@ def _build_graph(
         new = [*([forced] if forced is not None else []), *_new_nudge(msgs, nudge, bonus)]
         return {"messages": [*new, llm.invoke([*msgs, *new])]}
 
-    def should_continue(state: MessagesState) -> str:
-        last = state["messages"][-1]
-        if not (isinstance(last, AIMessage) and last.tool_calls):
-            return "prose_gate" if _text(last).strip() else END
-        for m in reversed(state["messages"]):
-            if (
-                isinstance(m, ToolMessage)
-                and m.name == "submit_chat_answer"
-                and isinstance(m.content, str)
-                and m.content.startswith("ACCEPTED")
-            ):
-                return END
-        return "tools"
-
     def prose_gate(state: MessagesState) -> dict[str, Any]:
         return _gate_prose(_text(state["messages"][-1]))
 
@@ -342,10 +369,16 @@ def _build_graph(
     g.add_node("agent", agent_node)  # pyright: ignore[reportUnknownMemberType]
     g.add_node("tools", _tool_node())  # pyright: ignore[reportUnknownMemberType]
     g.add_node("prose_gate", prose_gate)  # pyright: ignore[reportUnknownMemberType]
+    g.add_node("empty_turn", _empty_turn)  # pyright: ignore[reportUnknownMemberType]
     g.add_edge(START, "agent")
-    g.add_conditional_edges(
-        "agent", should_continue, {"tools": "tools", "prose_gate": "prose_gate", END: END}
-    )
+    routes: dict[Hashable, str] = {
+        "tools": "tools",
+        "prose_gate": "prose_gate",
+        "empty_turn": "empty_turn",
+        END: END,
+    }
+    g.add_conditional_edges("agent", _should_continue, routes)
+    g.add_edge("empty_turn", "agent")
     g.add_conditional_edges("prose_gate", _after_gate, {"agent": "agent", END: END})
     g.add_edge("tools", "agent")
     return g.compile()  # pyright: ignore[reportUnknownMemberType]
@@ -588,6 +621,7 @@ def _last_resort(question: str, directive: str, run: _Run) -> dict[str, Any]:
             ),
             **_cites(synth),
             "note": "Fallback synthesis from gathered tool results.",
+            "closing": "notes-fallback",
         }
     if run.recursion_hit:
         return {
@@ -712,6 +746,7 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
             "content": _with_iter_hint(ledgered, run.recursion_hit),
             **_cites(ledgered),
             "note": LEDGER_NOTE,
+            "closing": "ledger",
         }
     submitted = _extract_submitted_answer(run.messages)
     if submitted is not None:
@@ -720,6 +755,7 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
             "type": "final_answer",
             "content": _with_iter_hint(answer, run.recursion_hit),
             **_cites(answer, sources),
+            "closing": "submitted",
         }
     direct = _direct_answer(run.final_msg)
     mem = run_memory.current()
@@ -730,6 +766,7 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
             "type": "final_answer",
             "content": _with_iter_hint(label + direct, run.recursion_hit),
             **_cites(direct),
+            "closing": "prose",
         }
     draft = _best_effort_draft(run.messages)
     if draft is None:
@@ -744,6 +781,7 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
         "type": "final_answer",
         "content": _with_iter_hint(f"{prefix}\n\n{draft[0]}", run.recursion_hit),
         **_cites(draft[0], draft[1]),
+        "closing": "draft",
     }
 
 

@@ -40,7 +40,8 @@ def test_stalled_agent_synthesizes_from_notes(monkeypatch):
         monkeypatch,
         [
             _ai_with_tool("think_tool", {"reflection": "found X about Y"}),
-            AIMessage(content="", tool_calls=[]),  # stalls: graph ends, no answer
+            AIMessage(content="", tool_calls=[]),  # stalls: nudged once to go on
+            AIMessage(content="", tool_calls=[]),  # stalls again: graph ends, no answer
         ],
     )
     monkeypatch.setattr(
@@ -53,7 +54,33 @@ def test_stalled_agent_synthesizes_from_notes(monkeypatch):
     assert final
     assert "SYNTHESIZED" in final[-1]["content"]
     assert final[-1].get("note", "").startswith("Fallback synthesis")
+    assert final[-1]["closing"] == "notes-fallback"
     assert "foo.md" in final[-1]["sources"]
+
+
+def test_an_empty_turn_before_the_run_is_covered_is_sent_back_once(monkeypatch):
+    # E4B sometimes ends with an empty turn after the pre-flight; falling through to the
+    # ungated notes fallback let an unread § into the answer (q3).
+    monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
+    fake = _patch_llm(monkeypatch, [AIMessage(content=""), AIMessage(content="")])
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    steps = list(chat_agent.run_chat_agent("q?"))
+    assert len(fake.calls) == 2
+    nudge = fake.calls[1][-1]
+    assert isinstance(nudge, HumanMessage)
+    assert "submit_chat_answer" in nudge.content
+    gates = [s["content"] for s in steps if s["type"] == "gate"]
+    assert gates == ["empty turn: sent back to search and read"]
+
+
+def test_a_covered_runs_empty_turn_still_ends_the_run(monkeypatch):
+    monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
+    monkeypatch.setattr(chat_agent, "_covered", lambda mem: True)
+    monkeypatch.setattr(chat_agent, "STALL_TURNS", 99)
+    fake = _patch_llm(monkeypatch, [AIMessage(content="")])
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    list(chat_agent.run_chat_agent("q?"))
+    assert len(fake.calls) == 1
 
 
 def test_iteration_limit_appends_end_hint(monkeypatch):
@@ -77,9 +104,10 @@ def test_iteration_limit_appends_end_hint(monkeypatch):
 
 
 def test_no_notes_no_prose_yields_error_without_synth_call(monkeypatch):
-    # Empty first completion, no tool calls -> no notes -> no synthesis, plain error.
+    # Empty completions, no tool calls -> no notes -> no synthesis, plain error (the first
+    # empty turn is sent back once).
     monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])  # pre-flight hits are notes
-    _patch_llm(monkeypatch, [AIMessage(content="", tool_calls=[])])
+    _patch_llm(monkeypatch, [AIMessage(content="", tool_calls=[]), AIMessage(content="")])
     called = {"n": 0}
 
     def _spy(system, prompt, **kw):
@@ -400,6 +428,7 @@ def test_the_final_answer_is_written_from_the_ledger_when_it_passes_the_gate(mon
     run = chat_agent._Run()
     run.messages = [_ai_with_tool("submit_chat_answer", {"answer": "AGENT ANSWER"})]
     final = chat_agent._final_step("q?", "", run)
+    assert final["closing"] == "ledger"
     assert final["content"] == "FROM QUOTES [Source: f0.md § 0]"
     assert '[1] [Source: f0.md § 0] "Satz 0' in prompts_seen[0]
     assert final["sources"] == ["f0.md § 0"]
@@ -412,6 +441,7 @@ def test_a_ledger_answer_the_gate_rejects_leaves_the_agents_answer(monkeypatch):
     monkeypatch.setattr(chat_agent, "_extract_submitted_answer", lambda m: ("AGENT ANSWER", []))
     final = chat_agent._final_step("q?", "", chat_agent._Run())
     assert final["content"] == "AGENT ANSWER"
+    assert final["closing"] == "submitted"
 
 
 def test_every_written_ledger_answer_is_kept_for_the_trace(monkeypatch):

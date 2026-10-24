@@ -649,6 +649,12 @@ CHAT_OPEN_REF_LINE = {
     "en": "- {work}: not among the searchable originals; what depends on it stays open.",
 }
 
+CHAT_EMPTY_TURN = (
+    "You ended without an answer. The run has {searches} of {min_searches} searches and "
+    "{sources} of {min_sources} quoted sources the answer needs. raw_search the open "
+    "sub-questions with other words, raw_read the best hits, then call submit_chat_answer."
+)
+
 CHAT_LEDGER_REJECTED = (
     "No new quotes came in for a while, so code wrote an answer from the quotes collected "
     "so far, and the quality gate rejected it:\n{verdict}\n"

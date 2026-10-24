@@ -60,6 +60,12 @@ def ledger_record(mem: run_memory.RunMemory) -> dict[str, Any]:
     return {"ledger": evidence.render(mem.ledger), "ledger_answers": list(mem.ledger_drafts)}
 
 
+def closing(steps: list[dict[str, Any]]) -> str:
+    """Which path wrote the final answer (ledger, submitted, prose, draft, notes-fallback)."""
+    final = next((s for s in reversed(steps) if s["type"] == "final_answer"), {})
+    return str(final.get("closing", "none"))
+
+
 def gate_events(steps: list[dict[str, Any]]) -> list[str]:
     """The run's gate events in order: stop rule, prose-gate verdicts."""
     return [str(s.get("content", "")) for s in steps if s["type"] == "gate"]
@@ -134,6 +140,7 @@ def _run(item: dict[str, Any]) -> dict[str, Any]:
         "id": item["id"],
         **memory_counts(steps),
         "exit": exit_path(steps),
+        "closing": closing(steps),
         "gates": gate_events(steps),
         **ledger_record(mem),
         "cited_unread": [f"{f} {a}" for f, a in tools._tagged_unread(mem, cited)],  # pyright: ignore[reportPrivateUsage]
@@ -146,7 +153,8 @@ def _run(item: dict[str, Any]) -> dict[str, Any]:
 
 def _print(row: dict[str, Any]) -> None:
     print(
-        f"{row['id']:<4} {row['exit']:<21} calls={row['tool_calls']:<3} "
+        f"{row['id']:<4} {row['exit']:<21} closing={row['closing']:<14} "
+        f"calls={row['tool_calls']:<3} "
         f"adv={row['advances']:<2} stubs={row['empty_stubs']:<2} "
         f"unread={len(row['cited_unread']):<2} gold={row['gold_read']:<5} "
         f"overlap={row['quote_overlap']} hops={row['hops']} bonus={row['bonus']} "
