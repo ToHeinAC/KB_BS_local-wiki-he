@@ -984,3 +984,13 @@ def test_every_raw_read_adds_its_matching_sentences_to_the_run_ledger(monkeypatc
     assert mem.ledger == [
         ("a.md § 5", "Der Grenzwert für Radon in Aufenthaltsräumen beträgt 300 Bq.")
     ]
+
+
+def test_a_tag_with_a_paragraph_maps_to_a_section_stored_in_parts(monkeypatch):
+    # KI stores a long § in parts ("§ 62 (Teil 1)"); E4B tags "§ 62 (2)" or "§ 62 Absatz 2".
+    parts = [{"anchor": "§ 62 (Teil 1)", "text": "a"}, {"anchor": "§ 62 (Teil 2)", "text": "b"}]
+    monkeypatch.setattr(tools.chunker, "load_chunks", lambda base: parts)
+    for section in ("§ 62 (2)", "§ 62 Absatz 2", "§ 62 Abs. 2 Satz 1", "§ 62"):
+        assert tools._resolve_section("StrlSchG.md", section) is parts[0]
+    assert tools._resolve_section("StrlSchG.md", "§ 62 (Teil 2)") is parts[1]
+    assert tools._resolve_section("StrlSchG.md", "§ 6 (2)") is None

@@ -56,8 +56,13 @@ def exit_path(steps: list[dict[str, Any]]) -> str:
 
 
 def ledger_record(mem: run_memory.RunMemory) -> dict[str, Any]:
-    """The run's evidence ledger and every answer written from it (shown or not)."""
-    return {"ledger": evidence.render(mem.ledger), "ledger_answers": list(mem.ledger_drafts)}
+    """The run's evidence ledger and every answer written from it (shown or not), cleaned
+    and as the model wrote it."""
+    return {
+        "ledger": evidence.render(mem.ledger),
+        "ledger_answers": list(mem.ledger_drafts),
+        "ledger_raw": list(mem.ledger_raw),
+    }
 
 
 def closing(steps: list[dict[str, Any]]) -> str:

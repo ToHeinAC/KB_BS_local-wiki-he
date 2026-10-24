@@ -453,7 +453,7 @@ def _resolve_section(base: str, section: str) -> dict[str, Any] | None:
         if _norm_anchor(ch.get("anchor", "")) == want:
             return ch
     for ch in chunks:  # prefix either direction (tolerate '(Teil n)', "(2)", title variants)
-        a = _norm_anchor(ch.get("anchor", ""))
+        a = _norm_anchor(_TEIL_RE.sub("", ch.get("anchor", "")))  # "§ 62 (2)" is in "§ 62 (Teil 1)"
         if a and (_prefix_of(want, a) or _prefix_of(a, want)):
             return ch
     return None

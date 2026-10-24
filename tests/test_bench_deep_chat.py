@@ -56,10 +56,13 @@ def test_each_row_keeps_the_ledger_and_the_answers_written_from_it():
     import run_memory
 
     bench = _bench()
-    mem = run_memory.RunMemory(ledger=[("a.md § 1", "Satz.")], ledger_drafts=["draft"])
+    mem = run_memory.RunMemory(
+        ledger=[("a.md § 1", "Satz.")], ledger_drafts=["draft"], ledger_raw=["raw draft"]
+    )
     assert bench.ledger_record(mem) == {
         "ledger": '[1] [Source: a.md § 1] "Satz."',
         "ledger_answers": ["draft"],
+        "ledger_raw": ["raw draft"],
     }
 
 

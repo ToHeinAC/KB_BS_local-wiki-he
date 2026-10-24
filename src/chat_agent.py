@@ -667,6 +667,7 @@ def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: st
         mem.ledger_verdict = ""
         mem.gate_events.append(f"ledger answer failed: {exc}")
         return None
+    mem.ledger_raw.append(answer)
     answer = _clean_ledger_answer(answer, mem)
     mem.ledger_drafts.append(answer)
     verdict = tool_module.chat_verdict(answer)
