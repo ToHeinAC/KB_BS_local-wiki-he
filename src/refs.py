@@ -19,14 +19,21 @@ SAME, CROSS, OUT = "same", "cross", "out_of_scope"
 MAX_REFS = 8  # per text, in order of first mention
 MAX_RANGE = 5  # sections expanded from one "§§ N bis M"
 
+# A document's own sections: "Kapitel 3", "Abschnitt 5", "Abs. 5" (numbered headings).
+DOC_KINDS = ("Kapitel", "Abschnitt", "Absatz")
 _REF_RE = re.compile(
-    r"(?P<kind>§§?|Anlagen?\b|Artikel\b|Art\.)\s*(?P<a>\d+[a-z]?)\b"
-    r"(?:\s*(?P<sep>bis|und|,|-|–)\s*(?P<b>\d+[a-z]?)\b)?"
+    r"(?P<kind>§§?|Anlagen?\b|Artikel\b|Art\.|Kapitel\b|Kap\.|Abschnitte?\b|Abschn\."
+    r"|Absatz\b|Abs\.)\s*(?P<a>\d+(?:\.\d+)*[a-z]?)\b"
+    r"(?:\s*(?P<sep>bis|und|,|-|–)\s*(?P<b>\d+(?:\.\d+)*[a-z]?)\b)?"
     r"(?:\s+(?:Abs(?:atz|\.)|Satz|S\.|Nr\.|Nummer|Buchst(?:abe|\.))\s*\d+[a-z]?\b)*"
 )
+# A work after a mention: "der StrlSchV", "des Berichts ABC", "AtG", or a document type
+# followed by its name ("Bericht ABC", "Dokument CDE").
 _WORK_RE = re.compile(
-    r"\s*,?\s*(?:(?:des|der|dem|den|nach|im|gemäß)\s+(?P<w>[A-ZÄÖÜ][\w\-]*)"
-    r"|(?P<abbr>[A-ZÄÖÜ][a-zäöüß]*[A-ZÄÖÜ][\w\-]*))"
+    r"\s*,?\s*(?:(?:des|der|dem|den|nach|im|gemäß)\s+"
+    r"(?P<w>[A-ZÄÖÜ][\w\-]*(?:\s+[A-ZÄÖÜ0-9][A-ZÄÖÜ0-9\-]*\b)?)"
+    r"|(?P<abbr>[A-ZÄÖÜ][a-zäöüß]*[A-ZÄÖÜ][\w\-]*)"
+    r"|(?P<doc>[A-ZÄÖÜ][a-zäöüß]+\s+[A-ZÄÖÜ0-9][A-ZÄÖÜ0-9\-]*\b))"
 )
 _LAWLIKE_RE = re.compile(
     r"(?:gesetz|verordnung|ordnung|richtlinie|abkommen|übereinkommen|vertrag|satzung)"
@@ -38,8 +45,12 @@ _ABBR_RE = re.compile(r"^[A-ZÄÖÜ][A-Za-zäöüß]{0,8}[A-ZÄÖÜ][A-Za-zäö�
 
 def _kind(word: str) -> str:
     """The anchor prefix of a matched mention: "§§" → "§", "Anlagen" → "Anlage",
-    "Art." → "Artikel" (every spelling `_REF_RE` accepts)."""
-    return "§" if word.startswith("§") else "Anlage" if word.startswith("Anl") else "Artikel"
+    "Art." → "Artikel", "Kap." → "Kapitel", "Abschn." → "Abschnitt", "Abs." → "Absatz"
+    (every spelling `_REF_RE` accepts)."""
+    for prefix, kind in (("§", "§"), ("Anl", "Anlage"), ("Art", "Artikel"), ("Kap", "Kapitel")):
+        if word.startswith(prefix):
+            return kind
+    return "Abschnitt" if word.startswith("Abschn") else "Absatz"
 
 
 @dataclass(frozen=True)
@@ -69,18 +80,25 @@ def is_lawlike(name: str) -> bool:
 
 def _work_after(text: str, end: int) -> str:
     m = _WORK_RE.match(text, end)
-    return (m["w"] or m["abbr"]) if m else ""
+    return (m["w"] or m["abbr"] or m["doc"]) if m else ""
 
 
 def _target(
     name: str, self_file: str, resolve: Callable[[str], str | None]
 ) -> tuple[str, str | None, str]:
-    """(work as written, target file, kind). A name that resolves to nothing and does not
-    read as a law is plain prose, so the mention points into the same file."""
-    file = resolve(name) if name else None
+    """(work as written, target file, kind). A two-word name ("Bericht ABC") resolves as a
+    whole or by its identifier ("ABC"). A name that resolves to nothing and does not read as
+    a law is plain prose, so the mention points into the same file."""
+    last = name.split()[-1] if " " in name else ""
+    tries = (
+        [name, last]
+        if last and (_ABBR_RE.match(last) or any(c.isdigit() for c in last))
+        else [name]
+    )
+    file = next((f for f in map(resolve, tries) if f), None) if name else None
     if file is not None:
         return name, file, SAME if file == self_file else CROSS
-    if name and is_lawlike(name):
+    if name and any(is_lawlike(n) for n in tries):
         return name, None, OUT
     return "", self_file, SAME
 
@@ -97,8 +115,11 @@ def find_refs(
     out: dict[tuple[str, str], Ref] = {}
     for m in _REF_RE.finditer(text):
         work, target, kind = _target(_work_after(text, m.end()), self_file, resolve)
+        prefix = _kind(m["kind"])
+        if prefix == "Absatz" and kind == SAME:
+            continue  # "Absatz 2" in a law is part of the § it stands in
         for num in _numbers(m["a"], m["sep"], m["b"]):
-            anchor = f"{_kind(m['kind'])} {num}"
+            anchor = f"{prefix} {num}"
             if kind == SAME and anchor == self_anchor:
                 continue
             found = target is None or has_anchor(target, anchor)

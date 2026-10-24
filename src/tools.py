@@ -90,9 +90,15 @@ _URL_RE = re.compile(r"https?://[^\s\)\]]+")
 # Permissive body so a DB-qualified page ("Investing::foo.md") still parses —
 # DB names may contain spaces, so this can't be a \w-class.
 _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([^\]\n]+?\.md)\s*\]")
-# Accept an optional trailing " §..." or " #..." section marker so the same file
-# can be cited as multiple distinct sources, e.g. [Source: StrlSchG.md §62].
-_RAW_CITE_RE = re.compile(r"\[Source:\s*([^\]\n]+?\.(?:md|txt|html)(?:\s*[§#][^\]\n]+?)?)\s*\]")
+# A document's own numbered sections, as cited or mentioned: "Kapitel 3", "Kap. 3.2",
+# "Abschnitt 5", "Abs. 5" (resolved to the heading that starts with the number).
+_DOC_SECTION = r"(?:Kapitel\b|Kap\.|Abschnitte?\b|Abschn\.|Absatz\b|Abs\.)"
+_DOC_SECTION_RE = re.compile(rf"^{_DOC_SECTION}\s*(?P<num>\d+(?:\.\d+)*)\b")
+# Accept an optional trailing " §...", " #..." or " Kapitel ..." section marker so the same
+# file can be cited as multiple distinct sources, e.g. [Source: StrlSchG.md §62].
+_RAW_CITE_RE = re.compile(
+    rf"\[Source:\s*([^\]\n]+?\.(?:md|txt|html)(?:\s*(?:[§#]|{_DOC_SECTION})[^\]\n]+?)?)\s*\]"
+)
 
 
 def _slug(text: str) -> str:
@@ -401,9 +407,10 @@ def _split_ref(filename: str) -> tuple[str, str, str]:
 
 
 def _other_work(base: str, section: str) -> tuple[str, str] | None:
-    """(qualified file, anchor) when `section` names another work's § ("§ 34 StrlSchG",
-    "§ 34 des Strahlenschutzgesetzes" in a StrlSchV tag), else None."""
-    if not section.startswith("§"):
+    """(qualified file, anchor) when `section` names another work's § or chapter ("§ 34
+    StrlSchG", "§ 34 des Strahlenschutzgesetzes" in a StrlSchV tag, "Kapitel 3 Bericht
+    ABC"), else None."""
+    if not (section.startswith("§") or _DOC_SECTION_RE.match(section)):
         return None
     try:
         found = refs.find_refs(section, base, None, _resolve_work, lambda _f, _a: True)
@@ -439,12 +446,33 @@ def _resolve_section(base: str, section: str) -> dict[str, Any] | None:
     if not want:
         return None
     chunks = chunker.load_chunks(base)
+    numbered = _DOC_SECTION_RE.match(section)
+    if numbered:
+        return _numbered_heading(chunks, numbered["num"])
     for ch in chunks:  # exact
         if _norm_anchor(ch.get("anchor", "")) == want:
             return ch
     for ch in chunks:  # prefix either direction (tolerate '(Teil n)', "(2)", title variants)
         a = _norm_anchor(ch.get("anchor", ""))
         if a and (_prefix_of(want, a) or _prefix_of(a, want)):
+            return ch
+    return None
+
+
+_LEGAL_ANCHOR_RE = re.compile(r"^(?:§|Anlage|Artikel|Art\.|Präambel)")
+_HEADING_NUM_RE = re.compile(
+    rf"^(?:{_DOC_SECTION}\s*|chapter\s+|section\s+)?(\d+(?:\.\d+)*)\.?(?:\s|$)", re.I
+)
+
+
+def _numbered_heading(chunks: list[dict[str, Any]], num: str) -> dict[str, Any] | None:
+    """The first chunk whose heading starts with the number `num` ("3 Ergebnisse",
+    "3. Ergebnisse", "Kapitel 3 …"); a law's § anchors never count, so "Abschnitt 3" is
+    not § 3."""
+    for ch in chunks:
+        anchor = ch.get("anchor", "")
+        m = _HEADING_NUM_RE.match(anchor)
+        if m and m.group(1) == num and not _LEGAL_ANCHOR_RE.match(anchor):
             return ch
     return None
 
@@ -1219,6 +1247,15 @@ def _ref_entry(mem: run_memory.RunMemory, r: refs.Ref, depth: int) -> tuple[str,
     return f"{label} ({status})", None if read else label
 
 
+def _no_own_chapter(r: refs.Ref) -> bool:
+    return (
+        r.kind == refs.SAME
+        and r.anchor.split()[0] in refs.DOC_KINDS
+        and r.target is not None
+        and _find_anchor(r.target, r.anchor) is None
+    )
+
+
 def _ref_footer(mem: run_memory.RunMemory, t: _Target, anchor: str | None, text: str) -> str:
     """Fix F: the references a read text makes, resolved in code, with their status."""
     key = f"{t.qbase}|sec={_norm_anchor(anchor)}" if anchor else ""
@@ -1227,6 +1264,9 @@ def _ref_footer(mem: run_memory.RunMemory, t: _Target, anchor: str | None, text:
         found = refs.find_refs(text, t.qbase, anchor, _resolve_work, lambda f, a: True)
     except Exception:  # the footer is a hint: an odd text shape must never cost the read
         return ""
+    # A law names its own structure ("Kapitel 2") all the time: a chapter of this file
+    # with no heading for it is no reference, and listing it would crowd out the §§.
+    found = [r for r in found if not _no_own_chapter(r)]
     if not found:
         return ""
     entries: list[str] = []

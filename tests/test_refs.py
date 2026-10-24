@@ -2,7 +2,12 @@
 
 import refs
 
-FILES = {"verordnungb": "VerordnungB.md", "richtliniec": "RichtlinieC.md"}
+FILES = {
+    "verordnungb": "VerordnungB.md",
+    "richtliniec": "RichtlinieC.md",
+    "abc": "Bericht_ABC.md",
+    "cde": "Dokument_CDE.md",
+}
 ANCHORS = {
     "GesetzA.md": {"§ 7", "§ 8"},
     "VerordnungB.md": {"§ 12"},
@@ -77,3 +82,33 @@ def test_section_numbers_tolerate_letter_suffixes_and_no_space():
 def test_every_spelling_of_annex_and_article_is_a_reference():
     out = _find("Nach Art. 5, Artikel 6, Anlagen 2 und Anlage 3 der RichtlinieC.")
     assert [r.anchor for r in out] == ["Artikel 5", "Artikel 6", "Anlage 2", "Anlage 3"]
+
+
+def test_chapter_and_section_mentions_name_another_document():
+    out = _find(
+        "Siehe Kapitel 3 Bericht ABC, Kap. 4 Bericht ABC, Abschnitt 5 Dokument CDE "
+        "und Abs. 6 Dokument CDE."
+    )
+    assert [(r.anchor, r.target, r.kind) for r in out] == [
+        ("Kapitel 3", "Bericht_ABC.md", "cross"),
+        ("Kapitel 4", "Bericht_ABC.md", "cross"),
+        ("Abschnitt 5", "Dokument_CDE.md", "cross"),
+        ("Absatz 6", "Dokument_CDE.md", "cross"),
+    ]
+    assert out[0].work == "Bericht ABC"
+
+
+def test_a_document_named_after_an_article_and_dotted_numbers_resolve():
+    (ref,) = _find("Die Methode steht in Kapitel 3.2 des Berichts ABC.")
+    assert (ref.anchor, ref.target) == ("Kapitel 3.2", "Bericht_ABC.md")
+
+
+def test_a_bare_absatz_stays_inside_its_section():
+    # In a law "Absatz 2 gilt entsprechend" means the § it stands in, not a section.
+    assert _find("Absatz 2 gilt entsprechend.") == []
+    assert [r.anchor for r in _find("Kapitel 2 gilt entsprechend.")] == ["Kapitel 2"]
+
+
+def test_a_capitalised_phrase_after_a_mention_is_not_a_document():
+    (ref,) = _find("Die Werte stehen in Anlage 4 Tabelle 1.")
+    assert (ref.anchor, ref.kind, ref.work) == ("Anlage 4", "same", "")

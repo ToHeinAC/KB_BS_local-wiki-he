@@ -809,6 +809,57 @@ def test_a_law_named_in_its_plain_title_line_is_found(wiki_dir):
     assert tools._resolve_work("Strahlenschutzgesetzes") == "G.md"
 
 
+def _report() -> None:
+    heads = ("1 Einleitung", "3 Ergebnisse", "3.2 Methode", "Kapitel 4 Ausblick", "5. Anhang")
+    body = "".join(f"## {h}\n" + "Inhalt des Kapitels ohne Bezug. " * 5 + "\n\n" for h in heads)
+    _ingest_source("Bericht_ABC.md", "# Bericht ABC\n\n" + body)
+
+
+def test_a_chapter_or_section_number_resolves_to_its_numbered_heading(wiki_dir):
+    _report()
+    _two_laws()
+    want = {
+        "Kapitel 3": "3 Ergebnisse",
+        "Kap. 3.2": "3.2 Methode",
+        "Abschnitt 4": "Kapitel 4 Ausblick",
+        "Abs. 5": "5. Anhang",
+    }
+    for section, heading in want.items():
+        ch = tools._resolve_section("Bericht_ABC.md", section)
+        assert ch is not None
+        assert ch["anchor"] == heading
+    assert tools._resolve_section("Bericht_ABC.md", "Kapitel 2") is None
+    assert tools._resolve_section("StrlSchV.md", "Abschnitt 3") is None  # never § 3
+
+
+def test_a_tag_naming_a_chapter_of_another_document_points_to_it(wiki_dir):
+    _report()
+    _two_laws()
+    run_memory.begin_run()
+    db = tools.db_context.get_active_db()
+    tag = "StrlSchV.md Kapitel 3 Bericht ABC"
+    assert tools._split_ref(tag) == (db, "Bericht_ABC.md", "Kapitel 3")
+    assert tools.ref_key(tag) == tools.ref_key("Bericht_ABC.md Kap. 3")
+    answer = "Ergebnis [Source: Bericht_ABC.md Kapitel 3] und [Source: StrlSchV.md Abschnitt 2]."
+    assert tools._RAW_CITE_RE.findall(answer) == [
+        "Bericht_ABC.md Kapitel 3",
+        "StrlSchV.md Abschnitt 2",
+    ]
+
+
+def test_a_footer_skips_a_chapter_mention_its_own_file_has_no_heading_for(wiki_dir):
+    # Laws name their structure ("Kapitel 2", "Abschnitt 3") all the time; listing each as
+    # "not found" would crowd out the § references.
+    body = "## § 1 Pflichten\nNach Kapitel 9 und § 2 gilt X. " + "Text der Vorschrift. " * 6
+    body += "\n\n## § 2 Ausnahmen\n" + "Text der Vorschrift ohne Bezug. " * 6
+    _ingest_source("L.md", "# L\n\n" + body)
+    run_memory.begin_run()
+    out = tools.raw_read.invoke({"filenames": ["L.md § 1"]})
+    footer = out.rsplit("References: ", 1)[1]
+    assert "L.md § 2" in footer
+    assert "Kapitel" not in footer
+
+
 def test_a_broken_reference_footer_never_costs_the_read(wiki_dir, monkeypatch):
     _chain(2)
     run_memory.begin_run()

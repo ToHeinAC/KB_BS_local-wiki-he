@@ -162,8 +162,11 @@ anchor it resolves to (`§62` and `§ 62` are one entry).
 | An offset past the end | Clamped: the next unread window, labelled with the file's length; the bad offset is not remembered. |
 
 **Reference footers (`src/refs.py`, pure).** `find_refs` finds `§ N` / `§§ N bis M` (expanded,
-≤ 5) / `Anlage N` / `Artikel N` and the work named right after them (`der StrlSchV`, `des
-Atomgesetzes`, `AtG`). `tools._resolve_work` maps the name to a file **inside the search scope
+≤ 5) / `Anlage N` / `Artikel N`, a document's numbered sections `Kapitel N` / `Kap. N` /
+`Abschnitt N` / `Abs. N` (also `3.2`), and the work named right after them (`der StrlSchV`, `des
+Atomgesetzes`, `AtG`, or a document type with its name: `Bericht ABC`, `des Berichts ABC`,
+resolved as a whole or by the identifier `ABC`). A bare `Absatz N` in the same file is part of
+the § it stands in, never a reference. `tools._resolve_work` maps the name to a file **inside the search scope
 only** (a file of a level out of scope is never named): the version in force by the DB's
 ontology (`ontology_query.resolve` + `ontology_time.current_expression`), else a raw file whose
 stem, first heading or plain title line names it (gesetze-im-internet texts open with a title
@@ -171,8 +174,10 @@ line). The same resolution applies to a citation: `tools._split_ref` points `[So
 StrlSchV.md § 34 StrlSchG]` (or `… § 34 des Strahlenschutzgesetzes`) at StrlSchG.md § 34, and
 `tools._resolve_section` matches a cited section only at a number boundary, so `§ 31 (2)` or
 `§ 31 Abs. 2` is § 31, never § 3; `tools.ref_key` compares two spellings of one citation.
-Only `§` mentions are retargeted; `Kapitel`/`Abschnitt` mentions of non-legal documents are
-not parsed. A § without a work name points into the same file; an
+A `Kapitel`/`Abschnitt`/`Abs.` section resolves to the first heading that starts with its
+number (`3 Ergebnisse`, `3. Ergebnisse`, `Kapitel 3 …`), never to a law's `§` anchor, and a
+citation tag naming one (`[Source: ABC.md Kapitel 3]`) counts as a raw citation. Footers leave
+out a chapter of the read file that has no such heading (laws name their own structure). A § without a work name points into the same file; an
 unresolved law-like name is `(not in scope)`; a missing anchor is flagged, never guessed. The
 footer shows each reference's status (`unread`, `read`, `same file, …`, `hop limit reached`)
 and the exact call to follow the first unread one. **Hop budget:** a section reached through a
