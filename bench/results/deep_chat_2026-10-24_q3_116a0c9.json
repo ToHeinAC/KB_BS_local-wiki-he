@@ -1,0 +1,23 @@
+[
+  {
+    "id": "q3",
+    "tool_calls": 6,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "best-effort",
+    "gates": [],
+    "ledger": "[1] [Source: StrlSchG.md § 133] \"Der Referenzwert für die effektive Dosis aus äußerer Exposition von Einzelpersonen der Bevölkerung in Aufenthaltsräumen durch Gammastrahlung aus Bauprodukten beträgt zusätzlich zur effektiven Dosis aus äußerer Exposition im Freien 1 Millisievert im Kalenderjahr.\"\n[2] [Source: StrlSchG.md § 80] \"(1) Für Einzelpersonen der Bevölkerung beträgt der Grenzwert der Summe der effektiven Dosen 1 Millisievert im Kalenderjahr durch Expositionen aus 1. genehmigungs- oder anzeigebedürftigen Tätigkeiten nach diesem Gesetz oder dem Atomgesetz, 2. der staatlichen Verwahrung von Kernbrennstoffen nach § 5 Absatz 3 Satz 1 des Atomgesetzes, 3. der planfeststellungsbedürftigen Errichtung, dem planfeststellungsbedürftigen Betrieb oder der planfeststellungsbedürftigen Stilllegung der in § 9a Absatz 3 des Atomgesetzes genannten Anlagen des Bundes und 4. dem Aufsuchen …\"\n[3] [Source: StrlSchG.md § 80] \"(2) Der Grenzwert der Summe der Organ-Äquivalentdosen für Einzelpersonen der Bevölkerung beträgt 1. für die Augenlinse 15 Millisievert im Kalenderjahr und 2. für die lokale Hautdosis 50 Millisievert im Kalenderjahr.\"\n[4] [Source: StrlSchG.md § 80] \"(3) Expositionen auf Grund nichtmedizinischer Anwendung nach § 83 Absatz 1 Nummer 2 werden bei den Grenzwerten für Einzelpersonen der Bevölkerung nicht berücksichtigt.\"\n[5] [Source: StrlSchG.md § 80] \"(4) Die zuständige Behörde hat darauf hinzuwirken, dass bei mehreren zu betrachtenden genehmigungs- oder anzeigebedürftigen Tätigkeiten die in den Absätzen 1 und 2 genannten Grenzwerte insgesamt eingehalten werden.\"",
+    "ledger_answers": [],
+    "cited_unread": [
+      "StrlSchG.md § 93"
+    ],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      1.0
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 310.8
+  }
+]
