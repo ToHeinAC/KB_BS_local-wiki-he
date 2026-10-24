@@ -423,6 +423,39 @@ def test_every_written_ledger_answer_is_kept_for_the_trace(monkeypatch):
     assert mem.ledger_drafts == ["bad"]
 
 
+def test_no_ledger_answer_before_the_run_has_its_searches(monkeypatch):
+    # The gate rejects an answer of a run with too few searches, so writing one is waste.
+    mem = _ledger_run()
+    mem.searches = {"raw_search:a": 1}
+    calls: list = []
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda *a, **k: calls.append(1))
+    assert chat_agent._ledger_answer("q?", "") is None
+    assert calls == []
+
+
+def test_the_ledger_answers_tags_are_mapped_to_the_quoted_sections(monkeypatch):
+    # E4B writes "§ 31 (2)" into a tag, or a § the quote never carried: code maps each tag
+    # to the quote's own tag and drops a claim no quote backs, or one naming an unread §.
+    mem = _ledger_run()
+    mem.ledger = [("V.md § 31", "a"), ("V.md", "b")]
+    keys = {"V.md § 31 (2)": "31", "V.md § 31": "31", "V.md": "V", "V.md § 4": "4"}
+    monkeypatch.setattr(chat_agent.tool_module, "ref_key", lambda r: keys[r])
+    monkeypatch.setattr(
+        chat_agent.tool_module,
+        "_prose_unread",
+        lambda mem, text, cited: [("V.md", "§ 42")] if "§ 42" in text else [],
+    )
+    answer = (
+        "## Kriterium\n"
+        "Es gilt 10 µSv [Source: V.md § 31 (2)]. Falsch [Source: V.md § 4].\n"
+        "Nach § 42 gilt X [Source: V.md]. Allgemein gilt Y [Source: V.md].\n"
+        "Nur falsch [Source: V.md § 4]."
+    )
+    assert chat_agent._clean_ledger_answer(answer, mem) == (
+        "## Kriterium\nEs gilt 10 µSv [Source: V.md § 31].\nAllgemein gilt Y [Source: V.md]."
+    )
+
+
 def test_no_ledger_answer_without_enough_quoted_sources(monkeypatch):
     _ledger_run(n_refs=2)  # the gate needs 3 sources; a call that cannot pass is skipped
     calls: list = []
@@ -481,7 +514,8 @@ def test_a_stalled_run_whose_ledger_answer_fails_goes_on_with_the_verdict(monkey
 
 def test_the_final_ledger_answer_reports_its_verdict_as_a_gate_step(monkeypatch):
     # Why a ledger answer did not ship must show in the trace and the bench rows.
-    _, steps = _stalling_run(monkeypatch, "REJECTED: unread § 6", covered=False)
+    monkeypatch.setattr(chat_agent, "STALL_TURNS", 99)  # only the final step writes one
+    _, steps = _stalling_run(monkeypatch, "REJECTED: unread § 6")
     gates = [s["content"] for s in steps if s["type"] == "gate"]
     assert gates[-1] == "ledger answer rejected: REJECTED: unread § 6"
     assert steps[-1]["type"] == "final_answer"

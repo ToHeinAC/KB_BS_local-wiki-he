@@ -166,7 +166,13 @@ anchor it resolves to (`§62` and `§ 62` are one entry).
 Atomgesetzes`, `AtG`). `tools._resolve_work` maps the name to a file **inside the search scope
 only** (a file of a level out of scope is never named): the version in force by the DB's
 ontology (`ontology_query.resolve` + `ontology_time.current_expression`), else a raw file whose
-stem or first heading names it. A § without a work name points into the same file; an
+stem, first heading or plain title line names it (gesetze-im-internet texts open with a title
+line). The same resolution applies to a citation: `tools._split_ref` points `[Source:
+StrlSchV.md § 34 StrlSchG]` (or `… § 34 des Strahlenschutzgesetzes`) at StrlSchG.md § 34, and
+`tools._resolve_section` matches a cited section only at a number boundary, so `§ 31 (2)` or
+`§ 31 Abs. 2` is § 31, never § 3; `tools.ref_key` compares two spellings of one citation.
+Only `§` mentions are retargeted; `Kapitel`/`Abschnitt` mentions of non-legal documents are
+not parsed. A § without a work name points into the same file; an
 unresolved law-like name is `(not in scope)`; a missing anchor is flagged, never guessed. The
 footer shows each reference's status (`unread`, `read`, `same file, …`, `hop limit reached`)
 and the exact call to follow the first unread one. **Hop budget:** a section reached through a

@@ -393,7 +393,26 @@ def _split_ref(filename: str) -> tuple[str, str, str]:
     db, rest = db_context.split_ref(filename)
     with db_context.using_db(db):
         base, section = _split_filename(rest)
-    return db, base, section
+        other = _other_work(base, section)
+    if other is None:
+        return db, base, section
+    db, other_base = db_context.split_ref(other[0])
+    return db, other_base, other[1]
+
+
+def _other_work(base: str, section: str) -> tuple[str, str] | None:
+    """(qualified file, anchor) when `section` names another work's § ("§ 34 StrlSchG",
+    "§ 34 des Strahlenschutzgesetzes" in a StrlSchV tag), else None."""
+    if not section.startswith("§"):
+        return None
+    try:
+        found = refs.find_refs(section, base, None, _resolve_work, lambda _f, _a: True)
+    except Exception:  # a broken reference parse must never cost the read or the gate
+        return None
+    first = found[0] if found else None
+    if first is None or first.kind != refs.CROSS or first.target is None:
+        return None
+    return first.target, first.anchor
 
 
 def _norm_anchor(s: str) -> str:
@@ -423,11 +442,28 @@ def _resolve_section(base: str, section: str) -> dict[str, Any] | None:
     for ch in chunks:  # exact
         if _norm_anchor(ch.get("anchor", "")) == want:
             return ch
-    for ch in chunks:  # prefix either direction (tolerate '(Teil n)' / title variants)
+    for ch in chunks:  # prefix either direction (tolerate '(Teil n)', "(2)", title variants)
         a = _norm_anchor(ch.get("anchor", ""))
-        if a and (a.startswith(want) or want.startswith(a)):
+        if a and (_prefix_of(want, a) or _prefix_of(a, want)):
             return ch
     return None
+
+
+def _prefix_of(short: str, long: str) -> bool:
+    """`short` starts `long` and ends at a word boundary: "31" starts "31 (2)", but "3"
+    does not start "31 (2)"."""
+    return long.startswith(short) and (len(long) == len(short) or not long[len(short)].isalnum())
+
+
+def ref_key(ref: str) -> tuple[str, str]:
+    """(qualified file, section) a citation points to, for comparing two spellings of one
+    source: "StrlSchV.md § 31 (2)" and "StrlSchV.md § 31" are one key; a § of another work
+    ("StrlSchV.md § 34 StrlSchG") is keyed to that work's file."""
+    db, base, section = _split_ref(ref)
+    with db_context.using_db(db):
+        ch = _resolve_section(base, section) if section else None
+    anchor = _TEIL_RE.sub("", ch["anchor"]) if ch is not None else _norm_anchor(section)
+    return db_context.qualify(base, db), anchor
 
 
 def _format_section(base: str, ch: dict[str, Any], label: str | None = None) -> str:
@@ -659,11 +695,15 @@ def _named_raw_file(name: str) -> str | None:
 
 
 def _first_heading(p: Any) -> str:
+    """The first heading, plus the first line when it is plain text (a gesetze-im-internet
+    text opens with its title line, not a markdown heading)."""
+    first = ""
     with contextlib.suppress(OSError), p.open("r", errors="replace") as fh:
         for _, line in zip(range(40), fh, strict=False):
             if line.startswith("#"):
-                return line.lstrip("# ").strip()
-    return ""
+                return f"{first} {line.lstrip('# ').strip()}".strip()
+            first = first or line.strip()
+    return first
 
 
 def _ontology_work_file(name: str) -> str | None:

@@ -767,6 +767,48 @@ def test_a_work_name_resolves_through_the_ontology_to_the_version_in_force(wiki_
     assert tools._resolve_work("Strahlenschutzgesetzes") is None
 
 
+def _two_laws() -> None:
+    body = "".join(
+        f"## § {i} Pflichten {i}\n" + "Text der Vorschrift ohne Bezug. " * 4 + "\n\n"
+        for i in (3, 31, 34)
+    )
+    _ingest_source("StrlSchV.md", "# Strahlenschutzverordnung (StrlSchV)\n\n" + body)
+    _ingest_source("StrlSchG.md", "# Strahlenschutzgesetz (StrlSchG)\n\n" + body)
+
+
+def test_a_paragraph_number_in_a_tag_resolves_to_its_own_section(wiki_dir):
+    # Small models tag "§ 31 (2)": the prefix fallback once took § 3 for it, so a read
+    # § 31 was judged an unread § 3.
+    _two_laws()
+    for tag in ("§ 31 (2)", "§ 31 Abs. 2", "§ 31"):
+        ch = tools._resolve_section("StrlSchV.md", tag)
+        assert ch is not None
+        assert ch["anchor"] == "§ 31"
+    assert tools._resolve_section("StrlSchV.md", "§ 3")["anchor"] == "§ 3"  # type: ignore[index]
+    assert tools._resolve_section("StrlSchV.md", "§ 32") is None
+
+
+def test_a_tag_naming_another_law_points_to_that_laws_file(wiki_dir):
+    # "[Source: StrlSchV.md § 34 StrlSchG]" cites § 34 of the act, not of the ordinance.
+    _two_laws()
+    run_memory.begin_run()
+    db = tools.db_context.get_active_db()
+    assert tools._split_ref("StrlSchV.md § 34 StrlSchG") == (db, "StrlSchG.md", "§ 34")
+    assert tools._split_ref("StrlSchV.md § 34 des Strahlenschutzgesetzes")[1] == "StrlSchG.md"
+    assert tools._split_ref("StrlSchV.md § 34 Abs. 1") == (db, "StrlSchV.md", "§ 34 Abs. 1")
+    assert tools.ref_key("StrlSchV.md § 31 (2)") == tools.ref_key("StrlSchV.md § 31")
+    assert tools.ref_key("StrlSchV.md § 34 StrlSchG") == tools.ref_key("StrlSchG.md § 34")
+    assert tools.ref_key("StrlSchV.md") != tools.ref_key("StrlSchV.md § 3")
+
+
+def test_a_law_named_in_its_plain_title_line_is_found(wiki_dir):
+    # gesetze-im-internet texts start with a plain title line, not a markdown heading.
+    title = "Gesetz zum Schutz vor ionisierender Strahlung (Strahlenschutzgesetz - StrlSchG)"
+    _ingest_source("G.md", title + "\n\n## § 1 Zweck\n" + "Text der Vorschrift. " * 4)
+    run_memory.begin_run()
+    assert tools._resolve_work("Strahlenschutzgesetzes") == "G.md"
+
+
 def test_a_broken_reference_footer_never_costs_the_read(wiki_dir, monkeypatch):
     _chain(2)
     run_memory.begin_run()

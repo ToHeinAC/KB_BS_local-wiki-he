@@ -603,9 +603,10 @@ def _last_resort(question: str, directive: str, run: _Run) -> dict[str, Any]:
 
 def _ledger_answer(question: str, directive: str) -> str | None:
     """The answer written from the run's evidence ledger, if it passes the submit gate;
-    None without enough quoted sources or on any failure. Written once per ledger size."""
+    None before the run is covered (the gate would reject it) or on any failure. Written
+    once per ledger size."""
     mem = run_memory.current()
-    if mem is None or len({ref for ref, _ in mem.ledger}) < MIN_SOURCES:
+    if mem is None or not _covered(mem):
         return None
     if mem.ledger_tried != len(mem.ledger):
         mem.ledger_tried = len(mem.ledger)
@@ -631,6 +632,7 @@ def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: st
         mem.ledger_verdict = ""
         mem.gate_events.append(f"ledger answer failed: {exc}")
         return None
+    answer = _clean_ledger_answer(answer, mem)
     mem.ledger_drafts.append(answer)
     verdict = tool_module.chat_verdict(answer)
     if verdict.startswith("ACCEPTED"):
@@ -640,6 +642,46 @@ def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: st
     mem.ledger_verdict = verdict
     mem.gate_events.append(f"ledger answer rejected: {_verdict_reason(verdict)}")
     return None
+
+
+_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")
+_TAG_RE = re.compile(r"\s*\[Source:\s*([^\]\n]+?)\s*\]")
+
+
+def _clean_ledger_answer(answer: str, mem: run_memory.RunMemory) -> str:
+    """The ledger answer with each `[Source: ...]` tag mapped to the quote's own tag (E4B
+    writes "§ 31 (2)", or a § the quote never carried), and without the sentences no quote
+    backs or that name a § the run never read. Headings stay."""
+    tags = {tool_module.ref_key(ref): ref for ref, _ in mem.ledger}
+    files = {db_context.qualify(b, d) for d, b, _ in map(tool_module._split_ref, tags.values())}  # pyright: ignore[reportPrivateUsage]
+    out: list[str] = []
+    for line in answer.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            out.append(line)
+            continue
+        kept = [k for k in (_backed(s, tags, mem, files) for s in _SENTENCE_RE.split(line)) if k]
+        if kept:
+            out.append(" ".join(kept))
+    return "\n".join(out).strip()
+
+
+def _backed(
+    sentence: str, tags: dict[tuple[str, str], str], mem: run_memory.RunMemory, files: set[str]
+) -> str | None:
+    """`sentence` with its tags mapped to ledger tags; None when it has tags but no ledger
+    quote backs any of them, or when it names a § of a cited file that was never read."""
+    found = _TAG_RE.findall(sentence)
+    mapped = {t: tags.get(tool_module.ref_key(t)) for t in found}
+    if found and not any(mapped.values()):
+        return None
+    if tool_module._prose_unread(mem, _TAG_RE.sub("", sentence), files):  # pyright: ignore[reportPrivateUsage]
+        return None
+
+    def retag(m: re.Match[str]) -> str:
+        ref = mapped.get(m.group(1))
+        return f" [Source: {ref}]" if ref else ""
+
+    return _TAG_RE.sub(retag, sentence)
 
 
 def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
