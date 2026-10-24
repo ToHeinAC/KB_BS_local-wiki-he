@@ -17,7 +17,22 @@ _STEM = 6  # prefix length: "Rückstände"/"Rückständen" share "rückst"
 # `## Raw file: <file>[ <section>][ (bytes a-b of n)]` opens each block of a raw_read output.
 _HEADER_RE = re.compile(r"^## Raw file: (.+?)(?: \((?:bytes|offset) [^)]*\))?[ \t]*$", re.M)
 _TEIL_RE = re.compile(r"\s*\(Teil \d+\)$")
-_SENTENCE_RE = re.compile(r"(?<=[.;!?])\s+|\n+")
+# A line break inside one sentence: after an enumeration number ("1.", "a)") or a list
+# item that goes on (",", "und", "oder"), as German legal texts lay out their lists.
+_LIST_BREAK_RE = re.compile(
+    r"(?:(?<=[\s(]\d\.)|(?<=[\s(]\d\d\.)|(?<=^\d\.)|(?<=\s[a-z]\))|(?<=,)"
+    r"|(?<=\bund)|(?<=\boder))[ \t]*\n+[ \t]*(?!References:|Map near|\[|…\[|#)",
+    re.M,
+)
+_BOUNDARY_RE = re.compile(r"[.;!?](?=\s)")
+_LAST_WORD_RE = re.compile(r"(\S+)$")
+# Words a period follows without ending the sentence ("Abs. 2", "BGBl. I S. 2833").
+_ABBREV = frozenset(
+    {"abs", "nr", "art", "anl", "buchst", "kap", "abschn", "bgbl", "vgl", "ggf", "bzw"}
+    | {"ca", "inkl", "gem", "lit", "s", "z", "b", "u", "a", "i", "v", "m", "d", "h"}
+)
+# A table-of-contents line: several "· § N …" entries.
+_TOC_RE = re.compile(r"·\s*(?:§|Anlage|Artikel)")
 _WORD_RE = re.compile(r"\w{4,}")
 # Lines raw_read adds around the text: memory stubs, hints, reference footers, section maps.
 _NOT_TEXT = ("[", "…[", "#", "References:", "Map near the matches:")
@@ -80,12 +95,42 @@ def _score(sentence: str, query: set[str]) -> int:
     return shared + (1 if shared and re.search(r"\d", sentence) else 0)
 
 
+def _ends_sentence(before: str) -> bool:
+    """Whether a period after `before` ends a sentence: not after a day or list number
+    ("24. Juli", "1.") or a legal abbreviation ("Abs.", "BGBl.")."""
+    m = _LAST_WORD_RE.search(before)
+    word = m.group(1).lstrip("(").casefold() if m else ""
+    return not (re.fullmatch(r"\d{1,2}", word) or word in _ABBREV)
+
+
+def _sentences(body: str) -> list[str]:
+    """The sentences of `body`; a list stays with the sentence that introduces it."""
+    out: list[str] = []
+    for para in _LIST_BREAK_RE.sub(" ", body).split("\n"):
+        start = 0
+        for m in _BOUNDARY_RE.finditer(para):
+            if m.group() != "." or _ends_sentence(para[start : m.start()]):
+                out.append(para[start : m.end()])
+                start = m.end()
+        out.append(para[start:])
+    return [s.strip() for s in out if s.strip()]
+
+
+def _clip(sentence: str) -> str:
+    """`sentence` cut at its last clause before `_MAX_CHARS`, marked " …" (a verbatim
+    prefix, so the quote check still finds it)."""
+    if len(sentence) <= _MAX_CHARS:
+        return sentence
+    cut = sentence.rfind(", ", 0, _MAX_CHARS - 2)
+    return sentence[: cut if cut > _MIN_CHARS else _MAX_CHARS - 2].rstrip(" ,") + " …"
+
+
 def _best(body: str, query: set[str], k: int) -> list[str]:
     """Up to ``k`` sentences of ``body`` that share enough of the query, in reading order."""
     scored = [
         (_score(s, query), i, s)
-        for i, s in enumerate(p.strip() for p in _SENTENCE_RE.split(body))
-        if _MIN_CHARS <= len(s) <= _MAX_CHARS and not s.startswith(_NOT_TEXT)
+        for i, s in enumerate(_clip(p) for p in _sentences(body))
+        if len(s) >= _MIN_CHARS and not s.startswith(_NOT_TEXT) and len(_TOC_RE.findall(s)) < 2
     ]
     top = sorted((x for x in scored if x[0] >= _MIN_SHARED), key=lambda x: (-x[0], x[1]))[:k]
     return [s for _, _, s in sorted(top, key=lambda x: x[1])]

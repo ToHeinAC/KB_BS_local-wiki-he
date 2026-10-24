@@ -1450,7 +1450,13 @@ def _note_evidence(mem: run_memory.RunMemory, outputs: list[str]) -> None:
 
 @tool(description=SUBMIT_CHAT_DESCRIPTION)
 def submit_chat_answer(answer: str, sources: list[str] | None = None) -> str:
-    return _submit_chat_impl(answer, sources)
+    verdict = _submit_chat_impl(answer, sources)
+    mem = run_memory.current()
+    if mem is not None:  # the trace and bench rows show why a submission failed
+        ok = verdict.startswith("ACCEPTED")
+        head = verdict.strip().splitlines()[0][:300] if verdict.strip() else verdict
+        mem.gate_events.append("submit accepted" if ok else f"submit rejected: {head}")
+    return verdict
 
 
 # --- evaluate_condition -------------------------------------------------------

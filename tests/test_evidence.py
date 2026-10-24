@@ -50,3 +50,49 @@ def test_memory_stubs_and_errors_yield_no_evidence():
 def test_the_ledger_renders_numbered_quotes_with_their_citation_tags():
     text = evidence.render([("a.md § 5", "Satz eins."), ("b.md", "Satz zwei.")])
     assert text == '[1] [Source: a.md § 5] "Satz eins."\n[2] [Source: b.md] "Satz zwei."'
+
+
+def test_a_numbered_list_stays_with_the_sentence_that_introduces_it():
+    # § 78 (2) StrlSchG: cut after "1.", the quote lost every limit the question asks for.
+    read = (
+        "## Raw file: StrlSchG.md § 78\n"
+        "(2) Der Grenzwert der Organ-Äquivalentdosis beträgt für beruflich exponierte "
+        "Personen 1.\nfür die Augenlinse 20 Millisievert im Kalenderjahr,\n\n2.\n"
+        "für die Haut 500 Millisievert im Kalenderjahr und\n\n3.\n"
+        "für die Hände 500 Millisievert im Kalenderjahr.\n"
+    )
+    ((_, quote),) = evidence.extract(read, "Grenzwert beruflich exponierte Personen")
+    assert "Augenlinse 20 Millisievert" in quote
+    assert quote.endswith("für die Hände 500 Millisievert im Kalenderjahr.")
+
+
+def test_dates_and_legal_abbreviations_do_not_end_a_sentence():
+    read = (
+        "## Raw file: V.md § 37\n"
+        "Satz 1 gilt auch für die Freigabe zum Einsatz nach der Versatzverordnung vom "
+        "24. Juli 2002 (BGBl. I S. 2833) und nach § 78 Abs. 2 Nr. 1 im Grenzwert. "
+        "Der zweite Satz zur Freigabe nennt keinen Grenzwert der Versatzverordnung."
+    )
+    got = [q for _, q in evidence.extract(read, "Freigabe Versatzverordnung Grenzwert")]
+    assert len(got) == 2
+    assert got[0].endswith("nach § 78 Abs. 2 Nr. 1 im Grenzwert.")
+
+
+def test_a_table_of_contents_line_is_not_evidence():
+    read = (
+        "## Raw file: G.md § 78\n"
+        "· § 80 Grenzwerte für die Exposition der Bevölkerung · § 212 Grenzwerte für "
+        "beruflich exponierte Personen;\n"
+        "Der Grenzwert beträgt für beruflich exponierte Personen 20 Millisievert."
+    )
+    got = [q for _, q in evidence.extract(read, "Grenzwerte beruflich exponierte Personen")]
+    assert got == ["Der Grenzwert beträgt für beruflich exponierte Personen 20 Millisievert."]
+
+
+def test_an_overlong_sentence_is_clipped_at_a_clause_not_dropped():
+    clauses = ", ".join(f"Grenzwert für Personen der Gruppe {i} gilt" for i in range(30))
+    read = "## Raw file: G.md § 9\n" + clauses + "."
+    ((_, quote),) = evidence.extract(read, "Grenzwert Personen Gruppe")
+    assert len(quote) <= 610
+    assert quote.endswith(" …")
+    assert quote[:-2] in read

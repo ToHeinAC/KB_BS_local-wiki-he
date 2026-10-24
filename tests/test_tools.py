@@ -446,6 +446,14 @@ def test_judging_code_written_answers_keeps_the_gates_one_time_nudges(monkeypatc
     assert not mem.prose_section_nudged
 
 
+def test_each_submission_verdict_is_a_gate_event(monkeypatch):
+    # A best-effort run must show why the agent's own submissions failed.
+    mem = _gate_ready(monkeypatch)
+    out = tools.submit_chat_answer.invoke({"answer": "too short"})
+    assert out.startswith("REJECTED")
+    assert mem.gate_events == [f"submit rejected: {out.splitlines()[0]}"]
+
+
 def test_a_deep_chat_answer_must_have_read_an_original_it_cites(monkeypatch):
     mem = _gate_ready(monkeypatch)
     for q in ("a", "b", "c"):
