@@ -93,7 +93,7 @@ def test_an_overlong_sentence_is_clipped_at_a_clause_not_dropped():
     clauses = ", ".join(f"Grenzwert für Personen der Gruppe {i} gilt" for i in range(30))
     read = "## Raw file: G.md § 9\n" + clauses + "."
     ((_, quote),) = evidence.extract(read, "Grenzwert Personen Gruppe")
-    assert len(quote) <= 610
+    assert 610 < len(quote) <= 910  # a list item is not left as a stub ("dem Aufsuchen …")
     assert quote.endswith(" …")
     assert quote[:-2] in read
 

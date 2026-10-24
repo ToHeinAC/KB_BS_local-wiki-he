@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 
 PER_BLOCK = 4  # sentences kept per read section or window
-_MIN_CHARS, _MAX_CHARS = 40, 600
+_MIN_CHARS, _MAX_CHARS = 40, 900
 _MIN_SHARED = 2  # query stems a sentence must share (a figure counts as one)
 _STEM = 6  # prefix length: "Rückstände"/"Rückständen" share "rückst"
 
