@@ -456,6 +456,45 @@ def test_the_ledger_answers_tags_are_mapped_to_the_quoted_sections(monkeypatch):
     )
 
 
+def _clean_setup(monkeypatch, unnamed: list[str]) -> Any:
+    mem = _ledger_run()
+    mem.question = "Welches Dosiskriterium gilt?"
+    mem.ledger = [("V.md § 31", "a")]
+    monkeypatch.setattr(chat_agent.tool_module, "ref_key", lambda r: r.replace(" (2)", ""))
+    monkeypatch.setattr(chat_agent.tool_module, "_prose_unread", lambda mem, text, cited: [])
+    monkeypatch.setattr(chat_agent.tool_module, "open_refs_unnamed", lambda a, c: unnamed)
+    return mem
+
+
+def test_code_names_the_out_of_scope_works_under_open_points(monkeypatch):
+    # The gate requires a law the cited sections rely on but the DB lacks under Open points;
+    # code knows those laws, so it writes the entry instead of an LLM round.
+    mem = _clean_setup(monkeypatch, ["Atomgesetzes", "TrinkwV"])
+    out = chat_agent._clean_ledger_answer("Es gilt X [Source: V.md § 31].", mem)
+    head, open_points = out.split("\n\n## Open points\n")
+    assert head == "Es gilt X [Source: V.md § 31]."
+    assert open_points.splitlines() == [
+        chat_agent.CHAT_OPEN_REF_LINE["de"].format(work=w) for w in ("Atomgesetzes", "TrinkwV")
+    ]
+    existing = "Es gilt X [Source: V.md § 31].\n\n## Offene Punkte\n- Y bleibt offen."
+    out = chat_agent._clean_ledger_answer(existing, mem)
+    assert out.endswith(
+        "- Y bleibt offen.\n"
+        + chat_agent.CHAT_OPEN_REF_LINE["de"].format(work="Atomgesetzes")
+        + "\n"
+        + chat_agent.CHAT_OPEN_REF_LINE["de"].format(work="TrinkwV")
+    )
+    assert out.count("Offene Punkte") == 1
+
+
+def test_a_list_item_emptied_by_the_clean_up_is_dropped(monkeypatch):
+    mem = _clean_setup(monkeypatch, [])
+    answer = "Es umfasst:\n1. Stoffe [Source: V.md § 4].\n2. Gegenstände [Source: V.md § 31]."
+    assert chat_agent._clean_ledger_answer(answer, mem) == (
+        "Es umfasst:\n2. Gegenstände [Source: V.md § 31]."
+    )
+
+
 def test_no_ledger_answer_without_enough_quoted_sources(monkeypatch):
     _ledger_run(n_refs=2)  # the gate needs 3 sources; a call that cannot pass is skipped
     calls: list = []

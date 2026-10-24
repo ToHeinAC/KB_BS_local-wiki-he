@@ -64,6 +64,7 @@ from prompts import (
     CHAT_LEDGER_PROMPT,
     CHAT_LEDGER_REJECTED,
     CHAT_LEDGER_SYSTEM,
+    CHAT_OPEN_REF_LINE,
     CHAT_PROSE_GATE_RETRY,
     CHAT_TOOL_ERROR,
 )
@@ -651,7 +652,8 @@ _TAG_RE = re.compile(r"\s*\[Source:\s*([^\]\n]+?)\s*\]")
 def _clean_ledger_answer(answer: str, mem: run_memory.RunMemory) -> str:
     """The ledger answer with each `[Source: ...]` tag mapped to the quote's own tag (E4B
     writes "§ 31 (2)", or a § the quote never carried), and without the sentences no quote
-    backs or that name a § the run never read. Headings stay."""
+    backs or that name a § the run never read. Headings stay; the laws not in scope that
+    the cited sections rely on are named under `## Open points` by code."""
     tags = {tool_module.ref_key(ref): ref for ref, _ in mem.ledger}
     files = {db_context.qualify(b, d) for d, b, _ in map(tool_module._split_ref, tags.values())}  # pyright: ignore[reportPrivateUsage]
     out: list[str] = []
@@ -660,9 +662,25 @@ def _clean_ledger_answer(answer: str, mem: run_memory.RunMemory) -> str:
             out.append(line)
             continue
         kept = [k for k in (_backed(s, tags, mem, files) for s in _SENTENCE_RE.split(line)) if k]
-        if kept:
+        if kept and not _LIST_MARKER_RE.fullmatch(" ".join(kept)):
             out.append(" ".join(kept))
-    return "\n".join(out).strip()
+    return _with_open_refs("\n".join(out).strip(), mem)
+
+
+_LIST_MARKER_RE = re.compile(r"\s*(?:\d+[.)]|[-*•])\s*")
+
+
+def _with_open_refs(answer: str, mem: run_memory.RunMemory) -> str:
+    """`answer` with a code-written `## Open points` entry for each law not in scope that
+    its cited sections rely on and it does not name yet."""
+    cited = set(tool_module._RAW_CITE_RE.findall(answer))  # pyright: ignore[reportPrivateUsage]
+    works = tool_module.open_refs_unnamed(answer, cited)
+    if not works:
+        return answer
+    lines = [CHAT_OPEN_REF_LINE[lang.detect(mem.question)].format(work=w) for w in works]
+    if tool_module._OPEN_POINTS_RE.search(answer):  # pyright: ignore[reportPrivateUsage]
+        return "\n".join([answer, *lines])
+    return "\n".join([answer, "", "## Open points", *lines])
 
 
 def _backed(

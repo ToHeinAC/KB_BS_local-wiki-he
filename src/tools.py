@@ -861,8 +861,21 @@ def _open_refs_missing(answer: str, raw_cited: set[str]) -> str | None:
     """Once per run: reject when a cited section relies on a law not in scope that the
     answer does not name under `## Open points`."""
     mem = run_memory.current()
-    if mem is None or mem.open_refs_nudged or not mem.out_of_scope:
+    if mem is None or mem.open_refs_nudged:
         return None
+    missing = open_refs_unnamed(answer, raw_cited)
+    if not missing:
+        return None
+    mem.open_refs_nudged = True
+    return CHAT_OPEN_REFS_MISSING.format(works=", ".join(missing[:5]))
+
+
+def open_refs_unnamed(answer: str, raw_cited: set[str]) -> list[str]:
+    """The laws not in scope that a cited section relies on and the answer does not name
+    under `## Open points` (the gate's open-references check, without its nudge)."""
+    mem = run_memory.current()
+    if mem is None or not mem.out_of_scope:
+        return []
     m = _OPEN_POINTS_RE.search(answer)
     open_points = answer[m.end() :].casefold() if m else ""
     missing: list[str] = []
@@ -871,10 +884,7 @@ def _open_refs_missing(answer: str, raw_cited: set[str]) -> str | None:
         for work in mem.out_of_scope.get(f"{t.qbase}|sec={t.canon}", []) if t.section else []:
             if work.casefold() not in open_points and work not in missing:
                 missing.append(work)
-    if not missing:
-        return None
-    mem.open_refs_nudged = True
-    return CHAT_OPEN_REFS_MISSING.format(works=", ".join(missing[:5]))
+    return missing
 
 
 def _research_gap(raw_cited: set[str]) -> str | None:

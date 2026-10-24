@@ -801,6 +801,17 @@ def test_a_tag_naming_another_law_points_to_that_laws_file(wiki_dir):
     assert tools.ref_key("StrlSchV.md") != tools.ref_key("StrlSchV.md § 3")
 
 
+def test_the_out_of_scope_works_an_answer_leaves_unnamed_are_listed(wiki_dir):
+    # What the gate's open-references check misses, without spending its one-time nudge.
+    _chain(1)
+    mem = run_memory.begin_run()
+    tools.raw_read.invoke({"filenames": ["L0.md § 1"]})
+    cited = {"L0.md § 1"}
+    assert tools.open_refs_unnamed("Text.", cited) == ["AtG"]
+    assert tools.open_refs_unnamed("Text.\n\n## Offene Punkte\n- AtG fehlt.", cited) == []
+    assert not mem.open_refs_nudged
+
+
 def test_a_law_named_in_its_plain_title_line_is_found(wiki_dir):
     # gesetze-im-internet texts start with a plain title line, not a markdown heading.
     title = "Gesetz zum Schutz vor ionisierender Strahlung (Strahlenschutzgesetz - StrlSchG)"
