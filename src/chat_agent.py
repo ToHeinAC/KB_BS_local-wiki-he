@@ -691,17 +691,40 @@ def _clean_ledger_answer(answer: str, mem: run_memory.RunMemory) -> str:
     tags = {tool_module.ref_key(ref): ref for ref, _ in mem.ledger}
     files = {db_context.qualify(b, d) for d, b, _ in map(tool_module._split_ref, tags.values())}  # pyright: ignore[reportPrivateUsage]
     out: list[str] = []
+    body = False  # under a heading other than the open points: every claim needs a tag
     for line in answer.splitlines():
+        if line.lstrip().startswith("#"):
+            body = not tool_module._OPEN_POINTS_RE.match(line.strip())  # pyright: ignore[reportPrivateUsage]
         if not line.strip() or line.lstrip().startswith("#"):
             out.append(line)
             continue
-        kept = [k for k in (_backed(s, tags, mem, files) for s in _SENTENCE_RE.split(line)) if k]
+        sentences = (_backed(s, tags, mem, files) for s in _SENTENCE_RE.split(line))
+        kept = [k for k in sentences if k and not (body and _untagged(k))]
         if kept and not _LIST_MARKER_RE.fullmatch(" ".join(kept)):
             out.append(" ".join(kept))
-    return _with_open_refs("\n".join(out).strip(), mem)
+    return _with_open_refs(_tidy(out), mem)
 
 
 _LIST_MARKER_RE = re.compile(r"\s*(?:\d+[.)]|[-*•])\s*")
+
+
+def _untagged(sentence: str) -> bool:
+    """A claim without a `[Source: ...]` tag; a list marker ("1.") or a line that
+    introduces a list is none."""
+    s = sentence.rstrip()
+    return not (_TAG_RE.search(s) or s.endswith(":") or _LIST_MARKER_RE.fullmatch(s))
+
+
+def _tidy(lines: list[str]) -> str:
+    """`lines` without the headings left empty and the blank runs dropped sentences leave."""
+    out: list[str] = []
+    for line in reversed(lines):  # backwards: a heading sees what follows it
+        nxt = next((x for x in out[::-1] if x.strip()), None)
+        if line.lstrip().startswith("#") and (nxt is None or nxt.lstrip().startswith("#")):
+            continue
+        out.append(line)
+    text = "\n".join(reversed(out)).strip()
+    return re.sub(r"\n{3,}", "\n\n", text)
 
 
 def _with_open_refs(answer: str, mem: run_memory.RunMemory) -> str:
@@ -713,7 +736,8 @@ def _with_open_refs(answer: str, mem: run_memory.RunMemory) -> str:
         return answer
     lines = [CHAT_OPEN_REF_LINE[lang.detect(mem.question)].format(work=w) for w in works]
     if tool_module._OPEN_POINTS_RE.search(answer):  # pyright: ignore[reportPrivateUsage]
-        return "\n".join([answer, *lines])
+        gap = [] if answer.splitlines()[-1].lstrip().startswith(("- ", "* ", "• ")) else [""]
+        return "\n".join([answer, *gap, *lines])
     return "\n".join([answer, "", "## Open points", *lines])
 
 

@@ -40,6 +40,7 @@ _LAWLIKE_RE = re.compile(
     r"(?:es|s|en)?$",
     re.IGNORECASE,
 )
+_GENITIVE_RE = re.compile(r"(gesetz|abkommen|vertrag)(?:es|s)$", re.IGNORECASE)
 _ABBR_RE = re.compile(r"^[A-ZÄÖÜ][A-Za-zäöüß]{0,8}[A-ZÄÖÜ][A-Za-zäöüß]{0,4}$")
 
 
@@ -127,3 +128,9 @@ def find_refs(
             if len(out) >= MAX_REFS:
                 return list(out.values())
     return list(out.values())
+
+
+def nominative(work: str) -> str:
+    """A law's name as a heading gives it: the genitive of the text dropped
+    ("Atomgesetzes" → "Atomgesetz")."""
+    return _GENITIVE_RE.sub(r"\1", work)

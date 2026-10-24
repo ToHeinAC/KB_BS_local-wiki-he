@@ -820,6 +820,11 @@ def test_the_out_of_scope_works_an_answer_leaves_unnamed_are_listed(wiki_dir):
     assert tools.open_refs_unnamed("Text.", cited) == ["AtG"]
     assert tools.open_refs_unnamed("Text.\n\n## Offene Punkte\n- AtG fehlt.", cited) == []
     assert not mem.open_refs_nudged
+    # A law named in the genitive of the text ("Atomgesetzes") is listed, and counts as
+    # named, in the nominative.
+    next(iter(mem.out_of_scope.values())).append("Atomgesetzes")
+    assert tools.open_refs_unnamed("Text.", cited) == ["AtG", "Atomgesetz"]
+    assert tools.open_refs_unnamed("Text.\n\n## Open points\n- AtG, Atomgesetz.", cited) == []
 
 
 def test_a_law_named_in_its_plain_title_line_is_found(wiki_dir):

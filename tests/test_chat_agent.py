@@ -528,6 +528,40 @@ def test_a_list_item_emptied_by_the_clean_up_is_dropped(monkeypatch):
     )
 
 
+def test_untagged_body_sentences_and_the_gaps_they_leave_are_dropped(monkeypatch):
+    # E4B pads a section with a filler sentence no quote backs ("Ein wichtiger Punkt ist
+    # …"); the lead, a list's intro line and the open points may go without a tag.
+    mem = _clean_setup(monkeypatch, [])
+    answer = (
+        "Kurz: es gilt X.\n\n"
+        "## Verfahren\n"
+        "Ein besonderes Verfahren gibt es. Es gilt Y [Source: V.md § 31].\n\n\n\n"
+        "Es umfasst:\n1. Stoffe [Source: V.md § 31].\n\n"
+        "## Leer\n"
+        "Ein wichtiger Punkt ist die Abgrenzung.\n\n"
+        "## Open points\n"
+        "Unklar bleibt Z."
+    )
+    assert chat_agent._clean_ledger_answer(answer, mem) == (
+        "Kurz: es gilt X.\n\n"
+        "## Verfahren\n"
+        "Es gilt Y [Source: V.md § 31].\n\n"
+        "Es umfasst:\n1. Stoffe [Source: V.md § 31].\n\n"
+        "## Open points\n"
+        "Unklar bleibt Z."
+    )
+
+
+def test_code_written_open_points_follow_prose_after_a_blank_line(monkeypatch):
+    mem = _clean_setup(monkeypatch, ["Atomgesetz"])
+    out = chat_agent._clean_ledger_answer(
+        "Es gilt X [Source: V.md § 31].\n\n## Open points\nUnklar bleibt Z.", mem
+    )
+    assert out.endswith(
+        "Unklar bleibt Z.\n\n" + chat_agent.CHAT_OPEN_REF_LINE["de"].format(work="Atomgesetz")
+    )
+
+
 def test_no_ledger_answer_without_enough_quoted_sources(monkeypatch):
     _ledger_run(n_refs=1)  # the gate needs 2 sources; a call that cannot pass is skipped
     calls: list = []

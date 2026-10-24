@@ -882,8 +882,9 @@ def open_refs_unnamed(answer: str, raw_cited: set[str]) -> list[str]:
     for ref in sorted(raw_cited):
         t = _target(ref)
         for work in mem.out_of_scope.get(f"{t.qbase}|sec={t.canon}", []) if t.section else []:
-            if work.casefold() not in open_points and work not in missing:
-                missing.append(work)
+            name = refs.nominative(work)
+            if name.casefold() not in open_points and name not in missing:
+                missing.append(name)
     return missing
 
 

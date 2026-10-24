@@ -108,10 +108,14 @@ def key_terms(text: str) -> str:
     return " ".join(out)
 
 
+# German inflection changes the vowel ("entlassen" → "entlässt"), so stems fold umlauts.
+_FOLD = str.maketrans({"ä": "a", "ö": "o", "ü": "u", "ß": "ss"})
+
+
 def stems(text: str) -> set[str]:
-    """The content-word stems of ``text``."""
+    """The content-word stems of ``text``, umlauts folded."""
     words = (w.casefold() for w in _WORD_RE.findall(text))
-    return {w[:_STEM] for w in words if w not in _STOP}
+    return {w.translate(_FOLD)[:_STEM] for w in words if w not in _STOP}
 
 
 def _score(sentence: str, query: set[str]) -> int:

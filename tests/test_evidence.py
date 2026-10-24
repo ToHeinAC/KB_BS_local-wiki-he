@@ -103,3 +103,13 @@ def test_a_questions_key_terms_drop_question_and_function_words():
     assert evidence.key_terms(q) == "Grenzwert effektiven Dosis Einzelpersonen Bevölkerung"
     assert evidence.key_terms("Which limit applies to the public?") == "limit public"
     assert evidence.key_terms("Was gilt?") == ""
+
+
+def test_umlaut_forms_of_a_query_word_share_its_stem():
+    # "entlässt" (the text) and "entlassen" (the question) are one word to the ledger.
+    read = (
+        "## Raw file: StrlSchG.md § 62\n"
+        "Die Behörde entlässt auf Antrag die Rückstände zum Zweck einer bestimmten Verwertung.\n"
+    )
+    assert evidence.extract(read, "Wie können Rückstände entlassen werden?")
+    assert evidence.stems("Überwachung") == evidence.stems("uberwachung")

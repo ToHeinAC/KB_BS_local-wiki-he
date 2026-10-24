@@ -112,3 +112,13 @@ def test_a_bare_absatz_stays_inside_its_section():
 def test_a_capitalised_phrase_after_a_mention_is_not_a_document():
     (ref,) = _find("Die Werte stehen in Anlage 4 Tabelle 1.")
     assert (ref.anchor, ref.kind, ref.work) == ("Anlage 4", "same", "")
+
+
+def test_a_law_named_in_the_genitive_is_given_in_the_nominative():
+    assert refs.nominative("Atomgesetzes") == "Atomgesetz"
+    assert refs.nominative("Bundesberggesetzes") == "Bundesberggesetz"
+    assert refs.nominative("Abkommens") == "Abkommen"
+    assert refs.nominative("Vertrages") == "Vertrag"
+    assert refs.nominative("Strahlenschutzverordnung") == "Strahlenschutzverordnung"
+    assert refs.nominative("AtG") == "AtG"
+    assert refs.nominative("Bericht ABC") == "Bericht ABC"
