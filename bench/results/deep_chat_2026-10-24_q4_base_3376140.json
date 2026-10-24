@@ -1,0 +1,18 @@
+[
+  {
+    "id": "q4",
+    "tool_calls": 7,
+    "advances": 1,
+    "empty_stubs": 0,
+    "exit": "best-effort",
+    "cited_unread": [],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      0.5833333333333334
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 472.3
+  }
+]

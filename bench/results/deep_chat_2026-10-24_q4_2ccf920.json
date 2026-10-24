@@ -1,0 +1,23 @@
+[
+  {
+    "id": "q4",
+    "tool_calls": 10,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "best-effort",
+    "gates": [],
+    "ledger": "[1] [Source: StrlSchG.md § 212] \"(1) Der Grenzwert nach § 78 Absatz 2 Nummer 1 ist ab dem 1.\"\n[2] [Source: StrlSchG.md § 78] \"(1) Der Grenzwert der effektiven Dosis beträgt für beruflich exponierte Personen 20 Millisievert im Kalenderjahr.\"\n[3] [Source: StrlSchG.md § 78] \"(2) Der Grenzwert der Organ-Äquivalentdosis beträgt für beruflich exponierte Personen 1.\"\n[4] [Source: StrlSchG.md § 78] \"(3) Für beruflich exponierte Personen unter 18 Jahren beträgt der Grenzwert der effektiven Dosis 1 Millisievert im Kalenderjahr.\"\n[5] [Source: StrlSchG.md § 78] \"· § 80 Grenzwerte für die Exposition der Bevölkerung · § 81 Verordnungsermächtigung für den Schutz der Bevölkerung  · § 82 Verordnungsermächtigung für Pflichten des Strahlenschut · § 83 Anwendung ionisierender Strahlung oder radioaktiver Sto · § 207 Genehmigungsbedürftige grenzüberschreitende Verbringun · § 208 Bauartzulassung (§ 45) · § 209 Anzeigebedürftiger Betrieb von Luftfahrzeugen (§ 50) · § 210 Anzeigebedürftige Tätigkeiten (§ 56) · § 211 Bestellung von Strahlenschutzbeauftragten (§ 70) · § 212 Grenzwerte für beruflich exponierte Personen;\"\n[6] [Source: StrlSchG.md § 77] \"Der Grenzwert für die Summe der in allen Kalenderjahren ermittelten effektiven Dosen beruflich exponierter Personen beträgt 400 Millisievert.\"\n[7] [Source: StrlSchG.md § 77] \"Die zuständige Behörde kann im Benehmen mit einem ermächtigten Arzt eine zusätzliche berufliche Exposition zulassen, wenn diese nicht mehr als 10 Millisievert effektive Dosis im Kalenderjahr beträgt und die beruflich exponierte Person einwilligt.\"\n[8] [Source: StrlSchG.md § 79] \"(1) Die Bundesregierung wird ermächtigt, durch Rechtsverordnung mit Zustimmung des Bundesrates festzulegen, welche Vorsorge- und Überwachungsmaßnahmen für den Schutz von Personen, die einer beruflichen Exposition unterliegen, zu treffen sind.\"\n[9] [Source: StrlSchG.md § 79] \"unter welchen Voraussetzungen eine Weiterbeschäftigung als beruflich exponierte Person bei Grenzwertüberschreitung zulässig ist und unter welchen Voraussetzungen von den Grenzwerten abweichende Expositionen zugelassen werden können,\"\n[10] [Source: StrlSchG.md § 79] \"dass und wie Schutzvorkehrungen vor äußerer und innerer Exposition getroffen werden, welche Beschäftigungsverbote und Beschäftigungsbeschränkungen für Personen unter 18 Jahren gelten sowie Ausnahmen von diesen Verboten und Beschränkungen,\"\n[11] [Source: StrlSchG.md § 79] \"in welchen Fällen Personen nur nach Vorlage einer Bescheinigung ermächtigter Ärzte so beschäftigt werden dürfen, dass sie einer beruflichen Exposition ausgesetzt sind, und dass die zuständige Behörde bei gesundheitlichen Bedenken gegen eine solche Beschäftigung nach Einholung eines Gutachtens ärztlicher Sachverständiger entscheidet, dass die ärztliche Untersuchung in regelmäßigen Abständen zu wiederholen ist und auch in kürzeren Abständen sowie nach Beendigung des Arbeitsverhältnisses angeordnet werden kann,\"\n[12] [Source: StrlSchG.md § 80] \"(1) Für Einzelpersonen der Bevölkerung beträgt der Grenzwert der Summe der effektiven Dosen 1 Millisievert im Kalenderjahr durch Expositionen aus 1.\"\n[13] [Source: StrlSchG.md § 80] \"(2) Der Grenzwert der Summe der Organ-Äquivalentdosen für Einzelpersonen der Bevölkerung beträgt 1.\"\n[14] [Source: StrlSchG.md § 80] \"(3) Expositionen auf Grund nichtmedizinischer Anwendung nach § 83 Absatz 1 Nummer 2 werden bei den Grenzwerten für Einzelpersonen der Bevölkerung nicht berücksichtigt.\"\n[15] [Source: StrlSchG.md § 80] \"(4) Die zuständige Behörde hat darauf hinzuwirken, dass bei mehreren zu betrachtenden genehmigungs- oder anzeigebedürftigen Tätigkeiten die in den Absätzen 1 und 2 genannten Grenzwerte insgesamt eingehalten werden.\"\n[16] [Source: StrlSchG.md § 79] \"(3) Die Gesundheitsakte ist während der Tätigkeit der beruflich exponierten Person auf dem neuesten Stand zu halten.\"\n[17] [Source: StrlSchG.md § 79] \"Sie ist so lange aufzubewahren, bis die Person das 75.\"\n[18] [Source: StrlSchG.md § 79] \"Lebensjahr vollendet hat oder vollendet hätte, mindestens jedoch 30 Jahre nach Beendigung der Wahrnehmung von Aufgaben als beruflich exponierte Person.\"\n[19] [Source: StrlSchG.md § 79] \"Sie ist spätestens 100 Jahre nach der Geburt der überwachten Person zu vernichten.\"",
+    "ledger_answers": [],
+    "cited_unread": [
+      "StrlSchV.md § 73"
+    ],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      1.0
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 842.0
+  }
+]
