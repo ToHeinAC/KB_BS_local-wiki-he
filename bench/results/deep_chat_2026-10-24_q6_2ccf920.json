@@ -1,0 +1,27 @@
+[
+  {
+    "id": "q6",
+    "tool_calls": 6,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "ledger-accepted",
+    "gates": [
+      "rejected (retry 1/2): REJECTED: 1 distinct searches so far, minimum is 3. raw_search the open sub-questions with other stems first.",
+      "ledger answer accepted",
+      "stopped: no new evidence in 3 turns"
+    ],
+    "ledger": "[1] [Source: StrlSchV.md § 31] \"(1) Nur nach einer Freigabe dürfen als nicht radioaktive Stoffe verwendet, verwertet, beseitigt, innegehalten oder an einen Dritten weitergegeben werden: 1.\"\n[2] [Source: StrlSchV.md § 31] \"radioaktive Stoffe, die aus Tätigkeiten nach § 4 Absatz 1 Satz 1 Nummer 1 in Verbindung mit § 5 Absatz 39 Nummer 1 oder 2, oder aus Tätigkeiten nach § 4 Absatz 1 Satz 1 Nummer 3 bis 7 des Strahlenschutzgesetzes stammen, und\"\n[3] [Source: StrlSchV.md § 31] \"bewegliche Gegenstände, Gebäude, Räume, Raumteile und Bauteile, Bodenflächen, Anlagen oder Anlagenteile (Gegenstände), die mit radioaktiven Stoffen, die aus Tätigkeiten nach § 4 Absatz 1 Satz 1 Nummer 1 in Verbindung mit § 5 Absatz 39 Nummer 1 oder 2, oder aus Tätigkeiten nach § 4 Absatz 1 Satz 1 Nummer 3 bis 7 des Strahlenschutzgesetzes stammen, kontaminiert sind oder durch die genannten Tätigkeiten aktiviert wurden.\"\n[4] [Source: StrlSchV.md § 31] \"(2) Dosiskriterium für die Freigabe ist, dass für Einzelpersonen der Bevölkerung durch die freizugebenden Stoffe und Gegenstände nur eine effektive Dosis im Bereich von 10 Mikrosievert im Kalenderjahr auftreten kann.\"\n[5] [Source: StrlSchV.md § 37] \"(1) Der Antragsteller kann den Nachweis, dass das Dosiskriterium für die Freigabe eingehalten ist, auch im Einzelfall führen.\"\n[6] [Source: StrlSchV.md § 37] \"der zuständigen Behörde Anhaltpunkte dafür vorliegen, dass am Standort der Entsorgungsanlage bei Heranziehung der Freigabewerte nach Anlage 4 Tabelle 1 Spalte 8, 9, 10, 11 oder 14 das Dosiskriterium für die Freigabe nicht eingehalten ist.\"\n[7] [Source: StrlSchV.md § 37] \"Satz 1 gilt auch, soweit die Freigabe zum Einsatz in einem Grubenbau nach § 1 Absatz 1 der Versatzverordnung vom 24.\"\n[8] [Source: StrlSchV.md § 37] \"Dosiskriterium · § 32 Antrag auf Freigabe · § 33 Erteilung der Freigabe · § 34 Vermischungsverbot · § 35 Uneingeschränkte Freigabe · § 36 Spezifische Freigabe · § 37 Freigabe im Einzelfall · § 38 Freigabe von Amts wegen · § 39 Einvernehmen bei der spezifischen Freigabe zur Beseitig · § 40 Abfallrechtlicher Verwertungs- und Beseitigungsweg · § 41 Festlegung des Verfahrens · § 42 Pflichten des Inhabers einer Freigabe.\"",
+    "ledger_answers": [
+      "Das Dosiskriterium für die Freigabe besagt, dass für Einzelpersonen der Bevölkerung durch die freizugebenden Stoffe und Gegenstände nur eine effektive Dosis im Bereich von 10 Mikrosievert im Kalenderjahr auftreten darf [Source: StrlSchV.md § 31]. Dieses Kriterium ist die Grundlage dafür, dass radioaktive Stoffe oder Gegenstände freigegeben werden können [Source: StrlSchV.md § 31].\n\n## Gültigkeitsbereich der Freigabe\nDie Freigabe betrifft sowohl radioaktive Stoffe als auch Gegenstände, die mit diesen Stoffen kontaminiert oder aktiviert wurden [Source: StrlSchV.md § 31].\n\n\nEbenso können bewegliche Gegenstände, Gebäude, Räume, Raumteile und Bauteile, Bodenflächen, Anlagen oder Anlagenteile (Gegenstände) freigegeben werden, sofern sie mit den genannten radioaktiven Stoffen kontaminiert sind oder durch die entsprechenden Tätigkeiten aktiviert wurden [Source: StrlSchV.md § 31].\n\n## Einhaltung des Dosiskriteriums\nDas Dosiskriterium für die Freigabe ist definiert als die Bedingung, dass für Einzelpersonen der Bevölkerung durch die freizugebenden Stoffe und Gegenstände nur eine effektive Dosis im Bereich von 10 Mikrosievert im Kalenderjahr auftreten kann [Source: StrlSchV.md § 31].\n\nDie Einhaltung dieses Kriteriums kann auf verschiedene Weisen nachgewiesen werden [Source: StrlSchV.md § 37].\n\n*   **Einzelfallnachweis:** Der Antragsteller kann den Nachweis erbringen, dass das Dosiskriterium für die Freigabe auch im Einzelfall eingehalten ist [Source: StrlSchV.md § 37].\n*   **Behördliche Prüfung:** Die zuständige Behörde kann feststellen, dass das Dosiskriterium für die Freigabe nicht eingehalten ist, wenn ihr Anhaltspunkte vorliegen, dass dies bei Heranziehung der Freigabewerte nach Anlage 4 Tabelle 1 Spalte 8, 9, 10, 11 oder 14 der Fall ist [Source: StrlSchV.md § 37].\n*   **Spezifische Anwendung:** Das Dosiskriterium gilt auch, wenn die Freigabe zum Einsatz in einem Grubenbau nach § 1 Absatz 1 der Versatzverordnung vom 24 erfolgt [Source: StrlSchV.md § 37].\n\n## Open points\nDie vorliegenden Quellen nennen zwar die Kriterien und die zuständigen Paragraphen, geben jedoch keine vollständige Aufstellung der Tätigkeiten an, aus denen die radioaktiven Stoffe stammen müssen [Source: StrlSchV.md § 31] [Source: StrlSchV.md § 31]. Des Weiteren sind die spezifischen Details der \"Freigabewerte nach Anlage 4 Tabelle 1 Spalte 8, 9, 10, 11 oder 14\" nicht enthalten [Source: StrlSchV.md § 37].\n- Atomgesetzes: liegt nicht unter den durchsuchbaren Originalen vor; was davon abhängt, bleibt offen.\n- Versatzverordnung: liegt nicht unter den durchsuchbaren Originalen vor; was davon abhängt, bleibt offen."
+    ],
+    "cited_unread": [],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      0.5
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 305.5
+  }
+]
