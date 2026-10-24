@@ -74,7 +74,7 @@ load_dotenv()
 
 MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
 MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "500"))
-MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "3"))
+MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 MAX_ITER = int(os.getenv("CHAT_MAX_ITERATIONS", "40"))
 NUDGE_AT = int(os.getenv("CHAT_NUDGE_AT", str(MAX_ITER // 2 - 2)))
 LLM_TIMEOUT = int(os.getenv("CHAT_LLM_TIMEOUT", "180"))
@@ -786,13 +786,18 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
 
 
 def _preflight(question: str) -> list[AnyMessage]:
-    """The run's first raw and wiki search, run by code on the question: a small model's
-    weakest step is starting retrieval at all. One query in two scopes, they count as one
-    of the gate's searches; on any failure the model starts the search itself."""
+    """The run's first searches, run by code: a raw and a wiki search on the question, and a
+    raw search on its key terms (a small model's weakest step is starting retrieval at all,
+    and E4B rarely makes the gate's searches itself). They count as two of the gate's
+    searches; on any failure the model starts the search itself."""
     tools = {"raw_search": tool_module.raw_search, "wiki_search": tool_module.wiki_search}
+    queries = [("raw_search", question), ("wiki_search", question)]
+    terms = evidence.key_terms(question)
+    if terms and terms.casefold() != question.strip().casefold():
+        queries.append(("raw_search", terms))
     calls: list[ToolCall] = [
-        {"name": name, "args": {"query": question}, "id": f"preflight-{name}", "type": "tool_call"}
-        for name in tools
+        {"name": name, "args": {"query": q}, "id": f"preflight-{i}", "type": "tool_call"}
+        for i, (name, q) in enumerate(queries)
     ]
     try:
         results: list[AnyMessage] = [

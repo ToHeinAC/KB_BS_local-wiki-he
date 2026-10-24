@@ -84,6 +84,30 @@ _STOP = frozenset(
 )
 
 
+# Question and modal words a search query does without (the stems' stopwords as well).
+_QUESTION_WORDS = frozenset(
+    {"welche", "welcher", "welches", "welchem", "welchen", "wann", "warum", "wieso", "gilt"}
+    | {"gelten", "gibt", "dürfen", "darf", "müssen", "muss", "sollen", "soll", "what"}
+    | {"which", "when", "does", "apply", "applies", "should"}
+    | {"ihre", "ihrem", "ihren", "ihrer", "ihres", "seine", "seinem", "seinen", "seiner"}
+)
+_TERM_RE = re.compile(r"\w[\w\-]{3,}")
+
+
+def key_terms(text: str) -> str:
+    """The content words of a question, in order, as a search query: no question, modal or
+    function words ("Welcher Grenzwert gilt für die Bevölkerung?" → "Grenzwert
+    Bevölkerung")."""
+    seen: set[str] = set()
+    out: list[str] = []
+    for w in _TERM_RE.findall(text):
+        k = w.casefold()
+        if k not in _STOP and k not in _QUESTION_WORDS and k not in seen:
+            seen.add(k)
+            out.append(w)
+    return " ".join(out)
+
+
 def stems(text: str) -> set[str]:
     """The content-word stems of ``text``."""
     words = (w.casefold() for w in _WORD_RE.findall(text))

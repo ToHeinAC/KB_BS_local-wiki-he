@@ -309,16 +309,19 @@ def test_code_runs_the_first_raw_and_wiki_search_before_the_model_acts(monkeypat
     monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
     list(chat_agent.run_chat_agent("Wer genehmigt NORM-Rückstände?"))
     first = fake.calls[0]
-    results = {m.name: m.content for m in first if isinstance(m, ToolMessage)}
-    assert results == {
-        "raw_search": "RAW HITS for Wer genehmigt NORM-Rückstände?",
-        "wiki_search": "WIKI HITS",
-    }
+    reads = [(m.name, m.content) for m in first if isinstance(m, ToolMessage)]
+    assert reads == [
+        ("raw_search", "RAW HITS for Wer genehmigt NORM-Rückstände?"),
+        ("wiki_search", "WIKI HITS"),
+        ("raw_search", "RAW HITS for genehmigt NORM-Rückstände"),
+    ]
     calls = next(m for m in first if isinstance(m, AIMessage)).tool_calls
-    assert [c["name"] for c in calls] == ["raw_search", "wiki_search"]
+    assert [c["name"] for c in calls] == ["raw_search", "wiki_search", "raw_search"]
     mem = chat_agent.run_memory.current()
     assert mem is not None
-    assert mem.search_count() == 1  # one query in two scopes: one search for the gate
+    # The question in two scopes is one search, its key terms a second: the model still
+    # makes the third itself.
+    assert mem.search_count() == 2
 
 
 def test_a_failing_pre_flight_search_leaves_the_run_to_the_model(monkeypatch):
@@ -526,7 +529,7 @@ def test_a_list_item_emptied_by_the_clean_up_is_dropped(monkeypatch):
 
 
 def test_no_ledger_answer_without_enough_quoted_sources(monkeypatch):
-    _ledger_run(n_refs=2)  # the gate needs 3 sources; a call that cannot pass is skipped
+    _ledger_run(n_refs=1)  # the gate needs 2 sources; a call that cannot pass is skipped
     calls: list = []
     monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda *a, **k: calls.append(1))
     assert chat_agent._ledger_answer("q?", "") is None
@@ -645,15 +648,20 @@ def test_the_pre_flight_also_searches_with_a_hypothetical_answer_passage(monkeyp
     )
     chat_agent.run_memory.begin_run("q?")
     msgs = chat_agent._preflight("Wann dürfen Rückstände verwertet werden?")
-    assert seen == [["Wann dürfen Rückstände verwertet werden?"], ["Rückstände dürfen nur"]]
+    assert seen == [
+        ["Wann dürfen Rückstände verwertet werden?"],
+        ["Rückstände verwertet"],
+        ["Rückstände dürfen nur"],
+    ]
     assert [m.name for m in msgs if isinstance(m, ToolMessage)] == [
         "raw_search",
         "wiki_search",
         "raw_search",
+        "raw_search",
     ]
     mem = chat_agent.run_memory.current()
     assert mem is not None
-    assert mem.search_count() == 1
+    assert mem.search_count() == 2  # HyDE does not count
 
 
 def test_a_failed_hypothetical_passage_leaves_the_plain_pre_flight(monkeypatch):

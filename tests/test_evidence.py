@@ -96,3 +96,10 @@ def test_an_overlong_sentence_is_clipped_at_a_clause_not_dropped():
     assert len(quote) <= 610
     assert quote.endswith(" …")
     assert quote[:-2] in read
+
+
+def test_a_questions_key_terms_drop_question_and_function_words():
+    q = "Welcher Grenzwert der effektiven Dosis gilt für Einzelpersonen der Bevölkerung?"
+    assert evidence.key_terms(q) == "Grenzwert effektiven Dosis Einzelpersonen Bevölkerung"
+    assert evidence.key_terms("Which limit applies to the public?") == "limit public"
+    assert evidence.key_terms("Was gilt?") == ""

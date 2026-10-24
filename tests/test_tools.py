@@ -382,10 +382,12 @@ def test_chat_tools_expose_wiki_search_and_read():
     assert {"raw_search", "raw_read"} <= names  # still raw-grounded
 
 
-def test_a_deep_chat_answer_needs_3_sources() -> None:
-    assert tools._submit_chat_impl("word " * 520 + "[Source: a.md] [Source: b.md]").startswith(
-        "REJECTED"
-    )
+def test_a_deep_chat_answer_needs_2_sources() -> None:
+    # Three padded single-section answers (q3: § 80 alone settles it); two still asks for
+    # a second original to check against.
+    assert tools._submit_chat_impl("word " * 520 + "[Source: a.md]").startswith("REJECTED")
+    two = tools._submit_chat_impl("word " * 520 + "[Source: a.md] [Source: b.md]")
+    assert two.startswith("ACCEPTED")
 
 
 def test_the_word_floor_grows_with_the_cited_sources() -> None:

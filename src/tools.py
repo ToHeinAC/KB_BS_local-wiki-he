@@ -61,7 +61,7 @@ PARALLELISM = int(os.getenv("RESEARCH_PARALLELISM", "4"))
 MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
 CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "500"))
-CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "3"))
+CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 CHAT_MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
 # Deep chat's word floor per cited source, capped at CHAT_MIN_WORDS: a flat floor makes a
 # small model pad thin evidence with uncited text.
