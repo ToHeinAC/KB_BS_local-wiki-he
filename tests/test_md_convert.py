@@ -5,6 +5,7 @@ import io
 import pytest
 from PIL import Image
 
+import chunker
 import md_convert
 
 # --- is_convertible --------------------------------------------------------
@@ -66,18 +67,100 @@ def test_pdf_routing_text_and_image(monkeypatch):
     pages = [("text", "raw text page"), ("image", object())]
     monkeypatch.setattr(md_convert, "_pdf_page_count", lambda b: len(pages))
     monkeypatch.setattr(md_convert, "iter_pdf_pages", lambda b, dpi=md_convert.PDF_DPI: iter(pages))
-    monkeypatch.setattr(md_convert, "rewrite_text", lambda t: f"REWRITE[{t}]")
     monkeypatch.setattr(md_convert, "convert_image", lambda img: "OCR")
 
     md = md_convert.convert_to_markdown(b"fake-pdf", "x.pdf")
-    assert md == "REWRITE[raw text page]\n\nOCR"
+    assert md == "raw text page\n\nOCR"
+
+
+_LAW_PAGE = (
+    "Strahlenschutzgesetz\n"
+    "§ 61 Anfall und Lagerung\n"
+    "§ 62 Entlassung von Rückständen aus der Überwachung\n"
+    "Teil 2\n"
+    "Kapitel 1\n"
+    "§ 61 Anfall und Lagerung\n"
+    "(1) Wer überwachungsbedürftige Rückstände erzeugt, hat dies der zuständigen Behörde "
+    "innerhalb eines Monats anzuzeigen.\n"
+    "§ 62 Entlassung von Rückständen aus der Überwachung\n"
+    "(2) Die Behörde entlässt Rückstände aus der Überwachung auf Antrag nach\n"
+    "§ 61 Absatz 2 Satz 2, wenn die Dosis 1 Millisievert nicht überschreitet.\n"
+    "§ 63 In der Überwachung verbleibende Rückstände\n"
+    "(1) Ist eine Entlassung nicht möglich, so hat der Verpflichtete Art und Masse der "
+    "Rückstände anzuzeigen.\n"
+    "Anlage 1\n"
+    "Rückstände nach § 5"
+)
+
+
+def _words(text: str) -> list[str]:
+    return sorted(w for w in text.replace("#", " ").split())
+
+
+def test_pdf_text_pages_keep_every_word_without_a_model(monkeypatch):
+    # A text layer is already exact: a 1.2B rewrite echoed its prompt ("Critical Rule"),
+    # translated titles and invented sentences into the stored originals.
+    pages = [("text", _LAW_PAGE), ("text", "Seite 2 bleibt wörtlich.")]
+    monkeypatch.setattr(md_convert, "_pdf_page_count", lambda b: len(pages))
+    monkeypatch.setattr(md_convert, "iter_pdf_pages", lambda b, dpi=md_convert.PDF_DPI: iter(pages))
+    monkeypatch.setattr(md_convert.ollama_client, "chat", lambda *a, **k: 1 / 0, raising=False)
+    monkeypatch.setattr(md_convert.ollama_client, "unload", lambda m: None)
+    md = md_convert.convert_to_markdown(b"fake-pdf", "x.pdf")
+    assert _words(md) == _words(_LAW_PAGE + "\n" + "Seite 2 bleibt wörtlich.")
+
+
+def test_section_lines_with_a_body_become_headings_the_chunker_anchors(monkeypatch):
+    md = md_convert._promote_headings(_LAW_PAGE)
+    lines = md.splitlines()
+    assert lines[1:3] == [  # table of contents: § lines without a body stay plain
+        "§ 61 Anfall und Lagerung",
+        "§ 62 Entlassung von Rückständen aus der Überwachung",
+    ]
+    assert {"## Teil 2", "## Kapitel 1", "## Anlage 1"} <= set(lines)
+    assert "## § 61 Anfall und Lagerung" in lines
+    assert "## § 62 Entlassung von Rückständen aus der Überwachung" in lines
+    assert "§ 61 Absatz 2 Satz 2, wenn die Dosis 1 Millisievert nicht überschreitet." in lines
+    anchors = {c["anchor"] for c in chunker.split(md)}
+    assert {"§ 61", "§ 62", "§ 63"} <= anchors
+
+
+def test_a_wrapped_table_of_contents_entry_stays_plain():
+    # The official PDF wraps long titles: "§ 13 … Aussetzung des" / "Genehmigungsverfahrens"
+    # in the contents must not become a second, empty § 13 next to the real one.
+    text = (
+        "§ 13 Allgemeine Voraussetzungen; Aussetzung des\n"
+        "Genehmigungsverfahrens\n"
+        "§ 14 Besondere Voraussetzungen\n"
+        "§ 13 Allgemeine Voraussetzungen; Aussetzung des\n"
+        "Genehmigungsverfahrens\n"
+        "(1) Die Genehmigung ist zu erteilen, wenn die Voraussetzungen vorliegen.\n"
+        "§ 14 Besondere Voraussetzungen\n"
+        "Die Genehmigung setzt voraus, dass die Anwendung gerechtfertigt ist."
+    )
+    heads = [ln for ln in md_convert._promote_headings(text).splitlines() if ln.startswith("##")]
+    assert heads == [
+        "## § 13 Allgemeine Voraussetzungen; Aussetzung des",
+        "## § 14 Besondere Voraussetzungen",
+    ]
+
+
+def test_page_furniture_does_not_break_the_table_of_contents():
+    text = (
+        "§ 31a Antrag auf Genehmigung einer Anwendung\n"
+        "- Seite 2 von 132 -\n\n"
+        "Ein Service des Bundesministerium der Justiz und für Verbraucherschutz\n"
+        "§ 31b Prüfung des Antrags\n"
+        "§ 31a Antrag auf Genehmigung einer Anwendung\n"
+        "Der Antrag ist schriftlich bei der zuständigen Behörde zu stellen."
+    )
+    heads = [ln for ln in md_convert._promote_headings(text).splitlines() if ln.startswith("##")]
+    assert heads == ["## § 31a Antrag auf Genehmigung einer Anwendung"]
 
 
 def test_pdf_progress_callback(monkeypatch):
     pages = [("text", "a"), ("text", "b")]
     monkeypatch.setattr(md_convert, "_pdf_page_count", lambda b: len(pages))
     monkeypatch.setattr(md_convert, "iter_pdf_pages", lambda b, dpi=md_convert.PDF_DPI: iter(pages))
-    monkeypatch.setattr(md_convert, "rewrite_text", lambda t: t)
     calls = []
     md_convert.convert_to_markdown(
         b"x", "x.pdf", on_progress=lambda d, t, _label: calls.append((d, t))
@@ -170,18 +253,6 @@ def test_pdf_pages_route_text_and_image():
     assert pages[0] == ("text", _PDF_TEXT)
     assert pages[1][0] == "image"
     assert md_convert._image_to_base64(pages[1][1])  # rendered bitmap encodes as JPEG
-
-
-def test_rewrite_text_prefixes_the_prompt(monkeypatch):
-    seen = {}
-    monkeypatch.setattr(
-        md_convert.ollama_client,
-        "rewrite",
-        lambda model, prompt: seen.update(model=model, prompt=prompt) or "md",
-    )
-    assert md_convert.rewrite_text("body", model_id="m") == "md"
-    assert seen["prompt"].endswith("body")
-    assert seen["model"] == "m"
 
 
 def test_docx_styles_and_empty_paragraphs():

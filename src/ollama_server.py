@@ -63,7 +63,6 @@ _MODEL_ENV = {
     "INGEST_MODEL": "",
     "FAST_MODEL": "",
     "EMBED_MODEL": "bge-m3",  # embed_index
-    "REWRITE_MODEL": "LiquidAI/lfm2.5-1.2b-instruct:latest",  # md_convert
     "OCR_MODEL": "deepseek-ocr:3b",  # md_convert
 }
 

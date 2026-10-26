@@ -3,8 +3,9 @@
 Pipeline ported and adapted from ToHeinAC/MD-maker (Apache-2.0):
 https://github.com/ToHeinAC/MD-maker
 
-- PDF: per-page routing — digital-text pages are LLM-rewritten into clean
-  Markdown; scanned/empty pages are rasterized and OCR'd via a vision model.
+- PDF: per-page routing — digital-text pages keep their extracted text word for
+  word (law structure promoted to headings in code); scanned/empty pages are
+  rasterized and OCR'd via a vision model.
 - DOCX: deterministic heading/list/table mapping (no LLM).
 - Images: OCR via the vision model.
 
@@ -16,6 +17,7 @@ from __future__ import annotations
 import base64
 import io
 import os
+import re
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -23,7 +25,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from dotenv import load_dotenv
 
 import ollama_client
-from prompts import MD_REWRITE_PROMPT, OCR_DEEPSEEK_PROMPT, OCR_SYSTEM_PROMPT, OCR_USER_PROMPT
+from prompts import OCR_DEEPSEEK_PROMPT, OCR_SYSTEM_PROMPT, OCR_USER_PROMPT
 
 if TYPE_CHECKING:
     from docx.table import Table
@@ -33,10 +35,6 @@ if TYPE_CHECKING:
 load_dotenv()
 
 OCR_MODEL = os.getenv("OCR_MODEL", "deepseek-ocr:3b")
-# The per-page rewrite only adds Markdown structure and never rewords, so a small
-# fixed model is ~8x faster at equal fidelity (99% word recall, no hallucination)
-# and keeps PDF conversion independent of the main chat model (OLLAMA_MODEL).
-REWRITE_MODEL = os.getenv("REWRITE_MODEL", "LiquidAI/lfm2.5-1.2b-instruct:latest")
 PDF_DPI = int(os.getenv("PDF_DPI", "150"))
 
 TEXT_THRESHOLD = 40  # chars; below this a PDF page is treated as image-only
@@ -96,11 +94,6 @@ def _pdf_page_count(pdf_bytes: bytes) -> int:
 
 
 # --- LLM calls (from MD-maker models.py) -----------------------------------
-
-
-def rewrite_text(text: str, model_id: str = REWRITE_MODEL) -> str:
-    """Reformat already-extracted PDF text into Markdown without altering wording."""
-    return ollama_client.rewrite(model_id, MD_REWRITE_PROMPT + text)
 
 
 def convert_image(pil_image: Image, model_id: str = OCR_MODEL) -> str:
@@ -173,12 +166,56 @@ def _convert_pdf(pdf_bytes: bytes, on_progress: ProgressCb | None) -> str:
             kind = "OCR" if page[0] == "image" else "text"
             on_progress(i, total, f"Page {i + 1}/{total} ({kind})")
         if page[0] == "text":
-            parts.append(rewrite_text(page[1]))
+            parts.append(page[1])
         else:
             parts.append(convert_image(page[1]))
     if on_progress:
         on_progress(total, total, "Done")
-    return "\n\n".join(parts)
+    return _promote_headings("\n\n".join(parts))
+
+
+# A section's title line in extracted law text ("§ 62 Entlassung …"), not a wrapped
+# sentence that starts with a reference ("§ 61 Absatz 2 Satz 2, …").
+_SECTION_LINE_RE = re.compile(
+    r"^§\s*\d+[a-z]?\s+(?!(?:Abs\.|Absatz|Satz|Nr\.|Nummer|und|oder|bis)\b)[A-ZÄÖÜ(].{0,200}$"
+)
+# Page header/footer lines between a heading and what follows it (official law PDFs).
+_PAGE_FURNITURE_RE = re.compile(
+    r"^(?:-\s*)?Seite \d+ von \d+(?:\s*-)?$|^Ein Service des Bundesministerium"
+)
+_STRUCTURE_LINE_RE = re.compile(r"^(?:Teil|Kapitel|Abschnitt|Unterabschnitt|Anlage)\s+\d+[a-z]?$")
+
+
+def _promote_headings(text: str) -> str:
+    """`text` with law structure as `## ` headings, every word kept: a line that is only
+    "Teil 2" / "Kapitel 1" / "Abschnitt 3" / "Anlage 1", and a "§ n Title" line that body
+    text follows (a run of § lines is a table of contents and stays plain), so the chunker
+    gets one anchor per section."""
+    lines = text.splitlines()
+    out: list[str] = []
+    for i, line in enumerate(lines):
+        s = line.strip()
+        if _STRUCTURE_LINE_RE.match(s) or (_SECTION_LINE_RE.match(s) and _has_body(lines, i)):
+            out.append(f"## {s}")
+        else:
+            out.append(line)
+    return "\n".join(out)
+
+
+def _has_body(lines: list[str], i: int) -> bool:
+    """Body text follows `lines[i]`: the next non-empty line is no heading, and is not a
+    wrapped title's tail (no sentence end) that another heading follows, as in the
+    table of contents."""
+    following = (lines[j].strip() for j in range(i + 1, len(lines)))
+    nxt = (ln for ln in following if ln and not _PAGE_FURNITURE_RE.match(ln))
+    first, second = next(nxt, ""), next(nxt, "")
+    if not first or _is_heading_line(first):
+        return False
+    return first.endswith((".", ":", ";")) or not _is_heading_line(second)
+
+
+def _is_heading_line(line: str) -> bool:
+    return bool(_SECTION_LINE_RE.match(line) or _STRUCTURE_LINE_RE.match(line))
 
 
 def convert_to_markdown(

@@ -183,16 +183,3 @@ def ocr(model_id: str, prompt: str, image_b64: str, temperature: float = 0.0) ->
         return resp["message"]["content"]
     except Exception as exc:
         raise RuntimeError(f"Ollama OCR failed ({model_id}): {exc}") from exc
-
-
-def rewrite(model_id: str, prompt: str, temperature: float = 0.0) -> str:
-    """Reformat text into Markdown via a text model, using a given model id."""
-    try:
-        resp = _client().chat(
-            model=model_id,
-            messages=[{"role": "user", "content": prompt}],
-            options={"temperature": temperature},
-        )
-        return resp["message"]["content"]
-    except Exception as exc:
-        raise RuntimeError(f"Ollama rewrite failed ({model_id}): {exc}") from exc

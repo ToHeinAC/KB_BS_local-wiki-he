@@ -20,6 +20,17 @@ Track open work and resolved items here. Keep entries short; link to PRs/commits
   the app's own PID); its sidebar only has Reset. The Broadsheet frontend (the default) has one:
   *Stop server* in the user menu, admins only.
 - **Stale `postings.json` / `stats.json` in most `data/<DB>/index/`.** Dead artifacts of the JSON-postings backend retired in `d25fbe8`; nothing reads them (~4 MB in KI alone). Safe to delete, but they are inside user databases, so removal needs an explicit go-ahead.
+- **~60 originals in `data/*/raw/` were damaged by the old PDF rewrite** (fixed 2026-10-26, see
+  [changelog](changelog.md)): the 1.2B rewrite model echoed its prompt ("Critical Rule",
+  "Reformatting Instructions"), translated titles and invented text. Files carrying the echo per
+  DB (2026-10-26): StrlSch_DE 13/14, ZB BHB 8/8, LV-SMB 10/13, AVE 7/9, Abluftreinigung 6/34,
+  CO2-Zertifikate_BECV 5/6, Investing 3/23, NORM-SV-Orga 2/4 (+ 1/6 confidential), Strahlenschutz
+  2/10, AVE_RAG 1/17, NORM 1/15, KI 1/21 (`EU-AIandFinMarkets_Sept.md`). A rewrite that did not echo
+  the prompt is not detected by this count. Each needs `wiki_engine.delete_source` and a
+  re-upload of the original PDF; these are user databases, so only with the owner's go-ahead.
+- **Converted law PDFs keep a few duplicate § anchors:** on the official StrlSchG/StrlSchV PDFs,
+  2 and 3 table-of-contents entries still become headings (§ 36b, § 218; § 16, § 143, § 200), so
+  a section read of those may serve the contents line instead of the section.
 
 # Karpathy Wiki Knowledge System — Deep Dive & LocalWiki Implementation Review
 

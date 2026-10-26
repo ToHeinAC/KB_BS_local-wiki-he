@@ -317,7 +317,6 @@ def test_required_gib_sums_distinct_models_plus_overhead(monkeypatch):
         monkeypatch.setenv(key, "main:1b")  # same model in three roles
     monkeypatch.setenv("OLLAMA_MODEL", "main:1b")
     monkeypatch.setenv("EMBED_MODEL", "embed:1b")
-    monkeypatch.setenv("REWRITE_MODEL", "main:1b")
     monkeypatch.setenv("OCR_MODEL", "main:1b")
     monkeypatch.setattr(
         ollama_server,
@@ -350,7 +349,7 @@ def test_a_model_never_pulled_contributes_nothing(monkeypatch):
 
 def test_latest_suffix_matches_either_way(monkeypatch):
     monkeypatch.setenv("OLLAMA_MODEL", "vendor/m")
-    for key in ("QUERY_MODEL", "INGEST_MODEL", "FAST_MODEL", "REWRITE_MODEL", "OCR_MODEL"):
+    for key in ("QUERY_MODEL", "INGEST_MODEL", "FAST_MODEL", "OCR_MODEL"):
         monkeypatch.setenv(key, "vendor/m")
     monkeypatch.setenv("EMBED_MODEL", "vendor/m")
     monkeypatch.setattr(

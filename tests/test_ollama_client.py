@@ -225,20 +225,11 @@ def test_ocr_sends_the_image(monkeypatch):
     assert mock.chat.call_args.kwargs["messages"][0]["images"] == ["B64"]
 
 
-def test_rewrite_uses_the_given_model(monkeypatch):
-    mock = _make_mock(monkeypatch)
-    mock.chat.return_value = {"message": {"content": "md"}}
-    assert ollama_client.rewrite("small:1b", "text") == "md"
-    assert mock.chat.call_args.kwargs["model"] == "small:1b"
-
-
-@pytest.mark.parametrize(("fn", "label"), [("ocr", "OCR"), ("rewrite", "rewrite")])
-def test_vision_and_rewrite_failures_raise(monkeypatch, fn, label):
+def test_vision_failure_raises(monkeypatch):
     mock = _make_mock(monkeypatch)
     mock.chat.side_effect = ConnectionError("down")
-    args = ("m", "p", "img") if fn == "ocr" else ("m", "p")
-    with pytest.raises(RuntimeError, match=f"Ollama {label} failed"):
-        getattr(ollama_client, fn)(*args)
+    with pytest.raises(RuntimeError, match="Ollama OCR failed"):
+        ollama_client.ocr("m", "p", "img")
 
 
 def test_host_delegates_to_the_pinned_daemon(monkeypatch):

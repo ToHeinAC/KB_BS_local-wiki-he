@@ -730,18 +730,3 @@ OCR_USER_PROMPT = "Convert this document page to Markdown."
 # deepseek-ocr requires a short, punctuated prompt on its own line after the image.
 # The <|grounding|> token activates layout-aware OCR; omitting it degrades structure.
 OCR_DEEPSEEK_PROMPT = "<|grounding|>Convert the document to markdown."
-
-MD_REWRITE_PROMPT = """You are reformatting extracted PDF text as Markdown.
-
-CRITICAL RULE: Do NOT change, paraphrase, summarize, translate, or reorder
-any wording. Reproduce every word exactly. You may only:
-- Add Markdown headings (#, ##, ###) to match visual hierarchy.
-- Convert lists to Markdown bullet/numbered lists.
-- Convert tabular text to Markdown tables when clearly tabular.
-- Wrap code in fenced blocks.
-- Use $...$ / $$...$$ for math if present.
-
-Do not add commentary, preamble, or explanations. Output only Markdown.
-
-Text to reformat:
-"""
