@@ -1,0 +1,123 @@
+[
+  {
+    "id": "q1",
+    "tool_calls": 13,
+    "advances": 1,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "0/1",
+    "quote_overlap": [
+      0.0
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 103.1
+  },
+  {
+    "id": "q2",
+    "tool_calls": 18,
+    "advances": 1,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "0/1",
+    "quote_overlap": [
+      null
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 106.8
+  },
+  {
+    "id": "q3",
+    "tool_calls": 16,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      0.4444444444444444
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 106.0
+  },
+  {
+    "id": "q4",
+    "tool_calls": 15,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "best-effort",
+    "cited_unread": [
+      "StrlSchG.md § 8"
+    ],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      0.38461538461538464
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 128.9
+  },
+  {
+    "id": "q5",
+    "tool_calls": 3,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "best-effort",
+    "cited_unread": [
+      "StrlSchG.md § 61",
+      "StrlSchG.md § 6",
+      "StrlSchG.md § 63"
+    ],
+    "gold_read": "1/2",
+    "quote_overlap": [
+      0.0,
+      0.75
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 35.2
+  },
+  {
+    "id": "q6",
+    "tool_calls": 16,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "1/1",
+    "quote_overlap": [
+      0.0
+    ],
+    "problems": [],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 86.5
+  },
+  {
+    "id": "q7",
+    "tool_calls": 13,
+    "advances": 0,
+    "empty_stubs": 0,
+    "exit": "submit-accepted",
+    "cited_unread": [],
+    "gold_read": "0/2",
+    "quote_overlap": [
+      0.0
+    ],
+    "problems": [
+      "gold label wrong: StrlSchV.md § 98 is '§ 98 Einweisung in Tätigkeiten mit Strahlungsquellen', not 'Entlassung'"
+    ],
+    "hops": 0,
+    "bonus": 0,
+    "seconds": 81.9
+  }
+]
