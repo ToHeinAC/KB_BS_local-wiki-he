@@ -776,9 +776,11 @@ def _tagged_unread(mem: run_memory.RunMemory, raw_cited: set[str]) -> list[tuple
 
 def _prose_unread(mem: run_memory.RunMemory, answer: str, cited: set[str]) -> list[tuple[str, str]]:
     """(file, anchor) of each § the prose names in a cited original but that was not read.
-    A § naming another work counts only when that work's file is cited."""
+    A § naming another work counts only when that work's file is cited. A § inside a
+    quotation is the quoted text's own (the quote check verifies it), not a claim."""
+    prose = _QUOTE_RE.sub(lambda m: "" if len(m[1].split()) >= QUOTE_MIN_WORDS else m[0], answer)
     out: list[tuple[str, str]] = []
-    for r in refs.find_refs(answer, "", None, _resolve_work, lambda _f, _a: True):
+    for r in refs.find_refs(prose, "", None, _resolve_work, lambda _f, _a: True):
         files = sorted(cited) if r.kind == refs.SAME else [r.target] if r.target in cited else []
         held: list[tuple[str, dict[str, Any]]] = []
         for qbase in files:

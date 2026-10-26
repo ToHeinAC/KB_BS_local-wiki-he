@@ -639,6 +639,17 @@ def test_an_unread_section_named_only_in_the_prose_is_rejected_once(wiki_dir, mo
     assert tools._submit_chat_impl(answer).startswith("ACCEPTED")  # bounded: once per run
 
 
+def test_a_section_named_inside_a_verbatim_quote_is_not_a_prose_claim(wiki_dir, monkeypatch):
+    # A quote copies the read section word for word, § references included ("der Umgang
+    # nach § 5 Absatz 39"); the quote check verifies it, so its § is not a claim.
+    mem = _grounding_run(monkeypatch)
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md § 1"]})
+    quoted = "Es gilt „Ist eine Entlassung nach § 63 nicht möglich, so gilt das“ hier."
+    assert tools._prose_unread(mem, quoted, {"KI/StrlSchG.md"}) == []
+    plain = quoted.replace("„", "").replace("“", "")
+    assert tools._prose_unread(mem, plain, {"KI/StrlSchG.md"}) == [("KI/StrlSchG.md", "§ 63")]
+
+
 def test_a_section_of_a_law_that_is_not_cited_is_ignored(wiki_dir, monkeypatch):
     _grounding_run(monkeypatch)
     tools.raw_read.invoke({"filenames": ["StrlSchG.md § 1"]})
