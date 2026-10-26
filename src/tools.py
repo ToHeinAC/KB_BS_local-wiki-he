@@ -911,6 +911,14 @@ def _research_gap(raw_cited: set[str]) -> str | None:
     return None
 
 
+def _section_key(ref: str) -> tuple[str, str]:
+    """The section a citation points to, for counting sources: "§ 62 (2) Nr. 1" and
+    "§ 62 (3)" are § 62, so finer tags do not raise the word floor."""
+    file, anchor = ref_key(ref)
+    m = re.match(r"§?\s*(\d+[a-z]?)\b", anchor)
+    return file, m[1] if m else anchor
+
+
 def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     words = len(re.findall(r"\w+", answer or ""))
     cited = set(_RAW_CITE_RE.findall(answer or ""))
@@ -920,10 +928,11 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     wiki_cited = {f"wiki:{w}" for w in _WIKI_CITE_RE.findall(answer or "")}
     raw_unique = cited | extra
     unique = raw_unique | wiki_cited
-    floor = min(CHAT_MIN_WORDS, CHAT_WORDS_PER_SOURCE * len(unique))
+    sections = len({_section_key(r) for r in raw_unique}) + len(wiki_cited)
+    floor = min(CHAT_MIN_WORDS, CHAT_WORDS_PER_SOURCE * sections)
     if words < floor:
         return (
-            f"REJECTED: answer has {words} words; with {len(unique)} cited sources the minimum "
+            f"REJECTED: answer has {words} words; with {sections} cited sections the minimum "
             f"is {floor}. Continue researching and expand the answer."
         )
     if len(unique) < CHAT_MIN_SOURCES or not raw_unique:

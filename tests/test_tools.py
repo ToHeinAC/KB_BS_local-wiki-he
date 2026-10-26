@@ -404,6 +404,15 @@ def test_the_word_floor_grows_with_the_cited_sources() -> None:
     assert "500" in capped
 
 
+def test_the_word_floor_counts_sections_not_paragraph_tags() -> None:
+    # Citing § 62 (2) and § 62 (3) is one section: finer tags must not raise the floor
+    # (a correct 368-word answer citing 8 paragraph tags of 2 sections was rejected).
+    tags = "[Source: a.md § 62 (2)] [Source: a.md § 62 (3) Nr. 1] [Source: b.md § 29 (1)]"
+    assert tools._submit_chat_impl("word " * 210 + tags).startswith("ACCEPTED")
+    short = tools._submit_chat_impl("word " * 150 + tags)
+    assert "with 2 cited sections the minimum is 200" in short
+
+
 def _gate_ready(monkeypatch) -> run_memory.RunMemory:
     monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
