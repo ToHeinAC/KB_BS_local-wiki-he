@@ -617,6 +617,13 @@ def _next_unread_offset(
     return None
 
 
+def _heading_offset(body: str, section: str) -> int:
+    """Where a § no chunk holds starts in `body` (its heading line), else 0: a file chunked
+    before its plain § headings were recognised is read from the §, not its first page."""
+    m = re.match(r"§\s*(\d+[a-z]?)", section)
+    return (chunker.find_legal_head(body, m[1]) or 0) if m else 0
+
+
 def _raw_read_one(filename: str, offset: int = 0) -> str:
     db, base, section = _split_ref(filename)
     with db_context.using_db(db):
@@ -633,7 +640,7 @@ def _raw_read_one(filename: str, offset: int = 0) -> str:
         return f"## Raw file: {filename}\n(not found)"
     body = data.decode("utf-8", errors="replace")
     total = len(body)
-    start = max(0, int(offset or 0))
+    start = max(0, int(offset or 0)) or _heading_offset(body, section)
     if start >= total:
         return f"## Raw file: {label} (offset {start}/{total})\n(offset past end)"
     end = min(total, start + RAW_READ_CAP)

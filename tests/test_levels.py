@@ -264,3 +264,14 @@ def test_citations_of_markdown_heading_sections_count_as_sources(wiki_dir):
     tools.raw_read.invoke({"filenames": ["manual.md Installation", "manual.md Maintenance"]})
     answer = _covered_answer("manual.md Installation", "manual.md Maintenance")
     assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
+
+
+def test_a_section_the_chunks_do_not_hold_is_read_from_its_heading_not_the_file_start(wiki_dir):
+    # chunked before plain § headings were recognised: the parts carry no § anchor
+    text = "Vorspann " * 2000 + "\n§ 62 Entlassung von Rückständen\n(1) Die Behörde entlässt.\n"
+    (tools.db_context.raw_dir() / "old.md").write_text(text, encoding="utf-8")
+    chunker.write_chunks("old.md", chunker._split_long(text, "", [], 0, "de"))
+    run_memory.begin_run(_Q)
+    out = tools.raw_read.invoke({"filenames": ["old.md § 62"]})
+    assert "\n§ 62 Entlassung von Rückständen\n(1) Die Behörde entlässt." in out
+    assert "(bytes 0-" not in out
