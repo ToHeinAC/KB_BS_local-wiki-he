@@ -113,3 +113,15 @@ def test_a_paragraph_reference_names_one_definition():
     assert definitions.find(defs, "§ 5 Absatz 32") is not None
     assert definitions.find(defs, "§ 5") is None
     assert definitions.find(defs, "§ 62 Abs. 2") is None
+
+
+def test_a_statute_with_plain_section_headings_has_a_register():
+    law = (
+        "Nichtamtliches Inhaltsverzeichnis\r\n§ 4 Tätigkeiten\r\n(1) Tätigkeiten sind alle.\r\n"
+        "Nichtamtliches Inhaltsverzeichnis\r\n§ 5 Sonstige Begriffsbestimmungen\r\n"
+        "(32) Rückstände: Materialien, die in Prozessen anfallen.\r\n"
+        "§ 6 Absatz 3 bleibt unberührt.\r\n"
+        "Nichtamtliches Inhaltsverzeichnis\r\n§ 6 Rechtfertigung\r\n(1) Text.\r\n"
+    )
+    defs = definitions.register(law)
+    assert [(d.term, d.section) for d in defs] == [("Rückstände", "§ 5 Abs. 32")]

@@ -116,3 +116,36 @@ def test_all_chunks_reads_every_source(tmp_path, monkeypatch):
     assert chunker.load_chunks("missing.md") == []
     monkeypatch.setattr(chunker, "_chunks_dir", lambda: tmp_path / "absent")
     assert chunker.all_chunks() == []
+
+
+# A statute copied as text from gesetze-im-internet.de: each heading a plain line without
+# "#", CRLF line ends, and running text whose line may start with a § reference.
+PLAIN_LEGAL = (
+    "Gesetz zum Schutz vor der schädlichen Wirkung ionisierender Strahlung\r\n"
+    "Nichtamtliches Inhaltsverzeichnis\r\n"
+    "§ 61 Anfall und Lagerung überwachungsbedürftiger Rückstände\r\n"
+    "(1) Wer Rückstände anfallen lässt, hat sie zu lagern und der Behörde anzuzeigen.\r\n"
+    "Nichtamtliches Inhaltsverzeichnis\r\n"
+    "§ 62 Entlassung von Rückständen aus der Überwachung; Verordnungsermächtigung\r\n"
+    "(1) Der nach § 61 Absatz 1 Satz 1 Verpflichtete hat die Verwertung anzumelden.\r\n"
+    "§ 61 Absatz 2 gilt entsprechend für die Beseitigung der Rückstände im Inland.\r\n"
+    "Nichtamtliches Inhaltsverzeichnis\r\n"
+    "§ 63 Anzeige\r\n"
+    "(1) Rückstände sind der zuständigen Behörde vor ihrer Verwertung anzuzeigen.\r\n"
+)
+
+
+def test_plain_section_headings_without_hash_split_a_statute_per_section():
+    chunks = chunker.split(PLAIN_LEGAL)
+    anchors = [c["anchor"] for c in chunks if c["anchor"] != "Präambel"]
+    assert anchors == ["§ 61", "§ 62", "§ 63"]  # "§ 61 Absatz 2 gilt …" is running text
+    s62 = next(c for c in chunks if c["anchor"] == "§ 62")
+    assert s62["heading_path"] == [
+        "§ 62 Entlassung von Rückständen aus der Überwachung; Verordnungsermächtigung"
+    ]
+    assert "§ 61 Absatz 2 gilt entsprechend" in s62["text"]
+
+
+def test_a_text_naming_a_few_sections_at_line_start_is_not_a_statute():
+    text = "Notes\n\n§ 5 Absatz 1 applies here.\n\nSee also the appendix.\n" * 2
+    assert all(not c["anchor"].startswith("§") for c in chunker.split(text))

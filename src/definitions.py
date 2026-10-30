@@ -13,8 +13,8 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-# A law section heading, as the chunker splits laws ("## § 5 Sonstige Begriffsbestimmungen").
-_SECTION_RE = re.compile(r"^#{1,4}\s*§\s*(\d+[a-z]?)\b[ \t]*(.*)$", re.M)
+from chunker import legal_heads
+
 _HEADING_RE = re.compile(r"^#{1,4}\s", re.M)
 _PARA_RE = re.compile(r"^\((\d+[a-z]?)\)[ \t]*", re.M)
 # "(N) Begriff: …" — at most six words before the colon.
@@ -82,10 +82,12 @@ def parse(anchor: str, heading: str, body: str) -> list[Definition]:
 def register(text: str) -> list[Definition]:
     """Every definition of a markdown law, in document order."""
     out: list[Definition] = []
-    for m in _SECTION_RE.finditer(text):
-        nxt = _HEADING_RE.search(text, m.end())
-        body = text[m.end() : nxt.start() if nxt else len(text)]
-        out += parse(f"§ {m[1]}", m[2].strip(), body)
+    heads = legal_heads(text)  # the § headings, as the chunker splits the law
+    for i, m in enumerate(heads):
+        end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
+        nxt = _HEADING_RE.search(text, m.end(), end)
+        body = text[m.end() : nxt.start() if nxt else end]
+        out += parse(f"§ {m[2]}", m[3].strip(), body)
     return out
 
 

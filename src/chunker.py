@@ -5,7 +5,8 @@ ids and precise anchors. Chunks are the ground truth for retrieval and citation;
 wiki pages become LLM summaries over them.
 
 Boundary strategy (first matching rule wins):
-1. Legal-style: lines like `## § N Title` (German statutes). Each § is one chunk.
+1. Legal-style: lines like `## § N Title` (German statutes) — or, in a statute copied as
+   text without `#`, a line of its own starting `§ N Title`. Each § is one chunk.
 2. Markdown headings: split on `##`/`###`. Long sections are paragraph-windowed.
 3. Plain text: paragraph windows with overlap.
 
@@ -66,6 +67,15 @@ MIN_CHUNK_CHARS = 80
 OVERLAP_CHARS = 300
 
 _LEGAL_HEAD_RE = re.compile(r"^(#{1,4})\s*§\s*(\d+[a-z]?)\b(.*)$", re.MULTILINE)
+# A heading without "#" (a statute copied as text, gesetze-im-internet.de): "§ 62 Entlassung
+# …" at the start of a line, not running text starting with a reference ("§ 61 Absatz 2 …").
+_PLAIN_LEGAL_HEAD_RE = re.compile(
+    r"^()§[ \t]*(\d+[a-z]?)\b"
+    r"(?![ \t]*(?:Abs\.|Absatz|Satz|Nr\.|Nummer|Buchstabe|bis\b|und\b|oder\b|[,;.]))"
+    r"([^\n]{0,200}?)\r?$",
+    re.MULTILINE,
+)
+_MIN_LEGAL_HEADS = 3
 _MD_HEAD_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.MULTILINE)
 
 
@@ -92,8 +102,23 @@ def _detect_lang(text: str) -> str:
     return "de" if de_markers > en_markers else "en"
 
 
-def _is_legal(text: str) -> bool:
-    return len(_LEGAL_HEAD_RE.findall(text)) >= 3
+def find_legal_head(text: str, number: str) -> int | None:
+    """The offset of § `number`'s heading line (with or without "#"), else None."""
+    for head_re in (_LEGAL_HEAD_RE, _PLAIN_LEGAL_HEAD_RE):
+        m = next((m for m in head_re.finditer(text) if m[2] == number), None)
+        if m is not None:
+            return m.start()
+    return None
+
+
+def legal_heads(text: str) -> list[re.Match[str]]:
+    """The § headings of a statute — `## § N …` lines, else plain `§ N …` lines — or []
+    when `text` has fewer than _MIN_LEGAL_HEADS of either. Groups: 2 number, 3 title."""
+    for head_re in (_LEGAL_HEAD_RE, _PLAIN_LEGAL_HEAD_RE):
+        heads = list(head_re.finditer(text))
+        if len(heads) >= _MIN_LEGAL_HEADS:
+            return heads
+    return []
 
 
 def _split_long(
@@ -152,8 +177,8 @@ def _mk(
 
 
 def _chunk_legal(text: str, lang: str) -> list[dict[str, Any]]:
-    """Split on `## § N` headers. Each § becomes one chunk (windowed if huge)."""
-    matches = list(_LEGAL_HEAD_RE.finditer(text))
+    """Split on the § headings (`legal_heads`). Each § becomes one chunk (windowed if huge)."""
+    matches = legal_heads(text)
     chunks: list[dict[str, Any]] = []
     # Preamble before first §
     if matches and matches[0].start() > 0:
@@ -206,7 +231,7 @@ def split(text: str) -> list[dict[str, Any]]:
     if not text or not text.strip():
         return []
     lang = _detect_lang(text)
-    chunks = _chunk_legal(text, lang) if _is_legal(text) else _chunk_markdown(text, lang)
+    chunks = _chunk_legal(text, lang) if legal_heads(text) else _chunk_markdown(text, lang)
     # Drop too-small chunks (merge into previous when feasible)
     merged: list[dict[str, Any]] = []
     for ch in chunks:
