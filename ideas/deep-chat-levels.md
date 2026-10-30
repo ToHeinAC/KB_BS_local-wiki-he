@@ -63,3 +63,14 @@ Findings (the second set shows what one corpus hid):
    rules." but not the bullet list that follows, and keeps `{{#rustdoc_include …}}` lines.
 4. **The 3-search minimum rejects almost every first submit** (pre-flight counts 2 searches).
 5. A question naming four defined terms (g3) is required to cite all four.
+
+### Rerun after fixes 1–3 (76da02b … c8a2017)
+
+| Set | Accepted | Best effort | Gold read | Mean time |
+|---|---|---|---|---|
+| StrlSch | 6 (was 3) | 1 | 9/10 | 106 s (q1 167, q5 120, q7 104) |
+| General | 4 (was 2; Rust 3/3, was 0/3) | 3 | 7/7 | 75 s |
+
+Still open: the 3-search minimum is the most frequent rejection (g4 six times, g7 five);
+the ledger writer still drops a named term's definition although the prompt names it (q1,
+q3, q4, q7, g3, g4); g1 answers from one section and falls under the 2-source minimum.
