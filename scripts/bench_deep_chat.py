@@ -86,6 +86,18 @@ def memory_counts(steps: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
+def cited_by_level(
+    levels: dict[tuple[str, str], int], cited: list[tuple[str, str]]
+) -> dict[str, int]:
+    """How many of the answer's cited sources (by `tools.ref_key`) each level read in code
+    supplied (ideas/deep-chat-levels.md); "other" for sources the model found itself."""
+    out = {"1": 0, "2": 0, "3": 0, "other": 0}
+    for key in dict.fromkeys(cited):
+        level = levels.get(key)
+        out[str(level) if level else "other"] += 1
+    return out
+
+
 def _grams(text: str) -> set[tuple[str, ...]]:
     words = re.findall(r"\w+", text.casefold())
     return {tuple(words[i : i + NGRAM]) for i in range(len(words) - NGRAM + 1)}
@@ -150,6 +162,10 @@ def _run(item: dict[str, Any]) -> dict[str, Any]:
         **ledger_record(mem),
         "cited_unread": [f"{f} {a}" for f, a in tools._tagged_unread(mem, cited)],  # pyright: ignore[reportPrivateUsage]
         **_score_gold(mem, answer, item["gold"]),
+        "core": mem.core_refs,
+        "terms": mem.term_refs,
+        "cited_by_level": cited_by_level(mem.levels, [tools.ref_key(r) for r in cited]),
+        "words": len(answer.split()),
         "hops": max(mem.ref_depth.values(), default=0),
         "bonus": mem.bonus,
         "seconds": round(time.monotonic() - started, 1),
@@ -163,7 +179,7 @@ def _print(row: dict[str, Any]) -> None:
         f"adv={row['advances']:<2} stubs={row['empty_stubs']:<2} "
         f"unread={len(row['cited_unread']):<2} gold={row['gold_read']:<5} "
         f"overlap={row['quote_overlap']} hops={row['hops']} bonus={row['bonus']} "
-        f"{row['seconds']}s"
+        f"levels={row['cited_by_level']} words={row['words']} {row['seconds']}s"
     )
     for g in row.get("gates", []):
         print(f"     · {g}")

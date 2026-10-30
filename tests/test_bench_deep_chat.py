@@ -97,3 +97,10 @@ def test_quote_overlap_is_the_share_of_citing_sentences_that_quote_the_section()
     )
     assert bench.quote_overlap(answer, "§ 62", text) == 0.5
     assert bench.quote_overlap("Nichts dazu.", "§ 62", text) is None
+
+
+def test_each_row_counts_the_cited_sources_per_level():
+    bench = _bench()
+    levels = {("a.md", "§ 62"): 1, ("a.md", "§ 5 Abs. 32"): 2, ("b.md", "§ 29"): 2}
+    keys = [("a.md", "§ 62"), ("a.md", "§ 5 Abs. 32"), ("c.md", "§ 1")]
+    assert bench.cited_by_level(levels, keys) == {"1": 1, "2": 1, "3": 0, "other": 1}
