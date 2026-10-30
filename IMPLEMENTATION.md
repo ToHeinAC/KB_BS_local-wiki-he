@@ -12,7 +12,7 @@ Rules: [AGENTS.md](AGENTS.md). Design: [docs/architecture.md](docs/architecture.
 | Tests (fast loop) | `uv run pytest` or `uv run pytest tests/test_wiki_engine.py` |
 | Full gate | `uv run pre-commit run --all-files` |
 | Ontology detection bench | `uv run python scripts/bench_ontology_detect.py` (legal heads; `--gold bench/fixture_ontology_detect_KI.json` for KI, see [docs/ontology.md](docs/ontology.md)) |
-| Deep chat bench (live model) | `uv run python scripts/bench_deep_chat.py` (gold `bench/fixture_deep_chat_KI.json`; needs StrlSchG/StrlSchV ingested into KI, see [docs/retrieval.md](docs/retrieval.md) §Reading originals in Deep chat) |
+| Deep chat bench (live model) | `uv run python scripts/bench_deep_chat.py` (gold `bench/fixture_deep_chat_KI.json`, needs StrlSchG/StrlSchV in KI; second set `--gold bench/fixture_deep_chat_general.json`, needs KrWG and the Rust Book ownership chapter; see [docs/retrieval.md](docs/retrieval.md) §Reading originals in Deep chat) |
 | Ontology export (SKOS / JSON-LD) | `uv run python scripts/export_ontology.py --db <DB> --out <dir>` |
 | Ontology search eval | `uv run python scripts/eval_ontology_search.py --root <scratch dir>` (downloads public law texts; never writes `data/`) |
 | Heal missing search indexes | `uv run python scripts/heal_indexes.py` (also run by `scripts/run_app.py` before every start) |

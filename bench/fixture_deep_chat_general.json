@@ -1,0 +1,14 @@
+{
+  "_note": "Second gold set for scripts/bench_deep_chat.py (--gold), outside radiation protection, so a change tuned to one corpus shows. Ingest KrWG.md (gesetze-im-internet.de/krwg) and rust-ownership.md (the Rust Book chapter 'What Is Ownership?', src/ch04-01-what-is-ownership.md of rust-lang/book, MIT/Apache-2.0; not committed) into KI first, best beside StrlSchG.md/StrlSchV.md as distractors.",
+  "db": "KI",
+  "files": ["KrWG.md", "rust-ownership.md"],
+  "questions": [
+    {"id": "g1", "question": "Wann endet die Abfalleigenschaft eines Stoffes?", "gold": [{"file": "KrWG.md", "section": "§ 5", "heading": "Ende der Abfalleigenschaft"}]},
+    {"id": "g2", "question": "Unter welchen Voraussetzungen ist ein Stoff ein Nebenprodukt und kein Abfall?", "gold": [{"file": "KrWG.md", "section": "§ 4", "heading": "Nebenprodukte"}]},
+    {"id": "g3", "question": "In welcher Rangfolge stehen Vermeidung, Verwertung und Beseitigung von Abfällen?", "gold": [{"file": "KrWG.md", "section": "§ 6", "heading": "Abfallhierarchie"}]},
+    {"id": "g4", "question": "Wem müssen private Haushalte ihre Abfälle überlassen?", "gold": [{"file": "KrWG.md", "section": "§ 17", "heading": "Überlassungspflichten"}]},
+    {"id": "g5", "question": "What are the ownership rules in Rust?", "gold": [{"file": "rust-ownership.md", "section": "Ownership Rules", "heading": "Ownership Rules"}]},
+    {"id": "g6", "question": "What happens to the first variable when a String is assigned to a second variable?", "gold": [{"file": "rust-ownership.md", "section": "Variables and Data Interacting with Move", "heading": "Move"}]},
+    {"id": "g7", "question": "Which types implement the Copy trait?", "gold": [{"file": "rust-ownership.md", "section": "Stack-Only Data: Copy", "heading": "Copy"}]}
+  ]
+}

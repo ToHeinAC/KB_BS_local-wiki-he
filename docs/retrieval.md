@@ -193,19 +193,26 @@ searches, `tools.level_reads(question, raw_search outputs)` reads, under the run
 
 | Level | What | How it is found | Cap |
 |---|---|---|---|
-| 1 — core | The top two distinct sections of the searches, all parts of a long § | `tools.core_refs` (rank order; `§ 62 (Teil 2)` is § 62) | `CORE_MAX` 2, `CORE_CHARS` 8 000 per section |
+| 1 — core | The best section of the first search that hit one, and the next one when it scores at least `CORE_RATIO` (0.8) of it (scores compared within one search only); all parts of a long § | `tools.core_refs` (`§ 62 (Teil 2)` is § 62) | `CORE_MAX` 2, `CORE_CHARS` 8 000 per section |
 | 2 — terms | The definitions of the terms the core uses | `definitions.used_in` over the in-scope laws' registers; the core's own law wins a term | `TERMS_MAX` 6 |
 | 2 — applying provisions | Sections of other laws that cite a core section (the regulation names the act, never the reverse) | `tools.citing_sections`: every law's cross references (`refs.find_refs`), built once per run; shared heading words first | `CITING_MAX` 2 |
 | 3 — inner terms | Terms used inside the level-2 definitions | as level 2, minus what was read | `DEEP_TERMS_MAX` 4 |
 
 Each level reaches the model as one `raw_read` turn headed `[level N — …]`
-(`prompts.CHAT_LEVEL_HEADERS`), and `prompts.LEVELS_GUIDE` tells both agents to answer core
-rule → terms → applying provisions and to read further only for gaps. Measured on StrlSchG +
+(`prompts.CHAT_LEVEL_HEADERS`); the level-1 header also tells the model to answer core rule →
+terms → applying provisions, using only what the question needs. It is not in the system
+prompts, so a run without levels (a corpus without sections) never hears of them. Measured on StrlSchG +
 StrlSchV for "Wie können Rückstände entlassen werden?": § 30 StrlSchV and § 62 StrlSchG;
 Rückstände, Bauprodukte, Exposition, Einzelperson der Bevölkerung, effektive Dosis, spezifische
 Aktivität and § 29 StrlSchV; Materialien and three more inner terms — about 15 000 characters,
 0.24 s, no LLM call. Quick research shows the levels only when level 1 found a section; a run
 without matching originals starts as before.
+
+**Not tuned to one corpus.** Counts and ratios are not fitted to the example question; each
+change is checked on a second gold set outside radiation protection
+(`bench/fixture_deep_chat_general.json`: KrWG and an English technical text without
+definitions), where the levels reduce to the core sections. Prompt examples use neutral
+placeholders (`law.md § 12`), enforced by `test_the_agent_prompts_carry_no_example_from_one_corpus`.
 
 **Definition register (`src/definitions.py`, pure).** A definition is a numbered paragraph
 `(N) Begriff: …` in a section whose heading says "Begriff…", or `(N) Begriff [im Sinne dieses
@@ -229,8 +236,10 @@ ledger answer gets the quotes grouped by level (`evidence.render`, `prompts.CHAT
 and is asked for about `LEDGER_WORDS_PER_SOURCE` (80) words per quoted source.
 
 **Coverage instead of a word floor.** The submit gates (`_submit_chat_impl`,
-`_submit_final_impl`) reject an answer that leaves out a core section or cites fewer than
-`TERMS_REQUIRED` (3) of the level-2 definitions, naming the leading ones it lacks
-(`CHAT_COVERAGE_GAP`). Verbosity is a once-only check: under `ANSWER_WORDS_PER_SOURCE` words per
+`_submit_final_impl`) reject an answer that cites none of the core sections, or leaves out the
+definition of a term the question itself names (`definitions.used_in(question, …)`) from a
+document whose core section it cites (`CHAT_COVERAGE_GAP`). Everything else the levels read is
+offered, not forced: a top hit can be off the question, and a narrow question must not be
+pushed into every definition. Verbosity is a once-only check: under `ANSWER_WORDS_PER_SOURCE` words per
 cited source, the answer is sent back once to explain each source (`CHAT_TERSE`); a second short
 answer passes, so a short answer never turns into padding.

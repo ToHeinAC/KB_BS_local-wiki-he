@@ -37,7 +37,7 @@ What the code did before this change (checked against the code and the pasted §
 | Reverse references | `tools` | Sections of other in-scope laws that cite a core section. |
 | Level plan | `chat_agent._levels` | After the pre-flight searches: read the top-2 sections (level 1), then ≤ 6 definitions + ≤ 2 citing sections (level 2), then ≤ 4 definitions used inside level 2 (level 3). |
 | Level ledger | `evidence`, `run_memory` | Level-1 sections keep the first sentence of every paragraph; quotes carry their level; the ledger prompt writes core rule → conditions and terms → further provisions. |
-| Coverage gate | `tools._submit_chat_impl` | Replaces the word floor: every level-1 section and up to 3 level-2 definitions must be cited; a once-only terse check keeps answers detailed. |
+| Coverage gate | `tools._submit_chat_impl` | Replaces the word floor: one level-1 section and the definitions of the terms the question names must be cited; a once-only terse check keeps answers detailed. (First version forced both top sections and 3 definitions — derived from the one example, revised the same day.) |
 | Quick research | `agent.py` | Same level reads before the first turn; same coverage check in place of `RESEARCH_MIN_WORDS`. |
 
 Time budget: every step above is code (lexical lookups, regex), well under a second per
