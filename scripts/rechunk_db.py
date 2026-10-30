@@ -29,6 +29,11 @@ import wiki_engine
 _TEXT_EXTS = (".md", ".txt", ".html")
 
 
+def _text(name: str) -> str:
+    """The original as ingest chunks it (line ends kept)."""
+    return (wiki_engine.read_raw_source(name) or b"").decode("utf-8", errors="replace")
+
+
 def changed_sources() -> list[tuple[str, int, int]]:
     """(source, old chunk count, new chunk count) of each text original in the bound DB
     whose re-split chunks carry other anchors than the stored ones."""
@@ -37,7 +42,7 @@ def changed_sources() -> list[tuple[str, int, int]]:
         old = chunker.load_chunks(path.name) if path.suffix.lower() in _TEXT_EXTS else []
         if not old:
             continue
-        new = chunker.split(path.read_text(encoding="utf-8", errors="replace"))
+        new = chunker.split(_text(path.name))
         if new and [c["anchor"] for c in new] != [c["anchor"] for c in old]:
             out.append((path.name, len(old), len(new)))
     return out
@@ -50,9 +55,7 @@ def rechunk(apply: bool) -> list[tuple[str, int, int]]:
     if not apply or not changed:
         return changed
     for name, _, _ in changed:
-        data = wiki_engine.read_raw_source(name) or b""
-        chunks = chunker.split(data.decode("utf-8", errors="replace"))
-        chunker.write_chunks(name, chunks)
+        chunker.write_chunks(name, chunker.split(_text(name)))
         embed_index.index_replace_source(name, chunker.load_chunks(name))
     wiki_engine.rebuild_lex_index()
     return changed

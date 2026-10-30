@@ -129,6 +129,7 @@ PLAIN_LEGAL = (
     "§ 62 Entlassung von Rückständen aus der Überwachung; Verordnungsermächtigung\r\n"
     "(1) Der nach § 61 Absatz 1 Satz 1 Verpflichtete hat die Verwertung anzumelden.\r\n"
     "§ 61 Absatz 2 gilt entsprechend für die Beseitigung der Rückstände im Inland.\r\n"
+    "§ 53 des Atomgesetzes bleibt unberührt.\r\n"
     "Nichtamtliches Inhaltsverzeichnis\r\n"
     "§ 63 Anzeige\r\n"
     "(1) Rückstände sind der zuständigen Behörde vor ihrer Verwertung anzuzeigen.\r\n"
@@ -138,7 +139,7 @@ PLAIN_LEGAL = (
 def test_plain_section_headings_without_hash_split_a_statute_per_section():
     chunks = chunker.split(PLAIN_LEGAL)
     anchors = [c["anchor"] for c in chunks if c["anchor"] != "Präambel"]
-    assert anchors == ["§ 61", "§ 62", "§ 63"]  # "§ 61 Absatz 2 gilt …" is running text
+    assert anchors == ["§ 61", "§ 62", "§ 63"]  # "§ 61 Absatz 2 …", "§ 53 des …": running text
     s62 = next(c for c in chunks if c["anchor"] == "§ 62")
     assert s62["heading_path"] == [
         "§ 62 Entlassung von Rückständen aus der Überwachung; Verordnungsermächtigung"
@@ -149,3 +150,15 @@ def test_plain_section_headings_without_hash_split_a_statute_per_section():
 def test_a_text_naming_a_few_sections_at_line_start_is_not_a_statute():
     text = "Notes\n\n§ 5 Absatz 1 applies here.\n\nSee also the appendix.\n" * 2
     assert all(not c["anchor"].startswith("§") for c in chunker.split(text))
+
+
+def test_a_table_of_contents_of_plain_section_lines_is_not_split_into_sections():
+    toc = (
+        "Inhaltsübersicht\r\n§  61\tAnfall und Lagerung\r\nAbschnitt 2\r\nEntlassung aus\r\n"
+        "der Überwachung\r\n§  62\tEntlassung von Rückständen\r\n"
+        "§  63\tAnzeige\r\nAnlage 1\tRückstände nach § 5 Absatz 32\r\n"
+    )
+    chunks = chunker.split(toc + PLAIN_LEGAL)
+    assert [c["anchor"] for c in chunks if c["anchor"] != "Präambel"] == ["§ 61", "§ 62", "§ 63"]
+    s62 = next(c for c in chunks if c["anchor"] == "§ 62")
+    assert s62["text"].startswith("§ 62 Entlassung von Rückständen aus der Überwachung")

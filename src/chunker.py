@@ -68,11 +68,12 @@ OVERLAP_CHARS = 300
 
 _LEGAL_HEAD_RE = re.compile(r"^(#{1,4})\s*§\s*(\d+[a-z]?)\b(.*)$", re.MULTILINE)
 # A heading without "#" (a statute copied as text, gesetze-im-internet.de): "§ 62 Entlassung
-# …" at the start of a line, not running text starting with a reference ("§ 61 Absatz 2 …").
+# …" at the start of a line — a title starts upper-case or "(" — not running text starting
+# with a reference ("§ 61 Absatz 2 …", "§ 53 des Atomgesetzes bleibt unberührt.").
 _PLAIN_LEGAL_HEAD_RE = re.compile(
     r"^()§[ \t]*(\d+[a-z]?)\b"
-    r"(?![ \t]*(?:Abs\.|Absatz|Satz|Nr\.|Nummer|Buchstabe|bis\b|und\b|oder\b|[,;.]))"
-    r"([^\n]{0,200}?)\r?$",
+    r"(?![ \t]*(?:Abs\.|Absatz|Satz|Nr\.|Nummer|Buchstabe)\b)"
+    r"((?:[ \t]+[A-ZÄÖÜ(][^\n]{0,200}?)?)[ \t]*\r?$",
     re.MULTILINE,
 )
 _MIN_LEGAL_HEADS = 3
@@ -111,14 +112,39 @@ def find_legal_head(text: str, number: str) -> int | None:
     return None
 
 
+def _number(m: re.Match[str]) -> int:
+    return int(re.sub(r"\D", "", m[2]))
+
+
+# A sentence ends somewhere in a section's text: a table of contents has none.
+_SENTENCE_END_RE = re.compile(r"[.!?](?:\s|$)")
+
+
+def _without_toc(text: str, heads: list[re.Match[str]]) -> list[re.Match[str]]:
+    """`heads` without a table of contents: a heading with no sentence before the next one
+    (only structure lines such as "Kapitel 2" in between), or whose number exceeds the next
+    one's (the contents end at § 218, the text starts at § 1). An empty "(weggefallen)" §
+    joins the section before it."""
+    out: list[re.Match[str]] = []
+    for i, m in enumerate(heads):
+        nxt = heads[i + 1] if i + 1 < len(heads) else None
+        toc = nxt is not None and (
+            not _SENTENCE_END_RE.search(text, m.end(), nxt.start()) or _number(m) > _number(nxt)
+        )
+        if not toc:
+            out.append(m)
+    return out
+
+
 def legal_heads(text: str) -> list[re.Match[str]]:
-    """The § headings of a statute — `## § N …` lines, else plain `§ N …` lines — or []
-    when `text` has fewer than _MIN_LEGAL_HEADS of either. Groups: 2 number, 3 title."""
-    for head_re in (_LEGAL_HEAD_RE, _PLAIN_LEGAL_HEAD_RE):
-        heads = list(head_re.finditer(text))
-        if len(heads) >= _MIN_LEGAL_HEADS:
-            return heads
-    return []
+    """The § headings of a statute — `## § N …` lines, else plain `§ N …` lines without a
+    table of contents (a `#` heading is set on purpose) — or [] when `text` has fewer than
+    _MIN_LEGAL_HEADS of either. Groups: 2 number, 3 title."""
+    marked = list(_LEGAL_HEAD_RE.finditer(text))
+    if len(marked) >= _MIN_LEGAL_HEADS:
+        return marked
+    plain = _without_toc(text, list(_PLAIN_LEGAL_HEAD_RE.finditer(text)))
+    return plain if len(plain) >= _MIN_LEGAL_HEADS else []
 
 
 def _split_long(
