@@ -16,6 +16,7 @@ Rules: [AGENTS.md](AGENTS.md). Design: [docs/architecture.md](docs/architecture.
 | Ontology export (SKOS / JSON-LD) | `uv run python scripts/export_ontology.py --db <DB> --out <dir>` |
 | Ontology search eval | `uv run python scripts/eval_ontology_search.py --root <scratch dir>` (downloads public law texts; never writes `data/`) |
 | Heal missing search indexes | `uv run python scripts/heal_indexes.py` (also run by `scripts/run_app.py` before every start) |
+| Re-split originals after a chunker change | `uv run python scripts/rechunk_db.py --db <DB>` (dry run; `--apply` writes chunks, re-embeds changed sources, rebuilds the index) |
 | Optional reranker | `uv sync --inexact --extra rerank` (see [docs/retrieval.md](docs/retrieval.md)) |
 
 - Port 8520 (8511 belongs to another app on this host). Both frontends serve under `/wiwi` to
