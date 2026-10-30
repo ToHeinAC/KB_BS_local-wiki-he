@@ -1,6 +1,6 @@
 # Deep chat and Quick research: answering level by level
 
-Status: implemented 2026-10-30 (commits 3d2d54a … d05a55d); live bench timing pending. Scope agreed with the user: Deep chat and Quick research
+Status: implemented 2026-10-30 (commits 3d2d54a … d05a55d, revised 1b6a004); first live bench below. Scope agreed with the user: Deep chat and Quick research
 (not the web-only Deep research); the word floor is replaced by a coverage check, answers
 stay detailed; StrlSchG/StrlSchV (public law) may be loaded for tests and the bench.
 
@@ -43,3 +43,23 @@ What the code did before this change (checked against the code and the pasted §
 Time budget: every step above is code (lexical lookups, regex), well under a second per
 run; it should save model turns. Verified with `scripts/bench_deep_chat.py` (q1, q5, q7)
 against the GPU-box numbers (76 / 106 / 78 s).
+
+## Bench 2026-10-30 (gemma4:e4b, pinned daemon, scratch KI: StrlSchG, StrlSchV, KrWG, Rust Book ch. 4.1)
+
+| Set | Runs | Accepted (ledger/submit) | Best effort | Gold read | Mean time |
+|---|---|---|---|---|---|
+| StrlSch (`fixture_deep_chat_KI.json`) | 7 | 3 | 4 | 9/10 | 89 s (q1 116, q5 76, q7 112; before 76 / 106 / 78) |
+| General (`fixture_deep_chat_general.json`) | 7 | 2 | 5 | 7/7 | 78 s |
+
+Findings (the second set shows what one corpus hid):
+
+1. **Markdown section citations are not counted.** Code's own tags for heading sections
+   (`[Source: rust-ownership.md Ownership Rules]`) do not match `tools._RAW_CITE_RE` (needs
+   `§`, `#` or "Kapitel/Abschnitt"), so every Rust answer "cites 0 sources" (g5–g7). Predates
+   the levels; hits every corpus without § numbering.
+2. **The ledger writer drops the required definition** (q1, q7, g2–g4): the ledger holds
+   `§ 5 Abs. 32`, the answer leaves it out, the gate rejects it, the run ends best effort.
+3. **Markdown evidence is thin:** the ledger keeps "First, let's take a look at the ownership
+   rules." but not the bullet list that follows, and keeps `{{#rustdoc_include …}}` lines.
+4. **The 3-search minimum rejects almost every first submit** (pre-flight counts 2 searches).
+5. A question naming four defined terms (g3) is required to cite all four.
