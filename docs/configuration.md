@@ -34,7 +34,6 @@ Copy it to `.env` (gitignored, never committed) and adjust.
 | `QA_BATCH_SIZE` | `12` | Number of chunks per `qa_gen` LLM batch. |
 | `QA_MAX_PAIRS_PER_SOURCE` | `5` | Max hypothetical-question pairs `qa_gen` emits per source; drives the chunk-selection heuristic and slices the final output. |
 | `RESEARCH_MIN_SEARCHES` | `6` | Deep researcher: minimum web searches before submitting. |
-| `RESEARCH_MIN_WORDS` | `600` | Deep researcher: minimum final-report word count. |
 | `RESEARCH_MIN_URLS` | `4` | Deep researcher: minimum unique sources cited (URLs + `[Wiki: ...]` citations). |
 | `RESEARCH_MAX_ITERATIONS` | `40` | Deep researcher: LangGraph recursion cap. |
 | `RESEARCH_PARALLELISM` | `4` | Deep researcher: thread-pool size for parallel Tavily / page fetches. |
@@ -48,8 +47,7 @@ Copy it to `.env` (gitignored, never committed) and adjust.
 | `DEEP_RESEARCH_MAX_TOKENS` | `8192` | Per-role `*_model_max_tokens`. **No-op on Ollama** — `ChatOllama` bounds output with `num_predict`, not `max_tokens`, and `Configuration` exposes only `model`/`max_tokens`/`api_key` as configurable. Kept for parity with upstream. |
 | `DEEP_RESEARCH_CLARIFICATION` | `false` | `allow_clarification`. Keep off: the Research page is one-shot and cannot answer a clarifying turn. |
 | `CHAT_MIN_SEARCHES` | `3` | Deep chat: minimum distinct searches (`raw_search`/`wiki_search` queries) before the submit gate accepts. The gate also requires that at least one cited original was opened with `raw_read`. |
-| `CHAT_MIN_WORDS` | `500` | Deep chat: the highest word floor an answer must meet. |
-| `CHAT_WORDS_PER_SOURCE` | `100` | Deep chat: word floor per cited section, capped at `CHAT_MIN_WORDS` (3 sections → 300 words; `§ 62 (2)` and `§ 62 (3)` count as one). A flat floor makes a small model pad thin evidence with uncited text. |
+| `ANSWER_WORDS_PER_SOURCE` | `40` | Deep chat and Quick research: an answer under this many words per cited source is sent back **once** to explain each source (no word floor: a fixed floor made E4B pad with uncited detail). Coverage of the levels read in code is the real gate ([retrieval.md](retrieval.md) §Levels read in code). |
 | `CHAT_MIN_SOURCES` | `2` | Deep chat: minimum unique citations (`[Source: filename]` + `[Wiki: page.md]`; at least one must be a `[Source: ...]` original). |
 | `CHAT_MAX_ITERATIONS` | `40` | Deep chat: step cap (each agent turn is two steps, so about 20 turns), raised by turns earned through `CHAT_REF_BONUS_MAX`. |
 | `CHAT_NUDGE_AT` | `CHAT_MAX_ITERATIONS // 2 - 2` | Deep chat: agent turns after which the agent is told once (stored in the history) to submit now. |

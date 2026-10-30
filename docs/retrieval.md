@@ -184,3 +184,53 @@ and the exact call to follow the first unread one. **Hop budget:** a section rea
 cross-file reference is one hop deeper (same-file references are free); after 3 hops, footers
 stop offering cross-file references; each followed cross-file reference earns 2 agent turns,
 capped by `CHAT_REF_BONUS_MAX` ([configuration.md](configuration.md)).
+
+### Levels read in code (Deep chat and Quick research)
+
+A question is answered level by level, and code — not the model — decides what each level
+reads (memo: [ideas/deep-chat-levels.md](../ideas/deep-chat-levels.md)). After the pre-flight
+searches, `tools.level_reads(question, raw_search outputs)` reads, under the run memory:
+
+| Level | What | How it is found | Cap |
+|---|---|---|---|
+| 1 — core | The top two distinct sections of the searches, all parts of a long § | `tools.core_refs` (rank order; `§ 62 (Teil 2)` is § 62) | `CORE_MAX` 2, `CORE_CHARS` 8 000 per section |
+| 2 — terms | The definitions of the terms the core uses | `definitions.used_in` over the in-scope laws' registers; the core's own law wins a term | `TERMS_MAX` 6 |
+| 2 — applying provisions | Sections of other laws that cite a core section (the regulation names the act, never the reverse) | `tools.citing_sections`: every law's cross references (`refs.find_refs`), built once per run; shared heading words first | `CITING_MAX` 2 |
+| 3 — inner terms | Terms used inside the level-2 definitions | as level 2, minus what was read | `DEEP_TERMS_MAX` 4 |
+
+Each level reaches the model as one `raw_read` turn headed `[level N — …]`
+(`prompts.CHAT_LEVEL_HEADERS`), and `prompts.LEVELS_GUIDE` tells both agents to answer core
+rule → terms → applying provisions and to read further only for gaps. Measured on StrlSchG +
+StrlSchV for "Wie können Rückstände entlassen werden?": § 30 StrlSchV and § 62 StrlSchG;
+Rückstände, Bauprodukte, Exposition, Einzelperson der Bevölkerung, effektive Dosis, spezifische
+Aktivität and § 29 StrlSchV; Materialien and three more inner terms — about 15 000 characters,
+0.24 s, no LLM call. Quick research shows the levels only when level 1 found a section; a run
+without matching originals starts as before.
+
+**Definition register (`src/definitions.py`, pure).** A definition is a numbered paragraph
+`(N) Begriff: …` in a section whose heading says "Begriff…", or `(N) Begriff [im Sinne dieses
+Gesetzes] ist/sind die …` where the heading says "Begriff…" or starts with the term (not after
+an article or preposition, and an article or list must follow: "Dem Antrag sind …" is a duty).
+Terms match in any inflection by word prefix (at most three letters added or changed), so
+"Einzelpersonen der Bevölkerung" uses "Einzelperson der Bevölkerung" but "abfallrechtliche" does
+not use "Abfälle"; terms the question names rank first, then the most used. Registers are cached
+per file version (`tools._register`).
+
+**Definitions are read and cited per paragraph.** `raw_read(['StrlSchG.md § 5 Abs. 32'])` serves
+that paragraph alone (`[definition of "Rückstände" — § 5]`, with its own reference footer);
+`tools.ref_key` keys each definition of a § separately, the gate counts a definition as read when
+it, or the part of its § that holds it, was read, and prose naming "§ 5" counts as read once one
+of its definitions was.
+
+**Ledger by level.** Level reads keep every paragraph's first sentence in the evidence ledger,
+whatever words the question used (`evidence.extract(…, leads=True)`, also for any definition
+read) — the § 62 (3) 1-mSv criterion shares no word with the question and used to be lost. The
+ledger answer gets the quotes grouped by level (`evidence.render`, `prompts.CHAT_LEDGER_LEVELS`)
+and is asked for about `LEDGER_WORDS_PER_SOURCE` (80) words per quoted source.
+
+**Coverage instead of a word floor.** The submit gates (`_submit_chat_impl`,
+`_submit_final_impl`) reject an answer that leaves out a core section or cites fewer than
+`TERMS_REQUIRED` (3) of the level-2 definitions, naming the leading ones it lacks
+(`CHAT_COVERAGE_GAP`). Verbosity is a once-only check: under `ANSWER_WORDS_PER_SOURCE` words per
+cited source, the answer is sent back once to explain each source (`CHAT_TERSE`); a second short
+answer passes, so a short answer never turns into padding.
