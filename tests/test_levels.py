@@ -192,3 +192,16 @@ def test_a_terse_answer_is_sent_back_once_to_explain_each_source(wiki_dir):
     terse = "Kurz. [Source: StrlSchG.md § 62] [Source: StrlSchV.md § 29]"
     assert tools._submit_chat_impl(terse).startswith("REJECTED: the answer is too short")
     assert tools._submit_chat_impl(terse).startswith("ACCEPTED")  # once only: no padding loop
+
+
+# --- Quick research ---
+
+
+def test_a_research_report_must_cover_the_levels_and_has_no_word_floor(wiki_dir, monkeypatch):
+    monkeypatch.setattr(tools, "MIN_URLS", 1)
+    mem = run_memory.begin_run("q")
+    mem.core_refs = ["a.md § 1"]
+    out = tools._submit_final_impl("T", "Kurz [Source: b.md]")
+    assert out.startswith("REJECTED: explain the core sections")
+    ok = tools._submit_final_impl("T", "Erläuterung " * 50 + "[Source: a.md § 1]")
+    assert ok.startswith("ACCEPTED")

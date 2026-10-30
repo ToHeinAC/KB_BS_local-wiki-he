@@ -94,6 +94,16 @@ RESEARCH_NO_WEB_DIRECTIVE = (
     "from the wiki and the original documents only, and cite them."
 )
 
+# Deep chat and Quick research: what code read before the model's first turn
+# (tools.level_reads, ideas/deep-chat-levels.md), and how to build the answer from it.
+LEVELS_GUIDE = """Levels (critical) — when the originals hold sections on the question, code has already read, before your first turn (the `[level N …]` raw_read results):
+- level 1: the core — the sections the search ranked highest, in full;
+- level 2: the definitions of the terms those sections use, and the sections of other laws that apply them;
+- level 3: the terms used inside those definitions.
+Answer level by level: first the core rule that answers the question (its conditions, procedure, figures), then what its terms mean (each definition with its citation), then the provisions that apply it. Read further only for gaps the levels leave open; do not wander into details the question does not ask about.
+
+"""
+
 RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the local wiki, then decide autonomously which further tools to use. After every tool result, explicitly track gaps versus the original query and stay on the main research line.
 
 {wiki_block}Tools available:
@@ -105,9 +115,9 @@ RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the 
 - fetch_webpage_content(urls): fetch full page markdown in parallel. Use sparingly, only for URLs the search snippets show as highly relevant.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
-- submit_final_answer(title, answer): submit the final report. REJECTED if answer < {min_words} words or fewer than {min_urls} unique sources (web URLs, [Wiki: filename.md], and [Source: filename] citations all count).
+- submit_final_answer(title, answer): submit the final report. REJECTED if it leaves out a level-1 core section or the leading level-2 defined terms, or cites fewer than {min_urls} unique sources (web URLs, [Wiki: filename.md], and [Source: filename] citations all count); once, if it has fewer than {words_per_item} words per cited source.
 
-{language_directive}
+{levels_guide}{language_directive}
 
 Required workflow:
 1. PLAN: think_tool once at the start. Break the original question into 3-6 sub-questions. Decide an initial wiki query plan.
@@ -119,7 +129,7 @@ Required workflow:
    If a thread is tangential to the original query, list it under an extra `Parked (out of scope):` bullet — do NOT research it.
 4. AUTONOMOUS EXPANSION: based on the gaps, choose the right tool. Prefer wiki_read when a wiki hit looks promising; use raw_search / raw_read to pull exact facts and wording the wiki only summarizes; use tavily_search only for gaps the local wiki and raw sources cannot fill. Repeat triage after every 2-3 tool calls.
 4.5 EVALUATE: if the question turns on whether values meet a threshold, limit, or compound rule that the sources state explicitly, you MUST call evaluate_condition exactly once before submit_final_answer. Extract the literal `facts` from the source text (numbers, categories, labels — keep the units the law uses) and assemble the `condition` tree as the law states it (use `or` when the law says "oder", `and` when "und"). Quote the result block verbatim in the final report.
-5. SUBMIT: when you have at least {min_searches} tool calls (wiki + web combined) and at least {min_urls} unique sources, call submit_final_answer with a structured markdown report (>= {min_words} words). Inline-cite every factual claim.
+5. SUBMIT: when you have at least {min_searches} tool calls (wiki + web combined) and at least {min_urls} unique sources, call submit_final_answer with a detailed, structured markdown report: level by level, each cited source explained in 2-4 sentences of its own. Inline-cite every factual claim.
 
 Evidence discipline (search ladder):
 - Escalate late, stop early, never read a corpus wholesale. Descend: wiki_search → wiki_read the condensed page → raw_search/raw_read the originals only for facts the wiki lacks → tavily only for what neither holds.
@@ -174,7 +184,8 @@ FETCH_WEBPAGE_DESCRIPTION = (
 )
 
 SUBMIT_FINAL_DESCRIPTION = (
-    "Submit the final research report. Validates >= min_words and >= min_urls unique sources "
+    "Submit the final research report. Validates that the level-1 core sections and the leading "
+    "level-2 defined terms are cited and >= min_urls unique sources "
     "(web URLs, [Wiki: filename.md], and [Source: filename] citations all count). "
     "On accept, the report is written to data/wiki/comparisons/ and the session ends."
 )
@@ -439,13 +450,7 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions from the
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
 - submit_chat_answer(answer, sources): submit the final answer. REJECTED if it leaves out a level-1 core section or the leading level-2 defined terms, or cites fewer than {min_sources} unique sources, or no [Source: ...] document, or after fewer than {min_searches} distinct searches, or if none of the cited originals was opened with raw_read, or if a § you cite was never read; once, if it has fewer than {words_per_item} words per cited source. An answer written as prose instead of submitted goes through the same checks.
 
-Levels (critical) — code has already read, before your first turn:
-- level 1: the core — the sections the search ranked highest, in full;
-- level 2: the definitions of the terms those sections use, and the sections of other laws that apply them;
-- level 3: the terms used inside those definitions.
-Answer level by level: first the core rule that answers the question (its conditions, procedure, figures), then what its terms mean (each definition with its citation), then the provisions that apply it. Read further only for gaps the levels leave open; do not wander into details the question does not ask about.
-
-Wiki vs raw (critical):
+{levels_guide}Wiki vs raw (critical):
 - The wiki is a MAP, the originals are the TERRITORY. Use the wiki to orient and to discover connections; take every fact, number, and exact wording from data/raw/.
 - Never answer from wiki pages alone. Every answer MUST cite at least one [Source: ...] original — a wiki-only answer is rejected.
 - When a wiki page looks relevant, raw_search or raw_read the originals listed in its `sources:` before citing anything from it.
@@ -633,7 +638,7 @@ RESEARCH_BUDGET_NUDGE = (
     "STEP BUDGET: you have used most of your step budget. "
     "Do NOT write prose — call submit_final_answer right now. "
     "Use `title` = a short report title, `answer` = all findings gathered so far "
-    "in full markdown (aim for 600+ words, cite every source). "
+    "in full markdown (explain every source in 2-4 sentences, cite each). "
     "This is your only remaining action."
 )
 

@@ -158,7 +158,8 @@ def test_the_deep_chat_prompt_asks_for_a_structured_answer_not_a_concise_one():
     assert "concise" not in prompts.CHAT_AGENT_SYSTEM
     assert "## " in prompts.CHAT_AGENT_SYSTEM
     assert "2-4 sentences" in prompts.CHAT_BUDGET_NUDGE  # detailed, without a word floor
-    assert "level by level" in prompts.CHAT_AGENT_SYSTEM
+    assert "level by level" in prompts.LEVELS_GUIDE
+    assert "{levels_guide}" in prompts.CHAT_AGENT_SYSTEM
 
 
 def _tool(name: str, content: str, call_id: str) -> ToolMessage:
@@ -347,7 +348,7 @@ RAW_HITS = (
 
 
 def _stub_search(monkeypatch, reads):
-    monkeypatch.setattr(chat_agent, "_levels", lambda q, searched: [])  # tested on its own
+    monkeypatch.setattr(chat_agent, "level_messages", lambda q, searched: [])  # tested on its own
     tm = chat_agent.tool_module
     monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: RAW_HITS)
     monkeypatch.setattr(tm, "_wiki_search_impl", lambda queries, **kw: "WIKI HITS")

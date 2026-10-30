@@ -69,6 +69,7 @@ from prompts import (
     CHAT_OPEN_REF_LINE,
     CHAT_PROSE_GATE_RETRY,
     CHAT_TOOL_ERROR,
+    LEVELS_GUIDE,
 )
 
 load_dotenv()
@@ -90,7 +91,7 @@ AUTO_READ_AT = 3
 # if that answer passes the gate, else goes on with the verdict as feedback.
 STALL_TURNS = 3
 # The length the ledger answer is asked for, per quoted source: detailed, not a floor (the
-# gate only sends back an answer under tools.CHAT_WORDS_PER_ITEM per source, once).
+# gate only sends back an answer under tools.WORDS_PER_SOURCE per source, once).
 LEDGER_WORDS_PER_SOURCE = 80
 # The note on a final answer written from the evidence ledger (it passed the gate).
 LEDGER_NOTE = "Written from the quotes collected from the originals."
@@ -457,7 +458,8 @@ def _system_prompt(directive: str = "") -> str:
         language_directive=directive,
         min_searches=MIN_SEARCHES,
         min_sources=MIN_SOURCES,
-        words_per_item=tool_module.CHAT_WORDS_PER_ITEM,
+        words_per_item=tool_module.WORDS_PER_SOURCE,
+        levels_guide=LEVELS_GUIDE,
     )
 
 
@@ -830,16 +832,19 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
     }
 
 
-def _preflight(question: str) -> list[AnyMessage]:
-    """The run's first searches, run by code: a raw and a wiki search on the question, and a
-    raw search on its key terms (a small model's weakest step is starting retrieval at all,
-    and E4B rarely makes the gate's searches itself). They count as two of the gate's
-    searches; on any failure the model starts the search itself."""
-    tools = {"raw_search": tool_module.raw_search, "wiki_search": tool_module.wiki_search}
-    queries = [("raw_search", question), ("wiki_search", question)]
+def search_queries(question: str, wiki: bool = True) -> list[tuple[str, str]]:
+    """(tool, query) of the pre-flight searches: the question (raw and, with `wiki`, wiki
+    scope) and its key terms in the raw scope."""
+    queries = [("raw_search", question), *([("wiki_search", question)] if wiki else [])]
     terms = evidence.key_terms(question)
     if terms and terms.casefold() != question.strip().casefold():
         queries.append(("raw_search", terms))
+    return queries
+
+
+def search_turn(queries: list[tuple[str, str]]) -> list[AnyMessage]:
+    """One tool turn of searches run by code; [] on any failure (the model searches)."""
+    tools = {"raw_search": tool_module.raw_search, "wiki_search": tool_module.wiki_search}
     calls: list[ToolCall] = [
         {"name": name, "args": {"query": q}, "id": f"preflight-{i}", "type": "tool_call"}
         for i, (name, q) in enumerate(queries)
@@ -855,16 +860,28 @@ def _preflight(question: str) -> list[AnyMessage]:
         ]
     except Exception:
         return []
+    return [AIMessage(content="", tool_calls=calls), *results]
+
+
+def raw_results(msgs: list[AnyMessage]) -> list[str]:
+    """The raw_search results among `msgs`, in order."""
+    return [str(m.content) for m in msgs if isinstance(m, ToolMessage) and m.name == "raw_search"]
+
+
+def _preflight(question: str) -> list[AnyMessage]:
+    """The run's first searches, run by code: a raw and a wiki search on the question, and a
+    raw search on its key terms (a small model's weakest step is starting retrieval at all,
+    and E4B rarely makes the gate's searches itself), then the levels read around their
+    best sections. They count as two of the gate's searches; on any failure the model
+    starts the search itself."""
+    searched = search_turn(search_queries(question))
+    if not searched:
+        return []
     hyde = _hyde_search(question)
-    searched = [
-        str(m.content)
-        for m in [*results, *hyde]
-        if isinstance(m, ToolMessage) and m.name == "raw_search"
-    ]
-    return [AIMessage(content="", tool_calls=calls), *results, *hyde, *_levels(question, searched)]
+    return [*searched, *hyde, *level_messages(question, raw_results([*searched, *hyde]))]
 
 
-def _levels(question: str, searched: list[str]) -> list[AnyMessage]:
+def level_messages(question: str, searched: list[str]) -> list[AnyMessage]:
     """Code's reads of the core sections and the terms and provisions around them, one
     `raw_read` turn per level (tools.level_reads); [] on any failure."""
     try:

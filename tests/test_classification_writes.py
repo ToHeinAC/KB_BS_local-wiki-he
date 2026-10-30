@@ -37,7 +37,7 @@ def _reports(root, shard_dir: str) -> list[str]:
 
 
 def test_a_report_drawing_on_strict_is_saved_at_strict(levels, monkeypatch):
-    monkeypatch.setattr(tools, "MIN_WORDS", 1)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 0)
     ctx = _scope(2, [DB, f"{DB}@strict"])
     try:
@@ -49,7 +49,7 @@ def test_a_report_drawing_on_strict_is_saved_at_strict(levels, monkeypatch):
 
 
 def test_a_normal_only_report_stays_normal(levels, monkeypatch):
-    monkeypatch.setattr(tools, "MIN_WORDS", 1)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 0)
     tools._submit_final_impl("Bunker", "Plan")
     assert _reports(levels, "KI") == ["report-bunker.md"]

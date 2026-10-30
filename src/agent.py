@@ -25,6 +25,7 @@ from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     SystemMessage,
+    ToolCall,
     ToolMessage,
 )
 from langchain_core.runnables import Runnable, RunnableConfig
@@ -40,6 +41,7 @@ from langgraph.graph.state import (  # pyright: ignore[reportMissingTypeStubs]
 )
 from langgraph.prebuilt import ToolNode
 
+import chat_agent
 import classification
 import db_context
 import lang
@@ -48,6 +50,7 @@ import retrieval
 import run_memory
 import tools as tool_module
 from prompts import (
+    LEVELS_GUIDE,
     RESEARCH_BUDGET_NUDGE,
     RESEARCH_FALLBACK_PROMPT,
     RESEARCH_FALLBACK_SYSTEM,
@@ -58,7 +61,6 @@ from prompts import (
 load_dotenv()
 
 MIN_SEARCHES = int(os.getenv("RESEARCH_MIN_SEARCHES", "6"))
-MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
 MAX_ITER = int(os.getenv("RESEARCH_MAX_ITERATIONS", "40"))
 NUDGE_AT = int(os.getenv("RESEARCH_NUDGE_AT", str(MAX_ITER // 2 - 2)))
@@ -173,8 +175,9 @@ def _system_prompt(wiki_context: str, directive: str = "") -> str:
         wiki_block=wiki_block,
         language_directive=directive,
         min_searches=MIN_SEARCHES,
-        min_words=MIN_WORDS,
         min_urls=MIN_URLS,
+        words_per_item=tool_module.WORDS_PER_SOURCE,
+        levels_guide=LEVELS_GUIDE,
     )
 
 
@@ -361,10 +364,33 @@ def _final_step(question: str, directive: str, run: _Run) -> dict[str, Any]:
     return step
 
 
+def _preflight(question: str) -> list[AnyMessage]:
+    """Code's raw searches on the question and its key terms and the levels read around
+    their best sections (as in Deep chat), shown only when a level was read; [] otherwise
+    or on any failure, so a run without matching originals starts as before."""
+    queries = [q for _, q in chat_agent.search_queries(question, wiki=False)]
+    try:
+        found = [tool_module._raw_search_impl(queries=[q]) for q in queries]  # pyright: ignore[reportPrivateUsage]
+    except Exception:
+        return []
+    levels = chat_agent.level_messages(question, found)
+    if not levels:
+        return []
+    calls: list[ToolCall] = [
+        {"name": "raw_search", "args": {"query": q}, "id": f"preflight-{i}", "type": "tool_call"}
+        for i, q in enumerate(queries)
+    ]
+    results = [
+        ToolMessage(content=text, name="raw_search", tool_call_id=c["id"])
+        for c, text in zip(calls, found, strict=True)
+    ]
+    return [AIMessage(content="", tool_calls=calls), *results, *levels]
+
+
 def run_research_agent(
     question: str, wiki_context: str = ""
 ) -> Generator[dict[str, Any], None, None]:
-    run_memory.begin_run()
+    run_memory.begin_run(question)
     directive = lang.response_directive(question)
     try:
         graph = _build_graph(_build_llm(), directive)
@@ -382,6 +408,7 @@ def run_research_agent(
         "messages": [
             SystemMessage(content=system),
             HumanMessage(content=question),
+            *_preflight(question),
         ]
     }
     run = _Run()

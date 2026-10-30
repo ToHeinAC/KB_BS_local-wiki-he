@@ -64,13 +64,12 @@ from prompts import (
 load_dotenv()
 
 PARALLELISM = int(os.getenv("RESEARCH_PARALLELISM", "4"))
-MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
 CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 CHAT_MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
-# Verbosity without a word floor: an answer under this many words per cited source is sent
-# back once (a fixed floor made E4B pad thin evidence with uncited detail).
-CHAT_WORDS_PER_ITEM = int(os.getenv("CHAT_WORDS_PER_ITEM", "40"))
+# Verbosity without a word floor (Deep chat and Quick research): an answer under this many
+# words per cited source is sent back once (a fixed floor made E4B pad thin evidence).
+WORDS_PER_SOURCE = int(os.getenv("ANSWER_WORDS_PER_SOURCE", "40"))
 # Levels read in code (ideas/deep-chat-levels.md).
 CORE_MAX = 2  # level 1: the top distinct sections of the searches, read in full
 CORE_CHARS = 8000  # parts of one core section read, at most
@@ -1018,12 +1017,11 @@ def _coverage_gap(raw_cited: set[str]) -> str | None:
     return CHAT_COVERAGE_GAP.format(what="; ".join(gaps)) if gaps else None
 
 
-def _too_terse(words: int, raw_cited: set[str], wiki_cited: set[str]) -> str | None:
-    """Once per run: an answer under CHAT_WORDS_PER_ITEM words per cited source is sent
-    back to explain each one (once, so a short answer never turns into padding)."""
+def _too_terse(words: int, items: int) -> str | None:
+    """Once per run: an answer under WORDS_PER_SOURCE words per cited source (`items`) is
+    sent back to explain each one (once, so a short answer never turns into padding)."""
     mem = run_memory.current()
-    items = len({ref_key(r) for r in raw_cited}) + len(wiki_cited)
-    if mem is None or mem.terse_nudged or words >= CHAT_WORDS_PER_ITEM * items:
+    if mem is None or mem.terse_nudged or words >= WORDS_PER_SOURCE * items:
         return None
     mem.terse_nudged = True
     return CHAT_TERSE.format(items=items, words=words)
@@ -1048,7 +1046,7 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
         _research_gap(raw_unique)
         or _unread_sections(answer or "", raw_unique)
         or _coverage_gap(raw_unique)
-        or _too_terse(words, raw_unique, wiki_cited)
+        or _too_terse(words, len({ref_key(r) for r in raw_unique}) + len(wiki_cited))
         or _unmatched_quotes(answer or "", raw_unique)
         or _open_refs_missing(answer or "", raw_unique)
         or _low_confidence_nudge()
@@ -1090,18 +1088,13 @@ def _submit_final_impl(title: str, answer: str) -> str:
     # [Source: https://…html] isn't tallied twice (already caught by _URL_RE).
     raw_cites = {r for r in _RAW_CITE_RE.findall(answer or "") if "://" not in r}
     sources = urls | {f"wiki:{w}" for w in wiki_cites} | {f"src:{r}" for r in raw_cites}
-    if words < MIN_WORDS:
-        return (
-            f"REJECTED: report has {words} words, minimum is {MIN_WORDS}. "
-            "Continue researching and expand the answer."
-        )
     if len(sources) < MIN_URLS:
         return (
             f"REJECTED: report cites {len(sources)} unique sources "
             f"(URLs + [Wiki: ...] + [Source: ...] citations), minimum is {MIN_URLS}. "
             "Run more searches and cite additional sources."
         )
-    nudge = _low_confidence_nudge()
+    nudge = _coverage_gap(raw_cites) or _too_terse(words, len(sources)) or _low_confidence_nudge()
     if nudge:
         return nudge
     # High-water mark: the report lands at the highest level this run could read.

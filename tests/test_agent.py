@@ -59,7 +59,7 @@ def test_submit_final_answer_accepted_yields_report_path(monkeypatch, tmp_path):
     import tools
 
     monkeypatch.setattr(db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 1)
     body = "alpha beta gamma delta http://example.com/x"
     _patch_llm(
@@ -103,7 +103,7 @@ def test_thresholds_appear_in_system_prompt(monkeypatch):
     list(agent.run_research_agent("q?"))
     sys_text = fake.calls[0][0].content
     assert str(agent.MIN_SEARCHES) in sys_text
-    assert str(agent.MIN_WORDS) in sys_text
+    assert "level by level" in sys_text
 
 
 # --- fallback synthesis (no submit, no prose) ------------------------------
@@ -172,3 +172,42 @@ def test_build_llm_applies_the_per_call_timeout(monkeypatch):
     monkeypatch.setattr(agent.ollama_client, "host", lambda: "http://127.0.0.1:11434")
     llm: Any = agent._build_llm()
     assert llm.bound._client._client.timeout.read == agent.LLM_TIMEOUT
+
+
+# --- levels read in code before the first turn (ideas/deep-chat-levels.md) ---
+
+
+def test_quick_research_reads_the_levels_before_the_first_turn(monkeypatch):
+    from langchain_core.messages import ToolMessage
+
+    tm = agent.tool_module
+    monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: "RAW HITS")
+    seen: list = []
+
+    def levels(question, searched):
+        seen.append(searched)
+        return [(["a.md § 1"], "[level 1] CORE")]
+
+    monkeypatch.setattr(tm, "level_reads", levels)
+    fake = _patch_llm(monkeypatch, [AIMessage(content="ok")])
+    list(agent.run_research_agent("Wie werden Rückstände entlassen?"))
+    assert seen == [["RAW HITS", "RAW HITS"]]
+    reads = [
+        (m.tool_call_id, m.content)
+        for m in fake.calls[0]
+        if isinstance(m, ToolMessage) and m.name == "raw_read"
+    ]
+    assert reads == [("level-1", "[level 1] CORE")]
+    mem = agent.run_memory.current()
+    assert mem is not None
+    assert mem.question == "Wie werden Rückstände entlassen?"
+
+
+def test_quick_research_without_a_level_read_starts_as_before(monkeypatch):
+    from langchain_core.messages import ToolMessage
+
+    monkeypatch.setattr(agent.tool_module, "_raw_search_impl", lambda queries, **kw: "RAW HITS")
+    monkeypatch.setattr(agent.tool_module, "level_reads", lambda q, searched: [])
+    fake = _patch_llm(monkeypatch, [AIMessage(content="ok")])
+    list(agent.run_research_agent("Wie werden Rückstände entlassen?"))
+    assert not any(isinstance(m, ToolMessage) for m in fake.calls[0])

@@ -71,18 +71,17 @@ def test_fetch_webpage_handles_failure(monkeypatch):
 # --- submit_final_answer --------------------------------------------------
 
 
-def test_submit_rejects_short_answer(tmp_path, monkeypatch):
+def test_submit_rejects_too_few_sources(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 100)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     out = tools._submit_final_impl("T", "too short http://a.com")
     assert out.startswith("REJECTED")
-    assert "words" in out
+    assert "sources" in out
 
 
 def test_submit_rejects_few_sources(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 3)
     out = tools._submit_final_impl("T", "one two three http://a.com")
     assert out.startswith("REJECTED")
@@ -91,7 +90,7 @@ def test_submit_rejects_few_sources(tmp_path, monkeypatch):
 
 def test_submit_accepts_and_writes_file(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     out = tools._submit_final_impl("My Report", "alpha beta gamma http://a.com http://b.com")
     assert out.startswith("ACCEPTED")
@@ -102,7 +101,7 @@ def test_submit_accepts_and_writes_file(tmp_path, monkeypatch):
 
 def test_submit_accepts_wiki_citations_as_sources(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     out = tools._submit_final_impl(
         "Wiki Only", "alpha beta gamma [Wiki: siemens-ag.md] [Wiki: sap-se.md]"
@@ -114,7 +113,7 @@ def test_submit_accepts_wiki_citations_as_sources(tmp_path, monkeypatch):
 
 def test_submit_accepts_file_source_citations(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     out = tools._submit_final_impl(
         "Legal", "alpha beta gamma [Source: StrlSchG.md § 78] [Source: StrlSchV.md § 33]"
@@ -132,7 +131,7 @@ def test_submit_report_survives_a_quoted_title(tmp_path, monkeypatch):
     import frontmatter as _fm
 
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     title = 'Thesis: "potential 100x baggers")'
     out = tools._submit_final_impl(title, "alpha beta gamma http://a.com http://b.com")
@@ -145,7 +144,7 @@ def test_submit_report_survives_a_quoted_title(tmp_path, monkeypatch):
 
 def test_submit_does_not_double_count_url_source_citations(tmp_path, monkeypatch):
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 2)
     # A single [Source: <URL>.html] must count once (as a URL), not twice.
     out = tools._submit_final_impl("Once", "alpha beta gamma [Source: https://x.com/a.html]")
@@ -391,7 +390,7 @@ def test_a_deep_chat_answer_needs_2_sources() -> None:
 
 
 def _gate_ready(monkeypatch) -> run_memory.RunMemory:
-    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     return run_memory.begin_run()
 
@@ -455,7 +454,7 @@ def test_a_deep_chat_answer_must_have_read_an_original_it_cites(monkeypatch):
 
 
 def test_submit_chat_counts_wiki_citations(monkeypatch):
-    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     answer = "one two three four five [Source: raw.md] and [Wiki: page.md]"
     assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
@@ -463,7 +462,7 @@ def test_submit_chat_counts_wiki_citations(monkeypatch):
 
 def test_submit_chat_wiki_cite_alone_does_not_meet_source_gate(monkeypatch):
     """Wiki pages orient the agent; grounding still needs a second source."""
-    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     answer = "one two three four five [Wiki: page.md]"
     assert tools._submit_chat_impl(answer).startswith("REJECTED")
@@ -482,7 +481,7 @@ def test_submit_chat_low_confidence_nudges_once(monkeypatch, tmp_path):
     idx = tmp_path / "KI" / "index"
     idx.mkdir(parents=True)
     (idx / "calibration.json").write_text(json.dumps({"tau": -4.14}))
-    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     monkeypatch.setattr(tools, "CHAT_MIN_SEARCHES", 0)
     answer = "one two three four five [Source: raw.md] and [Wiki: page.md]"
@@ -509,7 +508,7 @@ def test_submit_final_low_confidence_nudges_once(monkeypatch, tmp_path):
     idx.mkdir(parents=True)
     (idx / "calibration.json").write_text(json.dumps({"tau": -4.14}))
     monkeypatch.setattr(tools.db_context, "wiki_dir", lambda: tmp_path)
-    monkeypatch.setattr(tools, "MIN_WORDS", 3)
+    monkeypatch.setattr(tools, "WORDS_PER_SOURCE", 1)
     monkeypatch.setattr(tools, "MIN_URLS", 1)
     answer = "one two three [Source: raw.md]"
     try:
