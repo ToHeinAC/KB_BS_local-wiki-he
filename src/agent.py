@@ -50,7 +50,6 @@ import retrieval
 import run_memory
 import tools as tool_module
 from prompts import (
-    LEVELS_GUIDE,
     RESEARCH_BUDGET_NUDGE,
     RESEARCH_FALLBACK_PROMPT,
     RESEARCH_FALLBACK_SYSTEM,
@@ -177,7 +176,6 @@ def _system_prompt(wiki_context: str, directive: str = "") -> str:
         min_searches=MIN_SEARCHES,
         min_urls=MIN_URLS,
         words_per_item=tool_module.WORDS_PER_SOURCE,
-        levels_guide=LEVELS_GUIDE,
     )
 
 

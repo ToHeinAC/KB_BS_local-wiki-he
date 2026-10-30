@@ -97,16 +97,32 @@ def test_two_definitions_of_one_section_are_two_citations(wiki_dir):
 
 # --- the level plan ---
 
-_HITS = (
-    "## Raw query: q\n[Raw hit 1]\nfile: StrlSchG.md § 62\n---\n"
-    "[Raw hit 2]\nfile: StrlSchG.md § 62 (Teil 2)\n---\n"
-    "[Raw hit 3]\nfile: StrlSchG.md § 63\n---\n[Raw hit 4]\nfile: StrlSchV.md § 40\n---\n"
+
+def _hits(*scored: tuple[str, float]) -> str:
+    return "## Raw query: q\n" + "".join(
+        f"[Raw hit {i}]\nfile: {ref}\nchunk_id: c{i}\nscore: {score}  matched: x\n---\n"
+        for i, (ref, score) in enumerate(scored, 1)
+    )
+
+
+_HITS = _hits(
+    ("StrlSchG.md § 62", 0.9),
+    ("StrlSchG.md § 62 (Teil 2)", 0.85),
+    ("StrlSchG.md § 63", 0.8),
+    ("StrlSchV.md § 40", 0.3),
 )
 
 
 def test_the_core_is_the_top_two_distinct_sections_of_the_searches(wiki_dir):
     _laws()
     assert tools.core_refs([_HITS]) == ["StrlSchG.md § 62", "StrlSchG.md § 63"]
+
+
+def test_a_second_section_scored_far_below_the_best_hit_is_not_core(wiki_dir):
+    _laws()
+    far = _hits(("StrlSchG.md § 62", 0.9), ("StrlSchG.md § 63", 0.4))
+    other = _hits(("StrlSchV.md § 29", 0.95))  # a later search compares only to its own best
+    assert tools.core_refs([far, other]) == ["StrlSchG.md § 62"]
 
 
 def test_sections_of_other_laws_that_cite_a_core_section_are_found(wiki_dir):
@@ -130,8 +146,9 @@ def test_code_reads_the_core_then_its_terms_and_citing_sections_then_their_terms
         ["StrlSchG.md § 5 Abs. 22"],  # Materialien, inside the Rückstände definition
     ]
     assert levels[0][1].startswith("[level 1")
+    assert "level by level" in levels[0][1]  # how to answer comes with the levels read
     assert mem.core_refs == ["StrlSchG.md § 62", "StrlSchG.md § 63"]
-    assert mem.term_refs[0] == "StrlSchG.md § 5 Abs. 32"
+    assert mem.term_refs == ["StrlSchG.md § 5 Abs. 32"]  # and the terms the question names
     assert mem.levels[("StrlSchV.md", "§ 29")] == 2
     assert mem.levels[("StrlSchG.md", "§ 5 Abs. 22")] == 3
 
@@ -147,9 +164,9 @@ def test_the_core_keeps_every_paragraphs_rule_not_only_the_words_of_the_question
 def test_a_core_definitions_section_is_not_read_again_as_its_own_terms(wiki_dir):
     mem = _run()
     hits = "## Raw query: q\n[Raw hit 1]\nfile: StrlSchG.md § 5\n---\n"
-    tools.level_reads("Was sind Rückstände?", [hits])
+    levels = tools.level_reads("Was sind Rückstände?", [hits])
     assert mem.core_refs == ["StrlSchG.md § 5"]
-    assert not any(r.startswith("StrlSchG.md § 5 Abs.") for r in mem.term_refs)
+    assert not any(r.startswith("StrlSchG.md § 5 Abs.") for refs, _ in levels[1:] for r in refs)
 
 
 def test_no_level_reads_without_a_section_hit(wiki_dir):
@@ -167,23 +184,53 @@ def _covered_answer(*refs: str) -> str:
     return body + " " + "Erläuterung " * 300
 
 
-def test_an_answer_must_cite_the_core_and_the_leading_terms(wiki_dir):
-    mem = _run()
+def test_an_answer_must_cite_a_core_section_and_the_terms_the_question_names(wiki_dir):
+    _run()
     tools.level_reads(_Q, [_HITS])
     core_only = _covered_answer("StrlSchG.md § 62", "StrlSchG.md § 63")
     out = tools._submit_chat_impl(core_only)
     assert out.startswith("REJECTED: explain the defined terms")
     assert "[Source: StrlSchG.md § 5 Abs. 32]" in out
-    full = _covered_answer(
-        "StrlSchG.md § 62",
-        "StrlSchG.md § 63",
-        "StrlSchG.md § 5 Abs. 32",
-        "StrlSchG.md § 2 Abs. 1",
-        "StrlSchG.md § 5 Abs. 11",
-    )
-    assert tools._submit_chat_impl(full).startswith("ACCEPTED")
-    missing_core = _covered_answer("StrlSchG.md § 62", *mem.term_refs[:3])
-    assert "StrlSchG.md § 63" in tools._submit_chat_impl(missing_core)
+    term_only = _covered_answer("StrlSchG.md § 5 Abs. 32", "StrlSchV.md § 29")
+    out = tools._submit_chat_impl(term_only)
+    assert "[Source: StrlSchG.md § 62], [Source: StrlSchG.md § 63]" in out
+    # one core section suffices: a top hit can be off the question; the terms the
+    # question does not name are offered, not forced
+    enough = _covered_answer("StrlSchG.md § 63", "StrlSchG.md § 5 Abs. 32")
+    assert tools._submit_chat_impl(enough).startswith("ACCEPTED")
+
+
+def test_a_named_term_is_required_only_from_the_document_whose_core_the_answer_cites(wiki_dir):
+    # a top hit from another document must not force that document's definitions
+    mem = run_memory.begin_run(_Q)
+    mem.core_refs = ["StrlSchV.md § 29", "StrlSchG.md § 62"]
+    mem.term_refs = ["StrlSchG.md § 5 Abs. 32"]
+    assert tools._coverage_gap({"StrlSchV.md § 29"}) is None
+    out = tools._coverage_gap({"StrlSchG.md § 62"}) or ""
+    assert "[Source: StrlSchG.md § 5 Abs. 32]" in out
+
+
+_MANUAL = """# Pump manual
+
+## Installation
+Mount the pump on a level base. Connect the inlet before the outlet.
+
+## Maintenance
+Replace the seal every 2000 operating hours. Check the inlet filter monthly.
+
+## Warranty
+The warranty covers two years.
+"""
+
+
+def test_levels_on_a_document_without_definitions_read_the_core_and_require_only_it(wiki_dir):
+    (tools.db_context.raw_dir() / "manual.md").write_text(_MANUAL, encoding="utf-8")
+    chunker.write_chunks("manual.md", chunker.split(_MANUAL))
+    mem = run_memory.begin_run("How often is the seal replaced?")
+    hits = _hits(("manual.md Maintenance", 0.9), ("manual.md Warranty", 0.2))
+    levels = tools.level_reads("How often is the seal replaced?", [hits])
+    assert [refs for refs, _ in levels] == [["manual.md Maintenance"]]
+    assert (mem.core_refs, mem.term_refs) == (["manual.md Maintenance"], [])
 
 
 def test_a_terse_answer_is_sent_back_once_to_explain_each_source(wiki_dir):
@@ -202,6 +249,6 @@ def test_a_research_report_must_cover_the_levels_and_has_no_word_floor(wiki_dir,
     mem = run_memory.begin_run("q")
     mem.core_refs = ["a.md § 1"]
     out = tools._submit_final_impl("T", "Kurz [Source: b.md]")
-    assert out.startswith("REJECTED: explain the core sections")
+    assert out.startswith("REJECTED: explain the core section(s)")
     ok = tools._submit_final_impl("T", "Erläuterung " * 50 + "[Source: a.md § 1]")
     assert ok.startswith("ACCEPTED")

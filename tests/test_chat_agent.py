@@ -158,8 +158,34 @@ def test_the_deep_chat_prompt_asks_for_a_structured_answer_not_a_concise_one():
     assert "concise" not in prompts.CHAT_AGENT_SYSTEM
     assert "## " in prompts.CHAT_AGENT_SYSTEM
     assert "2-4 sentences" in prompts.CHAT_BUDGET_NUDGE  # detailed, without a word floor
-    assert "level by level" in prompts.LEVELS_GUIDE
-    assert "{levels_guide}" in prompts.CHAT_AGENT_SYSTEM
+    assert "level by level" in prompts.CHAT_LEVEL_HEADERS[1]
+    # the levels guide comes with the level reads, not in every run's system prompt
+    assert "level 1" not in prompts.CHAT_AGENT_SYSTEM + prompts.RESEARCHER_INSTRUCTIONS
+
+
+# Words of one corpus that once served as prompt examples: a small model reads an example
+# as a hint what to read, so the agents' prompts use neutral placeholders instead.
+_CORPUS_WORDS = ("StrlSch", "Rückst", "Kernbrenn", "Pu-239", "AtG", "mSv", "Strahlen")
+
+
+def _corpus_examples(text: str) -> list[str]:
+    return [w for w in _CORPUS_WORDS if w in text]
+
+
+def test_the_agent_prompts_carry_no_example_from_one_corpus():
+    import prompts
+
+    assert _corpus_examples("read `StrlSchG.md § 62`") == ["StrlSch"]  # the check bites
+    texts = (
+        prompts.CHAT_AGENT_SYSTEM,
+        prompts.RESEARCHER_INSTRUCTIONS,
+        prompts.RAW_SEARCH_DESCRIPTION,
+        prompts.RAW_READ_DESCRIPTION,
+        prompts.EVALUATE_CONDITION_DESCRIPTION,
+        prompts.CONDENSE_PROMPT,
+        prompts.ONTOLOGY_LOOKUP_DESCRIPTION,
+    )
+    assert [w for t in texts for w in _corpus_examples(t)] == []
 
 
 def _tool(name: str, content: str, call_id: str) -> ToolMessage:

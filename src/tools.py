@@ -71,12 +71,12 @@ CHAT_MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
 # words per cited source is sent back once (a fixed floor made E4B pad thin evidence).
 WORDS_PER_SOURCE = int(os.getenv("ANSWER_WORDS_PER_SOURCE", "40"))
 # Levels read in code (ideas/deep-chat-levels.md).
-CORE_MAX = 2  # level 1: the top distinct sections of the searches, read in full
+CORE_MAX = 2  # level 1: the top distinct sections of the first search, read in full
+CORE_RATIO = 0.8  # a further core section scores at least this share of the best hit
 CORE_CHARS = 8000  # parts of one core section read, at most
 TERMS_MAX = 6  # level 2: definitions of the terms the core uses
 CITING_MAX = 2  # level 2: sections of other laws that cite a core section
 DEEP_TERMS_MAX = 4  # level 3: terms used inside the level-2 definitions
-TERMS_REQUIRED = 3  # leading level-2 definitions an answer must cite
 DEF_CHARS = 1500  # a served definition is clipped here
 CONTENT_TRUNCATE = 2000
 RAW_READ_CAP = 16000  # chars per raw_read call (per file, per offset window)
@@ -1002,18 +1002,19 @@ def _tags(reads: list[str]) -> str:
 
 
 def _coverage_gap(raw_cited: set[str]) -> str | None:
-    """A rejection while the answer leaves out a core section of the run, or cites fewer
-    than TERMS_REQUIRED of the level-2 definitions (naming the leading ones it lacks)."""
+    """A rejection while the answer cites none of the run's core sections (a top hit can
+    be off the question) or leaves out the definition of a term the question names, from
+    a document whose core section it cites; the other levels are offered, not forced."""
     mem = run_memory.current()
     if mem is None or not mem.core_refs:
         return None
     cited = {ref_key(r) for r in raw_cited}
-    core = [r for r in mem.core_refs if ref_key(r) not in cited]
-    lacking = [r for r in mem.term_refs if ref_key(r) not in cited]
-    short = min(TERMS_REQUIRED, len(mem.term_refs)) - (len(mem.term_refs) - len(lacking))
+    files = {ref_key(r)[0] for r in mem.core_refs if ref_key(r) in cited}
+    core = [] if files else mem.core_refs
+    terms = [r for r in mem.term_refs if ref_key(r)[0] in files and ref_key(r) not in cited]
     gaps = [CHAT_COVERAGE_CORE.format(refs=_tags(core))] if core else []
-    if short > 0:
-        gaps.append(CHAT_COVERAGE_TERMS.format(refs=_tags(lacking[:short])))
+    if terms:
+        gaps.append(CHAT_COVERAGE_TERMS.format(refs=_tags(terms)))
     return CHAT_COVERAGE_GAP.format(what="; ".join(gaps)) if gaps else None
 
 
@@ -1581,22 +1582,34 @@ def _note_evidence(mem: run_memory.RunMemory, outputs: list[str], leads: bool = 
 # --- levels read in code (ideas/deep-chat-levels.md) ----------------------------------
 
 _HIT_FILE_RE = re.compile(r"^file: (.+)$", re.M)  # a raw_search hit's file and section
+_HIT_SCORE_RE = re.compile(r"^score: ([\d.]+)", re.M)
 _TEXT_EXTS = (".md", ".txt", ".html")
 
 
-def core_refs(outputs: list[str]) -> list[str]:
-    """Level 1: the first CORE_MAX distinct sections the raw searches ranked, in rank order
-    (the parts of one long § are one section)."""
-    out: list[str] = []
+def _scored_sections(block: str) -> list[tuple[str, float]]:
+    """(section ref, score) of one search's hits, best first, one per section."""
+    out: list[tuple[str, float]] = []
     seen: set[tuple[str, str]] = set()
+    for hit in block.split("[Raw hit ")[1:]:
+        file, score = _HIT_FILE_RE.search(hit), _HIT_SCORE_RE.search(hit)
+        ref = _TEIL_RE.sub("", file[1].strip()) if file else ""
+        if ref and _split_ref(ref)[2] and ref_key(ref) not in seen:
+            seen.add(ref_key(ref))
+            out.append((ref, float(score[1]) if score else 0.0))
+    return out
+
+
+def core_refs(outputs: list[str]) -> list[str]:
+    """Level 1: the best section of the first search that hit one, and up to CORE_MAX - 1
+    more of that search scoring at least CORE_RATIO of it (the parts of one long § are
+    one section). Scores are compared within one search only."""
     for text in outputs:
-        for hit in _HIT_FILE_RE.findall(text):
-            ref = _TEIL_RE.sub("", hit.strip())
-            key = ref_key(ref)
-            if _split_ref(ref)[2] and key not in seen:
-                seen.add(key)
-                out.append(ref)
-    return out[:CORE_MAX]
+        for block in text.split("## Raw query:"):
+            ranked = _scored_sections(block)
+            if ranked:
+                best = ranked[0][1]
+                return [r for r, s in ranked if s >= CORE_RATIO * best][:CORE_MAX]
+    return []
 
 
 def _section_chunks(ref: str) -> tuple[str, list[dict[str, Any]]]:
@@ -1741,7 +1754,8 @@ def level_reads(question: str, outputs: list[str]) -> list[tuple[list[str], str]
     text = "\n".join(c["text"] for ref in core for c in _section_chunks(ref)[1])
     own = {f"{ref_key(c)[0]} {ref_key(c)[1]}" for c in core}
     terms = _terms_used(text, pool, question, own)[:TERMS_MAX]
-    mem.term_refs = terms
+    named = {f"{pool[d]} {d.section}" for d in definitions.used_in(question, pool)}
+    mem.term_refs = [t for t in terms if t in named]
     citing = [s for c in core for s in citing_sections(mem, c, laws) if s not in own]
     second = [*terms, *list(dict.fromkeys(citing))[:CITING_MAX]]
     if second:

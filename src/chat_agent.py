@@ -69,7 +69,6 @@ from prompts import (
     CHAT_OPEN_REF_LINE,
     CHAT_PROSE_GATE_RETRY,
     CHAT_TOOL_ERROR,
-    LEVELS_GUIDE,
 )
 
 load_dotenv()
@@ -459,7 +458,6 @@ def _system_prompt(directive: str = "") -> str:
         min_searches=MIN_SEARCHES,
         min_sources=MIN_SOURCES,
         words_per_item=tool_module.WORDS_PER_SOURCE,
-        levels_guide=LEVELS_GUIDE,
     )
 
 

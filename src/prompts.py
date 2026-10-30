@@ -94,30 +94,20 @@ RESEARCH_NO_WEB_DIRECTIVE = (
     "from the wiki and the original documents only, and cite them."
 )
 
-# Deep chat and Quick research: what code read before the model's first turn
-# (tools.level_reads, ideas/deep-chat-levels.md), and how to build the answer from it.
-LEVELS_GUIDE = """Levels (critical) — when the originals hold sections on the question, code has already read, before your first turn (the `[level N …]` raw_read results):
-- level 1: the core — the sections the search ranked highest, in full;
-- level 2: the definitions of the terms those sections use, and the sections of other laws that apply them;
-- level 3: the terms used inside those definitions.
-Answer level by level: first the core rule that answers the question (its conditions, procedure, figures), then what its terms mean (each definition with its citation), then the provisions that apply it. Read further only for gaps the levels leave open; do not wander into details the question does not ask about.
-
-"""
-
 RESEARCHER_INSTRUCTIONS = """You are a deep research agent. Always start at the local wiki, then decide autonomously which further tools to use. After every tool result, explicitly track gaps versus the original query and stay on the main research line.
 
 {wiki_block}Tools available:
 - wiki_search(query OR queries): full-text search over the local wiki (data/wiki/) — summarized pages. Pass 2-4 sub-queries in parallel for speed. Cite hits as [Wiki: filename.md].
 - wiki_read(filenames): read full body of one or more wiki pages in parallel. Use after wiki_search surfaced a promising page.
 - raw_search(query OR queries): full-text BM25 over the ORIGINAL source documents (data/raw/) — the detailed texts the wiki only summarizes. Use whenever the wiki lacks a specific fact, number, or exact wording. Cite hits as [Source: filename].
-- raw_read(filenames, offset): read a section or byte-window of a raw source. After raw_search, pull the exact text — for legal/structured docs read a named section, e.g. raw_read(["StrlSchV.md § 33"]).
+- raw_read(filenames, offset): read a section or byte-window of a raw source. After raw_search, pull the exact text — for legal/structured docs read a named section, e.g. raw_read(["law.md § 12"]).
 - tavily_search(query OR queries): web search. Use ONLY for gaps the wiki AND the raw sources cannot fill. Parallel sub-queries supported. Cite as [Source: <full URL>] — copy the exact URL from the "Cite as:" line in each result, never use the result number.
 - fetch_webpage_content(urls): fetch full page markdown in parallel. Use sparingly, only for URLs the search snippets show as highly relevant.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
-- submit_final_answer(title, answer): submit the final report. REJECTED if it leaves out a level-1 core section or the leading level-2 defined terms, or cites fewer than {min_urls} unique sources (web URLs, [Wiki: filename.md], and [Source: filename] citations all count); once, if it has fewer than {words_per_item} words per cited source.
+- submit_final_answer(title, answer): submit the final report. REJECTED if, when code read levels, it cites none of the level-1 sections or leaves out the definition of a term the question names, or cites fewer than {min_urls} unique sources (web URLs, [Wiki: filename.md], and [Source: filename] citations all count); once, if it has fewer than {words_per_item} words per cited source.
 
-{levels_guide}{language_directive}
+{language_directive}
 
 Required workflow:
 1. PLAN: think_tool once at the start. Break the original question into 3-6 sub-questions. Decide an initial wiki query plan.
@@ -301,7 +291,7 @@ GLOSS_BRIEFING = (
     '- "{acronym}" means "{meaning}" (the user\'s own explanation). Search with "{meaning}"; '
     'a text where "{word}" is another word spelled the same is off-topic.'
 )
-ONTOLOGY_LOOKUP_DESCRIPTION = "Look up a document, law abbreviation or document class in this database's ontology: its versions (newest first) and which one is in force, its class, and related documents (based on, transposes, amends, ...). Use it when the question names a document and you need its versions or related documents. Args: term (e.g. 'StrlSchV'); optional as_of (a date such as '2017-06-01' or a year) for the point in time."
+ONTOLOGY_LOOKUP_DESCRIPTION = "Look up a document, law abbreviation or document class in this database's ontology: its versions (newest first) and which one is in force, its class, and related documents (based on, transposes, amends, ...). Use it when the question names a document and you need its versions or related documents. Args: term (e.g. a document's abbreviation); optional as_of (a date such as '2017-06-01' or a year) for the point in time."
 ONTOLOGY_SUPERSEDED_NUDGE = "REJECTED: every document you cite is a superseded version ({cited}). The version in force is {current}. Cite it, or state explicitly that your answer describes the old version, then submit again."
 
 ONTOLOGY_SUGGEST_CLASS_PROMPT = """No class of this database's ontology fits the document below. Suggest ONE new document class.
@@ -377,10 +367,10 @@ How to build it:
 - Keep the original language. Output ONLY the resulting question — no preamble, no quotes.
 
 Example
-Previous question: Ich habe einen Stoff mit 20 g Pu-239 und einer Konzentration von 10 g pro 100 kg. Ist dies ein Kernbrennstoff?
-Answer excerpt: Kernbrennstoffe nach § 2 AtG umfassen Plutonium-239 …
-Follow-up: Was wäre, wenn es 20 Bq/100 kg wären?
-Current question: Ich habe einen Stoff mit Pu-239 in einer Konzentration von 20 Bq pro 100 kg. Ist dies ein Kernbrennstoff?
+Previous question: Ein Betrieb hat 40 Beschäftigte und 8 Mio. € Umsatz. Gilt er als kleines Unternehmen?
+Answer excerpt: Kleine Unternehmen haben nach Artikel 2 weniger als 50 Beschäftigte …
+Follow-up: Was wäre, wenn es 60 Beschäftigte wären?
+Current question: Ein Betrieb hat 60 Beschäftigte und 8 Mio. € Umsatz. Gilt er als kleines Unternehmen?
 
 Now do the same for:
 Previous question:
@@ -443,14 +433,14 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions from the
 
 {raw_block}Tools available:
 - raw_search(query OR queries): full-text search over data/raw/. Pass 1-3 sub-queries in parallel. Cite hits as [Source: filename].
-- raw_read(filenames): read original files. Append a section to read just that part (`StrlSchG.md § 62`). A bare name of a long law returns its best-matching §§ in full plus a map of the sections around them. `offset=` is only for long files without sections; the footer tells you the next offset.
+- raw_read(filenames): read original files. Append a section to read just that part (`law.md § 12`). A bare name of a long law returns its best-matching §§ in full plus a map of the sections around them. `offset=` is only for long files without sections; the footer tells you the next offset.
 - wiki_search(query OR queries): full-text search over the local wiki — short summarized pages ABOUT the originals. Use it to find WHICH originals matter and how topics connect. Each hit's `sources:` names the originals behind it. Cite as [Wiki: filename.md].
 - wiki_read(filenames): read a full wiki page. Connected pages come from wiki_search as `[Wiki linked N]` entries — read them when the question spans more than one topic.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
-- submit_chat_answer(answer, sources): submit the final answer. REJECTED if it leaves out a level-1 core section or the leading level-2 defined terms, or cites fewer than {min_sources} unique sources, or no [Source: ...] document, or after fewer than {min_searches} distinct searches, or if none of the cited originals was opened with raw_read, or if a § you cite was never read; once, if it has fewer than {words_per_item} words per cited source. An answer written as prose instead of submitted goes through the same checks.
+- submit_chat_answer(answer, sources): submit the final answer. REJECTED if, when code read levels, it cites none of the level-1 sections or leaves out the definition of a term the question names, or cites fewer than {min_sources} unique sources, or no [Source: ...] document, or after fewer than {min_searches} distinct searches, or if none of the cited originals was opened with raw_read, or if a § you cite was never read; once, if it has fewer than {words_per_item} words per cited source. An answer written as prose instead of submitted goes through the same checks.
 
-{levels_guide}Wiki vs raw (critical):
+Wiki vs raw (critical):
 - The wiki is a MAP, the originals are the TERRITORY. Use the wiki to orient and to discover connections; take every fact, number, and exact wording from data/raw/.
 - Never answer from wiki pages alone. Every answer MUST cite at least one [Source: ...] original — a wiki-only answer is rejected.
 - When a wiki page looks relevant, raw_search or raw_read the originals listed in its `sources:` before citing anything from it.
@@ -460,17 +450,17 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions from the
 
 Search strategy (critical):
 - Use SINGLE keywords or short 2-word phrases. NEVER whole sentences.
-- Search is **prefix-based**: query tokens match the first 6 chars of words in the file. So for German compound or inflected nouns use the STEM (e.g. `Rückstand`, not `Rückstände`; `Freigabe`, not `Freigaben`). The English stem still works for English docs.
+- Search is **prefix-based**: query tokens match the first 6 chars of words in the file. So for German compound or inflected nouns use the STEM (e.g. `Genehmigung`, not `Genehmigungen`; `Prüfung`, not `Prüfungen`). The English stem still works for English docs.
 - If a search returns "(no results)", do NOT just rephrase with synonyms. Either (a) try a single broader stem, (b) `wiki_search` the topic and read the `sources:` of the hits to learn which originals to open, or (c) `raw_read` the most likely file with `offset=` to scan deeper. Repeated negative searches waste iterations.
 
 Reading long documents (critical):
-- To read a specific part of a long file, call `raw_read` with a section taken VERBATIM from a raw_search hit (e.g. `StrlSchG.md § 62`, `guide.md ## Overview`). That returns just that section, and its footer names the next section to read. Prefer this over byte offsets — read §61, then §62, then §63 as distinct reads.
+- To read a specific part of a long file, call `raw_read` with a section taken VERBATIM from a raw_search hit (e.g. `law.md § 12`, `guide.md ## Overview`). That returns just that section, and its footer names the next section to read. Prefer this over byte offsets — read § 11, then § 12, then § 13 as distinct reads.
 - Byte `offset` is only a fallback for files that have no `§`/`#` sections. The footer `[truncated; pass offset=N to continue]` tells you where to resume.
 - When a raw_read footer lists `References:` that the question depends on, follow the unread ones (raw_read with the given ref); list `(not in scope)` ones under `## Open points`.
 
 Definitional questions (critical):
 - For "Ist X ein Y?" / "Was gilt als …?" / "Zählt … als …?" questions, the deciding rule lives in the law's DEFINITION section — usually § 1 or § 2, often titled "Begriffsbestimmungen". A first raw_search on the term usually surfaces the OPERATIVE sections (possession, permits, procedures), NOT the definition. raw_read § 1 / § 2 of the governing law before you answer.
-- If you are about to conclude "no quantitative criterion / threshold exists", treat that as proof you have not yet read the definition section — go raw_read it first. The threshold is almost always there (e.g. the Kernbrennstoff mass/concentration rule in § 2 AtG).
+- If you are about to conclude "no quantitative criterion / threshold exists", treat that as proof you have not yet read the definition section — go raw_read it first. The threshold is usually there.
 
 Citations:
 - Cite as `[Source: filename]` or, for distinct sections of the same long file, `[Source: filename §X]` / `[Source: filename #section]`. Section-suffixed citations count as DISTINCT sources for the {min_sources}-source gate, so a single long document can satisfy it via two sections — do NOT pad with unrelated files.
@@ -495,8 +485,8 @@ Discipline:
 RAW_SEARCH_DESCRIPTION = (
     "Tokenized full-text search over original source documents in data/raw/. "
     "Pass `query` (single string) OR `queries` (list of 1-3 sub-queries) — each query is split into "
-    "whitespace tokens and matched as a 6-character PREFIX against the file body (so 'Rückstände' "
-    "matches 'Rückstand'). Use SINGLE keywords or short 2-word phrases — never full sentences. "
+    "whitespace tokens and matched as a 6-character PREFIX against the file body (so 'Genehmigungen' "
+    "matches 'Genehmigung'). Use SINGLE keywords or short 2-word phrases — never full sentences. "
     "Returns up to 3 excerpts per file ranked by how many query tokens hit. Cite results as "
     "[Source: filename] in the final answer."
 )
@@ -504,7 +494,7 @@ RAW_SEARCH_DESCRIPTION = (
 RAW_READ_DESCRIPTION = (
     "Read from one or more original files in data/raw/. Pass a list of filenames. To read a "
     "specific part, append a section taken verbatim from a raw_search hit (e.g. "
-    "'StrlSchG.md § 62' or 'guide.md ## Overview'); each distinct section is a fresh read. A "
+    "'law.md § 12' or 'guide.md ## Overview'); each distinct section is a fresh read. A "
     "bare name of a long law returns its best-matching sections in full plus a map of the "
     "sections around them. `offset` (default 0) is only for long files without sections; the "
     "footer tells you the next offset. A footer `References:` lists the sections the text "
@@ -512,8 +502,8 @@ RAW_READ_DESCRIPTION = (
 )
 
 SUBMIT_CHAT_DESCRIPTION = (
-    "Submit the final chat answer. Validates that the level-1 core sections and the leading level-2 "
-    "defined terms are cited, >= min_sources unique [Source: filename] "
+    "Submit the final chat answer. Validates that a level-1 section and the definitions of the "
+    "terms the question names are cited (when code read levels), >= min_sources unique [Source: filename] "
     "citations, >= min_searches distinct searches, that a cited original was raw_read, and that "
     "every cited § was read. On accept, returns the answer to the UI (no file is written; the user saves manually)."
 )
@@ -528,9 +518,9 @@ EVALUATE_CONDITION_DESCRIPTION = (
     "decide PASS/FAIL mentally or inside think_tool.\n\n"
     "Parameters:\n"
     "  facts (dict): named values you extracted from the text, e.g.\n"
-    '                {"dose_mSv": 25, "category": "A", "label": "warning level"}\n'
+    '                {"load_kg": 25, "category": "A", "label": "warning level"}\n'
     "  condition (dict): a nested logical tree. Each node is ONE of:\n"
-    '    comparison : {"op": ">=", "fact": "dose_mSv", "value": 20}\n'
+    '    comparison : {"op": ">=", "fact": "load_kg", "value": 20}\n'
     '                 op ∈ {">", ">=", "<", "<=", "==", "!="}\n'
     '    membership : {"op": "in", "fact": "category", "value": ["A","B"]}\n'
     '    substring  : {"op": "contains", "fact": "label", "value": "warning"}\n'
@@ -539,21 +529,21 @@ EVALUATE_CONDITION_DESCRIPTION = (
     '    compound   : {"op": "and", "args": [<condition>, <condition>, ...]}\n'
     '                 {"op": "or",  "args": [<condition>, <condition>, ...]}\n\n'
     "Example 1 — single threshold:\n"
-    '  facts = {"dose_mSv": 25}\n'
-    '  condition = {"op": ">=", "fact": "dose_mSv", "value": 20}\n'
+    '  facts = {"load_kg": 25}\n'
+    '  condition = {"op": ">=", "fact": "load_kg", "value": 20}\n'
     "  → PASS (25 ≥ 20)\n\n"
     "Example 2 — nested AND:\n"
-    '  facts = {"dose_mSv": 25, "category": "A"}\n'
+    '  facts = {"load_kg": 25, "category": "A"}\n'
     '  condition = {"op": "and", "args": [\n'
-    '      {"op": ">=", "fact": "dose_mSv", "value": 20},\n'
+    '      {"op": ">=", "fact": "load_kg", "value": 20},\n'
     '      {"op": "in", "fact": "category", "value": ["A","B"]}]}\n'
     "  → PASS\n\n"
-    'Example 3 — German "oder" rule (AtG §2 Kernbrennstoff):\n'
-    '  facts = {"masse_Pu239_g": 20, "konz_g_per_100kg": 10}\n'
+    'Example 3 — German "oder" rule (one condition suffices):\n'
+    '  facts = {"beschaeftigte": 60, "umsatz_mio_eur": 8}\n'
     '  condition = {"op": "or", "args": [\n'
-    '      {"op": ">", "fact": "masse_Pu239_g", "value": 15},\n'
-    '      {"op": ">", "fact": "konz_g_per_100kg", "value": 15}]}\n'
-    "  → PASS  (20 > 15 satisfies the OR, so it IS a Kernbrennstoff)\n\n"
+    '      {"op": "<", "fact": "beschaeftigte", "value": 50},\n'
+    '      {"op": "<=", "fact": "umsatz_mio_eur", "value": 10}]}\n'
+    "  → PASS  (8 <= 10 satisfies the OR although 60 >= 50)\n\n"
     "Returns: facts table, per-leaf TRUE/FALSE trace, and final Result: PASS or FAIL. "
     "Fact names in the condition must match keys in `facts` exactly."
 )
@@ -575,9 +565,15 @@ CHAT_SECTION_UNREAD = (
 # Levels read in code (tools.level_reads, ideas/deep-chat-levels.md): the first line of each
 # level's read, and the group headers of the evidence ledger.
 CHAT_LEVEL_HEADERS = {
-    1: "[level 1 — the core: the sections the search ranked highest, read in full]",
-    2: "[level 2 — the defined terms the core sections use, and the provisions of other "
-    "laws that apply them]",
+    1: "[level 1 — the core: the sections the search ranked highest, read in full. Code "
+    "reads the levels below it next: level 2, the defined terms these sections use and the "
+    "sections of other documents that refer to them; level 3, the terms inside those "
+    "definitions. Answer level by level: first the core rule that answers the question (its "
+    "conditions, procedure, figures), then what the terms the answer relies on mean, then "
+    "the provisions that apply it — each with its citation. Use only what the question "
+    "needs; read further only for gaps the levels leave open.]",
+    2: "[level 2 — the defined terms the core sections use, and the sections of other "
+    "documents that refer to them]",
     3: "[level 3 — the terms used inside those definitions]",
 }
 CHAT_LEDGER_LEVELS = {
@@ -594,8 +590,8 @@ CHAT_COVERAGE_GAP = (
     "its terms mean, then the provisions applying it — and explain each in its own "
     "sentences with its citation tag, then submit again."
 )
-CHAT_COVERAGE_CORE = "explain the core sections the search ranked highest: {refs}"
-CHAT_COVERAGE_TERMS = "explain the defined terms the core sections rely on: {refs}"
+CHAT_COVERAGE_CORE = "explain the core section(s) on the question: {refs}"
+CHAT_COVERAGE_TERMS = "explain the defined terms the question names: {refs}"
 # Verbosity (tools._too_terse), once per run: an answer too short for its sources.
 CHAT_TERSE = (
     "REJECTED: the answer is too short for its {items} cited sources ({words} words). "
