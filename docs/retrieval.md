@@ -233,7 +233,11 @@ of its definitions was.
 whatever words the question used (`evidence.extract(…, leads=True)`, also for any definition
 read) — the § 62 (3) 1-mSv criterion shares no word with the question and used to be lost. The
 ledger answer gets the quotes grouped by level (`evidence.render`, `prompts.CHAT_LEDGER_LEVELS`)
-and is asked for about `LEDGER_WORDS_PER_SOURCE` (80) words per quoted source.
+and is asked for about `LEDGER_WORDS_PER_SOURCE` (80) words per quoted source; the prompt names
+the sources the coverage gate requires (`CHAT_LEDGER_REQUIRED_CORE`/`_TERMS`), since E4B dropped
+the named term's definition otherwise. For markdown texts a hard-wrapped sentence is one quote,
+a bullet list stays with the line introducing it ("…:") and is kept like a numbered paragraph,
+and code fences, `{{…}}` includes and HTML lines are not quotes.
 
 **Coverage instead of a word floor.** The submit gates (`_submit_chat_impl`,
 `_submit_final_impl`) reject an answer that cites none of the core sections, or leaves out the
