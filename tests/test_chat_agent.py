@@ -469,6 +469,26 @@ def test_the_final_answer_is_written_from_the_ledger_when_it_passes_the_gate(mon
     assert final["sources"] == ["f0.md § 0"]
 
 
+def test_the_ledger_prompt_names_the_sources_the_gate_requires(monkeypatch):
+    # E4B left the definition of the term the question names out of the ledger answer
+    mem = _ledger_run()
+    mem.core_refs = ["f0.md § 0", "f1.md § 1"]
+    mem.term_refs = ["f2.md § 2"]
+    prompts_seen: list = []
+    monkeypatch.setattr(
+        chat_agent.ollama_client,
+        "generate",
+        lambda system, prompt, **kw: prompts_seen.append(prompt) or "x",
+    )
+    monkeypatch.setattr(chat_agent.tool_module, "chat_verdict", lambda a: "REJECTED")
+    chat_agent._write_ledger_answer(mem, "q?", "")
+    assert "at least one of [Source: f0.md § 0], [Source: f1.md § 1]" in prompts_seen[0]
+    assert "each of [Source: f2.md § 2]" in prompts_seen[0]
+    mem.core_refs, mem.term_refs = [], []  # no levels read: nothing extra is asked
+    chat_agent._write_ledger_answer(mem, "q?", "")
+    assert "at least one of" not in prompts_seen[1]
+
+
 def test_a_ledger_answer_the_gate_rejects_leaves_the_agents_answer(monkeypatch):
     _ledger_run()
     monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "bad")

@@ -65,6 +65,8 @@ from prompts import (
     CHAT_LEDGER_LEVELS,
     CHAT_LEDGER_PROMPT,
     CHAT_LEDGER_REJECTED,
+    CHAT_LEDGER_REQUIRED_CORE,
+    CHAT_LEDGER_REQUIRED_TERMS,
     CHAT_LEDGER_SYSTEM,
     CHAT_OPEN_REF_LINE,
     CHAT_PROSE_GATE_RETRY,
@@ -668,13 +670,28 @@ def _ledger_answer(question: str, directive: str) -> str | None:
     return mem.ledger_answer
 
 
+def _required(mem: run_memory.RunMemory) -> str:
+    """The prompt lines naming the sources the coverage gate requires ("" without levels)."""
+
+    def tags(refs: list[str]) -> str:
+        return ", ".join(f"[Source: {r}]" for r in refs)
+
+    lines = [CHAT_LEDGER_REQUIRED_CORE.format(refs=tags(mem.core_refs))] if mem.core_refs else []
+    if mem.term_refs:
+        lines.append(CHAT_LEDGER_REQUIRED_TERMS.format(refs=tags(mem.term_refs)))
+    return "".join(f"\n{line}" for line in lines)
+
+
 def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: str) -> str | None:
     """The ledger answer in a fresh, short prompt; its gate verdict goes to the gate events."""
     refs = len({ref for ref, _ in mem.ledger})
     levels = [mem.levels.get(tool_module.ref_key(ref), 0) for ref, _ in mem.ledger]
     rendered = evidence.render(mem.ledger, levels, CHAT_LEDGER_LEVELS)
     prompt = CHAT_LEDGER_PROMPT.format(
-        question=question, evidence=rendered, words=LEDGER_WORDS_PER_SOURCE * refs
+        question=question,
+        evidence=rendered,
+        words=LEDGER_WORDS_PER_SOURCE * refs,
+        required=_required(mem),
     )
     try:
         answer = ollama_client.generate(

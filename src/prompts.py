@@ -719,8 +719,13 @@ Write a detailed answer in markdown from these quotes only, level by level as th
 - End with `## Open points` for what the quotes do not settle.
 - After every claim put the citation tag of its quote exactly as given, e.g. [Source: file.md § 5]. Never cite anything else.
 - Outside quotation marks, name no section (§) that is not in one of the tags: write "a further provision" instead.
-- Put quotation marks only around wording copied exactly from a quote, § numbers included; otherwise paraphrase.
+- Put quotation marks only around wording copied exactly from a quote, § numbers included; otherwise paraphrase.{required}
 - Write about {words} words, without padding."""
+# What the coverage gate requires, named to the ledger writer (chat_agent._required).
+CHAT_LEDGER_REQUIRED_CORE = "- Explain and cite at least one of {refs}."
+CHAT_LEDGER_REQUIRED_TERMS = (
+    "- Explain and cite each of {refs}: the definitions of the terms the question names."
+)
 
 RESEARCH_FALLBACK_PROMPT = """The research agent gathered the notes below but stopped without assembling a report. Using ONLY these notes, write the best possible answer to the question.
 
