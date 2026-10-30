@@ -121,10 +121,12 @@ _RAW_CITE_RE = tool_module._RAW_CITE_RE  # pyright: ignore[reportPrivateUsage]
 _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([^\]\n]+?\.md)\s*\]")
 
 
-def _cites(text: str, extra: list[str] | None = None) -> dict[str, Any]:
-    """Split the citations in `text` into raw originals and wiki pages."""
+def _cites(text: str, extra: list[Any] | None = None) -> dict[str, Any]:
+    """Split the citations in `text` into raw originals and wiki pages. `extra` are the
+    sources a submit call passed: raw tool args, so only its strings count."""
+    named = {s for s in extra or [] if isinstance(s, str)}
     return {
-        "sources": sorted(set(_RAW_CITE_RE.findall(text)) | set(extra or [])),
+        "sources": sorted(set(_RAW_CITE_RE.findall(text)) | named),
         "wiki_sources": sorted(set(_WIKI_CITE_RE.findall(text))),
     }
 

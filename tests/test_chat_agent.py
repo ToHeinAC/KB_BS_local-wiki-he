@@ -825,3 +825,9 @@ def test_the_levels_code_reads_reach_the_model_as_raw_read_turns(monkeypatch):
         if isinstance(m, ToolMessage) and m.name == "raw_read"
     ]
     assert reads == [("level-1", "[level 1] CORE"), ("level-2", "[level 2] TERM")]
+
+
+def test_sources_the_model_passes_in_another_shape_never_crash_the_answer():
+    # E4B once passed submit_chat_answer(sources=[{...}]): raw tool args are not validated
+    got = chat_agent._cites("x [Source: a.md § 1]", [{"file": "b.md"}, "c.md", None])
+    assert got["sources"] == ["a.md § 1", "c.md"]
