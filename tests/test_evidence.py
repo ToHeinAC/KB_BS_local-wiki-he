@@ -113,3 +113,30 @@ def test_umlaut_forms_of_a_query_word_share_its_stem():
     )
     assert evidence.extract(read, "Wie können Rückstände entlassen werden?")
     assert evidence.stems("Überwachung") == evidence.stems("uberwachung")
+
+
+# A technical markdown text: hard-wrapped prose, a bullet list after "…:", markup lines.
+MANUAL = (
+    "## Raw file: guide.md Ownership Rules\n"
+    "First, let's take a look at the ownership rules. Keep these rules in mind as we\n"
+    "work through the examples that illustrate them:\n\n"
+    "- Each value in Rust has an owner.\n"
+    "- There can only be one owner at a time.\n"
+    "- When the owner goes out of scope, the value will be dropped.\n\n"
+    "```rust\n{{#rustdoc_include ../listings/listing-04-01/src/main.rs:here}}\n```\n\n"
+    '<Listing number="4-1" caption="A variable and the scope in which it is valid">\n'
+)
+
+
+def test_a_hard_wrapped_sentence_and_the_list_it_introduces_are_one_quote():
+    got = [s for _, s in evidence.extract(MANUAL, "What are the ownership rules?", leads=True)]
+    assert (
+        "Keep these rules in mind as we work through the examples that illustrate them: "
+        "- Each value in Rust has an owner. - There can only be one owner at a time. "
+        "- When the owner goes out of scope, the value will be dropped." in got
+    )
+
+
+def test_code_fences_includes_and_markup_lines_are_not_quotes():
+    got = [s for _, s in evidence.extract(MANUAL, "ownership rules listing scope", leads=True)]
+    assert not [s for s in got if s.startswith(("```", "{{", "<"))]

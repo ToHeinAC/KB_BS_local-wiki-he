@@ -25,6 +25,14 @@ _LIST_BREAK_RE = re.compile(
     r"|(?<=\bund)|(?<=\boder))[ \t]*\n+[ \t]*(?!References:|Map near|\[|…\[|#)",
     re.M,
 )
+# A soft line wrap of hard-wrapped prose (markdown): one line break inside a sentence,
+# not before a heading, list item, table row, numbered paragraph, markup or footer.
+_SOFT_WRAP_RE = re.compile(
+    r"(?<=[^\s.!?:;])[ \t]*\n(?!\n)(?![ \t]*(?:References:|Map near))"
+    r"(?=[ \t]*[^\s#*+|>(\[`{<…\-\d])"
+)
+# A markdown bullet item; after a line ending in ":" the list is one quote with that line.
+_ITEM_RE = re.compile(r"[-*+]\s")
 _BOUNDARY_RE = re.compile(r"[.;!?](?=\s)")
 _LAST_WORD_RE = re.compile(r"(\S+)$")
 # Words a period follows without ending the sentence ("Abs. 2", "BGBl. I S. 2833").
@@ -36,7 +44,7 @@ _ABBREV = frozenset(
 _TOC_RE = re.compile(r"·\s*(?:§|Anlage|Artikel)")
 _WORD_RE = re.compile(r"\w{4,}")
 # Lines raw_read adds around the text: memory stubs, hints, reference footers, section maps.
-_NOT_TEXT = ("[", "…[", "#", "References:", "Map near the matches:")
+_NOT_TEXT = ("[", "…[", "#", "References:", "Map near the matches:", "```", "{{", "<")
 _STOP = frozenset(
     {
         "auch",
@@ -132,17 +140,33 @@ def _ends_sentence(before: str) -> bool:
     return not (re.fullmatch(r"\d{1,2}", word) or word in _ABBREV)
 
 
-def _sentences(body: str) -> list[str]:
-    """The sentences of `body`; a list stays with the sentence that introduces it."""
+def _split(para: str) -> list[str]:
     out: list[str] = []
-    for para in _LIST_BREAK_RE.sub(" ", body).split("\n"):
-        start = 0
-        for m in _BOUNDARY_RE.finditer(para):
-            if m.group() != "." or _ends_sentence(para[start : m.start()]):
-                out.append(para[start : m.end()])
-                start = m.end()
-        out.append(para[start:])
+    start = 0
+    for m in _BOUNDARY_RE.finditer(para):
+        if m.group() != "." or _ends_sentence(para[start : m.start()]):
+            out.append(para[start : m.end()])
+            start = m.end()
+    out.append(para[start:])
     return [s.strip() for s in out if s.strip()]
+
+
+def _sentences(body: str) -> list[tuple[str, bool]]:
+    """(sentence, is a list) of `body`: a list stays with the sentence that introduces it,
+    a hard-wrapped sentence is one sentence."""
+    out: list[tuple[str, bool]] = []
+    in_list = False
+    for para in _SOFT_WRAP_RE.sub(" ", _LIST_BREAK_RE.sub(" ", body)).split("\n"):
+        line = para.strip()
+        if not line:
+            continue
+        if _ITEM_RE.match(line) and (in_list or (out and out[-1][0].endswith(":"))):
+            out[-1] = (f"{out[-1][0]} {line}", True)
+            in_list = True
+            continue
+        in_list = False
+        out += [(s, False) for s in _split(line)]
+    return out
 
 
 def _clip(sentence: str) -> str:
@@ -156,18 +180,21 @@ def _clip(sentence: str) -> str:
 
 def _best(body: str, query: set[str], k: int, leads: bool = False) -> list[str]:
     """Up to ``k`` sentences of ``body`` that share enough of the query, in reading order;
-    with ``leads``, also the first sentence of the block and of every numbered paragraph
-    ("(3) Maßstab …"): a section read as the core states its rules there, whatever words
-    the question used."""
+    with ``leads``, also the first sentence of the block, of every numbered paragraph
+    ("(3) Maßstab …") and every introduced list: a section read as the core states its
+    rules there, whatever words the question used."""
+    units = [(_clip(p), is_list) for p, is_list in _sentences(body)]
+    lists = {i for i, (_, is_list) in enumerate(units) if is_list}
     scored = [
         (_score(s, query), i, s)
-        for i, s in enumerate(_clip(p) for p in _sentences(body))
+        for i, (s, _) in enumerate(units)
         if len(s) >= _MIN_CHARS and not s.startswith(_NOT_TEXT) and len(_TOC_RE.findall(s)) < 2
     ]
     top = sorted((x for x in scored if x[0] >= _MIN_SHARED), key=lambda x: (-x[0], x[1]))[:k]
     if leads and scored:
         first = scored[0][1]
-        top += [x for x in scored if (x[1] == first or _PARA_RE.match(x[2])) and x not in top]
+        rules = [x for x in scored if x[1] == first or x[1] in lists or _PARA_RE.match(x[2])]
+        top += [x for x in rules if x not in top]
     return [s for _, _, s in sorted(top, key=lambda x: x[1])]
 
 
