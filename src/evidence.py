@@ -17,6 +17,7 @@ _STEM = 6  # prefix length: "Rückstände"/"Rückständen" share "rückst"
 # `## Raw file: <file>[ <section>][ (bytes a-b of n)]` opens each block of a raw_read output.
 _HEADER_RE = re.compile(r"^## Raw file: (.+?)(?: \((?:bytes|offset) [^)]*\))?[ \t]*$", re.M)
 _TEIL_RE = re.compile(r"\s*\(Teil \d+\)$")
+_PARA_RE = re.compile(r"\(\d+[a-z]?\)\s")  # a numbered paragraph's opening "(3) "
 # A line break inside one sentence: after an enumeration number ("1.", "a)") or a list
 # item that goes on (",", "und", "oder"), as German legal texts lay out their lists.
 _LIST_BREAK_RE = re.compile(
@@ -153,20 +154,29 @@ def _clip(sentence: str) -> str:
     return sentence[: cut if cut > _MIN_CHARS else _MAX_CHARS - 2].rstrip(" ,") + " …"
 
 
-def _best(body: str, query: set[str], k: int) -> list[str]:
-    """Up to ``k`` sentences of ``body`` that share enough of the query, in reading order."""
+def _best(body: str, query: set[str], k: int, leads: bool = False) -> list[str]:
+    """Up to ``k`` sentences of ``body`` that share enough of the query, in reading order;
+    with ``leads``, also the first sentence of the block and of every numbered paragraph
+    ("(3) Maßstab …"): a section read as the core states its rules there, whatever words
+    the question used."""
     scored = [
         (_score(s, query), i, s)
         for i, s in enumerate(_clip(p) for p in _sentences(body))
         if len(s) >= _MIN_CHARS and not s.startswith(_NOT_TEXT) and len(_TOC_RE.findall(s)) < 2
     ]
     top = sorted((x for x in scored if x[0] >= _MIN_SHARED), key=lambda x: (-x[0], x[1]))[:k]
+    if leads and scored:
+        first = scored[0][1]
+        top += [x for x in scored if (x[1] == first or _PARA_RE.match(x[2])) and x not in top]
     return [s for _, _, s in sorted(top, key=lambda x: x[1])]
 
 
-def extract(read_output: str, query: str, k: int = PER_BLOCK) -> list[tuple[str, str]]:
+def extract(
+    read_output: str, query: str, k: int = PER_BLOCK, leads: bool = False
+) -> list[tuple[str, str]]:
     """(citation ref, sentence) pairs from one raw_read output: per `## Raw file:` block, the
-    sentences sharing the most query stems. A section map's own header block is skipped."""
+    sentences sharing the most query stems (and with ``leads`` each paragraph's first
+    sentence). A section map's own header block is skipped."""
     q = stems(query)
     heads = list(_HEADER_RE.finditer(read_output))
     out: list[tuple[str, str]] = []
@@ -176,10 +186,25 @@ def extract(read_output: str, query: str, k: int = PER_BLOCK) -> list[tuple[str,
             continue
         end = heads[i + 1].start() if i + 1 < len(heads) else len(read_output)
         ref = _TEIL_RE.sub("", label)
-        out += [(ref, s) for s in _best(read_output[h.end() : end], q, k)]
+        out += [(ref, s) for s in _best(read_output[h.end() : end], q, k, leads)]
     return out
 
 
-def render(ledger: list[tuple[str, str]]) -> str:
-    """The ledger as numbered quotes, each with the citation tag to copy."""
-    return "\n".join(f'[{i}] [Source: {ref}] "{s}"' for i, (ref, s) in enumerate(ledger, 1))
+def render(
+    ledger: list[tuple[str, str]],
+    levels: list[int] | None = None,
+    headers: dict[int, str] | None = None,
+) -> str:
+    """The ledger as numbered quotes, each with the citation tag to copy; with ``levels``
+    (one per quote, 0 = not read as a level) grouped under ``headers``, level 1 first."""
+    if not levels or not headers:
+        return "\n".join(f'[{i}] [Source: {ref}] "{s}"' for i, (ref, s) in enumerate(ledger, 1))
+    order = sorted(range(len(ledger)), key=lambda i: (levels[i] or len(headers) + 1, i))
+    lines: list[str] = []
+    for n, i in enumerate(order, 1):
+        header = headers.get(levels[i], headers.get(0, ""))
+        if header and header not in lines:
+            lines += ["", header] if lines else [header]
+        ref, s = ledger[i]
+        lines.append(f'[{n}] [Source: {ref}] "{s}"')
+    return "\n".join(lines)

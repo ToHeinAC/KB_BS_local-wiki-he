@@ -62,6 +62,7 @@ from prompts import (
     CHAT_FALLBACK_SYSTEM,
     CHAT_HYDE_PROMPT,
     CHAT_HYDE_SYSTEM,
+    CHAT_LEDGER_LEVELS,
     CHAT_LEDGER_PROMPT,
     CHAT_LEDGER_REJECTED,
     CHAT_LEDGER_SYSTEM,
@@ -73,7 +74,6 @@ from prompts import (
 load_dotenv()
 
 MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
-MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "500"))
 MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 MAX_ITER = int(os.getenv("CHAT_MAX_ITERATIONS", "40"))
 NUDGE_AT = int(os.getenv("CHAT_NUDGE_AT", str(MAX_ITER // 2 - 2)))
@@ -89,6 +89,9 @@ AUTO_READ_AT = 3
 # (enough searches and quoted sources for the gate) is answered from the ledger: it stops
 # if that answer passes the gate, else goes on with the verdict as feedback.
 STALL_TURNS = 3
+# The length the ledger answer is asked for, per quoted source: detailed, not a floor (the
+# gate only sends back an answer under tools.CHAT_WORDS_PER_ITEM per source, once).
+LEDGER_WORDS_PER_SOURCE = 80
 # The note on a final answer written from the evidence ledger (it passed the gate).
 LEDGER_NOTE = "Written from the quotes collected from the originals."
 HYDE_CAP = 600  # characters of the hypothetical passage used as a query
@@ -363,9 +366,7 @@ def _step_guard(config: RunnableConfig, bonus: int) -> None:
 def _build_graph(
     llm: Runnable[LanguageModelInput, BaseMessage], directive: str = ""
 ) -> CompiledStateGraph[MessagesState]:
-    nudge = CHAT_BUDGET_NUDGE.format(min_words=MIN_WORDS) + (
-        f"\n\n{directive}" if directive else ""
-    )
+    nudge = CHAT_BUDGET_NUDGE + (f"\n\n{directive}" if directive else "")
     trimmed: frozenset[int] = frozenset()
 
     def agent_node(state: MessagesState, config: RunnableConfig) -> dict[str, Any]:
@@ -455,9 +456,8 @@ def _system_prompt(directive: str = "") -> str:
         raw_block=raw_block,
         language_directive=directive,
         min_searches=MIN_SEARCHES,
-        min_words=MIN_WORDS,
         min_sources=MIN_SOURCES,
-        words_per_source=tool_module.CHAT_WORDS_PER_SOURCE,
+        words_per_item=tool_module.CHAT_WORDS_PER_ITEM,
     )
 
 
@@ -671,9 +671,10 @@ def _ledger_answer(question: str, directive: str) -> str | None:
 def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: str) -> str | None:
     """The ledger answer in a fresh, short prompt; its gate verdict goes to the gate events."""
     refs = len({ref for ref, _ in mem.ledger})
-    words = min(MIN_WORDS, tool_module.CHAT_WORDS_PER_SOURCE * refs)
+    levels = [mem.levels.get(tool_module.ref_key(ref), 0) for ref, _ in mem.ledger]
+    rendered = evidence.render(mem.ledger, levels, CHAT_LEDGER_LEVELS)
     prompt = CHAT_LEDGER_PROMPT.format(
-        question=question, evidence=evidence.render(mem.ledger), words=words
+        question=question, evidence=rendered, words=LEDGER_WORDS_PER_SOURCE * refs
     )
     try:
         answer = ollama_client.generate(
@@ -854,7 +855,35 @@ def _preflight(question: str) -> list[AnyMessage]:
         ]
     except Exception:
         return []
-    return [AIMessage(content="", tool_calls=calls), *results, *_hyde_search(question)]
+    hyde = _hyde_search(question)
+    searched = [
+        str(m.content)
+        for m in [*results, *hyde]
+        if isinstance(m, ToolMessage) and m.name == "raw_search"
+    ]
+    return [AIMessage(content="", tool_calls=calls), *results, *hyde, *_levels(question, searched)]
+
+
+def _levels(question: str, searched: list[str]) -> list[AnyMessage]:
+    """Code's reads of the core sections and the terms and provisions around them, one
+    `raw_read` turn per level (tools.level_reads); [] on any failure."""
+    try:
+        done = tool_module.level_reads(question, searched)
+    except Exception:
+        return []
+    out: list[AnyMessage] = []
+    for n, (reads, text) in enumerate(done, 1):
+        call: ToolCall = {
+            "name": "raw_read",
+            "args": {"filenames": reads},
+            "id": f"level-{n}",
+            "type": "tool_call",
+        }
+        out += [
+            AIMessage(content="", tool_calls=[call]),
+            ToolMessage(content=text, name="raw_read", tool_call_id=call["id"]),
+        ]
+    return out
 
 
 def _hyde_search(question: str) -> list[AnyMessage]:

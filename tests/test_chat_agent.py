@@ -157,8 +157,8 @@ def test_the_deep_chat_prompt_asks_for_a_structured_answer_not_a_concise_one():
 
     assert "concise" not in prompts.CHAT_AGENT_SYSTEM
     assert "## " in prompts.CHAT_AGENT_SYSTEM
-    nudge = prompts.CHAT_BUDGET_NUDGE.format(min_words=500)
-    assert "500+ words" in nudge
+    assert "2-4 sentences" in prompts.CHAT_BUDGET_NUDGE  # detailed, without a word floor
+    assert "level by level" in prompts.CHAT_AGENT_SYSTEM
 
 
 def _tool(name: str, content: str, call_id: str) -> ToolMessage:
@@ -218,7 +218,11 @@ def test_the_wrap_up_nudge_is_stored_once_in_the_history(monkeypatch):
     monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
     list(chat_agent.run_chat_agent("q?"))
     nudges = [
-        [i for i, m in enumerate(call) if isinstance(m, HumanMessage) and "500+ words" in m.content]
+        [
+            i
+            for i, m in enumerate(call)
+            if isinstance(m, HumanMessage) and "STEP BUDGET" in m.content
+        ]
         for call in fake.calls
     ]
     assert nudges[1]
@@ -343,6 +347,7 @@ RAW_HITS = (
 
 
 def _stub_search(monkeypatch, reads):
+    monkeypatch.setattr(chat_agent, "_levels", lambda q, searched: [])  # tested on its own
     tm = chat_agent.tool_module
     monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: RAW_HITS)
     monkeypatch.setattr(tm, "_wiki_search_impl", lambda queries, **kw: "WIKI HITS")
@@ -577,7 +582,7 @@ def _stalling_run(monkeypatch, verdict: str, covered: bool = True) -> tuple[Fake
     # gate judges with `verdict`.
     monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
     monkeypatch.setattr(chat_agent, "_covered", lambda mem: covered)
-    monkeypatch.setattr(chat_agent.evidence, "render", lambda ledger: "QUOTES")
+    monkeypatch.setattr(chat_agent.evidence, "render", lambda ledger, *a: "QUOTES")
     fake = _patch_llm(
         monkeypatch,
         [_ai_with_tool("think_tool", {"reflection": f"n{i}"}, f"t{i}") for i in range(6)],
@@ -748,3 +753,28 @@ def test_code_reads_the_sections_a_rejection_names_as_unread(monkeypatch):
     mem = chat_agent.run_memory.current()
     assert mem is not None
     assert mem.unread_due == []
+
+
+def test_the_levels_code_reads_reach_the_model_as_raw_read_turns(monkeypatch):
+    tm = chat_agent.tool_module
+    monkeypatch.setattr(chat_agent, "_hyde_search", lambda q: [])
+    monkeypatch.setattr(tm, "_raw_search_impl", lambda queries, **kw: "RAW HITS")
+    monkeypatch.setattr(tm, "_wiki_search_impl", lambda queries, **kw: "WIKI HITS")
+    seen: list = []
+
+    def levels(question, searched):
+        seen.append(searched)
+        return [(["a.md § 1"], "[level 1] CORE"), (["a.md § 5 Abs. 2"], "[level 2] TERM")]
+
+    monkeypatch.setattr(tm, "level_reads", levels)
+    fake = _patch_llm(monkeypatch, [])
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    list(chat_agent.run_chat_agent("Wie werden Rückstände entlassen?"))
+    assert seen == [["RAW HITS", "RAW HITS"]]  # the raw searches, not the wiki one
+    first = fake.calls[0]
+    reads = [
+        (m.tool_call_id, m.content)
+        for m in first
+        if isinstance(m, ToolMessage) and m.name == "raw_read"
+    ]
+    assert reads == [("level-1", "[level 1] CORE"), ("level-2", "[level 2] TERM")]

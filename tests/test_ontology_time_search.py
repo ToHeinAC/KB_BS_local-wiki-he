@@ -95,7 +95,7 @@ def test_lookup_takes_a_point_in_time(versions: Path) -> None:
 
 @pytest.fixture
 def gate(versions: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 1)
+    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SEARCHES", 0)
     mem = run_memory.begin_run()

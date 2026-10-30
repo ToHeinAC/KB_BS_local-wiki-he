@@ -384,37 +384,14 @@ def test_chat_tools_expose_wiki_search_and_read():
 
 def test_a_deep_chat_answer_needs_2_sources() -> None:
     # Three padded single-section answers (q3: § 80 alone settles it); two still asks for
-    # a second original to check against.
+    # a second original to check against. (Outside a run there is no length check.)
     assert tools._submit_chat_impl("word " * 520 + "[Source: a.md]").startswith("REJECTED")
     two = tools._submit_chat_impl("word " * 520 + "[Source: a.md] [Source: b.md]")
     assert two.startswith("ACCEPTED")
 
 
-def test_the_word_floor_grows_with_the_cited_sources() -> None:
-    # A flat floor makes a small model pad thin evidence with uncited text; the floor is
-    # ~100 words per cited source, never above CHAT_MIN_WORDS.
-    three = "[Source: a.md] [Source: b.md] [Wiki: c.md]"
-    short = tools._submit_chat_impl("word " * 280 + three)
-    assert short.startswith("REJECTED")
-    assert "300" in short
-    assert tools._submit_chat_impl("word " * 320 + three).startswith("ACCEPTED")
-    six = three + " [Source: d.md] [Source: e.md] [Source: f.md]"
-    capped = tools._submit_chat_impl("word " * 450 + six)
-    assert capped.startswith("REJECTED")
-    assert "500" in capped
-
-
-def test_the_word_floor_counts_sections_not_paragraph_tags() -> None:
-    # Citing § 62 (2) and § 62 (3) is one section: finer tags must not raise the floor
-    # (a correct 368-word answer citing 8 paragraph tags of 2 sections was rejected).
-    tags = "[Source: a.md § 62 (2)] [Source: a.md § 62 (3) Nr. 1] [Source: b.md § 29 (1)]"
-    assert tools._submit_chat_impl("word " * 210 + tags).startswith("ACCEPTED")
-    short = tools._submit_chat_impl("word " * 150 + tags)
-    assert "with 2 cited sections the minimum is 200" in short
-
-
 def _gate_ready(monkeypatch) -> run_memory.RunMemory:
-    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
+    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     return run_memory.begin_run()
 
@@ -478,7 +455,7 @@ def test_a_deep_chat_answer_must_have_read_an_original_it_cites(monkeypatch):
 
 
 def test_submit_chat_counts_wiki_citations(monkeypatch):
-    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
+    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     answer = "one two three four five [Source: raw.md] and [Wiki: page.md]"
     assert tools._submit_chat_impl(answer).startswith("ACCEPTED")
@@ -486,7 +463,7 @@ def test_submit_chat_counts_wiki_citations(monkeypatch):
 
 def test_submit_chat_wiki_cite_alone_does_not_meet_source_gate(monkeypatch):
     """Wiki pages orient the agent; grounding still needs a second source."""
-    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
+    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     answer = "one two three four five [Wiki: page.md]"
     assert tools._submit_chat_impl(answer).startswith("REJECTED")
@@ -505,7 +482,7 @@ def test_submit_chat_low_confidence_nudges_once(monkeypatch, tmp_path):
     idx = tmp_path / "KI" / "index"
     idx.mkdir(parents=True)
     (idx / "calibration.json").write_text(json.dumps({"tau": -4.14}))
-    monkeypatch.setattr(tools, "CHAT_MIN_WORDS", 5)
+    monkeypatch.setattr(tools, "CHAT_WORDS_PER_ITEM", 1)
     monkeypatch.setattr(tools, "CHAT_MIN_SOURCES", 2)
     monkeypatch.setattr(tools, "CHAT_MIN_SEARCHES", 0)
     answer = "one two three four five [Source: raw.md] and [Wiki: page.md]"

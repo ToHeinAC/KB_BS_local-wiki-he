@@ -67,6 +67,17 @@ class RunMemory:
     ref_depth: dict[str, int] = field(default_factory=dict[str, int])
     out_of_scope: dict[str, list[str]] = field(default_factory=dict[str, list[str]])
     bonus: int = 0
+    # Levels read in code (ideas/deep-chat-levels.md): the core sections (level 1), the
+    # definitions of the terms they use in rank order (level 2), each read citation's level
+    # by `tools.ref_key`, and per law file its sections' cross references (anchor, heading,
+    # targets), built once per run for the reverse lookup.
+    core_refs: list[str] = field(default_factory=list[str])
+    term_refs: list[str] = field(default_factory=list[str])
+    levels: dict[tuple[str, str], int] = field(default_factory=dict[tuple[str, str], int])
+    citations: dict[str, list[tuple[str, str, list[tuple[str, str]]]]] = field(
+        default_factory=dict[str, list[tuple[str, str, list[tuple[str, str]]]]]
+    )
+    terse_nudged: bool = False  # an answer too short for its sources was sent back once
     work_files: dict[str, str | None] = field(default_factory=dict[str, str | None])  # name → file
 
     def tick(self) -> int:

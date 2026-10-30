@@ -25,6 +25,7 @@ import calibrate
 import chunker
 import classification
 import db_context
+import definitions
 import evidence
 import lex_index
 import okf
@@ -37,9 +38,14 @@ import retrieval
 import run_memory
 import wiki_engine
 from prompts import (
+    CHAT_COVERAGE_CORE,
+    CHAT_COVERAGE_GAP,
+    CHAT_COVERAGE_TERMS,
+    CHAT_LEVEL_HEADERS,
     CHAT_OPEN_REFS_MISSING,
     CHAT_QUOTE_UNMATCHED,
     CHAT_SECTION_UNREAD,
+    CHAT_TERSE,
     EVALUATE_CONDITION_DESCRIPTION,
     FETCH_WEBPAGE_DESCRIPTION,
     LOW_CONFIDENCE_NUDGE,
@@ -60,12 +66,19 @@ load_dotenv()
 PARALLELISM = int(os.getenv("RESEARCH_PARALLELISM", "4"))
 MIN_WORDS = int(os.getenv("RESEARCH_MIN_WORDS", "600"))
 MIN_URLS = int(os.getenv("RESEARCH_MIN_URLS", "4"))
-CHAT_MIN_WORDS = int(os.getenv("CHAT_MIN_WORDS", "500"))
 CHAT_MIN_SOURCES = int(os.getenv("CHAT_MIN_SOURCES", "2"))
 CHAT_MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
-# Deep chat's word floor per cited source, capped at CHAT_MIN_WORDS: a flat floor makes a
-# small model pad thin evidence with uncited text.
-CHAT_WORDS_PER_SOURCE = int(os.getenv("CHAT_WORDS_PER_SOURCE", "100"))
+# Verbosity without a word floor: an answer under this many words per cited source is sent
+# back once (a fixed floor made E4B pad thin evidence with uncited detail).
+CHAT_WORDS_PER_ITEM = int(os.getenv("CHAT_WORDS_PER_ITEM", "40"))
+# Levels read in code (ideas/deep-chat-levels.md).
+CORE_MAX = 2  # level 1: the top distinct sections of the searches, read in full
+CORE_CHARS = 8000  # parts of one core section read, at most
+TERMS_MAX = 6  # level 2: definitions of the terms the core uses
+CITING_MAX = 2  # level 2: sections of other laws that cite a core section
+DEEP_TERMS_MAX = 4  # level 3: terms used inside the level-2 definitions
+TERMS_REQUIRED = 3  # leading level-2 definitions an answer must cite
+DEF_CHARS = 1500  # a served definition is clipped here
 CONTENT_TRUNCATE = 2000
 RAW_READ_CAP = 16000  # chars per raw_read call (per file, per offset window)
 # After this many distinct byte-offset windows of one file have been read in a
@@ -76,7 +89,7 @@ RAW_READ_NUDGE_AFTER = int(os.getenv("CHAT_RAW_READ_NUDGE_AFTER", "3"))
 # turns it may earn by following them (+2 per followed cross-file reference).
 REF_MAX_HOPS = 3
 REF_BONUS_MAX = int(os.getenv("CHAT_REF_BONUS_MAX", "6"))
-LEDGER_MAX = 40  # quotes a run's evidence ledger keeps (first come; ~24K chars at most)
+LEDGER_MAX = 60  # quotes a run's evidence ledger keeps (first come; the levels read first)
 RANK_TOP_K = 12  # sections ranked per file for the section map and auto-advance
 MAP_RADIUS = 5  # section-map entries shown on each side of a served section
 WIKI_LINK_EXPANSION = os.getenv("WIKI_LINK_EXPANSION", "1") != "0"
@@ -483,13 +496,38 @@ def _prefix_of(short: str, long: str) -> bool:
     return long.startswith(short) and (len(long) == len(short) or not long[len(short)].isalnum())
 
 
+_REGISTERS: dict[tuple[str, str, int], list[definitions.Definition]] = {}
+
+
+def _register(base: str) -> list[definitions.Definition]:
+    """The definitions of raw file `base` in the bound DB, parsed once per file version."""
+    data = wiki_engine.read_raw_source(base)
+    if data is None:
+        return []
+    key = (str(db_context.raw_dir()), base, hash(data))
+    if key not in _REGISTERS:
+        _REGISTERS[key] = definitions.register(data.decode("utf-8", errors="replace"))
+    return _REGISTERS[key]
+
+
+def _definition_in(base: str, section: str) -> definitions.Definition | None:
+    """The definition `section` names in `base` ("§ 5 Abs. 32"); caller binds the DB."""
+    if not section or not definitions.is_paragraph_ref(section):
+        return None
+    return definitions.find(_register(base), section)
+
+
 def ref_key(ref: str) -> tuple[str, str]:
     """(qualified file, section) a citation points to, for comparing two spellings of one
     source: "StrlSchV.md § 31 (2)" and "StrlSchV.md § 31" are one key; a § of another work
-    ("StrlSchV.md § 34 StrlSchG") is keyed to that work's file."""
+    ("StrlSchV.md § 34 StrlSchG") is keyed to that work's file; each definition of a § is a
+    key of its own ("StrlSchG.md § 5 Abs. 32")."""
     db, base, section = _split_ref(ref)
     with db_context.using_db(db):
-        ch = _resolve_section(base, section) if section else None
+        d = _definition_in(base, section)
+        ch = _resolve_section(base, section) if section and d is None else None
+    if d is not None:
+        return db_context.qualify(base, db), d.section
     anchor = _TEIL_RE.sub("", ch["anchor"]) if ch is not None else _norm_anchor(section)
     return db_context.qualify(base, db), anchor
 
@@ -511,6 +549,15 @@ def _format_section(base: str, ch: dict[str, Any], label: str | None = None) -> 
     return f"## Raw file: {label} {anchor}\n{text}{footer}"
 
 
+_DEF_MARK = "[definition of "
+
+
+def _format_definition(label: str, d: definitions.Definition) -> str:
+    """One definition paragraph, labelled with its paragraph so it is cited on its own."""
+    text = d.text if len(d.text) <= DEF_CHARS else d.text[:DEF_CHARS] + " …[definition truncated]"
+    return f'## Raw file: {label} {d.section}\n{_DEF_MARK}"{d.term}" — {d.anchor}]\n{text}'
+
+
 def _read_key(base: str, canon: str, offset: int) -> str:
     """Visited-memory key. Distinct sections (canon) get distinct keys so the
     guard no longer collapses every section read to the base file at offset 0."""
@@ -521,7 +568,11 @@ def _read_key(base: str, canon: str, offset: int) -> str:
 
 def _canon(base: str, section: str) -> str:
     """A section's visited-memory form: the anchor it resolves to, so "§62" and "§ 62" share
-    one entry; the normalized request when it resolves to nothing. Caller binds the DB."""
+    one entry; a definition's own paragraph ("5 abs. 32"); the normalized request when it
+    resolves to nothing. Caller binds the DB."""
+    d = _definition_in(base, section)
+    if d is not None:
+        return _norm_anchor(d.section)
     ch = _resolve_section(base, section) if section else None
     return _norm_anchor(ch["anchor"]) if ch else _norm_anchor(section)
 
@@ -571,6 +622,9 @@ def _raw_read_one(filename: str, offset: int = 0) -> str:
     with db_context.using_db(db):
         label = db_context.qualify(base, db)
         if section:
+            d = _definition_in(base, section)
+            if d is not None:
+                return _format_definition(label, d)
             ch = _resolve_section(base, section)
             if ch is not None:
                 return _format_section(base, ch, label)
@@ -692,6 +746,13 @@ def _section_read(mem: run_memory.RunMemory, qbase: str, ch: dict[str, Any]) -> 
     return any(o < end and o + RAW_READ_CAP > start for o in _read_offsets(mem, qbase))
 
 
+def _paragraph_read(mem: run_memory.RunMemory, qbase: str, ch: dict[str, Any]) -> bool:
+    """Whether this run read a definition paragraph of the § that chunk `ch` belongs to:
+    prose naming "§ 5" after "§ 5 Abs. 32" was read names a read section."""
+    para = _norm_anchor(_TEIL_RE.sub("", ch.get("anchor", ""))) + " abs. "
+    return any(c.startswith(para) for c in _read_canons(mem, qbase))
+
+
 def _legal_chunk(base: str, anchor: str) -> dict[str, Any] | None:
     """The chunk of `base` whose anchor is exactly `anchor` (or its first part), else None:
     stricter than `_resolve_section`, so a "§ 6" in prose never resolves to § 60."""
@@ -761,17 +822,40 @@ def _resolve_work(name: str) -> str | None:
     return found
 
 
+def _definition_read(mem: run_memory.RunMemory, qbase: str, d: definitions.Definition) -> bool:
+    """Whether this run read definition `d`: on its own, or with the part of its § that
+    holds it. Caller binds the DB."""
+    if mem.seen_read(_read_key(qbase, _norm_anchor(d.section), 0)) is not None:
+        return True
+    _, base = db_context.split_ref(qbase)
+    parts = (
+        c
+        for c in chunker.load_chunks(base)
+        if _TEIL_RE.sub("", c.get("anchor", "")) == d.anchor and d.text[:80] in c.get("text", "")
+    )
+    return any(_section_read(mem, qbase, c) for c in parts)
+
+
+def _unread_ref(mem: run_memory.RunMemory, ref: str) -> tuple[str, str] | None:
+    """(qualified file, anchor) when `ref` cites a section or definition never read."""
+    db, base, section = _split_ref(ref)
+    if not section:
+        return None
+    qbase = db_context.qualify(base, db)
+    with db_context.using_db(db):
+        d = _definition_in(base, section)
+        if d is not None:
+            return None if _definition_read(mem, qbase, d) else (qbase, d.section)
+        ch = _resolve_section(base, section)
+    if ch is not None and not _section_read(mem, qbase, ch):
+        return qbase, ch["anchor"]
+    return None
+
+
 def _tagged_unread(mem: run_memory.RunMemory, raw_cited: set[str]) -> list[tuple[str, str]]:
     """(qualified file, anchor) of each `[Source: file §N]` whose section was not read."""
-    out: list[tuple[str, str]] = []
-    for ref in sorted(raw_cited):
-        db, base, section = _split_ref(ref)
-        with db_context.using_db(db):
-            ch = _resolve_section(base, section) if section else None
-        qbase = db_context.qualify(base, db)
-        if ch is not None and not _section_read(mem, qbase, ch):
-            out.append((qbase, ch["anchor"]))
-    return out
+    found = (_unread_ref(mem, ref) for ref in sorted(raw_cited))
+    return [u for u in found if u is not None]
 
 
 def _prose_unread(mem: run_memory.RunMemory, answer: str, cited: set[str]) -> list[tuple[str, str]]:
@@ -789,7 +873,9 @@ def _prose_unread(mem: run_memory.RunMemory, answer: str, cited: set[str]) -> li
                 ch = _legal_chunk(base, r.anchor)
             if ch is not None:
                 held.append((qbase, ch))
-        if held and not any(_section_read(mem, q, ch) for q, ch in held):
+        if held and not any(
+            _section_read(mem, q, ch) or _paragraph_read(mem, q, ch) for q, ch in held
+        ):
             out.append((held[0][0], r.anchor))
     return out
 
@@ -912,12 +998,35 @@ def _research_gap(raw_cited: set[str]) -> str | None:
     return None
 
 
-def _section_key(ref: str) -> tuple[str, str]:
-    """The section a citation points to, for counting sources: "§ 62 (2) Nr. 1" and
-    "§ 62 (3)" are § 62, so finer tags do not raise the word floor."""
-    file, anchor = ref_key(ref)
-    m = re.match(r"§?\s*(\d+[a-z]?)\b", anchor)
-    return file, m[1] if m else anchor
+def _tags(reads: list[str]) -> str:
+    return ", ".join(f"[Source: {r}]" for r in reads)
+
+
+def _coverage_gap(raw_cited: set[str]) -> str | None:
+    """A rejection while the answer leaves out a core section of the run, or cites fewer
+    than TERMS_REQUIRED of the level-2 definitions (naming the leading ones it lacks)."""
+    mem = run_memory.current()
+    if mem is None or not mem.core_refs:
+        return None
+    cited = {ref_key(r) for r in raw_cited}
+    core = [r for r in mem.core_refs if ref_key(r) not in cited]
+    lacking = [r for r in mem.term_refs if ref_key(r) not in cited]
+    short = min(TERMS_REQUIRED, len(mem.term_refs)) - (len(mem.term_refs) - len(lacking))
+    gaps = [CHAT_COVERAGE_CORE.format(refs=_tags(core))] if core else []
+    if short > 0:
+        gaps.append(CHAT_COVERAGE_TERMS.format(refs=_tags(lacking[:short])))
+    return CHAT_COVERAGE_GAP.format(what="; ".join(gaps)) if gaps else None
+
+
+def _too_terse(words: int, raw_cited: set[str], wiki_cited: set[str]) -> str | None:
+    """Once per run: an answer under CHAT_WORDS_PER_ITEM words per cited source is sent
+    back to explain each one (once, so a short answer never turns into padding)."""
+    mem = run_memory.current()
+    items = len({ref_key(r) for r in raw_cited}) + len(wiki_cited)
+    if mem is None or mem.terse_nudged or words >= CHAT_WORDS_PER_ITEM * items:
+        return None
+    mem.terse_nudged = True
+    return CHAT_TERSE.format(items=items, words=words)
 
 
 def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
@@ -929,13 +1038,6 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     wiki_cited = {f"wiki:{w}" for w in _WIKI_CITE_RE.findall(answer or "")}
     raw_unique = cited | extra
     unique = raw_unique | wiki_cited
-    sections = len({_section_key(r) for r in raw_unique}) + len(wiki_cited)
-    floor = min(CHAT_MIN_WORDS, CHAT_WORDS_PER_SOURCE * sections)
-    if words < floor:
-        return (
-            f"REJECTED: answer has {words} words; with {sections} cited sections the minimum "
-            f"is {floor}. Continue researching and expand the answer."
-        )
     if len(unique) < CHAT_MIN_SOURCES or not raw_unique:
         return (
             f"REJECTED: answer cites {len(unique)} unique sources ({len(raw_unique)} from "
@@ -945,6 +1047,8 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     nudge = (
         _research_gap(raw_unique)
         or _unread_sections(answer or "", raw_unique)
+        or _coverage_gap(raw_unique)
+        or _too_terse(words, raw_unique, wiki_cited)
         or _unmatched_quotes(answer or "", raw_unique)
         or _open_refs_missing(answer or "", raw_unique)
         or _low_confidence_nudge()
@@ -958,6 +1062,7 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
 # The gate's one-time nudges: each rejects once per run, then lets the answer pass.
 _ONCE_FLAGS = (
     "prose_section_nudged",
+    "terse_nudged",
     "quote_nudged",
     "open_refs_nudged",
     "low_conf_nudged",
@@ -1324,6 +1429,13 @@ def _serve_section(
     return _with_marker(text, marker) + _ref_footer(mem, t, ch["anchor"], ch["text"])
 
 
+def _serve_definition(mem: run_memory.RunMemory, t: _Target, d: definitions.Definition) -> str:
+    """One definition paragraph, marked read under its own key, with its reference footer."""
+    _note_follow(mem, t.qbase, t.canon)
+    mem.mark_read(_read_key(t.qbase, t.canon, 0))
+    return _raw_read_one(t.ref) + _ref_footer(mem, t, d.anchor, d.text)
+
+
 def _serve_window(mem: run_memory.RunMemory, t: _Target, offset: int, marker: str = "") -> str:
     """One byte window, marked read, with the references it makes."""
     text = _raw_read_one(t.qbase, offset=offset)
@@ -1415,6 +1527,10 @@ def _memory_read(mem: run_memory.RunMemory, ref: str, offset: int) -> tuple[str,
     prior = mem.seen_read(_read_key(t.qbase, t.canon, offset))
     if prior is not None:
         return _advance(mem, t, f"repeat of step {prior}"), t.qbase
+    with db_context.using_db(t.db):
+        d = _definition_in(t.base, t.section)
+    if d is not None:
+        return _serve_definition(mem, t, d), t.qbase
     if not t.section and offset == 0 and total > RAW_READ_CAP and _is_law(t):
         mapped = _section_map_read(mem, t)
         if mapped is not None:
@@ -1439,26 +1555,209 @@ def raw_read(filenames: list[str], offset: int = 0) -> str:
     mem = run_memory.current()
     if mem is None:
         return _raw_read_impl(filenames, offset=offset)
-    mem.tick()
     filenames = _names(filenames)
     if not filenames:
         return _raw_read_impl(filenames, offset=offset)
-    results = [_memory_read(mem, f, int(offset or 0)) for f in filenames]
+    return _reads(mem, filenames, int(offset or 0))
+
+
+def _reads(
+    mem: run_memory.RunMemory, filenames: list[str], offset: int, leads: bool = False
+) -> str:
+    """raw_read under the run memory; `leads` keeps every paragraph's rule in the ledger."""
+    mem.tick()
+    results = [_memory_read(mem, f, offset) for f in filenames]
     out = [text for text, _ in results]
-    _note_evidence(mem, out)
+    _note_evidence(mem, out, leads)
     nudge = _pagination_nudge(mem, [qbase for _, qbase in results])
     return "\n\n".join([*out, nudge] if nudge else out)
 
 
-def _note_evidence(mem: run_memory.RunMemory, outputs: list[str]) -> None:
-    """Add each read's sentences that match the run's query to its evidence ledger."""
+def _note_evidence(mem: run_memory.RunMemory, outputs: list[str], leads: bool = False) -> None:
+    """Add each read's sentences that match the run's query to its evidence ledger; with
+    `leads`, and for a definition, also each paragraph's first sentence."""
     query = _run_query(mem)
     have = {s for _, s in mem.ledger}
     for text in outputs:
-        for ref, sentence in evidence.extract(text, query):
+        for ref, sentence in evidence.extract(text, query, leads=leads or _DEF_MARK in text):
             if sentence not in have and len(mem.ledger) < LEDGER_MAX:
                 mem.ledger.append((ref, sentence))
                 have.add(sentence)
+
+
+# --- levels read in code (ideas/deep-chat-levels.md) ----------------------------------
+
+_HIT_FILE_RE = re.compile(r"^file: (.+)$", re.M)  # a raw_search hit's file and section
+_TEXT_EXTS = (".md", ".txt", ".html")
+
+
+def core_refs(outputs: list[str]) -> list[str]:
+    """Level 1: the first CORE_MAX distinct sections the raw searches ranked, in rank order
+    (the parts of one long § are one section)."""
+    out: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for text in outputs:
+        for hit in _HIT_FILE_RE.findall(text):
+            ref = _TEIL_RE.sub("", hit.strip())
+            key = ref_key(ref)
+            if _split_ref(ref)[2] and key not in seen:
+                seen.add(key)
+                out.append(ref)
+    return out[:CORE_MAX]
+
+
+def _section_chunks(ref: str) -> tuple[str, list[dict[str, Any]]]:
+    """(qualified file, every part of the section `ref` names, in order)."""
+    db, base, section = _split_ref(ref)
+    with db_context.using_db(db):
+        ch = _resolve_section(base, section) if section else None
+        chunks = chunker.load_chunks(base) if ch is not None else []
+    anchor = _TEIL_RE.sub("", ch["anchor"]) if ch is not None else ""
+    parts = [c for c in chunks if _TEIL_RE.sub("", c.get("anchor", "")) == anchor]
+    return db_context.qualify(base, db), parts
+
+
+def _section_parts(ref: str) -> list[str]:
+    """The raw_read refs of the parts of section `ref`, up to CORE_CHARS."""
+    qbase, parts = _section_chunks(ref)
+    out: list[str] = []
+    size = 0
+    for c in parts:
+        if out and size + len(c["text"]) > CORE_CHARS:
+            break
+        out.append(f"{qbase} {c['anchor']}")
+        size += len(c["text"])
+    return out or [ref]
+
+
+def _law_files() -> list[str]:
+    """The qualified raw files in the search scope that are laws (have § sections)."""
+    out: list[str] = []
+    for db in db_context.search_scope():
+        with db_context.using_db(db):
+            raw = db_context.raw_dir()
+            names = sorted(p.name for p in raw.iterdir() if p.suffix.lower() in _TEXT_EXTS)
+            laws = [
+                n
+                for n in names
+                if any(c.get("anchor", "").startswith("§") for c in chunker.load_chunks(n))
+            ]
+        out += [db_context.qualify(n, db) for n in laws]
+    return out
+
+
+def _outgoing(
+    mem: run_memory.RunMemory, qfile: str
+) -> list[tuple[str, str, list[tuple[str, str]]]]:
+    """(anchor, heading, cross references as (file, normalized anchor)) per § section of law
+    `qfile`, built once per run."""
+    if qfile not in mem.citations:
+        db, base = db_context.split_ref(qfile)
+        with db_context.using_db(db):
+            chunks = chunker.load_chunks(base)
+        rows: dict[str, tuple[str, list[tuple[str, str]]]] = {}
+        for ch in chunks:
+            anchor = _TEIL_RE.sub("", ch.get("anchor", ""))
+            if not anchor.startswith("§"):
+                continue
+            row = rows.setdefault(anchor, ((ch.get("heading_path") or [anchor])[0], []))
+            try:
+                found = refs.find_refs(
+                    ch["text"], qfile, anchor, _resolve_work, lambda _f, _a: True
+                )
+            except Exception:  # an odd text shape must never cost the run
+                continue
+            row[1].extend(
+                (r.target, _norm_anchor(r.anchor))
+                for r in found
+                if r.kind == refs.CROSS and r.target
+            )
+        mem.citations[qfile] = [(a, h, t) for a, (h, t) in rows.items()]
+    return mem.citations[qfile]
+
+
+def citing_sections(
+    mem: run_memory.RunMemory, core: str, laws: list[str] | None = None
+) -> list[str]:
+    """Sections of other laws in scope that cite the section `core` (a regulation applies
+    the act; the act never names it), those whose heading shares most words with the
+    core's heading first, then the most citing; at most CITING_MAX."""
+    qfile, anchor = ref_key(core)
+    want = (qfile, _norm_anchor(anchor))
+    _, parts = _section_chunks(core)
+    title = (parts[0].get("heading_path") or [""])[0] if parts else ""
+    heading = evidence.stems(str(title))
+    ranked: list[tuple[int, int, int, str]] = []
+    for f in laws if laws is not None else _law_files():
+        if f == qfile:
+            continue
+        for a, h, targets in _outgoing(mem, f):
+            if want in targets:
+                shared = len(evidence.stems(h) & heading)
+                ranked.append((-shared, -targets.count(want), len(ranked), f"{f} {a}"))
+    return [r[-1] for r in sorted(ranked)][:CITING_MAX]
+
+
+def _scope_terms(prefer: list[str], laws: list[str]) -> dict[definitions.Definition, str]:
+    """Every definition in scope → its file; a term defined in the core's own law wins."""
+    out: dict[definitions.Definition, str] = {}
+    seen: set[str] = set()
+    for qfile in dict.fromkeys([*prefer, *laws]):
+        db, base = db_context.split_ref(qfile)
+        with db_context.using_db(db):
+            defs = _register(base)
+        for d in defs:
+            if d.term.casefold() not in seen:
+                seen.add(d.term.casefold())
+                out[d] = qfile
+    return out
+
+
+def _terms_used(
+    text: str, pool: dict[definitions.Definition, str], question: str, skip: set[str]
+) -> list[str]:
+    """The definition refs ("file § 5 Abs. 32") of the terms `text` uses, ranked; none in
+    `skip`, neither as a definition nor as part of a skipped section (a core § 5)."""
+    out: list[str] = []
+    for d in definitions.used_in(text, pool, question):
+        ref = f"{pool[d]} {d.section}"
+        if ref not in skip and f"{pool[d]} {d.anchor}" not in skip:
+            out.append(ref)
+    return out
+
+
+def _level_read(mem: run_memory.RunMemory, level: int, reads: list[str]) -> tuple[list[str], str]:
+    for r in reads:
+        mem.levels.setdefault(ref_key(r), level)
+    return reads, f"{CHAT_LEVEL_HEADERS[level]}\n\n{_reads(mem, reads, 0, leads=True)}"
+
+
+def level_reads(question: str, outputs: list[str]) -> list[tuple[list[str], str]]:
+    """Code's reads, level by level, after the pre-flight searches `outputs`: the core
+    sections (1), the definitions of the terms they use and the sections citing them (2),
+    the terms inside those definitions (3). (refs, output) per level that read anything;
+    [] outside a run or without a section hit."""
+    mem = run_memory.current()
+    core = core_refs(outputs) if mem is not None else []
+    if mem is None or not core:
+        return []
+    mem.core_refs = core
+    done = [_level_read(mem, 1, [p for c in core for p in _section_parts(c)])]
+    laws = _law_files()
+    pool = _scope_terms([ref_key(c)[0] for c in core], laws)
+    text = "\n".join(c["text"] for ref in core for c in _section_chunks(ref)[1])
+    own = {f"{ref_key(c)[0]} {ref_key(c)[1]}" for c in core}
+    terms = _terms_used(text, pool, question, own)[:TERMS_MAX]
+    mem.term_refs = terms
+    citing = [s for c in core for s in citing_sections(mem, c, laws) if s not in own]
+    second = [*terms, *list(dict.fromkeys(citing))[:CITING_MAX]]
+    if second:
+        done.append(_level_read(mem, 2, second))
+    inner = "\n".join(d.text for d, f in pool.items() if f"{f} {d.section}" in terms)
+    third = _terms_used(inner, pool, question, own | set(terms))[:DEEP_TERMS_MAX]
+    if third:
+        done.append(_level_read(mem, 3, third))
+    return done
 
 
 @tool(description=SUBMIT_CHAT_DESCRIPTION)

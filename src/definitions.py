@@ -89,6 +89,11 @@ def register(text: str) -> list[Definition]:
     return out
 
 
+def is_paragraph_ref(ref: str) -> bool:
+    """Whether `ref` names one paragraph of a section ("§ 5 Abs. 32", "§ 5 (32)")."""
+    return bool(_PARA_REF_RE.match(ref.strip()))
+
+
 def find(defs: Iterable[Definition], ref: str) -> Definition | None:
     """The definition a paragraph reference names ("§ 5 Abs. 32"), or None."""
     m = _PARA_REF_RE.match(ref.strip())

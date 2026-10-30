@@ -437,7 +437,13 @@ CHAT_AGENT_SYSTEM = """You are a chat agent that answers user questions from the
 - wiki_read(filenames): read a full wiki page. Connected pages come from wiki_search as `[Wiki linked N]` entries — read them when the question spans more than one topic.
 - think_tool(reflection): MANDATORY reflection. Three labelled sections required, see below.
 - evaluate_condition(facts, condition): deterministic PASS/FAIL evaluator for thresholds, limits, eligibility rules, and compound legal/regulatory criteria. MUST be used whenever the user's question turns on whether numeric/categorical values from the sources meet a stated rule — never decide PASS/FAIL in prose.
-- submit_chat_answer(answer, sources): submit the final answer. REJECTED if answer has fewer than {words_per_source} words per cited source (at most {min_words} needed), or fewer than {min_sources} unique sources, or if no [Source: ...] document is cited, or after fewer than {min_searches} distinct searches, or if none of the cited originals was opened with raw_read, or if a § you cite was never read. An answer written as prose instead of submitted goes through the same checks.
+- submit_chat_answer(answer, sources): submit the final answer. REJECTED if it leaves out a level-1 core section or the leading level-2 defined terms, or cites fewer than {min_sources} unique sources, or no [Source: ...] document, or after fewer than {min_searches} distinct searches, or if none of the cited originals was opened with raw_read, or if a § you cite was never read; once, if it has fewer than {words_per_item} words per cited source. An answer written as prose instead of submitted goes through the same checks.
+
+Levels (critical) — code has already read, before your first turn:
+- level 1: the core — the sections the search ranked highest, in full;
+- level 2: the definitions of the terms those sections use, and the sections of other laws that apply them;
+- level 3: the terms used inside those definitions.
+Answer level by level: first the core rule that answers the question (its conditions, procedure, figures), then what its terms mean (each definition with its citation), then the provisions that apply it. Read further only for gaps the levels leave open; do not wander into details the question does not ask about.
 
 Wiki vs raw (critical):
 - The wiki is a MAP, the originals are the TERRITORY. Use the wiki to orient and to discover connections; take every fact, number, and exact wording from data/raw/.
@@ -474,7 +480,7 @@ Required workflow:
      Next: <which tool to call next and why; one of raw_read / raw_search / wiki_search / wiki_read / submit_chat_answer>
 4. AUTONOMOUS EXPANSION: based on the gaps, raw_read the next section OR raw_search with a different stem. When a gap is about which document covers a topic, or how two topics connect, use wiki_search / wiki_read to find the connection, then go back to the originals for the facts. Reflect every 2-3 tool calls.
 4.5 EVALUATE: if the question turns on whether values meet a threshold, limit, or compound rule that the sources state explicitly, you MUST call evaluate_condition exactly once before submit_chat_answer. Extract the literal `facts` from the source text (numbers, categories, labels — keep the units the law uses) and assemble the `condition` tree as the law states it (use `or` when the law says "oder", `and` when "und"). Quote the result block verbatim in the final answer.
-5. SUBMIT: when you have at least {min_searches} tool calls and at least {min_sources} unique sources (counting section suffixes), call submit_chat_answer with a structured markdown answer (about {words_per_source} words per cited source, up to {min_words}; no padding): open with a direct answer in 2-3 sentences, then one `## ` section per sub-question with the exact figures, conditions and exceptions from the originals, and end with `## Open points` when gaps remain. Inline-cite every factual claim.
+5. SUBMIT: when you have at least {min_searches} tool calls and at least {min_sources} unique sources (counting section suffixes), call submit_chat_answer with a detailed, structured markdown answer: open with a direct answer in 2-3 sentences, then one `## ` section per level (the core rule with its exact conditions, figures and exceptions; the defined terms; the provisions applying it), explain each cited source in 2-4 sentences of its own, and end with `## Open points` when gaps remain. Inline-cite every factual claim; add no uncited text.
 
 Discipline:
 - Stay on the question, but answer it completely: every sub-question from your PLAN gets its own section.
@@ -501,7 +507,8 @@ RAW_READ_DESCRIPTION = (
 )
 
 SUBMIT_CHAT_DESCRIPTION = (
-    "Submit the final chat answer. Validates >= min_words and >= min_sources unique [Source: filename] "
+    "Submit the final chat answer. Validates that the level-1 core sections and the leading level-2 "
+    "defined terms are cited, >= min_sources unique [Source: filename] "
     "citations, >= min_searches distinct searches, that a cited original was raw_read, and that "
     "every cited § was read. On accept, returns the answer to the UI (no file is written; the user saves manually)."
 )
@@ -550,7 +557,7 @@ CHAT_BUDGET_NUDGE = (
     "STEP BUDGET: you have used most of your step budget. "
     "Do NOT write prose — call submit_chat_answer right now. "
     "Use `answer` = all findings gathered so far in full markdown "
-    "(aim for {min_words}+ words, cite every source as [Source: filename]). "
+    "(explain every source in 2-4 sentences, cite each as [Source: filename]). "
     "This is your only remaining action."
 )
 
@@ -558,6 +565,37 @@ CHAT_BUDGET_NUDGE = (
 CHAT_SECTION_UNREAD = (
     "REJECTED: you cite {cited} but never read {pronoun}. Call raw_read({calls}), take the "
     "conditions from its text, then submit again."
+)
+
+# Levels read in code (tools.level_reads, ideas/deep-chat-levels.md): the first line of each
+# level's read, and the group headers of the evidence ledger.
+CHAT_LEVEL_HEADERS = {
+    1: "[level 1 — the core: the sections the search ranked highest, read in full]",
+    2: "[level 2 — the defined terms the core sections use, and the provisions of other "
+    "laws that apply them]",
+    3: "[level 3 — the terms used inside those definitions]",
+}
+CHAT_LEDGER_LEVELS = {
+    1: "Level 1 — core provisions (the rule that answers the question):",
+    2: "Level 2 — defined terms and provisions applying the core:",
+    3: "Level 3 — terms inside those definitions:",
+    0: "Further quotes:",
+}
+
+# Coverage gate (tools._coverage_gap): replaces the word floor. The answer explains every
+# core section and the leading defined terms, each with its own citation.
+CHAT_COVERAGE_GAP = (
+    "REJECTED: {what}. Build the answer level by level — the core rule first, then what "
+    "its terms mean, then the provisions applying it — and explain each in its own "
+    "sentences with its citation tag, then submit again."
+)
+CHAT_COVERAGE_CORE = "explain the core sections the search ranked highest: {refs}"
+CHAT_COVERAGE_TERMS = "explain the defined terms the core sections rely on: {refs}"
+# Verbosity (tools._too_terse), once per run: an answer too short for its sources.
+CHAT_TERSE = (
+    "REJECTED: the answer is too short for its {items} cited sources ({words} words). "
+    "Explain each source's rule, conditions, figures and exceptions in 2-4 sentences of "
+    "its own, then submit again. Add no uncited text."
 )
 
 # A Deep chat tool that raised (chat_agent._tool_error). Deliberately without the exception
@@ -671,14 +709,17 @@ CHAT_LEDGER_PROMPT = """Question: {question}
 Quotes from the original documents (the only facts you may use):
 {evidence}
 
-Write the answer in markdown from these quotes only:
-- Start with a direct answer in 2-3 sentences.
-- Then one `## ` section per sub-question, with the exact figures, conditions and exceptions from the quotes.
+Write a detailed answer in markdown from these quotes only, level by level as they are grouped:
+- Start with a direct answer in 2-3 sentences, from the level-1 quotes.
+- Then a `## ` section on the core provisions: the rule, its conditions, procedure, exact figures and exceptions.
+- Then a `## ` section on the defined terms (levels 2 and 3): what each term means, with its quote's tag, and why it matters for the core rule.
+- Then a `## ` section on the provisions that apply the core, if quoted.
+- Explain each quoted source in 2-4 sentences of its own.
 - End with `## Open points` for what the quotes do not settle.
 - After every claim put the citation tag of its quote exactly as given, e.g. [Source: file.md § 5]. Never cite anything else.
 - Outside quotation marks, name no section (§) that is not in one of the tags: write "a further provision" instead.
 - Put quotation marks only around wording copied exactly from a quote, § numbers included; otherwise paraphrase.
-- Write at least {words} words, without padding."""
+- Write about {words} words, without padding."""
 
 RESEARCH_FALLBACK_PROMPT = """The research agent gathered the notes below but stopped without assembling a report. Using ONLY these notes, write the best possible answer to the question.
 
