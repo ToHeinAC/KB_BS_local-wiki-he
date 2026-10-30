@@ -252,3 +252,15 @@ def test_a_research_report_must_cover_the_levels_and_has_no_word_floor(wiki_dir,
     assert out.startswith("REJECTED: explain the core section(s)")
     ok = tools._submit_final_impl("T", "Erläuterung " * 50 + "[Source: a.md § 1]")
     assert ok.startswith("ACCEPTED")
+
+
+def test_citations_of_markdown_heading_sections_count_as_sources(wiki_dir):
+    # code's own tags for a heading section carry its title, not a § or #
+    (tools.db_context.raw_dir() / "manual.md").write_text(_MANUAL, encoding="utf-8")
+    chunker.write_chunks("manual.md", chunker.split(_MANUAL))
+    mem = run_memory.begin_run("How is the pump installed and maintained?")
+    for q in ("a", "b", "c"):
+        mem.mark_search(f"raw_search:{q}")
+    tools.raw_read.invoke({"filenames": ["manual.md Installation", "manual.md Maintenance"]})
+    answer = _covered_answer("manual.md Installation", "manual.md Maintenance")
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")

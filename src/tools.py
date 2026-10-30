@@ -106,10 +106,11 @@ _WIKI_CITE_RE = re.compile(r"\[Wiki:\s*([^\]\n]+?\.md)\s*\]")
 # "Abschnitt 5", "Abs. 5" (resolved to the heading that starts with the number).
 _DOC_SECTION = r"(?:Kapitel\b|Kap\.|Abschnitte?\b|Abschn\.|Absatz\b|Abs\.)"
 _DOC_SECTION_RE = re.compile(rf"^{_DOC_SECTION}\s*(?P<num>\d+(?:\.\d+)*)\b")
-# Accept an optional trailing " §...", " #..." or " Kapitel ..." section marker so the same
-# file can be cited as multiple distinct sources, e.g. [Source: StrlSchG.md §62].
+# Accept an optional trailing section — " §...", " #...", " Kapitel ..." or a markdown
+# heading's title — so the same file can be cited as multiple distinct sources, e.g.
+# [Source: StrlSchG.md §62], [Source: guide.md Ownership Rules].
 _RAW_CITE_RE = re.compile(
-    rf"\[Source:\s*([^\]\n]+?\.(?:md|txt|html)(?:\s*(?:[§#]|{_DOC_SECTION})[^\]\n]+?)?)\s*\]"
+    r"\[Source:\s*([^\]\n]+?\.(?:md|txt|html)(?:\s*[§#][^\]\n]+?|\s+[^\]\n]+?)?)\s*\]"
 )
 
 
