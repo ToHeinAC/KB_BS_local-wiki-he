@@ -74,3 +74,16 @@ Findings (the second set shows what one corpus hid):
 Still open: the 3-search minimum is the most frequent rejection (g4 six times, g7 five);
 the ledger writer still drops a named term's definition although the prompt names it (q1,
 q3, q4, q7, g3, g4); g1 answers from one section and falls under the 2-source minimum.
+
+### Rerun with `CHAT_MIN_SEARCHES=2` (after 6572877)
+
+| Set | Accepted | Best effort | Gold read | Mean time |
+|---|---|---|---|---|
+| StrlSch | 4 | 3 (q1, q4, q5) | 9/10 | 72 s (q1 96, q5 76, q7 82) |
+| General | 7 | 0 | 7/7 | 66 s |
+
+The search minimum no longer rejects any run. The most frequent rejection now is a named
+term's definition missing from the answer (8 times on StrlSch, 6 on General). g7 first crashed
+the run: E4B passed `sources` as a list of objects (fixed in 81ddfa4). On the rerun, E4B cited
+`data/raw/rust-ownership.md …` with a path prefix, which the read check does not map to the
+file, so the answer was rejected seven times before the ledger answer passed (118 s).
