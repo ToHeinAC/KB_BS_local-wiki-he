@@ -283,6 +283,21 @@ def _auto_read(msgs: list[AnyMessage]) -> AIMessage | None:
     return AIMessage(content="", tool_calls=[read])
 
 
+def _due_read(mem: run_memory.RunMemory | None) -> AIMessage | None:
+    """A `raw_read` of the sections the last rejection cited unread: E4B tends to resubmit
+    the same answer instead of reading them."""
+    if mem is None or not mem.unread_due:
+        return None
+    refs, mem.unread_due = mem.unread_due, []
+    read: ToolCall = {
+        "name": "raw_read",
+        "args": {"filenames": refs},
+        "id": f"due-read-{mem.step}",
+        "type": "tool_call",
+    }
+    return AIMessage(content="", tool_calls=[read])
+
+
 def _covered(mem: run_memory.RunMemory) -> bool:
     """Enough searches and quoted sources for the gate to accept a ledger answer."""
     refs = {ref for ref, _ in mem.ledger}
@@ -303,9 +318,13 @@ def _evidence_stalled(mem: run_memory.RunMemory | None) -> bool:
 def _code_turn(
     msgs: list[AnyMessage], mem: run_memory.RunMemory | None, directive: str
 ) -> AIMessage | HumanMessage | None:
-    """A turn code takes instead of the model: the auto-read, or a stalled run's ledger
-    answer. If that passes the gate the run stops (an empty message ends the graph and the
-    final step ships it); else the verdict goes to the model as feedback."""
+    """A turn code takes instead of the model: the read of sections a rejection cited
+    unread, the auto-read, or a stalled run's ledger answer. If that passes the gate the
+    run stops (an empty message ends the graph and the final step ships it); else the
+    verdict goes to the model as feedback."""
+    due = _due_read(mem)
+    if due is not None:
+        return due
     stalled = _evidence_stalled(mem)
     auto = _auto_read(msgs)
     if auto is not None or not stalled or mem is None:

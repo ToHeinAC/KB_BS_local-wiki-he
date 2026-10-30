@@ -45,6 +45,8 @@ class RunMemory:
     prose_section_nudged: bool = False  # an unread § named in the prose was rejected once
     open_refs_nudged: bool = False  # an out-of-scope reference missing from Open points
     quote_nudged: bool = False  # a quoted span the cited originals lack was rejected once
+    # The sections the last rejection cited unread ("file § N"): code reads them next turn.
+    unread_due: list[str] = field(default_factory=list[str])
     # Evidence ledger (src/evidence.py): (citation ref, sentence) from every raw_read; and
     # how many turns in a row added none (chat_agent's stop rule).
     ledger: list[tuple[str, str]] = field(default_factory=list[tuple[str, str]])

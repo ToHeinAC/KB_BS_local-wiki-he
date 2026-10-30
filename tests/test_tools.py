@@ -631,6 +631,13 @@ def test_a_cited_section_that_was_never_read_is_rejected_with_the_exact_call(wik
     assert tools._submit_chat_impl(_TAGGED).startswith("ACCEPTED")
 
 
+def test_the_unread_sections_of_a_rejection_are_left_for_code_to_read(wiki_dir, monkeypatch):
+    mem = _grounding_run(monkeypatch)
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md § 1"]})
+    tools._submit_chat_impl(_TAGGED)
+    assert mem.unread_due == ["StrlSchG.md § 62"]
+
+
 def test_a_byte_window_that_covers_the_cited_section_counts_as_reading_it(wiki_dir, monkeypatch):
     mem = _grounding_run(monkeypatch)
     start = _LONG_LAW.index("## § 62")

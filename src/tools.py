@@ -808,6 +808,7 @@ def _unread_sections(answer: str, raw_cited: set[str]) -> str | None:
     if not unread:
         return None
     unread = list(dict.fromkeys(unread))[:3]
+    mem.unread_due = [f"{f} {a}" for f, a in unread]
     return CHAT_SECTION_UNREAD.format(
         cited=", ".join(f"{a} of {f}" for f, a in unread),
         pronoun="it" if len(unread) == 1 else "them",

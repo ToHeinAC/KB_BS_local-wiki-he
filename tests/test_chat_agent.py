@@ -712,3 +712,39 @@ def test_a_failed_hypothetical_passage_leaves_the_plain_pre_flight(monkeypatch):
     chat_agent.run_memory.begin_run("q?")
     msgs = chat_agent._preflight("q?")
     assert len([m for m in msgs if isinstance(m, ToolMessage)]) == 2
+
+
+# --- unread sections a rejection names are read by code (ideas/deep-chat-levels.md) ---
+
+
+def test_code_reads_the_sections_a_rejection_names_as_unread(monkeypatch):
+    # E4B resubmitted one answer six times against "you cite § 100 … but never read it"
+    # (~70 s) before reading it; code makes that read itself right after the rejection.
+    reads: list = []
+    _stub_search(monkeypatch, reads)
+
+    verdicts = iter(["REJECTED: you cite § 100 of StrlSchV.md but never read it."])
+
+    def gate(answer, sources=None):
+        verdict = next(verdicts, "ACCEPTED: ok")
+        mem = chat_agent.run_memory.current()
+        if mem is not None and verdict.startswith("REJECTED"):
+            mem.unread_due = ["StrlSchV.md § 100"]
+        return verdict
+
+    monkeypatch.setattr(chat_agent.tool_module, "_submit_chat_impl", gate)
+    fake = _patch_llm(
+        monkeypatch,
+        [
+            _ai_with_tool("raw_read", {"filenames": ["b.md"]}, "r1"),
+            _ai_with_tool("submit_chat_answer", {"answer": "A [Source: StrlSchV.md § 100]"}, "s1"),
+        ],
+    )
+    list(chat_agent.run_chat_agent("q?"))
+    assert reads == [["b.md"], ["StrlSchV.md § 100"]]
+    after = fake.calls[2]
+    assert isinstance(after[-1], ToolMessage)
+    assert after[-1].content == "READ TEXT"
+    mem = chat_agent.run_memory.current()
+    assert mem is not None
+    assert mem.unread_due == []
