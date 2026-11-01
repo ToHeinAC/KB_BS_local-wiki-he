@@ -136,6 +136,13 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   every level it writes is still reachable (`_resume`), so a shrunk clearance still drops it from view. *Reset* keeps
   the model loaded while a batch runs (`gui_chrome.release_model`), and *Stop server* refuses until it has finished.
   A server restart (`restart-app`, `tunnel.sh`) still ends it.
+- **Write a note (`src/gui_note.py`, below the drop zone):** a typed note (optional title) goes through *Clean up*
+  (`note.clean` in a worker), then an editable preview with *Add to batch* or *Back*. Numbers the cleanup added
+  are named in a warning (`note.new_numbers`); a failed cleanup shows the typed text unchanged so it can be added as
+  typed. *Add to batch* stores `note.compose(cleaned, typed)` as `note-<today>-<slug>.md` and queues it like a
+  dropped Markdown file (`UploadView.add_note`), with today as its effective date unless one is detected in the text
+  (`Upload.default_dates`); classification, review and Ingest are the batch's. The cleanup itself is described in
+  [architecture.md](architecture.md) (`src/note.py`).
 - **Maintenance (`src/gui_maint.py`):** statistics (pages, raw sources, data size), a level picker when more than one
   level is reachable (`Session.bind_shard`: that shard becomes the active DB and the only scope, so every section
   follows it), and a section toggle: *Search index* (counts, a missing-index warning, Rebuild), *Delete source* (a
