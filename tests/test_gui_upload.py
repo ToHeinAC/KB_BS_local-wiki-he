@@ -2,6 +2,7 @@
 
 import asyncio
 import threading
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -623,3 +624,94 @@ async def test_an_ingest_is_logged_with_file_count_but_no_file_names(
         0,
     )
     assert "secret-name" not in str(usage.read_events())
+
+
+# --- writing a note ------------------------------------------------------------------------------
+
+NOTE = "Der Termin mit dem Kunden ist am Montag, wir schicken das Angebot über 1200 EUR."
+
+
+def _textarea(user: User, marker: str) -> ui.textarea:
+    (box,) = user.find(marker).elements
+    assert isinstance(box, ui.textarea)
+    return box
+
+
+async def test_a_written_note_is_cleaned_reviewed_and_ingested_with_its_verbatim_text(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        ollama_client, "generate", lambda system, prompt, temperature=0.3: "# Kundentermin\n\nText."
+    )
+    texts: list[tuple[str, Any]] = []
+
+    def begin(text: str, name: str, meta: Any) -> dict[str, Any]:
+        texts.append((name, meta))
+        return {"name": name}
+
+    monkeypatch.setattr(wiki_engine, "ingest_begin", begin)
+    monkeypatch.setattr(wiki_engine, "ingest_piece", lambda *a: None)
+    monkeypatch.setattr(
+        wiki_engine,
+        "ingest_end",
+        lambda ctx, finalize=False: {"created": [], "updated": [], "contradictions": []},
+    )
+    await _open(user)
+    _textarea(user, "note-text").set_value(NOTE)
+    user.find("note-clean").click()
+    await _see(user, "note-cleaned")
+    cleaned = _textarea(user, "note-cleaned")
+    assert cleaned.value == "# Kundentermin\n\nText."
+    cleaned.set_value("# Kundentermin\n\nAngebot über 1200 EUR, Montag.")
+    user.find("note-add").click()
+    await _see(user, "1 file(s) ready to ingest.")
+    name = f"note-{date.today().isoformat()}-kundentermin.md"
+    await _see(user, name)
+    _classify(user, name, "normal")
+    await _until(lambda: user.find("ingest-batch").elements.copy().pop().enabled)  # type: ignore[union-attr]
+    user.find("ingest-batch").click()
+    await _see(user, "Ingest complete.")
+    assert texts == [(name, {"effective as of": date.today().isoformat()})]
+    with db_context.clearance({DB: 0}):
+        stored = (db_context.raw_dir() / name).read_text()
+    assert stored.startswith("# Kundentermin\n\nAngebot über 1200 EUR, Montag.")
+    assert stored.endswith(f"## Original note\n\n> {NOTE}\n")
+    await user.should_not_see("note-cleaned")  # the box is ready for the next note
+
+
+async def test_numbers_the_cleanup_added_are_pointed_out(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        ollama_client, "generate", lambda system, prompt, temperature=0.3: "# T\n\n1200 EUR, 15 %"
+    )
+    await _open(user)
+    _textarea(user, "note-text").set_value(NOTE)
+    user.find("note-clean").click()
+    await _see(user, "not in your note: 15")
+
+
+async def test_a_failed_cleanup_keeps_the_typed_note_and_can_go_back(
+    user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def down(system: str, prompt: str, temperature: float = 0.3) -> str:
+        raise RuntimeError("Ollama generate failed: refused")
+
+    monkeypatch.setattr(ollama_client, "generate", down)
+    await _open(user)
+    _textarea(user, "note-text").set_value(NOTE)
+    user.find("note-clean").click()
+    await _see(user, "Cleanup failed")
+    assert _textarea(user, "note-cleaned").value == NOTE
+    user.find("note-back").click()
+    await user.should_not_see("note-cleaned", retries=100)
+    assert _textarea(user, "note-text").value == NOTE
+
+
+async def test_an_empty_note_cannot_be_cleaned(user: User) -> None:
+    await _open(user)
+    (button,) = user.find("note-clean").elements
+    assert isinstance(button, ui.button)
+    assert not button.enabled
+    _textarea(user, "note-text").set_value("  some words ")
+    await _until(lambda: button.enabled)

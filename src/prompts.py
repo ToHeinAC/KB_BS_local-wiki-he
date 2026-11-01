@@ -358,6 +358,45 @@ Question: {question}
 Answer:
 {answer}"""
 
+# Typed notes (src/note.py): a note written on 2BrAIn is cleaned up before it joins an
+# upload batch. Code detects the language and picks the directive, drops keywords that
+# are not in the note, flags numbers the model added, and appends the verbatim note.
+NOTE_CLEANUP_SYSTEM = (
+    "You edit personal notes for a local knowledge base. You never invent content."
+)
+
+NOTE_LANGUAGE_DIRECTIVE = {
+    "de": (
+        "SPRACHE (verbindlich): Schreibe die bereinigte Notiz auf Deutsch, in der Sprache "
+        "der Notiz — nicht übersetzen. UNVERÄNDERT bleiben: die Überschrift `## Key facts` "
+        "und das Präfix `Keywords:` (genau so, englisch), Zahlen, Daten, Einheiten, "
+        "Eigennamen und Abkürzungen."
+    ),
+    "en": (
+        "LANGUAGE (strict): Write the cleaned note in English, the language of the note — "
+        "do not translate. KEEP UNCHANGED: the `## Key facts` heading and the `Keywords:` "
+        "prefix (exactly so), numbers, dates, units, proper names and abbreviations."
+    ),
+}
+
+NOTE_TITLE_RULE = ' — use exactly this title: "{title}"'
+
+NOTE_CLEANUP_PROMPT = """Clean up the note below so it can be stored in a knowledge base, linked to related topics and found again later.
+
+Rules:
+- Keep every fact, name, number, date and opinion of the note. Do not add facts, do not guess, do not leave anything out.
+- Fix spelling and grammar.
+- Start with one level-1 heading (# ...) that names the topic{title_rule}.
+- Group the content under short ## section headings by topic.
+- Replace pronouns and vague references (such as "he", "the law", "that project") with the name the note itself gives them. If the note does not name it, leave the reference as it is.
+- Spell out an abbreviation only if the note itself explains it.
+- Then a section `## Key facts` (exactly this heading): 3 to 7 short bullet points, each a self-contained statement.
+- Last line: `Keywords: ` followed by 3 to 8 comma-separated terms taken word for word from the note.
+- Output only the cleaned note in Markdown, nothing before or after it.
+
+Note:
+{note}"""
+
 CONDENSE_PROMPT = """You are given a PREVIOUS QUESTION, an excerpt of its ANSWER, and a FOLLOW-UP. Produce the user's CURRENT question as ONE self-contained question.
 
 How to build it:

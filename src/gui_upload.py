@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable, Generator
 from contextlib import AbstractContextManager, contextmanager
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +20,7 @@ from nicegui import events, ui
 import classification
 import db_context
 import dedup
+import gui_note
 import gui_session
 import md_convert
 import metadata_extract
@@ -266,6 +267,7 @@ class Upload:
     progress: Progress = field(default_factory=Progress)
     shards: list[str] = field(default_factory=lambda: [])  # the levels the running batch writes
     queued: dict[str, bytes] = field(default_factory=lambda: {})  # dropped while busy
+    default_dates: dict[str, str] = field(default_factory=lambda: {})  # notes: dated today
 
 
 # The batch each (user, database) is preparing or ingesting. It outlives the page that started it:
@@ -304,7 +306,8 @@ def adopt(state: Upload, prep: Prepared) -> None:
     state.prepared = prep
     for name, row in prep.rows.items():
         if name not in state.levels:
-            state.dates[name], state.classes[name] = row["date"], row["class"]
+            state.dates[name] = row["date"] or state.default_dates.get(name, "")
+            state.classes[name] = row["class"]
             state.works[name], state.levels[name] = row["work"], None
     if len(prep.files) != 1:
         state.convert_text = None
@@ -342,7 +345,7 @@ class UploadView:
     def build(self) -> None:
         ui.label(
             "Markdown, PDF, DOCX and images. Non-Markdown files are converted to Markdown before "
-            "ingest. Nothing is ingested until you confirm."
+            "ingest, a written note is cleaned up first. Nothing is ingested until you confirm."
         ).classes("hint q-px-xl q-pt-md")
         with ui.column().classes("upload-col"):
             self.uploader = ui.upload(
@@ -351,6 +354,7 @@ class UploadView:
             self.uploader.props(f'accept="{ACCEPT}" flat bordered').classes("w-full").mark(
                 "upload-files"
             )
+            gui_note.NoteBox(self.session, self.add_note).build()
             self.bar = ui.linear_progress(value=0, show_value=False).props("size=4px")
             with ui.row().classes("items-center no-wrap gap-2"):
                 self.spinner = ui.spinner(size="1.4em").mark("ingest-spinner")
@@ -411,12 +415,20 @@ class UploadView:
             _end(owner, state)
             self._settled()
 
+    async def add_note(self, name: str, data: bytes) -> None:
+        """A written note joins the batch like a dropped Markdown file, dated today."""
+        self.state.default_dates[name] = date.today().isoformat()
+        self.state.queued[name] = data
+        await self._prepare_queued()
+
     def _batch_state(self) -> Upload:
         """The batch under review, or a fresh one that keeps an open Resolve panel."""
         old = self.state
         if old.prepared is not None and old.prepared.files:
             return old
-        state = self.state = self.session.state["upload"] = Upload(queued=old.queued)
+        state = self.state = self.session.state["upload"] = Upload(
+            queued=old.queued, default_dates=old.default_dates
+        )
         state.contradictions, state.pages = old.contradictions, old.pages
         return state
 
