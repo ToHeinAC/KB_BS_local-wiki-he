@@ -42,3 +42,10 @@ def test_a_statute_chunked_before_plain_headings_were_recognised_is_re_split(wik
     assert [c["anchor"] for c in chunker.load_chunks("law.md")] == ["§ 61", "§ 62", "§ 63"]
     assert any(h.get("anchor") == "§ 62" for h in lex_index.query("Regel 62", 5, scope="raw"))
     assert script.rechunk(apply=False) == []
+
+
+def test_all_targets_every_base_database_once(monkeypatch):
+    script = _script()
+    monkeypatch.setattr(db_context, "list_dbs", lambda: ["A", "A@strict", "B"])
+    assert script.databases(db=None, every=True) == ["A", "B"]
+    assert script.databases(db="B", every=False) == ["B"]

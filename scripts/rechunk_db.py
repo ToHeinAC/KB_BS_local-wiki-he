@@ -10,6 +10,7 @@ lexical index is rebuilt once. Without `--apply` it only lists what would change
 Usage:
     uv run python scripts/rechunk_db.py --db KI            # dry run
     uv run python scripts/rechunk_db.py --db KI --apply
+    uv run python scripts/rechunk_db.py --all              # every database, dry run
 """
 
 from __future__ import annotations
@@ -61,19 +62,30 @@ def rechunk(apply: bool) -> list[tuple[str, int, int]]:
     return changed
 
 
+def databases(db: str | None, every: bool) -> list[str]:
+    """The databases to re-split: `db`, or with `every` each database (not its level shards)."""
+    names = db_context.list_dbs()
+    if every:
+        return [n for n in names if classification.LEVEL_SEP not in n]
+    if db not in names:
+        raise SystemExit(f"no database named {db!r}")
+    return [db]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n", 1)[0])
-    ap.add_argument("--db", required=True, help="database name (every level of it)")
+    target = ap.add_mutually_exclusive_group(required=True)
+    target.add_argument("--db", help="database name (every level of it)")
+    target.add_argument("--all", action="store_true", help="every database")
     ap.add_argument("--apply", action="store_true", help="write; without it, a dry run")
     args = ap.parse_args()
-    if args.db not in db_context.list_dbs():
-        raise SystemExit(f"no database named {args.db!r}")
-    with db_context.clearance({args.db: len(classification.LEVELS) - 1}):
-        for shard in db_context.reachable_shards(args.db):
-            with db_context.using_db(shard):
-                for name, old, new in rechunk(args.apply):
-                    verb = "re-split" if args.apply else "would re-split"
-                    print(f"{shard}: {verb} {name}: {old} -> {new} chunks")
+    verb = "re-split" if args.apply else "would re-split"
+    for db in databases(args.db, args.all):
+        with db_context.clearance({db: len(classification.LEVELS) - 1}):
+            for shard in db_context.reachable_shards(db):
+                with db_context.using_db(shard):
+                    for name, old, new in rechunk(args.apply):
+                        print(f"{shard}: {verb} {name}: {old} -> {new} chunks")
 
 
 if __name__ == "__main__":
