@@ -22,6 +22,12 @@ NEW = (
 Q = "Grenzwert Millisievert"
 
 
+@pytest.fixture(autouse=True)
+def _no_findings_floor(monkeypatch):
+    # these tests target the validity check; the findings floor is tested in test_levels.py
+    monkeypatch.setattr(tools, "WORDS_PER_FINDING", 0)
+
+
 @pytest.fixture
 def versions(wiki_dir: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Two versions of one ordinance; lexical search prefers the old one."""

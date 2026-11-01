@@ -246,4 +246,9 @@ document whose core section it cites (`CHAT_COVERAGE_GAP`). Everything else the 
 offered, not forced: a top hit can be off the question, and a narrow question must not be
 pushed into every definition. Verbosity is a once-only check: under `ANSWER_WORDS_PER_SOURCE` words per
 cited source, the answer is sent back once to explain each source (`CHAT_TERSE`); a second short
-answer passes, so a short answer never turns into padding.
+answer passes, so a short answer never turns into padding. Findings are a second once-only
+check (`tools._thin_findings`): a cited original whose tagged sentences hold under
+`ANSWER_WORDS_PER_FINDING` words (tags removed; a tag right after the full stop belongs to its
+sentence) was only named, not reported, and the answer is sent back to state what that source
+says on the question (`CHAT_THIN_FINDINGS`). The agent and ledger prompts ask for findings, not
+pointers ("X deals with Z"), from the start.

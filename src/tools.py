@@ -46,6 +46,7 @@ from prompts import (
     CHAT_QUOTE_UNMATCHED,
     CHAT_SECTION_UNREAD,
     CHAT_TERSE,
+    CHAT_THIN_FINDINGS,
     EVALUATE_CONDITION_DESCRIPTION,
     FETCH_WEBPAGE_DESCRIPTION,
     LOW_CONFIDENCE_NUDGE,
@@ -70,6 +71,9 @@ CHAT_MIN_SEARCHES = int(os.getenv("CHAT_MIN_SEARCHES", "3"))
 # Verbosity without a word floor (Deep chat and Quick research): an answer under this many
 # words per cited source is sent back once (a fixed floor made E4B pad thin evidence).
 WORDS_PER_SOURCE = int(os.getenv("ANSWER_WORDS_PER_SOURCE", "40"))
+# Deep chat: the sentences that carry one source's tag state its finding in at least this
+# many words; a source only named ("X regulates Y") is sent back once.
+WORDS_PER_FINDING = int(os.getenv("ANSWER_WORDS_PER_FINDING", "25"))
 # Levels read in code (ideas/deep-chat-levels.md).
 CORE_MAX = 2  # level 1: the top distinct sections of the first search, read in full
 CORE_RATIO = 0.8  # a further core section scores at least this share of the best hit
@@ -1036,6 +1040,34 @@ def _too_terse(words: int, items: int) -> str | None:
     return CHAT_TERSE.format(items=items, words=words)
 
 
+# A sentence ends at . ! ? or a line break; a tag right after the full stop stays with it.
+_SENTENCE_END_RE = re.compile(r"(?<=[.!?])\s+(?!\[Source:)|\n+")
+
+
+def _thin_findings(answer: str) -> list[str]:
+    """The cited originals whose tagged sentences, tags removed, hold fewer than
+    WORDS_PER_FINDING words: named, but what they find is not stated."""
+    words: dict[str, int] = {}
+    for sentence in _SENTENCE_END_RE.split(answer):
+        tags = _RAW_CITE_RE.findall(sentence)
+        n = len(re.findall(r"\w+", _RAW_CITE_RE.sub("", sentence)))
+        for ref in dict.fromkeys(tags):
+            words[ref] = words.get(ref, 0) + n
+    return [ref for ref, n in words.items() if n < WORDS_PER_FINDING]
+
+
+def _thin_nudge(answer: str) -> str | None:
+    """Once per run: send back an answer that names a source without its finding."""
+    mem = run_memory.current()
+    if mem is None or mem.thin_nudged:
+        return None
+    thin = _thin_findings(answer)
+    if not thin:
+        return None
+    mem.thin_nudged = True
+    return CHAT_THIN_FINDINGS.format(refs=_tags(thin[:5]))
+
+
 def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
     words = len(re.findall(r"\w+", answer or ""))
     cited = set(_RAW_CITE_RE.findall(answer or ""))
@@ -1056,6 +1088,7 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
         or _unread_sections(answer or "", raw_unique)
         or _coverage_gap(raw_unique)
         or _too_terse(words, len({ref_key(r) for r in raw_unique}) + len(wiki_cited))
+        or _thin_nudge(answer or "")
         or _unmatched_quotes(answer or "", raw_unique)
         or _open_refs_missing(answer or "", raw_unique)
         or _low_confidence_nudge()
@@ -1070,6 +1103,7 @@ def _submit_chat_impl(answer: str, sources: list[str] | None = None) -> str:
 _ONCE_FLAGS = (
     "prose_section_nudged",
     "terse_nudged",
+    "thin_nudged",
     "quote_nudged",
     "open_refs_nudged",
     "low_conf_nudged",

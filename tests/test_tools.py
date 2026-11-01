@@ -2,10 +2,19 @@
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 import chunker
 import lex_index
 import run_memory
 import tools
+
+
+@pytest.fixture(autouse=True)
+def _no_findings_floor(monkeypatch):
+    # these tests target the other gates; the findings floor is tested in test_levels.py
+    monkeypatch.setattr(tools, "WORDS_PER_FINDING", 0)
+
 
 # --- tavily_search --------------------------------------------------------
 

@@ -78,6 +78,7 @@ class RunMemory:
         default_factory=dict[str, list[tuple[str, str, list[tuple[str, str]]]]]
     )
     terse_nudged: bool = False  # an answer too short for its sources was sent back once
+    thin_nudged: bool = False  # an answer naming a source without its finding was sent back once
     work_files: dict[str, str | None] = field(default_factory=dict[str, str | None])  # name → file
 
     def tick(self) -> int:

@@ -179,7 +179,10 @@ def test_no_level_reads_without_a_section_hit(wiki_dir):
 
 def _covered_answer(*refs: str) -> str:
     body = " ".join(
-        f"Satz {i} erklärt die Vorschrift ausführlich. [Source: {r}]" for i, r in enumerate(refs)
+        f"Satz {i} erklärt, was die Vorschrift regelt: wer handeln muss, unter welchen "
+        f"Bedingungen, mit welchen Fristen, Grenzwerten und Ausnahmen, und welche Behörde "
+        f"darüber entscheidet. [Source: {r}]"
+        for i, r in enumerate(refs)
     )
     return body + " " + "Erläuterung " * 300
 
@@ -238,7 +241,43 @@ def test_a_terse_answer_is_sent_back_once_to_explain_each_source(wiki_dir):
     tools.raw_read.invoke({"filenames": ["StrlSchG.md § 62", "StrlSchV.md § 29"]})
     terse = "Kurz. [Source: StrlSchG.md § 62] [Source: StrlSchV.md § 29]"
     assert tools._submit_chat_impl(terse).startswith("REJECTED: the answer is too short")
-    assert tools._submit_chat_impl(terse).startswith("ACCEPTED")  # once only: no padding loop
+    again = tools._submit_chat_impl(terse)  # once only: no padding loop
+    assert not again.startswith("REJECTED: the answer is too short")
+
+
+_FINDING = (
+    "Die Behörde entlässt Rückstände aus der Überwachung, wenn der Schutz vor Exposition "
+    "sichergestellt ist; Maßstab ist eine effektive Dosis von 1 Millisievert im Kalenderjahr, "
+    "und die Verwertung ist vorher anzumelden."
+)
+
+
+def test_a_source_named_without_its_finding_is_thin():
+    answer = (
+        f"{_FINDING} [Source: StrlSchG.md § 62]\n"
+        "Die StrlSchV regelt das Verfahren. [Source: StrlSchV.md § 29]"
+    )
+    assert tools._thin_findings(answer) == ["StrlSchV.md § 29"]
+
+
+def test_a_tag_after_the_full_stop_belongs_to_its_sentence():
+    answer = f"{_FINDING} [Source: StrlSchG.md § 62]. {_FINDING}. [Source: StrlSchV.md § 29]"
+    assert tools._thin_findings(answer) == []
+
+
+def test_an_answer_that_names_a_source_without_its_finding_is_sent_back_once(wiki_dir):
+    _run()
+    tools.raw_read.invoke({"filenames": ["StrlSchG.md § 62", "StrlSchV.md § 29"]})
+    for q in ("a", "b", "c"):
+        run_memory.current().mark_search(f"raw_search:{q}")  # type: ignore[union-attr]
+    answer = (
+        f"{_FINDING} [Source: StrlSchG.md § 62]\n"
+        "Die StrlSchV regelt das Verfahren. [Source: StrlSchV.md § 29]\n" + "Erläuterung " * 100
+    )
+    out = tools._submit_chat_impl(answer)
+    assert out.startswith("REJECTED: state what each source finds")
+    assert "[Source: StrlSchV.md § 29]" in out
+    assert tools._submit_chat_impl(answer).startswith("ACCEPTED")  # once only
 
 
 # --- Quick research ---
