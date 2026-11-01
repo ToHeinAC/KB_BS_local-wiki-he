@@ -72,8 +72,16 @@ _LEGAL_HEAD_RE = re.compile(r"^(#{1,4})\s*§\s*(\d+[a-z]?)\b(.*)$", re.MULTILINE
 # with a reference ("§ 61 Absatz 2 …", "§ 53 des Atomgesetzes bleibt unberührt.").
 _PLAIN_LEGAL_HEAD_RE = re.compile(
     r"^()§[ \t]*(\d+[a-z]?)\b"
-    r"(?![ \t]*(?:Abs\.|Absatz|Satz|Nr\.|Nummer|Buchstabe)\b)"
+    r"(?![ \t]*(?:Abs\.|Nr\.|(?:Absatz|Satz|Nummer|Buchstabe)\b))"
     r"((?:[ \t]+[A-ZÄÖÜ(][^\n]{0,200}?)?)[ \t]*\r?$",
+    re.MULTILINE,
+)
+# An annex heading, with or without "#": "## Anlage 1 (zu § 5 Absatz 32) Rückstände",
+# "Anlage 2 Überwachungsgrenzen" — not running text ("Anlage 3 enthält … ."). Kept only after
+# the last § (`_without_toc`: an annex before a § is a mention or a contents line).
+_ANNEX_HEAD_RE = re.compile(
+    r"^(#{0,4})[ \t]*Anlage[ \t]+(\d+[a-z]?)\b"
+    r"((?:[ \t]+[A-ZÄÖÜ(][^\n]{0,200}?)?)(?<![.,;:])[ \t]*\r?$",
     re.MULTILINE,
 )
 _MIN_LEGAL_HEADS = 3
@@ -112,12 +120,29 @@ def find_legal_head(text: str, number: str) -> int | None:
     return None
 
 
-def _number(m: re.Match[str]) -> int:
-    return int(re.sub(r"\D", "", m[2]))
+def _is_annex(m: re.Match[str]) -> bool:
+    return m.re is _ANNEX_HEAD_RE
 
 
-# A sentence ends somewhere in a section's text: a table of contents has none.
-_SENTENCE_END_RE = re.compile(r"[.!?](?:\s|$)")
+def head_anchor(m: re.Match[str]) -> str:
+    """The anchor of a `legal_heads` match: "§ 62" or "Anlage 1"."""
+    return f"{'Anlage' if _is_annex(m) else '§'} {m[2]}"
+
+
+def _number(m: re.Match[str]) -> tuple[int, int]:
+    """Document order of a heading: every § before every annex, then by number."""
+    return (int(_is_annex(m)), int(re.sub(r"\D", "", m[2])))
+
+
+# A section's text: a sentence end or a "(1)" paragraph mark; a table of contents has
+# neither, only heading and structure lines ("Kapitel 2"), which stay short.
+_BODY_RE = re.compile(r"[.!?…](?:\s|$)|^\(\d+[a-z]?\)", re.MULTILINE)
+_MAX_TOC_GAP = 300
+
+
+def _is_body(text: str, start: int, end: int) -> bool:
+    """Whether text[start:end] reads as a section's text, not a contents gap."""
+    return end - start > _MAX_TOC_GAP or bool(_BODY_RE.search(text, start, end))
 
 
 def _without_toc(text: str, heads: list[re.Match[str]]) -> list[re.Match[str]]:
@@ -129,7 +154,7 @@ def _without_toc(text: str, heads: list[re.Match[str]]) -> list[re.Match[str]]:
     for i, m in enumerate(heads):
         nxt = heads[i + 1] if i + 1 < len(heads) else None
         toc = nxt is not None and (
-            not _SENTENCE_END_RE.search(text, m.end(), nxt.start()) or _number(m) > _number(nxt)
+            not _is_body(text, m.end(), nxt.start()) or _number(m) > _number(nxt)
         )
         if not toc:
             out.append(m)
@@ -137,14 +162,17 @@ def _without_toc(text: str, heads: list[re.Match[str]]) -> list[re.Match[str]]:
 
 
 def legal_heads(text: str) -> list[re.Match[str]]:
-    """The § headings of a statute — `## § N …` lines, else plain `§ N …` lines without a
-    table of contents (a `#` heading is set on purpose) — or [] when `text` has fewer than
-    _MIN_LEGAL_HEADS of either. Groups: 2 number, 3 title."""
-    marked = list(_LEGAL_HEAD_RE.finditer(text))
-    if len(marked) >= _MIN_LEGAL_HEADS:
-        return marked
-    plain = _without_toc(text, list(_PLAIN_LEGAL_HEAD_RE.finditer(text)))
-    return plain if len(plain) >= _MIN_LEGAL_HEADS else []
+    """The § and annex headings of a statute — `## § N …` and plain `§ N …` lines alike
+    (a conversion may set "#" on only some of them), without a table of contents — or []
+    when `text` has fewer than _MIN_LEGAL_HEADS § headings. Groups: 2 number, 3 title."""
+    found = [
+        *_LEGAL_HEAD_RE.finditer(text),
+        *_PLAIN_LEGAL_HEAD_RE.finditer(text),
+        *_ANNEX_HEAD_RE.finditer(text),
+    ]
+    heads = _without_toc(text, sorted(found, key=lambda m: m.start()))
+    sections = [m for m in heads if not _is_annex(m)]
+    return heads if len(sections) >= _MIN_LEGAL_HEADS else []
 
 
 def _split_long(
@@ -203,7 +231,8 @@ def _mk(
 
 
 def _chunk_legal(text: str, lang: str) -> list[dict[str, Any]]:
-    """Split on the § headings (`legal_heads`). Each § becomes one chunk (windowed if huge)."""
+    """Split on the § and annex headings (`legal_heads`). Each becomes one chunk (windowed if
+    huge)."""
     matches = legal_heads(text)
     chunks: list[dict[str, Any]] = []
     # Preamble before first §
@@ -215,7 +244,7 @@ def _chunk_legal(text: str, lang: str) -> list[dict[str, Any]]:
         start = m.start()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         section = text[start:end]
-        anchor = f"§ {m.group(2)}"
+        anchor = head_anchor(m)
         title = m.group(3).strip()
         heading_path = [anchor + (f" {title}" if title else "")]
         chunks.extend(_split_long(section, anchor, heading_path, start, lang))

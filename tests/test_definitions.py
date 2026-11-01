@@ -125,3 +125,14 @@ def test_a_statute_with_plain_section_headings_has_a_register():
     )
     defs = definitions.register(law)
     assert [(d.term, d.section) for d in defs] == [("Rückstände", "§ 5 Abs. 32")]
+
+
+def test_an_annex_is_not_registered_as_a_section_of_its_number():
+    law = (
+        _LAW
+        + "\n## Anlage 1 (zu § 5 Absatz 32) Begriffe der Rückstände\n"
+        + "(1) Schlamm ist ein Rückstand aus der Erdölförderung.\n"
+    )
+    defs = definitions.register(law)
+    assert all(d.anchor != "§ 1" for d in defs)
+    assert all("Erdölförderung" not in d.text for d in defs if d.anchor.startswith("§"))

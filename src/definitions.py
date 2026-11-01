@@ -13,7 +13,7 @@ import re
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from chunker import legal_heads
+from chunker import head_anchor, legal_heads
 
 _HEADING_RE = re.compile(r"^#{1,4}\s", re.M)
 _PARA_RE = re.compile(r"^\((\d+[a-z]?)\)[ \t]*", re.M)
@@ -87,7 +87,7 @@ def register(text: str) -> list[Definition]:
         end = heads[i + 1].start() if i + 1 < len(heads) else len(text)
         nxt = _HEADING_RE.search(text, m.end(), end)
         body = text[m.end() : nxt.start() if nxt else end]
-        out += parse(f"§ {m[2]}", m[3].strip(), body)
+        out += parse(head_anchor(m), m[3].strip(), body)
     return out
 
 

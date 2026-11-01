@@ -162,3 +162,68 @@ def test_a_table_of_contents_of_plain_section_lines_is_not_split_into_sections()
     assert [c["anchor"] for c in chunks if c["anchor"] != "Präambel"] == ["§ 61", "§ 62", "§ 63"]
     s62 = next(c for c in chunks if c["anchor"] == "§ 62")
     assert s62["text"].startswith("§ 62 Entlassung von Rückständen aus der Überwachung")
+
+
+# A statute whose conversion set "#" on only some § headings — here the contents block and
+# one section — while the other headings stayed plain lines (seen in a real PDF conversion).
+MIXED_HEADINGS = (
+    "# Strahlenschutzgesetz\n\n"
+    "Inhaltsübersicht\n"
+    "#### § 61 Anfall und Lagerung\n"
+    "##### § 62 Entlassung von Rückständen\n"
+    "##### § 63 Anzeige\n\n"
+    "## § 60 Anwendungsbereich\n"
+    "(1) Dieser Abschnitt gilt für Rückstände aus industriellen Prozessen.\n"
+    "§ 61 Anfall und Lagerung überwachungsbedürftiger Rückstände\n"
+    "(1) Wer Rückstände anfallen lässt, hat sie zu lagern und der Behörde anzuzeigen.\n"
+    "§ 62 Entlassung von Rückständen aus der Überwachung\n"
+    "(1) Der nach § 61 Absatz 1 Satz 1 Verpflichtete hat die Verwertung anzumelden.\n"
+    "§ 63 Anzeige\n"
+    "(1) Rückstände sind der zuständigen Behörde vor ihrer Verwertung anzuzeigen.\n"
+)
+
+
+def test_plain_section_headings_split_even_where_some_headings_carry_a_hash():
+    chunks = chunker.split(MIXED_HEADINGS)
+    assert [c["anchor"] for c in chunks if c["anchor"] != "Präambel"] == [
+        "§ 60",
+        "§ 61",
+        "§ 62",
+        "§ 63",
+    ]
+    s62 = next(c for c in chunks if c["anchor"] == "§ 62")
+    assert s62["text"].startswith("§ 62 Entlassung von Rückständen aus der Überwachung")
+    assert "zu lagern" not in s62["text"]
+
+
+ANNEXES = (
+    "## § 1 Anwendungsbereich\n(1) Dieses Gesetz gilt für Rückstände aus industriellen und "
+    "bergbaulichen Prozessen.\n\n"
+    "## § 2 Begriffe\n(1) Rückstände sind Materialien, die in den in Anlage 1 genannten "
+    "Prozessen anfallen.\n\n"
+    "## § 3 Schlussvorschrift\n(1) Dieses Gesetz tritt am Tag nach der Verkündung in Kraft.\n"
+    "Anlage 3 enthält die Werte für die Freigabe.\n\n"
+    "## Anlage 1 (zu § 2) Rückstände\n1. Schlämme und Ablagerungen aus der Erdölförderung "
+    "und der Erdgasgewinnung,\n\n"
+    "Anlage 2 Überwachungsgrenzen\n| Nuklid | Bq/g |\n| --- | --- |\n| U-238 | 1 |\n"
+    "| Th-232 | 1 |\n| Ra-226 | 1 |\n"
+)
+
+
+def test_each_annex_of_a_statute_is_its_own_section_not_part_of_the_last_one():
+    chunks = chunker.split(ANNEXES)
+    assert [c["anchor"] for c in chunks] == ["§ 1", "§ 2", "§ 3", "Anlage 1", "Anlage 2"]
+    a1 = chunks[3]
+    assert a1["heading_path"] == ["Anlage 1 (zu § 2) Rückstände"]
+    assert "Erdölförderung" in a1["text"]
+    assert "Erdölförderung" not in chunks[2]["text"]  # "Anlage 3 enthält …" is running text
+    assert "Bq/g" in chunks[4]["text"]
+
+
+def test_a_line_starting_with_an_abbreviated_reference_is_running_text_not_a_heading():
+    text = PLAIN_LEGAL.replace(
+        "§ 53 des Atomgesetzes bleibt unberührt.\r\n",
+        "§ 3a Abs. 2 Satz 2 und Abs. 3 bleibt unberührt.\r\n§ 4 Nr. 1 gilt entsprechend.\r\n",
+    )
+    anchors = [c["anchor"] for c in chunker.split(text) if c["anchor"] != "Präambel"]
+    assert anchors == ["§ 61", "§ 62", "§ 63"]
