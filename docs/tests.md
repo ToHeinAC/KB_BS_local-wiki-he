@@ -33,7 +33,7 @@ author: Tobias Hein
 
 1. **`dedup.py`** — hash determinism, manifest atomicity, duplicate detection edges.
 2. **`file_processor.py`** — per-format extraction (TXT, MD, PDF, DOCX, HTML), unsupported-type error, partial-extraction tolerance.
-2b. **`md_convert.py`** — `is_convertible` extension map; deterministic DOCX→Markdown (headings + tables); PDF page routing (text→rewrite vs image→OCR) and progress callback with conversion fns monkeypatched; image→OCR dispatch; per-model OCR prompt selection; unsupported-type error. No real Ollama / pypdfium2 needed.
+2b. **`md_convert.py`** — `is_convertible` extension map; deterministic DOCX→Markdown (headings + tables); PDF page routing (text kept verbatim vs image→OCR) and progress callback with conversion fns monkeypatched; text-layer cleanup (U+FFFE soft hyphens, running heads/feet, page-break hyphenation) and font-based headings on synthetic `PdfLine` pages, glyph sizes read from a generated PDF; image→OCR dispatch; per-model OCR prompt selection; unsupported-type error. No real Ollama / pypdfium2 needed.
 3. **`chunker.py`** — boundary detection per strategy (legal `§`, markdown, paragraph fallback); `chunk_id` content-addressability and stability.
 4. **`lex_index.py`** — BM25 ranking, 4-variant token recall (NFKD vs. umlaut digraph vs. stem), scope filtering, per-source incremental replace/delete, and `index_health()` (missing index reports zeros — the signal that separates *no index* from *no match*).
 6. **`qa_gen.py`** — JSON parse, unknown-chunk-id rejection, batching, end-to-end rank lift when questions are folded into BM25.

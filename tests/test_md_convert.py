@@ -63,8 +63,12 @@ def test_convert_to_markdown_docx_routes_to_extractor():
 # --- PDF routing (monkeypatched, no real model / no pypdfium2) --------------
 
 
+def _lines(text: str) -> list[md_convert.PdfLine]:
+    return [md_convert.PdfLine(ln) for ln in text.splitlines()]
+
+
 def test_pdf_routing_text_and_image(monkeypatch):
-    pages = [("text", "raw text page"), ("image", object())]
+    pages = [("text", _lines("raw text page")), ("image", object())]
     monkeypatch.setattr(md_convert, "_pdf_page_count", lambda b: len(pages))
     monkeypatch.setattr(md_convert, "iter_pdf_pages", lambda b, dpi=md_convert.PDF_DPI: iter(pages))
     monkeypatch.setattr(md_convert, "convert_image", lambda img: "OCR")
@@ -100,7 +104,7 @@ def _words(text: str) -> list[str]:
 def test_pdf_text_pages_keep_every_word_without_a_model(monkeypatch):
     # A text layer is already exact: a 1.2B rewrite echoed its prompt ("Critical Rule"),
     # translated titles and invented sentences into the stored originals.
-    pages = [("text", _LAW_PAGE), ("text", "Seite 2 bleibt wörtlich.")]
+    pages = [("text", _lines(_LAW_PAGE)), ("text", _lines("Seite 2 bleibt wörtlich."))]
     monkeypatch.setattr(md_convert, "_pdf_page_count", lambda b: len(pages))
     monkeypatch.setattr(md_convert, "iter_pdf_pages", lambda b, dpi=md_convert.PDF_DPI: iter(pages))
     monkeypatch.setattr(md_convert.ollama_client, "chat", lambda *a, **k: 1 / 0, raising=False)
@@ -158,7 +162,7 @@ def test_page_furniture_does_not_break_the_table_of_contents():
 
 
 def test_pdf_progress_callback(monkeypatch):
-    pages = [("text", "a"), ("text", "b")]
+    pages = [("text", _lines("a")), ("text", _lines("b"))]
     monkeypatch.setattr(md_convert, "_pdf_page_count", lambda b: len(pages))
     monkeypatch.setattr(md_convert, "iter_pdf_pages", lambda b, dpi=md_convert.PDF_DPI: iter(pages))
     calls = []
@@ -250,7 +254,8 @@ def test_pdf_pages_route_text_and_image():
     pdf = _pdf([text_page, blank_page])
     assert md_convert._pdf_page_count(pdf) == 2
     pages = list(md_convert.iter_pdf_pages(pdf, dpi=36))
-    assert pages[0] == ("text", _PDF_TEXT)
+    assert pages[0][0] == "text"
+    assert [ln.text for ln in pages[0][1]] == [_PDF_TEXT]
     assert pages[1][0] == "image"
     assert md_convert._image_to_base64(pages[1][1])  # rendered bitmap encodes as JPEG
 
@@ -279,3 +284,148 @@ def test_docx_and_image_report_progress(monkeypatch):
     Image.new("RGB", (2, 2)).save(buf, format="PNG")
     md_convert.convert_to_markdown(buf.getvalue(), "a.png", lambda d, t, label: calls.append(label))
     assert calls == ["Converting DOCX", "Done", "OCR image", "Done"]
+
+
+# --- text-layer cleanup: every word kept, nothing that breaks retrieval -------
+
+
+def test_soft_hyphen_markers_rejoin_split_words():
+    # pdfium marks a line-end hyphen with U+FFFE; left in, "\w+" cuts "Grubenwässer" in two.
+    text = "Gru￾benwässer, Gamma￾Ortsdosisleistung, Bau￾und Möbel,  Punkt"
+    assert md_convert.clean_text(text) == (
+        "Grubenwässer, Gamma-Ortsdosisleistung, Bau-und Möbel, • Punkt"
+    )
+
+
+def _page(no: int, body: str) -> list[md_convert.PdfLine]:
+    return _lines(
+        f"- {no} -\nIngenieurgesellschaft für wissenschaftlich\ntechnischen Umweltschutz\n{body}"
+    )
+
+
+def test_running_heads_and_page_numbers_are_dropped():
+    pages = [
+        _page(1, "Erste Seite mit Text."),
+        _page(2, "Zweite Seite mit Text."),
+        _page(3, "Dritte Seite mit Text.\nxvi"),
+        _page(4, "Vierte Seite mit Text."),
+    ]
+    md = md_convert._pages_to_markdown(pages)
+    assert "Ingenieurgesellschaft" not in md
+    assert "- 2 -" not in md
+    assert "xvi" not in md  # a roman page number counts as one
+    assert md.split() == [
+        "Erste",
+        "Seite",
+        "mit",
+        "Text.",
+        "Zweite",
+        "Seite",
+        "mit",
+        "Text.",
+        "Dritte",
+        "Seite",
+        "mit",
+        "Text.",
+        "Vierte",
+        "Seite",
+        "mit",
+        "Text.",
+    ]
+
+
+def test_a_word_split_across_pages_is_rejoined():
+    pages = [_lines("auf dem kontaminier-"), _lines("ten Gelände. Bau-"), _lines("und Möbel")]
+    assert md_convert._pages_to_markdown(pages) == (
+        "auf dem kontaminierten Gelände. Bau-\n\nund Möbel"
+    )
+
+
+def _styled(text: str, size: float, weight: int = 400) -> md_convert.PdfLine:
+    return md_convert.PdfLine(text, size, weight)
+
+
+_BODY = "Der Bericht beschreibt die Messungen an beiden Bächen im Herbst."
+
+
+def test_larger_or_bold_lines_of_a_report_become_headings():
+    page = [
+        _styled("1. HINTERGRUND", 11.6),
+        _styled(_BODY, 10.9),
+        _styled("4.1. Exposition durch äußere Gammastrahlung und", 12.5),
+        _styled("Inhalation von Material", 12.5),
+        _styled(_BODY, 10.9),
+        _styled("5.0 Contaminant Geochemistry", 10.9, 716),
+        _styled("1. HINTERGRUND .......................... 1", 12.5),  # contents line
+        _styled("Ergebnis siehe Tabelle 3.", 12.5),  # a sentence
+        _styled(_BODY, 10.9),
+    ]
+    lines = md_convert._pages_to_markdown([page]).splitlines()
+    assert [ln for ln in lines if ln.startswith("#")] == [
+        "## 1. HINTERGRUND",
+        "### 4.1. Exposition durch äußere Gammastrahlung und Inhalation von Material",
+        "## 5.0 Contaminant Geochemistry",
+    ]
+    anchors = [c["anchor"] for c in chunker.split("\n".join(lines))]
+    assert "1. HINTERGRUND" in anchors
+
+
+def test_a_statute_keeps_its_law_headings_only():
+    page = [
+        _styled(ln, 12.0 if ln.startswith(("§", "Teil", "Kapitel")) else 10.0)
+        for ln in _LAW_PAGE.splitlines()
+    ]
+    assert md_convert._pages_to_markdown([page]) == md_convert._promote_headings(_LAW_PAGE)
+
+
+def test_pdf_lines_carry_their_glyph_size():
+    stream = (
+        b"BT /F1 18 Tf 72 700 Td (1. Einleitung des Berichts) Tj ET "
+        b"BT /F1 10 Tf 72 660 Td (" + _PDF_TEXT.encode() + b") Tj ET"
+    )
+    [page] = list(md_convert.iter_pdf_pages(_pdf([stream]), dpi=36))
+    assert page[0] == "text"
+    head, body = (ln for ln in page[1] if ln.text.strip())
+    assert head.size > body.size > 0
+
+
+def test_a_running_foot_set_as_one_line_mid_page_is_dropped_too():
+    foot = ["Ein Service des Bundesministerium der Justiz", "sowie des Bundesamts für Justiz"]
+    pages = [_lines(f"{w} der Verordnung.\n" + "\n".join(foot)) for w in "ABCD"]
+    pages.append(
+        _lines(
+            "Ar-37 1 E+8\nEin Service des Bundesministerium der Justiz sowie des "
+            "Bundesamts für Justiz\nAr-39 1 E+4\nAr-41 1 E+9\nK-40 1 E+6"
+        )
+    )
+    md = md_convert._pages_to_markdown(pages)
+    assert "Service" not in md
+    assert "Ar-39 1 E+4" in md
+
+
+def test_bold_table_heads_and_bullets_stay_plain():
+    page = [
+        _styled("Soil Type", 10.9, 716),  # bold, unnumbered: a table's column head
+        _styled("· Kontakt mit kontaminierten Materialien vermeiden", 12.5),
+        _styled("5.1 General", 10.9, 716),
+        _styled(_BODY, 10.9),
+    ]
+    heads = [ln for ln in md_convert._pages_to_markdown([page]).splitlines() if ln[0] == "#"]
+    assert heads == ["### 5.1 General"]
+
+
+def test_a_paragraph_in_a_larger_font_is_no_heading():
+    page = [
+        _styled("Abtransport Aushubmaterial", 12.5),
+        _styled("Sind bei den Arbeiten Mitarbeiter von mehr als einem Unternehmen", 12.5),
+        _styled("gleichzeitig tätig, ist ein Koordinator zu bestellen.", 12.5),
+        _styled(
+            "Die vertraglich festgelegten Weisungsbefugnisse des Koordinators in Anlehnung "
+            "an die Regelungen in DGUV",
+            12.5,
+        ),
+        _styled("Vorschrift 1 gelten fort.", 10.9),
+        *[_styled(_BODY, 10.9)] * 6,
+    ]
+    heads = [ln for ln in md_convert._pages_to_markdown([page]).splitlines() if ln[0] == "#"]
+    assert heads == ["## Abtransport Aushubmaterial"]

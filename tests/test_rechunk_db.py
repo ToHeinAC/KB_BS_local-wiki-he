@@ -49,3 +49,17 @@ def test_all_targets_every_base_database_once(monkeypatch):
     monkeypatch.setattr(db_context, "list_dbs", lambda: ["A", "A@strict", "B"])
     assert script.databases(db=None, every=True) == ["A", "B"]
     assert script.databases(db="B", every=False) == ["B"]
+
+
+def test_an_original_with_pdf_soft_hyphens_is_cleaned_and_re_indexed(wiki_dir):
+    raw = db_context.raw_dir()
+    text = "## Befund\r\nDie Gru￾benwässer enthalten Radium aus dem Gestein.\r\n"
+    (raw / "bericht.md").write_bytes(text.encode())
+    chunker.write_chunks("bericht.md", chunker.split(text))
+    script = _script()
+    assert script.rechunk(apply=False) == [("bericht.md", 1, 1)]
+    assert (raw / "bericht.md").read_bytes() == text.encode()  # dry run: nothing written
+    script.rechunk(apply=True)
+    assert (raw / "bericht.md").read_bytes() == text.replace("￾", "").encode()
+    assert lex_index.query("Grubenwässer", 5, scope="raw")
+    assert script.rechunk(apply=False) == []
