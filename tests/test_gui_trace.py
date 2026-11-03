@@ -88,3 +88,18 @@ def test_memory_hits_section_maps_and_the_gate_are_labelled() -> None:
     assert title(explored) == "a.md fully explored"
     (gate,) = gui_trace.trace_items([{"type": "gate", "content": "rejected (retry 1/2): R"}])
     assert (gate.kind, gate.title) == ("notice", "Quality gate — rejected (retry 1/2): R")
+
+
+def test_long_unbroken_titles_stay_inside_the_rail() -> None:
+    """A filename without spaces must wrap, and the rail clips anything else."""
+    import re
+    from pathlib import Path
+
+    css = (Path(__file__).parents[1] / "src/assets/broadsheet/broadsheet.css").read_text()
+
+    def rule(selector: str) -> str:
+        found = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
+        return found.group(1) if found else ""
+
+    assert "overflow-wrap: anywhere" in rule(".wire .what")
+    assert "overflow-x: clip" in rule(".chat-grid .rail")

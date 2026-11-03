@@ -173,7 +173,7 @@ table.agate tr.sel td { background: var(--oxide-tint); }
 /* ── Chat (mockup 03): rail, reading column, margin notes ─────────────────────────────── */
 /* Same 1/4 : 1/2 : 1/4 grid as Research: the run on the left, the answer, the sources. */
 .chat-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr); column-gap: 48px; padding: 0 40px; width: 100%; }
-.chat-grid .rail { padding-top: 28px; border-right: 1px solid var(--hair); padding-right: 28px; margin-right: -20px; min-width: 0; align-items: flex-start; gap: 6px; }
+.chat-grid .rail { padding-top: 28px; border-right: 1px solid var(--hair); padding-right: 28px; margin-right: -20px; min-width: 0; overflow-x: clip; overflow-wrap: anywhere; align-items: flex-start; gap: 6px; }
 .chat-grid .hint { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 .chat-grid .hist { font: 400 15px/1.35 var(--serif); color: var(--ink-2); padding: 8px 0; border-bottom: 1px solid var(--hair); width: 100%; }
 .chat-col { padding-top: 26px; min-width: 0; }
@@ -204,7 +204,7 @@ sup.cite.hl { background: var(--oxide); color: var(--paper); padding: 1px 4px; }
 .figs { background: var(--panel); padding: 14px 18px; margin-bottom: 26px; }
 .figs .num { font-weight: 700; }
 .wire > .row { display: grid; grid-template-columns: 70px 18px minmax(0, 1fr); column-gap: 8px; padding-bottom: 12px; width: 100%; }
-.wire .what { min-width: 0; width: 100%; }
+.wire .what { min-width: 0; width: 100%; overflow-wrap: anywhere; }
 .wire .time { font-size: 13px; color: var(--muted); }
 .wire .pin { position: relative; }
 .wire .pin::after { content: ""; position: absolute; left: 4px; top: 5px; width: 9px; height: 9px; border-radius: 50%; background: var(--paper); border: 1px solid var(--ink); }
