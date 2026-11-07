@@ -77,11 +77,13 @@ _PLAIN_LEGAL_HEAD_RE = re.compile(
     re.MULTILINE,
 )
 # An annex heading, with or without "#": "## Anlage 1 (zu § 5 Absatz 32) Rückstände",
-# "Anlage 2 Überwachungsgrenzen" — not running text ("Anlage 3 enthält … ."). Kept only after
-# the last § (`_without_toc`: an annex before a § is a mention or a contents line).
+# "Anlage 2 Überwachungsgrenzen" — not running text ("Anlage 3 enthält … ."). The length cap
+# guards plain lines only: "#" marks a heading, and a long annex list can run past 300
+# characters (StrlSchV Anlage 4). Kept only after the last § (`_without_toc`: an annex before
+# a § is a mention or a contents line).
 _ANNEX_HEAD_RE = re.compile(
-    r"^(#{0,4})[ \t]*Anlage[ \t]+(\d+[a-z]?)\b"
-    r"((?:[ \t]+[A-ZÄÖÜ(][^\n]{0,200}?)?)(?<![.,;:])[ \t]*\r?$",
+    r"^(#{1,4})?[ \t]*Anlage[ \t]+(\d+[a-z]?)\b"
+    r"((?:[ \t]+[A-ZÄÖÜ(](?(1)[^\n]*?|[^\n]{0,200}?))?)(?<![.,;:])[ \t]*\r?$",
     re.MULTILINE,
 )
 _MIN_LEGAL_HEADS = 3

@@ -220,6 +220,23 @@ def test_each_annex_of_a_statute_is_its_own_section_not_part_of_the_last_one():
     assert "Bq/g" in chunks[4]["text"]
 
 
+def test_a_marked_annex_heading_of_any_length_is_its_own_section():
+    long_title = (
+        "## Anlage 4 (zu den §§ " + ", ".join(map(str, range(5, 120))) + ")<br />Freigrenzen"
+    )
+    text = ANNEXES.replace("Anlage 2 Überwachungsgrenzen", long_title)
+    assert len(long_title) > 300
+    a4 = next(c for c in chunker.split(text) if c["anchor"] == "Anlage 4")
+    assert "Bq/g" in a4["text"]
+
+
+def test_a_long_plain_line_starting_with_an_annex_is_running_text_not_a_heading():
+    line = "Anlage 2 Tabelle 1 " + "Spalte 3 und Spalte 4 " * 12
+    text = ANNEXES.replace("Anlage 2 Überwachungsgrenzen", line.rstrip())
+    assert len(line) > 200
+    assert "Anlage 2" not in [c["anchor"] for c in chunker.split(text)]
+
+
 def test_a_line_starting_with_an_abbreviated_reference_is_running_text_not_a_heading():
     text = PLAIN_LEGAL.replace(
         "§ 53 des Atomgesetzes bleibt unberührt.\r\n",
