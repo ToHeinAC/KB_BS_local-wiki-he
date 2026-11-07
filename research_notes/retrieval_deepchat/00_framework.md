@@ -1,6 +1,6 @@
 # Forschungsrahmen: Retrieval und Deep Chat
 
-Stand 2026-11-07 · Status: **Fünf Fragen gewählt (F02, F03, F05, F06, F10), Chunker-Fehler behoben, Wiki-Teilstand gebaut, Messung noch nicht begonnen**
+Stand 2026-11-07 · Status: **Fünf Fragen gewählt (F02, F03, F05, F06, F10), Chunker-Fehler behoben, Wiki vollständig gebaut, Messung noch nicht begonnen**
 
 Dieses Dokument ist der Startpunkt der Studie. Es legt die Forschungsfragen, Testfragen,
 Messgrößen und Entscheidungsregeln fest, **bevor** gemessen wird. Ergebnisse kommen später als
@@ -20,8 +20,8 @@ eigene Dateien in diesen Ordner (`01_…`, `02_…`).
 
 | Thema | Befund | Beleg |
 |---|---|---|
-| Korpus | `data/KI`: StrlSchG + StrlSchV, zusammen knapp 1 MB, **12 Wiki-Seiten als Teilstand** (nur StrlSchG bis § 60) | `data/KI/raw`, `data/KI/wiki` |
-| Index | `data/KI` neu gebaut: 533 Original-Chunks + 60 Wiki-Chunks, BM25 und Vektoren deckungsgleich | `index_health()`, `vectors.json` |
+| Korpus | `data/KI`: StrlSchG + StrlSchV, zusammen knapp 1 MB, **60 Wiki-Seiten** (Herkunft siehe § 6) | `data/KI/raw`, `data/KI/wiki` |
+| Index | `data/KI` neu gebaut: 533 Original-Chunks + 404 Wiki-Chunks, BM25 und Vektoren deckungsgleich | `index_health()`, `vectors.json` |
 | Retrieval | BM25 (FTS5) + exakter Kosinus über `vectors.npy` (bge-m3, 1024 Dim.), RRF, optional Cross-Encoder | [retrieval.md](../../docs/retrieval.md) |
 | Modell | `gemma4:e4b`, `num_ctx` 32768 für alle Aufrufe | `src/ollama_client.py` |
 | Letzter GPU-Lauf | 26.10., q1–q7: 517 s, also 74 s je Frage und 6 s je Tool-Aufruf; Gold 10/10 gelesen | [Bench-Log](../../bench/results/deep_chat_2026-10-22.md) |
@@ -430,10 +430,15 @@ und wird nur einmal gemessen.
   `bench/fixture_deep_chat_general.json` laufen, das KrWG und ein englisches Buchkapitel braucht.
 - **Wenig statistische Kraft.** Fünf Fragen zeigen große Effekte, keine kleinen. Unterschiede von
   einem Pflichtfakt sind Rauschen, solange sie nicht über Fragen hinweg gleichgerichtet sind.
-- **Wiki nur als Teilstand.** Der Ingest mit `gemma4:e4b` (Mac) wurde nach 4 von 25 Stücken beendet.
-  Die 12 Seiten decken das StrlSchG bis § 60 ab (34 % des Textes), die StrlSchV gar nicht.
-  **Keine Gold-Sektion der fünf Fragen liegt im Wiki.** Es kann in der Studie also nicht beim
-  Finden helfen, sondern höchstens als Ablenker wirken. Die Aussage zum Wiki-Weg bleibt offen.
+- **Wiki mit gemischter Herkunft.** Von 25 Stücken schrieb 4 `gemma4:e4b` lokal, 21 (StrlSchG ab
+  Stück 5, die ganze StrlSchV) ein Cloud-Modell (Claude Sonnet) anstelle von Ollama. Prompts,
+  Routing, Merge und OKF-Stempel waren der echte App-Code, aber die Seiten sind **nicht** das, was
+  `gemma4:e4b` geschrieben hätte: Die 21 Stücke zitieren häufiger einzelne §§, und das Limit
+  von 32k Tokens griff bei ihnen nicht. Ergebnisse zum Wiki-Weg gelten daher nur eingeschränkt für
+  einen rein lokalen Ingest.
+- **Wiki-Reichweite der fünf Fragen.** Bei F06 und F10 stehen alle Pflichtfakten schon in den
+  Wiki-Top-5, bei F02 stehen sie im Wiki, aber nicht in den Top-5. Bei F05 fehlt die Formulierung zur
+  inneren Exposition. Die Cs-137-Werte (F03) stehen nicht im Wiki, Tabellen wurden nicht übertragen.
 - **Skalierung ist synthetisch.** Aufgefüllte Vektoren messen Latenz, nicht Qualität.
 - **Gold nach Fachurteil.** Die Gold-Sektionen sind geprüfte Fundstellen, aber keine vollständige
   Rechtsauslegung. Pflichtfakten messen Vollständigkeit, keine juristische Korrektheit.
@@ -449,8 +454,8 @@ Ein Modellarm wäre die sinnvollste Erweiterung, sobald FF2 und FF3 entschieden 
 
 1. **Datenbank:** Ich gehe von `KI` aus, weil nur sie für Coding-Tools freigegeben ist (AGENTS.md
    §5.5). Soll eine andere Datenbank dazu, musst du sie ausdrücklich nennen.
-2. **Wiki-Schicht:** Teilstand gebaut (§ 6). Offen: die restlichen 21 Stücke nachziehen, sonst bleibt
-   das Wiki für die fünf Fragen ohne Treffer. Bei 273–463 s je Stück wären das rund 1,6–2,7 h.
+2. **Wiki-Schicht:** Entschieden und gebaut (§ 6). Bei Bedarf lässt sich ein rein lokaler Ingest als
+   Vergleichsarm nachziehen.
 3. **Vektor-DB-Kandidat:** Mein Vorschlag ist **ein** eingebetteter Kandidat ohne Dienst, LanceDB, weil
    das am nächsten an „lokal und wartungsarm“ liegt. Einen Server (Qdrant, pgvector) nur testen,
    falls du ihn wirklich betreiben würdest. Lizenz vor dem Test prüfen.
