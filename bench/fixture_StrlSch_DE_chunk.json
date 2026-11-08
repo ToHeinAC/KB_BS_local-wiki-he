@@ -1,0 +1,95 @@
+{
+  "description": "Should-answer set of the study, derived from fixture_study_StrlSch_DE.json (hand-checked gold).",
+  "collection": "StrlSch_DE",
+  "queries": [
+    {
+      "id": "F01",
+      "type": "study",
+      "query": "Ab welcher Strahlendosis muss eine Fluggesellschaft den Betrieb ihrer Flugzeuge wegen der Höhenstrahlung bei der Behörde melden?",
+      "expected": [
+        "StrlSchG.md#§ 50"
+      ]
+    },
+    {
+      "id": "F02",
+      "type": "study",
+      "query": "An welchen Arbeitsplätzen muss unabhängig vom Standort des Gebäudes die Radonkonzentration gemessen werden?",
+      "expected": [
+        "StrlSchG.md#§ 127",
+        "StrlSchG.md#Anlage 8"
+      ]
+    },
+    {
+      "id": "F03",
+      "type": "study",
+      "query": "Wie hoch sind die Freigrenzen für Cs-137?",
+      "expected": [
+        "StrlSchV.md#Anlage 4"
+      ]
+    },
+    {
+      "id": "F05",
+      "type": "study",
+      "query": "Eine Mitarbeiterin im Kontrollbereich teilt mit, dass sie schwanger ist. Was muss der Betrieb jetzt tun, und welche Dosisgrenze gilt für das ungeborene Kind?",
+      "expected": [
+        "StrlSchG.md#§ 78",
+        "StrlSchV.md#§ 69",
+        "StrlSchV.md#§ 55"
+      ]
+    },
+    {
+      "id": "F06",
+      "type": "study",
+      "query": "Im Erdgeschoss eines Betriebs in einem Radonvorsorgegebiet werden hohe Radonwerte gemessen. Welche Schritte muss der Arbeitgeber nacheinander gehen, und ab wann gilt der berufliche Strahlenschutz?",
+      "expected": [
+        "StrlSchG.md#§ 126",
+        "StrlSchG.md#§ 127",
+        "StrlSchG.md#§ 128",
+        "StrlSchG.md#§ 129",
+        "StrlSchG.md#§ 130",
+        "StrlSchG.md#§ 131",
+        "StrlSchV.md#§ 157",
+        "StrlSchV.md#§ 158"
+      ]
+    },
+    {
+      "id": "F07",
+      "type": "study",
+      "query": "Worin unterscheiden sich die Freigabe radioaktiver Stoffe und die Entlassung von Rückständen aus der Überwachung, und welches Dosiskriterium gilt jeweils?",
+      "expected": [
+        "StrlSchV.md#§ 31",
+        "StrlSchG.md#§ 62",
+        "StrlSchV.md#§ 29"
+      ]
+    },
+    {
+      "id": "F08",
+      "type": "study",
+      "query": "Wann ist etwas eine radioaktive Altlast, wer ist dafür verantwortlich, und wer trägt die Kosten der Sanierung?",
+      "expected": [
+        "StrlSchG.md#§ 136",
+        "StrlSchG.md#§ 137",
+        "StrlSchG.md#§ 146"
+      ]
+    },
+    {
+      "id": "F09",
+      "type": "study",
+      "query": "Wie sind die Pflichten zwischen Strahlenschutzverantwortlichem und Strahlenschutzbeauftragtem verteilt, und welche Pflichten dürfen nicht übertragen werden?",
+      "expected": [
+        "StrlSchG.md#§ 69",
+        "StrlSchG.md#§ 70",
+        "StrlSchG.md#§ 72",
+        "StrlSchV.md#§ 43"
+      ]
+    },
+    {
+      "id": "F10",
+      "type": "study",
+      "query": "Wie hoch ist der Grenzwert der Organ-Äquivalentdosis der Augenlinse für beruflich exponierte Erwachsene, und darf die Behörde davon abweichen?",
+      "expected": [
+        "StrlSchG.md#§ 78"
+      ]
+    }
+  ]
+}

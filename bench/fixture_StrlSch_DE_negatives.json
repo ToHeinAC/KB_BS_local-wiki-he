@@ -1,0 +1,62 @@
+{
+  "description": "Should-abstain set for StrlSch_DE: general out-of-domain queries plus near-domain ones the two statutes do not regulate.",
+  "collection": "StrlSch_DE",
+  "queries": [
+    {
+      "id": "neg-sourdough",
+      "query": "how do I bake a sourdough bread from scratch at home"
+    },
+    {
+      "id": "neg-revolution",
+      "query": "what were the main causes of the French Revolution"
+    },
+    {
+      "id": "neg-backpain",
+      "query": "best physiotherapy exercises for chronic lower back pain"
+    },
+    {
+      "id": "neg-beesting",
+      "query": "how to treat an allergic reaction to a bee sting"
+    },
+    {
+      "id": "neg-offside",
+      "query": "the offside rule in football explained for beginners"
+    },
+    {
+      "id": "neg-prune",
+      "query": "how to prune apple trees in late winter"
+    },
+    {
+      "id": "neg-carbonara",
+      "query": "authentic italian carbonara recipe with guanciale and pecorino"
+    },
+    {
+      "id": "neg-vitamind",
+      "query": "symptoms and treatment of vitamin D deficiency"
+    },
+    {
+      "id": "neg-winestain",
+      "query": "best way to remove a red wine stain from a wool carpet"
+    },
+    {
+      "id": "neg-oilpaint",
+      "query": "beginner tips for oil painting on canvas"
+    },
+    {
+      "id": "neg-mobilfunk",
+      "query": "Welche Grenzwerte gelten für elektromagnetische Felder von Mobilfunkanlagen?"
+    },
+    {
+      "id": "neg-asbest",
+      "query": "Welche Schutzmaßnahmen gelten bei der Sanierung von Asbest in Gebäuden?"
+    },
+    {
+      "id": "neg-laerm",
+      "query": "Welche Lärmgrenzwerte gelten am Arbeitsplatz?"
+    },
+    {
+      "id": "neg-solarium",
+      "query": "Ab welchem Alter darf man ein Solarium benutzen?"
+    }
+  ]
+}

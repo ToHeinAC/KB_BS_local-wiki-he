@@ -1,0 +1,108 @@
+{
+  "_note": "Gold of the study in research_notes/retrieval_deepchat/00_framework.md. Sections and mandatory facts were checked by hand against the statutes in StrlSch_DE (public law, gesetze-im-internet.de), never model-generated. `deep` marks the five questions of the Deep chat runs. `part` narrows a long annex to the part holding the answer. `facts` are regexes searched in the answer, case-insensitive, with whitespace normalised.",
+  "db": "StrlSch_DE",
+  "files": ["StrlSchG.md", "StrlSchV.md"],
+  "questions": [
+    {
+      "id": "F01",
+      "deep": false,
+      "question": "Ab welcher Strahlendosis muss eine Fluggesellschaft den Betrieb ihrer Flugzeuge wegen der Höhenstrahlung bei der Behörde melden?",
+      "gold": [{"file": "StrlSchG.md", "section": "§ 50", "heading": "Luftfahrzeugen"}],
+      "facts": ["\\b1 (Millisievert|mSv)", "vier Wochen"]
+    },
+    {
+      "id": "F02",
+      "deep": true,
+      "question": "An welchen Arbeitsplätzen muss unabhängig vom Standort des Gebäudes die Radonkonzentration gemessen werden?",
+      "gold": [
+        {"file": "StrlSchG.md", "section": "§ 127", "heading": "Messung der Radonkonzentration"},
+        {"file": "StrlSchG.md", "section": "Anlage 8", "heading": "Arbeitsfelder"}
+      ],
+      "facts": ["Bergwerk", "Radonheil", "Wasser(gewinnung|aufbereitung|verteilung)"]
+    },
+    {
+      "id": "F03",
+      "deep": true,
+      "question": "Wie hoch sind die Freigrenzen für Cs-137?",
+      "gold": [
+        {"file": "StrlSchV.md", "section": "Anlage 4", "part": "Anlage 4 (Teil 6)", "heading": "Freigrenzen"}
+      ],
+      "facts": ["1 ?(E\\+ ?0?4|× ?10\\^?4)|10[ .]?000 (Bq|Becquerel)", "1 ?(E- ?0?1)|0,1 (Bq|Becquerel)"]
+    },
+    {
+      "id": "F04",
+      "deep": false,
+      "question": "Welche Grenzwerte gelten für elektromagnetische Felder von Mobilfunkanlagen?",
+      "gold": [],
+      "facts": []
+    },
+    {
+      "id": "F05",
+      "deep": true,
+      "question": "Eine Mitarbeiterin im Kontrollbereich teilt mit, dass sie schwanger ist. Was muss der Betrieb jetzt tun, und welche Dosisgrenze gilt für das ungeborene Kind?",
+      "gold": [
+        {"file": "StrlSchG.md", "section": "§ 78", "heading": "Grenzwerte für beruflich exponierte"},
+        {"file": "StrlSchV.md", "section": "§ 69", "heading": "schwangeren"},
+        {"file": "StrlSchV.md", "section": "§ 55", "heading": "Zutritt"}
+      ],
+      "facts": ["\\b1 (Millisievert|mSv)", "innere[nr]? (berufliche[nr]? )?Exposition", "wöchentlich", "dokumentier"]
+    },
+    {
+      "id": "F06",
+      "deep": true,
+      "question": "Im Erdgeschoss eines Betriebs in einem Radonvorsorgegebiet werden hohe Radonwerte gemessen. Welche Schritte muss der Arbeitgeber nacheinander gehen, und ab wann gilt der berufliche Strahlenschutz?",
+      "gold": [
+        {"file": "StrlSchG.md", "section": "§ 126", "heading": "Referenzwert"},
+        {"file": "StrlSchG.md", "section": "§ 127", "heading": "Messung der Radonkonzentration"},
+        {"file": "StrlSchG.md", "section": "§ 128", "heading": "Reduzierung der Radonkonzentration"},
+        {"file": "StrlSchG.md", "section": "§ 129", "heading": "Anmeldung"},
+        {"file": "StrlSchG.md", "section": "§ 130", "heading": "Abschätzung der Exposition"},
+        {"file": "StrlSchG.md", "section": "§ 131", "heading": "Beruflicher Strahlenschutz"},
+        {"file": "StrlSchV.md", "section": "§ 157", "heading": "Körperdosis"},
+        {"file": "StrlSchV.md", "section": "§ 158", "heading": "beruflichen Strahlenschutzes"}
+      ],
+      "facts": ["300 (Becquerel|Bq)", "unverzüglich", "30 Monate", "anzumelden|Anmeldung|anmelden", "(sechs|6) Monate", "\\b6 (Millisievert|mSv)"]
+    },
+    {
+      "id": "F07",
+      "deep": false,
+      "question": "Worin unterscheiden sich die Freigabe radioaktiver Stoffe und die Entlassung von Rückständen aus der Überwachung, und welches Dosiskriterium gilt jeweils?",
+      "gold": [
+        {"file": "StrlSchV.md", "section": "§ 31", "heading": "Dosiskriterium"},
+        {"file": "StrlSchG.md", "section": "§ 62", "heading": "Entlassung von Rückständen"},
+        {"file": "StrlSchV.md", "section": "§ 29", "heading": "Entlassung überwachungsbedürftiger Rückstände"}
+      ],
+      "facts": ["\\b10 (Mikrosievert|µSv|μSv)", "\\b1 (Millisievert|mSv)"]
+    },
+    {
+      "id": "F08",
+      "deep": false,
+      "question": "Wann ist etwas eine radioaktive Altlast, wer ist dafür verantwortlich, und wer trägt die Kosten der Sanierung?",
+      "gold": [
+        {"file": "StrlSchG.md", "section": "§ 136", "heading": "radioaktiven Altlast"},
+        {"file": "StrlSchG.md", "section": "§ 137", "heading": "Verantwortlichkeit"},
+        {"file": "StrlSchG.md", "section": "§ 146", "heading": "Kosten"}
+      ],
+      "facts": ["menschliche[rn]? Betätigung", "\\b1 (Millisievert|mSv)", "Eigentümer", "verursach", "Ausgleichsanspruch"]
+    },
+    {
+      "id": "F09",
+      "deep": false,
+      "question": "Wie sind die Pflichten zwischen Strahlenschutzverantwortlichem und Strahlenschutzbeauftragtem verteilt, und welche Pflichten dürfen nicht übertragen werden?",
+      "gold": [
+        {"file": "StrlSchG.md", "section": "§ 69", "heading": "Strahlenschutzverantwortlicher"},
+        {"file": "StrlSchG.md", "section": "§ 70", "heading": "Strahlenschutzbeauftragter"},
+        {"file": "StrlSchG.md", "section": "§ 72", "heading": "Weitere Pflichten"},
+        {"file": "StrlSchV.md", "section": "§ 43", "heading": "Pflichten des Strahlenschutzbeauftragten"}
+      ],
+      "facts": ["schriftlich", "nicht übertrag", "§ 43"]
+    },
+    {
+      "id": "F10",
+      "deep": true,
+      "question": "Wie hoch ist der Grenzwert der Organ-Äquivalentdosis der Augenlinse für beruflich exponierte Erwachsene, und darf die Behörde davon abweichen?",
+      "gold": [{"file": "StrlSchG.md", "section": "§ 78", "heading": "Grenzwerte für beruflich exponierte"}],
+      "facts": ["\\b20 (Millisievert|mSv)", "\\b50 (Millisievert|mSv)", "\\b100 (Millisievert|mSv)"]
+    }
+  ]
+}
