@@ -1,6 +1,6 @@
 # Forschungsrahmen: Retrieval und Deep Chat
 
-Stand 2026-11-07 · Status: **Fünf Fragen gewählt (F02, F03, F05, F06, F10), Chunker-Fehler behoben, Wiki vollständig gebaut, DB in `StrlSch_DE` umbenannt, FF1 gemessen (außer R5), FF2 und FF3 warten auf die RTX 4090**. Stand der Messungen: [01_zwischenstand.md](01_zwischenstand.md)
+Stand 2026-11-07 · Status: **Fünf Fragen gewählt (F02, F03, F05, F06, F10), Chunker-Fehler behoben, Wiki vollständig gebaut, DB in `StrlSch_DE` umbenannt, FF1 entschieden (keine Vektordatenbank), FF2 und FF3 warten auf die RTX 4090**. Stand der Messungen: [01_zwischenstand.md](01_zwischenstand.md)
 
 Dieses Dokument ist der Startpunkt der Studie. Es legt die Forschungsfragen, Testfragen,
 Messgrößen und Entscheidungsregeln fest, **bevor** gemessen wird. Ergebnisse kommen später als

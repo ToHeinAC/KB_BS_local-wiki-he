@@ -1,13 +1,13 @@
 # Zwischenstand der Messungen
 
-Stand 2026-11-08. Rahmen: [00_framework.md](00_framework.md). **FF1 ist bis auf R5 gemessen, FF2 und
-FF3 warten auf die RTX 4090.** Noch keine Entscheidung: Die Regeln aus dem Framework werden erst
-mit vollständigen Daten angewandt.
+Stand 2026-11-08. Rahmen: [00_framework.md](00_framework.md). **FF1 ist gemessen und entschieden, FF2
+und FF3 warten auf die RTX 4090.**
 
 ## FF1: Retrieval
 
 Mac, Scratch-Kopie von `StrlSch_DE`, Suche über die Originale, Ränge auf Sektionsebene, Reranker
-aktiv. Rohdaten: `bench/results/study_ff1_arms_adbf8c6.json`, `study_ff1_lancedb_adbf8c6.json`.
+aktiv. Rohdaten: `bench/results/study_ff1_arms_adbf8c6.json`, `study_ff1_lancedb_adbf8c6.json`,
+`study_ff1_m3_adbf8c6.json`.
 
 | Arm | Recall@5 | Recall@10 (von 26) | MRR | nDCG@10 |
 |---|---|---|---|---|
@@ -16,7 +16,15 @@ aktiv. Rohdaten: `bench/results/study_ff1_arms_adbf8c6.json`, `study_ff1_lancedb
 | R2 Hybrid | 13 | 16 | 0,85 | 0,71 |
 | R3 Hybrid + Reranker (heute) | 16 | 20 | 0,87 | 0,78 |
 | R4 gleiche Vektoren in LanceDB | 16 | 20 | 0,87 | 0,78 |
-| R5 bge-m3 Sparse + Multi-Vektor | offen | offen | offen | offen |
+| R5 nur Sparse | 12 | 15 | 0,64 | 0,51 |
+| R5 nur Multi-Vektor | 17 | 21 | 0,87 | 0,78 |
+| R5 Dense + Sparse + Multi-Vektor, ohne BM25 und Reranker | 18 | 20 | 0,94 | 0,81 |
+| R5 dasselbe als Dense-Arm in Fusion und Reranker | 16 | 20 | 0,93 | 0,79 |
+
+**Entscheidung nach der Regel aus § 2: keine Vektordatenbank.** R4 ändert nichts. R5 gewinnt in
+Recall@10 höchstens 1 von 26 Sektionen statt der geforderten 3, und auch dieser Gewinn braucht keine
+Vektordatenbank, nur die Repräsentation. Die Latenzschwelle reißt nur die heutige Ladeweise bei
+rund 190-facher Korpusgröße (p95 275 ms), im Speicher sind es 13 ms.
 
 **Skalierung** (1024 Dimensionen, mit Zufallsvektoren aufgefüllt, misst nur Latenz, p50):
 
@@ -31,6 +39,9 @@ aktiv. Rohdaten: `bench/results/study_ff1_arms_adbf8c6.json`, `study_ff1_lancedb
 - H1.1 bestätigt: Gleiche Vektoren in LanceDB liefern dieselben Summenwerte wie R3.
 - H1.2: Bei 100 000 Zeilen dauert die Suche im Speicher 12 ms. Die 257 ms kommen fast nur vom Neuladen
   von `vectors.json` und `vectors.npy` je Suche, das ließe sich ohne Datenbank beheben.
+- R5 zeigt einen eigenen, kleineren Kandidaten: Die Kombination verbessert die vorderen Ränge (MRR 0,94 gegen 0,87,
+  Recall@5 18 gegen 16) ohne Reranker. Das ist dünn: Der MRR-Gewinn kommt allein von F05 (bester Rang 1 statt 3), § 126 und § 157 findet auch R5 nicht. Es bräuchte
+  eine Embedding-Laufzeit neben Ollama und ist eine eigene Entscheidung, keine Datenbankfrage.
 - Im Verhältnis dazu ist das Reranking teuer: rund 6 s je Suche auf dem Mac (laut Doku 0,3 s auf der GPU).
 - Unerwartet: Hybrid (16) liegt bei Recall@10 unter Dense allein (19), MRR etwas höher. Die Fusion zieht
   Dense-Treffer nach unten, etwa F02 Anlage 8 von Rang 5 auf 21 (mit Reranker 9).
