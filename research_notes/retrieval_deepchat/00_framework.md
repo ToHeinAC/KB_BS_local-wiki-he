@@ -1,6 +1,6 @@
 # Forschungsrahmen: Retrieval und Deep Chat
 
-Stand 2026-11-07 · Status: **Fünf Fragen gewählt (F02, F03, F05, F06, F10), Chunker-Fehler behoben, Wiki vollständig gebaut, Messung noch nicht begonnen**
+Stand 2026-11-07 · Status: **Fünf Fragen gewählt (F02, F03, F05, F06, F10), Chunker-Fehler behoben, Wiki vollständig gebaut, DB in `StrlSch_DE` umbenannt, FF1 gemessen (außer R5), FF2 und FF3 warten auf die RTX 4090**. Stand der Messungen: [01_zwischenstand.md](01_zwischenstand.md)
 
 Dieses Dokument ist der Startpunkt der Studie. Es legt die Forschungsfragen, Testfragen,
 Messgrößen und Entscheidungsregeln fest, **bevor** gemessen wird. Ergebnisse kommen später als
@@ -20,8 +20,8 @@ eigene Dateien in diesen Ordner (`01_…`, `02_…`).
 
 | Thema | Befund | Beleg |
 |---|---|---|
-| Korpus | `data/KI`: StrlSchG + StrlSchV, zusammen knapp 1 MB, **60 Wiki-Seiten** (Herkunft siehe § 6) | `data/KI/raw`, `data/KI/wiki` |
-| Index | `data/KI` neu gebaut: 533 Original-Chunks + 404 Wiki-Chunks, BM25 und Vektoren deckungsgleich | `index_health()`, `vectors.json` |
+| Korpus | `data/StrlSch_DE`: StrlSchG + StrlSchV, zusammen knapp 1 MB, **60 Wiki-Seiten** (Herkunft siehe § 6) | `data/StrlSch_DE/raw`, `data/StrlSch_DE/wiki` |
+| Index | `data/StrlSch_DE` neu gebaut: 533 Original-Chunks + 404 Wiki-Chunks, BM25 und Vektoren deckungsgleich | `index_health()`, `vectors.json` |
 | Retrieval | BM25 (FTS5) + exakter Kosinus über `vectors.npy` (bge-m3, 1024 Dim.), RRF, optional Cross-Encoder | [retrieval.md](../../docs/retrieval.md) |
 | Modell | `gemma4:e4b`, `num_ctx` 32768 für alle Aufrufe | `src/ollama_client.py` |
 | Letzter GPU-Lauf | 26.10., q1–q7: 517 s, also 74 s je Frage und 6 s je Tool-Aufruf; Gold 10/10 gelesen | [Bench-Log](../../bench/results/deep_chat_2026-10-22.md) |
@@ -31,18 +31,18 @@ eigene Dateien in diesen Ordner (`01_…`, `02_…`).
 
 ### Lücken, die vor jeder Messung zu schließen sind
 
-- **Retrieval-Gold fehlt.** `bench/fixture_KI*.json` stammen aus dem früheren KI-Korpus
+- **Retrieval-Gold fehlte: behoben** durch `bench/fixture_study_StrlSch_DE.json`. `bench/fixture_KI*.json` stammen aus dem früheren KI-Korpus
   (Attention-Paper usw.): 0 von 11 Chunk-Labels existieren noch. `bench_retrieval.py` und
-  `calibrate_abstention.py` messen auf KI derzeit nichts Sinnvolles. In `data/KI/index` liegt
+  `calibrate_abstention.py` messen auf dieser Datenbank nichts Sinnvolles. In `data/StrlSch_DE/index` liegt
   auch keine `calibration.json`, Abstention und das τ-Filtern greifen dort also nicht.
 - **Chunker-Fehler bei langen Anlagen-Köpfen: behoben (2026-11-07).** Die Köpfe von Anlage 4
   (357 Zeichen) und Anlage 19 (227) überschritten die Grenze von 200 Zeichen in
   `_ANNEX_HEAD_RE`, Anlage 4 stand deshalb unter „Anlage 3 (Teil N)“. Auf einer Scratch-Kopie haben
-  jetzt alle 19 Anlagen einen eigenen Anker, `data/KI` ist damit neu gebaut.
+  jetzt alle 19 Anlagen einen eigenen Anker, `data/StrlSch_DE` ist damit neu gebaut.
 
 ### Vorabmessung auf dem Mac
 
-Nur zur Einschätzung, nicht als Ergebnis: Mac, ohne Reranker, Scratch-Kopie von KI mit aktuellem
+Nur zur Einschätzung, nicht als Ergebnis: Mac, ohne Reranker, Scratch-Kopie von `StrlSch_DE` mit aktuellem
 Chunker (533 Chunks), Gold ungeprüft.
 
 | Messung | Wert |
@@ -226,7 +226,7 @@ gegenüber D0 auf mindestens 2 von 5 Fragen Pflichtfakten kostet.
 
 ## 3. Die zehn Testfragen
 
-Alle Abschnitte sind im Text von `data/KI/raw` geprüft. **BM25 / Dense / Hybrid** zeigen den Rang
+Alle Abschnitte sind im Text von `data/StrlSch_DE/raw` geprüft. **BM25 / Dense / Hybrid** zeigen den Rang
 der Gold-Sektion in der Vorabmessung (`–` = nicht in den Top 60, ohne Reranker).
 
 | # | Kurzname | Typ | Gold-Sektionen | Besonderheit |
@@ -276,7 +276,7 @@ der Gold-Sektion in der Vorabmessung (`–` = nicht in den Top 60, ohne Reranker
 - **Pflichtfakten:** Keine erfundenen Grenzwerte · Korpus deckt das Thema nicht ab
 - **Sinn:** Prüft, ob Gates und Tiefe zu Scheinbelegen drängen. Dense liefert fachfremde Treffer mit Score 0,57, ein rohes Score-Limit reicht also nicht.
 - **Vorteile:** Einzige Sicherheitsfrage. Zeigt, ob der Lauf früh abbricht, was auch ein Tempothema ist.
-- **Nachteile:** Braucht ein neu kalibriertes τ für KI. Kein Recall messbar, Bewertung teils manuell.
+- **Nachteile:** Braucht ein neu kalibriertes τ für `StrlSch_DE`. Kein Recall messbar, Bewertung teils manuell.
 
 ### F05: Schwangerschaft
 
@@ -377,7 +377,7 @@ nicht zu den fünf.
 
 ### 5.1 Voraussetzungen
 
-1. Scratch-`DATA_ROOT` je Arm, nie `data/` beschreiben. KI dorthin kopieren.
+1. Scratch-`DATA_ROOT` je Arm, nie `data/` beschreiben. `StrlSch_DE` dorthin kopieren.
 2. Neue Gold-Datei aus den gewählten Fragen, zusätzlich Retrieval-Gold mit Sektionsanker statt
    veralteter Chunk-IDs. Prüfung der Labels von Hand, nicht durch ein LLM.
 3. τ auf dem neuen Gold kalibrieren.
@@ -452,8 +452,9 @@ Ein Modellarm wäre die sinnvollste Erweiterung, sobald FF2 und FF3 entschieden 
 
 ## 7. Offene Entscheidungen
 
-1. **Datenbank:** Ich gehe von `KI` aus, weil nur sie für Coding-Tools freigegeben ist (AGENTS.md
-   §5.5). Soll eine andere Datenbank dazu, musst du sie ausdrücklich nennen.
+1. **Datenbank:** Entschieden: die frühere `KI`, jetzt `data/StrlSch_DE`. AGENTS.md §5.5 und der Hook geben
+   weiter nur `data/KI` frei. Das bleibt offen, denn auf der GPU-Maschine trägt eine echte Datenbank
+   denselben Namen, und eine Freigabe des Namens würde sie mit öffnen.
 2. **Wiki-Schicht:** Entschieden und gebaut (§ 6). Bei Bedarf lässt sich ein rein lokaler Ingest als
    Vergleichsarm nachziehen.
 3. **Vektor-DB-Kandidat:** Mein Vorschlag ist **ein** eingebetteter Kandidat ohne Dienst, LanceDB, weil
