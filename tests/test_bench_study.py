@@ -7,9 +7,17 @@ import sys
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
+import chunker
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "bench_study.py"
-GOLD = ROOT / "bench" / "fixture_study_StrlSch_DE.json"
+# The two-statute corpus of the Mac runs, and the whole StrlSch_DE database of the 4090 runs.
+GOLDS = [
+    ROOT / "bench" / n
+    for n in ("fixture_study_StrlSch_DE.json", "fixture_study_StrlSch_DE_full.json")
+]
 
 
 def _bench() -> ModuleType:
@@ -88,8 +96,9 @@ def test_a_fact_is_found_across_a_line_break_and_in_any_case():
     assert bench.fact_hits("UNVERZÜGLICH handeln", ["unverzüglich"]) == [True]
 
 
-def test_the_gold_file_is_complete_and_names_the_chosen_questions():
-    gold = json.loads(GOLD.read_text(encoding="utf-8"))
+@pytest.mark.parametrize("path", GOLDS, ids=lambda p: p.stem)
+def test_the_gold_file_is_complete_and_names_the_chosen_questions(path):
+    gold = json.loads(path.read_text(encoding="utf-8"))
     questions = gold["questions"]
     assert gold["db"] == "StrlSch_DE"
     assert [q["id"] for q in questions] == [f"F{n:02d}" for n in range(1, 11)]
@@ -98,3 +107,11 @@ def test_the_gold_file_is_complete_and_names_the_chosen_questions():
     for q in questions:
         assert all(re.compile(f) for f in q["facts"])
         assert q["facts"] or q["id"] == "F04"
+
+
+def test_the_corpus_is_the_gold_files_or_else_every_source(wiki_dir):
+    bench = _bench()
+    for name in ("a.md", "b.md"):
+        chunker.write_chunks(name, chunker.split(f"## Teil\nText aus {name} für den Korpus.\n"))
+    assert {c["source"] for c in bench.corpus({"files": ["a.md"]})} == {"a.md"}
+    assert {c["source"] for c in bench.corpus({})} == {"a.md", "b.md"}

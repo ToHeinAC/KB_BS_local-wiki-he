@@ -24,7 +24,6 @@ from FlagEmbedding import BGEM3FlagModel  # pyright: ignore[reportMissingImports
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bench_study
 
-import chunker
 import db_context
 import embed_index
 import retrieval
@@ -91,7 +90,7 @@ def main() -> None:
     fixture = json.loads(args.gold.read_text(encoding="utf-8"))
     db_context.set_active_db(fixture["db"])
     db_context.set_search_scope([fixture["db"]])
-    chunks = [{**c, "source": f} for f in fixture["files"] for c in chunker.load_chunks(f)]
+    chunks = bench_study.corpus(fixture)
     model = BGEM3FlagModel("BAAI/bge-m3", use_fp16=False)
     docs = _encode(model, [c["text"] for c in chunks])
     print("encoded", len(chunks), flush=True)

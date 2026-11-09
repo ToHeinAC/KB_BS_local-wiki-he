@@ -115,6 +115,14 @@ def gold_problems(fixture: dict[str, Any]) -> list[str]:
     return problems
 
 
+def corpus(fixture: dict[str, Any]) -> list[dict[str, Any]]:
+    """The chunks an experiment encodes itself: the gold file's `files`, or without them every
+    source of the database, as the app's own arms search it."""
+    if "files" not in fixture:
+        return chunker.all_chunks()
+    return [{**c, "source": f} for f in fixture["files"] for c in chunker.load_chunks(f)]
+
+
 def run_arm(fixture: dict[str, Any], search: Search) -> list[dict[str, Any]]:
     """One arm over every question: gold ranks and the search's wall time."""
     rows: list[dict[str, Any]] = []
