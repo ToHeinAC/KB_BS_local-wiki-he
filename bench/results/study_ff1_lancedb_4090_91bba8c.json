@@ -1,0 +1,536 @@
+{
+  "build_s": 0.33,
+  "dense_lance": {
+    "summary": {
+      "gold": 26,
+      "recall@5": 14,
+      "recall@10": 18,
+      "mrr": 0.894,
+      "ndcg@10": 0.761,
+      "ms_p50": 32.6,
+      "ms_max": 40500.7
+    },
+    "rows": [
+      {
+        "id": "F01",
+        "ms": 40500.7,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 50",
+          "§ 52",
+          "§ 54"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F02",
+        "ms": 32.6,
+        "ranks": [
+          1,
+          10
+        ],
+        "top": [
+          "§ 127",
+          "§ 132",
+          "§ 131a"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F03",
+        "ms": 30.5,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "Anlage 4 (Teil 14)",
+          "Anlage 4 (Teil 13)",
+          "Anlage 8 (Teil 4)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F04",
+        "ms": 36.6,
+        "ranks": [],
+        "top": [
+          "Anlage 8 (Teil 2)",
+          "Anlage 4 (Teil 1)",
+          "§ 99"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F05",
+        "ms": 42.5,
+        "ranks": [
+          38,
+          29,
+          23
+        ],
+        "top": [
+          "§ 64",
+          "§ 9",
+          "H_ T ðtÞ dt (Teil 7)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F06",
+        "ms": 31.3,
+        "ranks": [
+          null,
+          6,
+          8,
+          17,
+          3,
+          1,
+          null,
+          5
+        ],
+        "top": [
+          "§ 131",
+          "§ 154",
+          "§ 130"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F07",
+        "ms": 31.6,
+        "ranks": [
+          1,
+          2,
+          12
+        ],
+        "top": [
+          "§ 31",
+          "§ 62 (Teil 2)",
+          "Anlage 7"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F08",
+        "ms": 31.5,
+        "ranks": [
+          4,
+          1,
+          37
+        ],
+        "top": [
+          "§ 137",
+          "§ 143",
+          "§ 139"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F09",
+        "ms": 33.0,
+        "ranks": [
+          6,
+          3,
+          2,
+          1
+        ],
+        "top": [
+          "§ 43",
+          "§ 72",
+          "§ 70"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F10",
+        "ms": 31.8,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 78",
+          "§ 80",
+          "§ 74"
+        ],
+        "top_score": null
+      }
+    ]
+  },
+  "hybrid_lance": {
+    "summary": {
+      "gold": 26,
+      "recall@5": 12,
+      "recall@10": 16,
+      "mrr": 0.905,
+      "ndcg@10": 0.741,
+      "ms_p50": 32.1,
+      "ms_max": 66.8
+    },
+    "rows": [
+      {
+        "id": "F01",
+        "ms": 66.8,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 50",
+          "§ 52",
+          "§ 54"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F02",
+        "ms": 32.3,
+        "ranks": [
+          1,
+          18
+        ],
+        "top": [
+          "§ 127",
+          "§ 123",
+          "§ 132"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F03",
+        "ms": 25.9,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "Anlage 4 (Teil 14)",
+          "Anlage 4 (Teil 13)",
+          "Anlage 8 (Teil 4)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F04",
+        "ms": 30.4,
+        "ranks": [],
+        "top": [
+          "Anlage 8 (Teil 2)",
+          "§ 99",
+          "Anlage 4 (Teil 1)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F05",
+        "ms": 33.3,
+        "ranks": [
+          36,
+          9,
+          7
+        ],
+        "top": [
+          "§ 64",
+          "§ 9",
+          "H_ T ðtÞ dt (Teil 7)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F06",
+        "ms": 32.1,
+        "ranks": [
+          null,
+          14,
+          16,
+          22,
+          3,
+          1,
+          null,
+          13
+        ],
+        "top": [
+          "§ 131",
+          "§ 154",
+          "§ 130"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F07",
+        "ms": 33.9,
+        "ranks": [
+          1,
+          2,
+          8
+        ],
+        "top": [
+          "§ 31",
+          "§ 62 (Teil 2)",
+          "Anlage 7"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F08",
+        "ms": 30.2,
+        "ranks": [
+          6,
+          1,
+          12
+        ],
+        "top": [
+          "§ 137",
+          "§ 139",
+          "§ 143"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F09",
+        "ms": 23.2,
+        "ranks": [
+          11,
+          2,
+          3,
+          1
+        ],
+        "top": [
+          "§ 43",
+          "§ 70",
+          "§ 72"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F10",
+        "ms": 27.3,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 78",
+          "§ 74",
+          "§ 80"
+        ],
+        "top_score": null
+      }
+    ]
+  },
+  "rerank_lance": {
+    "summary": {
+      "gold": 26,
+      "recall@5": 15,
+      "recall@10": 18,
+      "mrr": 0.926,
+      "ndcg@10": 0.772,
+      "ms_p50": 379.7,
+      "ms_max": 5090.6
+    },
+    "rows": [
+      {
+        "id": "F01",
+        "ms": 4004.7,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 50",
+          "§ 54",
+          "§ 52"
+        ],
+        "top_score": 3.0716
+      },
+      {
+        "id": "F02",
+        "ms": 334.4,
+        "ranks": [
+          1,
+          13
+        ],
+        "top": [
+          "§ 127",
+          "§ 132",
+          "§ 123"
+        ],
+        "top_score": 4.0491
+      },
+      {
+        "id": "F03",
+        "ms": 5090.6,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "Anlage 4 (Teil 14)",
+          "Anlage 4 (Teil 13)",
+          "Anlage 8 (Teil 4)"
+        ],
+        "top_score": -0.4348
+      },
+      {
+        "id": "F04",
+        "ms": 429.9,
+        "ranks": [],
+        "top": [
+          "Anlage 8 (Teil 2)",
+          "§ 99",
+          "Anlage 4 (Teil 1)"
+        ],
+        "top_score": -5.5026
+      },
+      {
+        "id": "F05",
+        "ms": 380.4,
+        "ranks": [
+          36,
+          18,
+          3
+        ],
+        "top": [
+          "§ 64",
+          "§ 63",
+          "§ 55"
+        ],
+        "top_score": -2.1907
+      },
+      {
+        "id": "F06",
+        "ms": 358.6,
+        "ranks": [
+          null,
+          4,
+          17,
+          22,
+          5,
+          1,
+          null,
+          6
+        ],
+        "top": [
+          "§ 131",
+          "§ 76 (Teil 3)",
+          "§ 76 (Teil 2)"
+        ],
+        "top_score": 1.2823
+      },
+      {
+        "id": "F07",
+        "ms": 364.2,
+        "ranks": [
+          1,
+          2,
+          5
+        ],
+        "top": [
+          "§ 31",
+          "§ 62 (Teil 2)",
+          "Anlage 7"
+        ],
+        "top_score": 3.4442
+      },
+      {
+        "id": "F08",
+        "ms": 333.1,
+        "ranks": [
+          6,
+          1,
+          15
+        ],
+        "top": [
+          "§ 137",
+          "§ 139",
+          "§ 143"
+        ],
+        "top_score": 4.7143
+      },
+      {
+        "id": "F09",
+        "ms": 331.0,
+        "ranks": [
+          6,
+          3,
+          2,
+          1
+        ],
+        "top": [
+          "§ 43",
+          "§ 72",
+          "§ 70"
+        ],
+        "top_score": 6.8639
+      },
+      {
+        "id": "F10",
+        "ms": 379.7,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 78",
+          "§ 74",
+          "§ 80"
+        ],
+        "top_score": 7.5997
+      }
+    ]
+  },
+  "scaling": [
+    {
+      "rows": 533,
+      "npy_mb": 1.1,
+      "lance_mb": 2.8,
+      "lance_build_s": 0.1,
+      "ann_recall@10": 0.96,
+      "today": {
+        "ms_p50": 6.0,
+        "ms_p95": 44.0
+      },
+      "numpy_in_memory": {
+        "ms_p50": 3.0,
+        "ms_p95": 6.0
+      },
+      "lance_ann": {
+        "ms_p50": 1.77,
+        "ms_p95": 9.97
+      }
+    },
+    {
+      "rows": 10000,
+      "npy_mb": 20.5,
+      "lance_mb": 53.2,
+      "lance_build_s": 1.1,
+      "ann_recall@10": 0.98,
+      "today": {
+        "ms_p50": 54.02,
+        "ms_p95": 93.98
+      },
+      "numpy_in_memory": {
+        "ms_p50": 4.88,
+        "ms_p95": 12.94
+      },
+      "lance_ann": {
+        "ms_p50": 1.79,
+        "ms_p95": 9.12
+      }
+    },
+    {
+      "rows": 100000,
+      "npy_mb": 204.8,
+      "lance_mb": 531.7,
+      "lance_build_s": 11.3,
+      "ann_recall@10": 0.92,
+      "today": {
+        "ms_p50": 416.99,
+        "ms_p95": 439.48
+      },
+      "numpy_in_memory": {
+        "ms_p50": 15.05,
+        "ms_p95": 23.99
+      },
+      "lance_ann": {
+        "ms_p50": 1.94,
+        "ms_p95": 5.39
+      }
+    }
+  ]
+}

@@ -1,0 +1,634 @@
+{
+  "lexical": {
+    "summary": {
+      "gold": 26,
+      "recall@5": 8,
+      "recall@10": 11,
+      "mrr": 0.556,
+      "ndcg@10": 0.477,
+      "ms_p50": 19.1,
+      "ms_max": 22.6
+    },
+    "rows": [
+      {
+        "id": "F01",
+        "ms": 19.2,
+        "ranks": [
+          null
+        ],
+        "top": [
+          "§ 90",
+          "§ 29",
+          "§ 24"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F02",
+        "ms": 18.6,
+        "ranks": [
+          4,
+          null
+        ],
+        "top": [
+          "§ 123",
+          "§ 121",
+          "§ 125"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F03",
+        "ms": 15.8,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "Anlage 4 (Teil 13)",
+          "Anlage 4 (Teil 14)",
+          "§ 11"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F04",
+        "ms": 17.2,
+        "ranks": [],
+        "top": [
+          "§ 79 (Teil 1)",
+          "§ 24",
+          "§ 131"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F05",
+        "ms": 21.3,
+        "ranks": [
+          11,
+          4,
+          8
+        ],
+        "top": [
+          "§ 63",
+          "Anlage 18 (Teil 4)",
+          "Anlage 18 (Teil 3)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F06",
+        "ms": 19.7,
+        "ranks": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "top": [
+          "2.1 Erläuterungen zur Auswahl der Beispiele",
+          "§ 76 (Teil 3)",
+          "§ 76 (Teil 2)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F07",
+        "ms": 22.6,
+        "ranks": [
+          19,
+          2,
+          3
+        ],
+        "top": [
+          "Präambel (Teil 3)",
+          "Präambel (Teil 4)",
+          "§ 62 (Teil 2)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F08",
+        "ms": 19.1,
+        "ranks": [
+          14,
+          1,
+          6
+        ],
+        "top": [
+          "§ 137",
+          "§ 164",
+          "§ 163"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F09",
+        "ms": 17.9,
+        "ranks": [
+          null,
+          8,
+          16,
+          1
+        ],
+        "top": [
+          "§ 43",
+          "§ 7 (Teil 2)",
+          "§ 87"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F10",
+        "ms": 17.2,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 78",
+          "§ 71",
+          "§ 74"
+        ],
+        "top_score": null
+      }
+    ]
+  },
+  "dense": {
+    "summary": {
+      "gold": 26,
+      "recall@5": 14,
+      "recall@10": 18,
+      "mrr": 0.894,
+      "ndcg@10": 0.761,
+      "ms_p50": 97.5,
+      "ms_max": 40505.6
+    },
+    "rows": [
+      {
+        "id": "F01",
+        "ms": 40505.6,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 50",
+          "§ 52",
+          "§ 54"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F02",
+        "ms": 87.9,
+        "ranks": [
+          1,
+          10
+        ],
+        "top": [
+          "§ 127",
+          "§ 132",
+          "§ 131a"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F03",
+        "ms": 103.8,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "Anlage 4 (Teil 14)",
+          "Anlage 4 (Teil 13)",
+          "Anlage 8 (Teil 4)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F04",
+        "ms": 113.5,
+        "ranks": [],
+        "top": [
+          "Anlage 8 (Teil 2)",
+          "Anlage 4 (Teil 1)",
+          "§ 99"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F05",
+        "ms": 81.0,
+        "ranks": [
+          36,
+          29,
+          23
+        ],
+        "top": [
+          "§ 64",
+          "§ 9",
+          "H_ T ðtÞ dt (Teil 7)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F06",
+        "ms": 73.3,
+        "ranks": [
+          null,
+          6,
+          8,
+          16,
+          3,
+          1,
+          null,
+          5
+        ],
+        "top": [
+          "§ 131",
+          "§ 154",
+          "§ 130"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F07",
+        "ms": 145.9,
+        "ranks": [
+          1,
+          2,
+          12
+        ],
+        "top": [
+          "§ 31",
+          "§ 62 (Teil 2)",
+          "Anlage 7"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F08",
+        "ms": 67.8,
+        "ranks": [
+          4,
+          1,
+          37
+        ],
+        "top": [
+          "§ 137",
+          "§ 143",
+          "§ 139"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F09",
+        "ms": 97.5,
+        "ranks": [
+          6,
+          3,
+          2,
+          1
+        ],
+        "top": [
+          "§ 43",
+          "§ 72",
+          "§ 70"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F10",
+        "ms": 91.2,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 78",
+          "§ 80",
+          "§ 74"
+        ],
+        "top_score": null
+      }
+    ]
+  },
+  "hybrid": {
+    "summary": {
+      "gold": 26,
+      "recall@5": 12,
+      "recall@10": 16,
+      "mrr": 0.905,
+      "ndcg@10": 0.741,
+      "ms_p50": 89.1,
+      "ms_max": 122.6
+    },
+    "rows": [
+      {
+        "id": "F01",
+        "ms": 94.8,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 50",
+          "§ 52",
+          "§ 54"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F02",
+        "ms": 55.8,
+        "ranks": [
+          1,
+          19
+        ],
+        "top": [
+          "§ 127",
+          "§ 123",
+          "§ 132"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F03",
+        "ms": 89.1,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "Anlage 4 (Teil 14)",
+          "Anlage 4 (Teil 13)",
+          "Anlage 8 (Teil 4)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F04",
+        "ms": 92.5,
+        "ranks": [],
+        "top": [
+          "Anlage 8 (Teil 2)",
+          "§ 99",
+          "Anlage 4 (Teil 1)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F05",
+        "ms": 69.5,
+        "ranks": [
+          36,
+          9,
+          7
+        ],
+        "top": [
+          "§ 64",
+          "§ 9",
+          "H_ T ðtÞ dt (Teil 7)"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F06",
+        "ms": 82.1,
+        "ranks": [
+          null,
+          14,
+          16,
+          21,
+          3,
+          1,
+          null,
+          13
+        ],
+        "top": [
+          "§ 131",
+          "§ 154",
+          "§ 130"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F07",
+        "ms": 122.6,
+        "ranks": [
+          1,
+          2,
+          8
+        ],
+        "top": [
+          "§ 31",
+          "§ 62 (Teil 2)",
+          "Anlage 7"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F08",
+        "ms": 45.5,
+        "ranks": [
+          6,
+          1,
+          12
+        ],
+        "top": [
+          "§ 137",
+          "§ 139",
+          "§ 143"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F09",
+        "ms": 81.1,
+        "ranks": [
+          11,
+          2,
+          3,
+          1
+        ],
+        "top": [
+          "§ 43",
+          "§ 70",
+          "§ 72"
+        ],
+        "top_score": null
+      },
+      {
+        "id": "F10",
+        "ms": 108.8,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 78",
+          "§ 74",
+          "§ 80"
+        ],
+        "top_score": null
+      }
+    ]
+  },
+  "rerank": {
+    "summary": {
+      "gold": 26,
+      "recall@5": 15,
+      "recall@10": 18,
+      "mrr": 0.926,
+      "ndcg@10": 0.772,
+      "ms_p50": 404.2,
+      "ms_max": 5165.2
+    },
+    "rows": [
+      {
+        "id": "F01",
+        "ms": 4099.1,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 50",
+          "§ 54",
+          "§ 52"
+        ],
+        "top_score": 3.0716
+      },
+      {
+        "id": "F02",
+        "ms": 354.4,
+        "ranks": [
+          1,
+          13
+        ],
+        "top": [
+          "§ 127",
+          "§ 132",
+          "§ 123"
+        ],
+        "top_score": 4.0491
+      },
+      {
+        "id": "F03",
+        "ms": 5165.2,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "Anlage 4 (Teil 14)",
+          "Anlage 4 (Teil 13)",
+          "Anlage 8 (Teil 4)"
+        ],
+        "top_score": -0.4348
+      },
+      {
+        "id": "F04",
+        "ms": 469.2,
+        "ranks": [],
+        "top": [
+          "Anlage 8 (Teil 2)",
+          "§ 99",
+          "Anlage 4 (Teil 1)"
+        ],
+        "top_score": -5.5026
+      },
+      {
+        "id": "F05",
+        "ms": 404.2,
+        "ranks": [
+          36,
+          17,
+          3
+        ],
+        "top": [
+          "§ 64",
+          "§ 63",
+          "§ 55"
+        ],
+        "top_score": -2.1907
+      },
+      {
+        "id": "F06",
+        "ms": 386.9,
+        "ranks": [
+          null,
+          4,
+          18,
+          23,
+          5,
+          1,
+          null,
+          6
+        ],
+        "top": [
+          "§ 131",
+          "§ 76 (Teil 3)",
+          "§ 76 (Teil 2)"
+        ],
+        "top_score": 1.2823
+      },
+      {
+        "id": "F07",
+        "ms": 383.4,
+        "ranks": [
+          1,
+          2,
+          5
+        ],
+        "top": [
+          "§ 31",
+          "§ 62 (Teil 2)",
+          "Anlage 7"
+        ],
+        "top_score": 3.4442
+      },
+      {
+        "id": "F08",
+        "ms": 364.9,
+        "ranks": [
+          6,
+          1,
+          15
+        ],
+        "top": [
+          "§ 137",
+          "§ 139",
+          "§ 143"
+        ],
+        "top_score": 4.7143
+      },
+      {
+        "id": "F09",
+        "ms": 372.4,
+        "ranks": [
+          6,
+          3,
+          2,
+          1
+        ],
+        "top": [
+          "§ 43",
+          "§ 72",
+          "§ 70"
+        ],
+        "top_score": 6.8639
+      },
+      {
+        "id": "F10",
+        "ms": 411.9,
+        "ranks": [
+          1
+        ],
+        "top": [
+          "§ 78",
+          "§ 74",
+          "§ 80"
+        ],
+        "top_score": 7.5997
+      }
+    ]
+  }
+}
