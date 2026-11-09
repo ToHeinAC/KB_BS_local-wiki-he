@@ -12,7 +12,7 @@ Copy it to `.env` (gitignored, never committed) and adjust.
 | `QUERY_MODEL` | `OLLAMA_MODEL` | Per-role override for precision/selection calls (`_select_affected_pages`, query page-select) + agent loops. |
 | `INGEST_MODEL` | `OLLAMA_MODEL` | Per-role override for wiki page synthesis during ingest. |
 | `FAST_MODEL` | `OLLAMA_MODEL` | Per-role override for lightweight maintenance (lint). |
-| `EMBED_MODEL` | `bge-m3` | Embedding model for the semantic arm (`src/embed_index.py`), called via local Ollama `/api/embed`. Changing it invalidates the vector cache — re-run `scripts/backfill_embeddings.py <DB>`. Vectors are optional: DBs without them degrade to lexical-only. |
+| `EMBED_MODEL` | `bge-m3` | Embedding model for the semantic arm (`src/embed_index.py`), called via local Ollama `/api/embed`. Changing it invalidates the vector cache — re-run `scripts/backfill_embeddings.py <DB>`, or the next ingest into that DB re-embeds it in full. Vectors are optional: DBs without them (or with the embed model down) degrade to lexical-only. |
 | `RERANK_ENABLED` | `1` | Master switch for the Stage D cross-encoder. `0` forces plain RRF fusion. |
 | `RERANK_MODEL` | `models/bge-reranker-v2-m3-Q8_0.gguf` | Reranker GGUF path. Absent ⇒ `rerank.available()` is False and retrieval silently stays fusion-only. |
 | `RERANK_CANDIDATES` | `30` | Fused-list depth handed to the cross-encoder. Cost is linear in this number (~35 ms/pair on CPU). |

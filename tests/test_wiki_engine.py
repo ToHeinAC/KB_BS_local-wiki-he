@@ -1,5 +1,6 @@
 """Tests for wiki_engine.py — core wiki operations."""
 
+import json
 from datetime import date
 from unittest.mock import MagicMock
 
@@ -297,6 +298,42 @@ def test_ingest_end_indexes_incrementally_no_full_rebuild(wiki_dir, monkeypatch)
     assert any(h["source"] == "mysrc.txt" for h in raw)
     wiki = wiki_engine.lex_index.query("Alpha", scope="wiki")
     assert any(h["source"] == "concept-alpha.md" for h in wiki)
+
+
+def _toy_embed(texts, model_id):
+    return [[1.0, float(len(t) % 7) + 1.0] for t in texts]
+
+
+def test_ingest_embeds_a_database_without_vectors_in_full(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    monkeypatch.setenv("EMBED_MODEL", "toy")
+    monkeypatch.setattr(wiki_engine.embed_index.ollama_client, "embed", _toy_embed)
+    old = "## Alt\nEin älteres Original über Radon in Gebäuden und Arbeitsplätzen."
+    wiki_engine.chunker.write_chunks("old.md", wiki_engine.chunker.split(old))
+    assert not wiki_engine.embed_index.available()
+    wiki_engine.ingest("plutonium isotope criticality data", "mysrc.txt")
+    assert wiki_engine.embed_index.available()
+    meta = json.loads(wiki_engine.embed_index._meta_path().read_text())
+    sources = {(r["scope"], r["source"]) for r in meta["rows"]}
+    # the whole database, not only the new source: no partially embedded corpus
+    assert {("raw", "old.md"), ("raw", "mysrc.txt"), ("wiki", "concept-alpha.md")} <= sources
+
+
+def test_ingest_without_a_reachable_embed_model_stays_lexical(wiki_dir, monkeypatch):
+    mock = MagicMock()
+    mock.generate.return_value = {"response": _INGEST_RESPONSE}
+    monkeypatch.setattr(ollama_client, "_client", lambda: mock)
+    monkeypatch.setenv("EMBED_MODEL", "toy")
+
+    def _down(texts, model_id):
+        raise ConnectionError("embed model unreachable")
+
+    monkeypatch.setattr(wiki_engine.embed_index.ollama_client, "embed", _down)
+    wiki_engine.ingest("plutonium isotope criticality data", "mysrc.txt")
+    assert not wiki_engine.embed_index.available()
+    assert wiki_engine.lex_index.query("plutonium", scope="raw")
 
 
 def test_ingest_end_finalize_gates_description_only(wiki_dir, monkeypatch):

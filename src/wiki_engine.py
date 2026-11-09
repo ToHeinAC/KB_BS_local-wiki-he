@@ -1205,6 +1205,20 @@ def _note_markers(ctx: dict[str, Any], response: str) -> None:
                 ctx["contradictions"].append(desc)
 
 
+def _embed_ingested(source: str, raw_chunks: list[dict[str, Any]], pages: list[str]) -> None:
+    """Semantic arm after an ingest, best-effort (a down embed model never fails ingest). An
+    embedded DB gets this source and these pages; a DB without vectors for the configured
+    model is embedded in full, so its index never covers only part of the corpus."""
+    with contextlib.suppress(Exception):
+        if not embed_index.available():
+            embed_index.build()
+            return
+        if raw_chunks:
+            embed_index.index_replace_source(source, raw_chunks)
+        for name in pages:
+            embed_index.index_replace_wiki_page(name)
+
+
 def ingest_end(ctx: dict[str, Any], finalize: bool = True) -> dict[str, Any]:
     """Finalise: index page rebuild + log entry, and (when ``finalize``) the
     single corpus-wide `lex_index` rebuild + description refresh.
@@ -1219,18 +1233,13 @@ def ingest_end(ctx: dict[str, Any], finalize: bool = True) -> dict[str, Any]:
     # every file (batch or single) — replaces the former corpus-wide rebuild.
     # Single-file ingest keeps identical end state with no full rebuild; in a
     # batch each file becomes searchable as it lands (like sequential ingests).
-    if ctx["chunks"]:
-        raw_chunks = chunker.load_chunks(ctx["source_name"])
+    raw_chunks = chunker.load_chunks(ctx["source_name"]) if ctx["chunks"] else []
+    if raw_chunks:
         lex_index.index_replace_source(ctx["source_name"], raw_chunks)
-        # Semantic arm: best-effort + gated on an existing model-matching index, so
-        # it keeps an already-embedded DB current without failing ingest or building
-        # a partial index on a never-backfilled DB.
-        with contextlib.suppress(Exception):
-            embed_index.index_replace_source(ctx["source_name"], raw_chunks)
-    for name in dict.fromkeys(ctx["created"] + ctx["updated"]):
+    pages = list(dict.fromkeys(ctx["created"] + ctx["updated"]))
+    for name in pages:
         lex_index.index_replace_wiki_page(name)
-        with contextlib.suppress(Exception):
-            embed_index.index_replace_wiki_page(name)
+    _embed_ingested(ctx["source_name"], raw_chunks, pages)
     if finalize and os.getenv("INGEST_DESCRIPTION", "1") == "1":
         # best-effort; never fail ingest on the overview refresh
         with contextlib.suppress(Exception):
