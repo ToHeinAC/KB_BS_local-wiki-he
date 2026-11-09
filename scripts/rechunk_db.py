@@ -7,9 +7,9 @@ word); such an original is cleaned in place first — every word kept — and re
 Chunks are derived from `raw/` (AGENTS.md §5.3), so a chunker change — e.g. statutes with
 plain `§ N Title` headings, which used to become anonymous `part N` windows — only reaches
 an existing database by re-splitting it. Only text originals (.md, .txt, .html) that
-already have chunks are considered; a source whose new chunks carry the same anchors is
-left alone. Changed sources are re-embedded when the database has vectors, and the
-lexical index is rebuilt once. Without `--apply` it only lists what would change.
+already have chunks are considered; a source whose new chunks carry the same anchors and
+headings is left alone. Changed sources are re-embedded when the database has vectors, and
+the lexical index is rebuilt once. Without `--apply` it only lists what would change.
 
 Usage:
     uv run python scripts/rechunk_db.py --db KI            # dry run
@@ -40,20 +40,24 @@ def _text(name: str) -> str:
     return (wiki_engine.read_raw_source(name) or b"").decode("utf-8", errors="replace")
 
 
+def _heads(chunks: list[dict[str, object]]) -> list[tuple[object, object]]:
+    return [(c["anchor"], c.get("heading_path")) for c in chunks]
+
+
 def _changed(name: str, old: list[dict[str, object]]) -> int | None:
     """The new chunk count of original `name` if it needs cleaning or its re-split chunks
-    carry other anchors than the stored `old` ones, else None."""
+    carry other anchors or headings than the stored `old` ones, else None."""
     text = _text(name)
     clean = md_convert.clean_text(text)
     new = chunker.split(clean)
-    if new and (clean != text or [c["anchor"] for c in new] != [c["anchor"] for c in old]):
+    if new and (clean != text or _heads(new) != _heads(old)):
         return len(new)
     return None
 
 
 def changed_sources() -> list[tuple[str, int, int]]:
     """(source, old chunk count, new chunk count) of each text original in the bound DB
-    that needs cleaning or whose re-split chunks carry other anchors."""
+    that needs cleaning or whose re-split chunks carry other anchors or headings."""
     out: list[tuple[str, int, int]] = []
     for path in sorted(db_context.raw_dir().iterdir()):
         old = chunker.load_chunks(path.name) if path.suffix.lower() in _TEXT_EXTS else []

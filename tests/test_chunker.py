@@ -230,6 +230,54 @@ def test_a_marked_annex_heading_of_any_length_is_its_own_section():
     assert "Bq/g" in a4["text"]
 
 
+# A statute copied as text from gesetze-im-internet.de: the "(zu …)" list can wrap, and the
+# title stands on its own line(s) above "(Fundstelle: …)".
+PLAIN_ANNEXES = (
+    "§ 1 Anwendungsbereich\n(1) Dieses Gesetz gilt für Rückstände.\n\n"
+    "§ 2 Begriffe\n(1) Rückstände sind Materialien, die in industriellen und bergbaulichen "
+    "Prozessen anfallen.\n\n"
+    "§ 3 Freigabe\n(1) Die Freigabe richtet sich nach den Werten der Anlagen.\n"
+    "Anlage 3 (vgl. die Werte,\ndie dort stehen) gilt entsprechend.\n\n"
+    "Anlage 1 (zu § 2)\nArbeitsfelder mit erhöhter Exposition durch Radon\n"
+    "(Fundstelle: BGBl. I 2017, 2056)\n\n1. Arbeitsplätze in untertägigen Bergwerken,\n\n"
+    "Anlage 2 (zu den §§ 1, 2,\n3 und Anlage 1)\nFreigrenzen, Freigabewerte für verschiedene\n"
+    "Freigabearten\n(Fundstelle: BGBl. I 2018, 2108 - 2124)\n| Nuklid | Bq/g |\n| Cs-137 | 0,1 |\n"
+)
+
+
+def test_a_plain_annex_heading_wrapped_over_lines_is_its_own_section():
+    chunks = chunker.split(PLAIN_ANNEXES)
+    assert [c["anchor"] for c in chunks] == ["§ 1", "§ 2", "§ 3", "Anlage 1", "Anlage 2"]
+    assert "Cs-137" in chunks[4]["text"]
+    assert "Cs-137" not in chunks[3]["text"]
+    assert "Bergwerken" not in chunks[2]["text"]  # "Anlage 3 (vgl. …" is running text
+
+
+def test_a_plain_annex_title_above_its_fundstelle_line_joins_the_heading():
+    a1, a2 = chunker.split(PLAIN_ANNEXES)[3:]
+    assert a1["heading_path"] == [
+        "Anlage 1 (zu § 2) Arbeitsfelder mit erhöhter Exposition durch Radon"
+    ]
+    assert a2["heading_path"] == [
+        "Anlage 2 (zu den §§ 1, 2, 3 und Anlage 1) Freigrenzen, Freigabewerte für verschiedene "
+        "Freigabearten"
+    ]
+
+
+def test_a_line_naming_an_earlier_annex_inside_a_later_one_is_running_text():
+    mention = "Anlage 1 Tabelle 1 Spalte 5 überschreitet und deren Gesamtaktivität die Werte der\n"
+    text = PLAIN_ANNEXES.replace("| Nuklid | Bq/g |\n", mention + "| Nuklid | Bq/g |\n")
+    chunks = chunker.split(text)
+    assert [c["anchor"] for c in chunks] == ["§ 1", "§ 2", "§ 3", "Anlage 1", "Anlage 2"]
+    assert "Cs-137" in chunks[4]["text"]
+
+
+def test_an_annex_without_a_fundstelle_line_keeps_its_heading_line_only():
+    text = PLAIN_ANNEXES.replace("(Fundstelle: BGBl. I 2017, 2056)\n", "")
+    a1 = chunker.split(text)[3]
+    assert a1["heading_path"] == ["Anlage 1 (zu § 2)"]
+
+
 def test_a_long_plain_line_starting_with_an_annex_is_running_text_not_a_heading():
     line = "Anlage 2 Tabelle 1 " + "Spalte 3 und Spalte 4 " * 12
     text = ANNEXES.replace("Anlage 2 Überwachungsgrenzen", line.rstrip())

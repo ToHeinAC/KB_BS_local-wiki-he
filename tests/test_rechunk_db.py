@@ -44,6 +44,20 @@ def test_a_statute_chunked_before_plain_headings_were_recognised_is_re_split(wik
     assert script.rechunk(apply=False) == []
 
 
+def test_a_statute_whose_headings_changed_under_the_same_anchors_is_re_split(wiki_dir):
+    raw = db_context.raw_dir()
+    (raw / "law.md").write_text(_LAW, encoding="utf-8")
+    stale = chunker.split(_LAW)
+    for c in stale:
+        c["heading_path"] = [c["anchor"]]  # same anchors, titles missing
+    chunker.write_chunks("law.md", stale)
+    script = _script()
+    assert script.rechunk(apply=False) == [("law.md", 3, 3)]
+    script.rechunk(apply=True)
+    assert chunker.load_chunks("law.md")[1]["heading_path"] == ["§ 62 Titel 62"]
+    assert script.rechunk(apply=False) == []
+
+
 def test_all_targets_every_base_database_once(monkeypatch):
     script = _script()
     monkeypatch.setattr(db_context, "list_dbs", lambda: ["A", "A@strict", "B"])

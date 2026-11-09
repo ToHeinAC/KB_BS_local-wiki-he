@@ -86,6 +86,17 @@ _ANNEX_HEAD_RE = re.compile(
     r"((?:[ \t]+[A-ZÄÖÜ(](?(1)[^\n]*?|[^\n]{0,200}?))?)(?<![.,;:])[ \t]*\r?$",
     re.MULTILINE,
 )
+# A plain annex heading whose "(zu …)" list wraps (gesetze-im-internet.de, StrlSchV Anlage 4):
+# "Anlage 4 (zu den §§ 5, 10, … 58," then "61, 70, … und Anlage 3)". Each wrapped line ends
+# with "," inside the open parenthesis, the last one closes it.
+_WRAPPED_ANNEX_HEAD_RE = re.compile(
+    r"^()Anlage[ \t]+(\d+[a-z]?)"
+    r"([ \t]+\(zu\b(?:[^()\n]*,[ \t]*\r?\n){1,3}[^()\n]*\))[ \t]*\r?$",
+    re.MULTILINE,
+)
+# There the annex title stands on its own line(s) between the heading and "(Fundstelle: …)".
+_FUNDSTELLE_RE = re.compile(r"^[ \t]*\(Fundstelle\b")
+_MAX_TITLE_LINES = 4
 _MIN_LEGAL_HEADS = 3
 _MD_HEAD_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$", re.MULTILINE)
 
@@ -123,7 +134,18 @@ def find_legal_head(text: str, number: str) -> int | None:
 
 
 def _is_annex(m: re.Match[str]) -> bool:
-    return m.re is _ANNEX_HEAD_RE
+    return m.re is _ANNEX_HEAD_RE or m.re is _WRAPPED_ANNEX_HEAD_RE
+
+
+def _head_title(text: str, m: re.Match[str]) -> str:
+    """A heading's title on one line. An annex adds the title lines above a "(Fundstelle: …)"
+    line just below its heading; without that line, nothing below the heading is a title."""
+    title = m[3]
+    if _is_annex(m):
+        below = text[m.end() :].split("\n", _MAX_TITLE_LINES + 2)[1 : _MAX_TITLE_LINES + 2]
+        end = next((i for i, line in enumerate(below) if _FUNDSTELLE_RE.match(line)), 0)
+        title += " " + " ".join(below[:end])
+    return " ".join(title.split())
 
 
 def head_anchor(m: re.Match[str]) -> str:
@@ -163,6 +185,21 @@ def _without_toc(text: str, heads: list[re.Match[str]]) -> list[re.Match[str]]:
     return out
 
 
+def _ascending_annexes(heads: list[re.Match[str]]) -> list[re.Match[str]]:
+    """`heads` without an annex numbered below the annex before it since the last §: annexes
+    ascend, so such a line is a mention ("Anlage 4 Tabelle 1 Spalte 5 überschreitet …" inside
+    Anlage 15). Runs before `_without_toc`, which would take the annex above it for contents."""
+    out: list[re.Match[str]] = []
+    last = 0
+    for m in heads:
+        number = _number(m)[1] if _is_annex(m) else 0
+        if number and number < last:
+            continue
+        last = number
+        out.append(m)
+    return out
+
+
 def legal_heads(text: str) -> list[re.Match[str]]:
     """The § and annex headings of a statute — `## § N …` and plain `§ N …` lines alike
     (a conversion may set "#" on only some of them), without a table of contents — or []
@@ -171,8 +208,9 @@ def legal_heads(text: str) -> list[re.Match[str]]:
         *_LEGAL_HEAD_RE.finditer(text),
         *_PLAIN_LEGAL_HEAD_RE.finditer(text),
         *_ANNEX_HEAD_RE.finditer(text),
+        *_WRAPPED_ANNEX_HEAD_RE.finditer(text),
     ]
-    heads = _without_toc(text, sorted(found, key=lambda m: m.start()))
+    heads = _without_toc(text, _ascending_annexes(sorted(found, key=lambda m: m.start())))
     sections = [m for m in heads if not _is_annex(m)]
     return heads if len(sections) >= _MIN_LEGAL_HEADS else []
 
@@ -247,7 +285,7 @@ def _chunk_legal(text: str, lang: str) -> list[dict[str, Any]]:
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         section = text[start:end]
         anchor = head_anchor(m)
-        title = m.group(3).strip()
+        title = _head_title(text, m)
         heading_path = [anchor + (f" {title}" if title else "")]
         chunks.extend(_split_long(section, anchor, heading_path, start, lang))
     return chunks
