@@ -74,8 +74,8 @@ WINDOWS = {"E2": 16384, "E3": 65536, "E4": 131072}
 
 def token_budget(num_ctx: int, chars: int, tokens: int) -> int:
     """The history budget in characters from the run's measured ratio (the code's estimate
-    until the first call has been measured)."""
-    ratio = chars / tokens if tokens else CODE_RATIO
+    until a history and the prompt that carried it have both been measured)."""
+    ratio = chars / tokens if chars and tokens else CODE_RATIO
     return int((num_ctx - RESERVE) * ratio)
 
 
@@ -130,16 +130,27 @@ def arm_switches(arm: str) -> Iterator[None]:
 
 class _Recorder:
     """Every LLM call of a run, read from the Ollama client under both LangChain and
-    `ollama_client`, plus what the history trim did."""
+    `ollama_client`, plus what the history trim did. The ratio pairs the history of the last
+    fit with the prompt of the chat call that sent it, never with a generate call."""
 
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
         self.trims = 0
-        self.history_chars = 0
         self.token_budget = False
+        self.reset()
         self._fit = chat_agent._fit_window  # pyright: ignore[reportPrivateUsage]
 
-    def note(self, resp: Any) -> None:
+    def reset(self) -> None:
+        """A new run: no history measured yet."""
+        self.calls.clear()
+        self.trims = 0
+        self.measured = (0, 0)  # (history chars, prompt tokens of the call that sent them)
+        self._sent_chars: int | None = None
+
+    def note(self, resp: Any, chat: bool = False) -> None:
+        if chat and self._sent_chars is not None:
+            self.measured = (self._sent_chars, getattr(resp, "prompt_eval_count", 0) or 0)
+            self._sent_chars = None
         self.calls.append(
             {
                 "prompt_tokens": getattr(resp, "prompt_eval_count", 0) or 0,
@@ -151,37 +162,36 @@ class _Recorder:
         )
 
     def fit(self, msgs: list[Any], trimmed: frozenset[int] = frozenset()) -> Any:
-        tokens = self.calls[-1]["prompt_tokens"] if self.calls else 0
         budget = (
-            token_budget(ollama_client.NUM_CTX, self.history_chars, tokens)
+            token_budget(ollama_client.NUM_CTX, *self.measured)
             if self.token_budget
             else chat_agent.WINDOW_CHARS
         )
         out, cut = self._fit(msgs, trimmed, budget)
         self.trims += len(cut) - len(trimmed)
-        self.history_chars = sum(map(chat_agent._size, out))  # pyright: ignore[reportPrivateUsage]
+        self._sent_chars = sum(map(chat_agent._size, out))  # pyright: ignore[reportPrivateUsage]
         return out, cut
 
 
 def _record(rec: _Recorder) -> None:
-    def wrap(orig: Callable[..., Any]) -> Callable[..., Any]:
+    def wrap(orig: Callable[..., Any], chat: bool) -> Callable[..., Any]:
         def stream(chunks: Iterable[Any]) -> Iterator[Any]:
             for chunk in chunks:
                 if getattr(chunk, "done", False):
-                    rec.note(chunk)
+                    rec.note(chunk, chat)
                 yield chunk
 
         def call(self: Any, *args: Any, **kwargs: Any) -> Any:
             out = orig(self, *args, **kwargs)
             if isinstance(out, Iterator):
                 return stream(out)
-            rec.note(out)
+            rec.note(out, chat)
             return out
 
         return call
 
-    ollama.Client.chat = wrap(ollama.Client.chat)  # pyright: ignore[reportAttributeAccessIssue]
-    ollama.Client.generate = wrap(ollama.Client.generate)  # pyright: ignore[reportAttributeAccessIssue]
+    ollama.Client.chat = wrap(ollama.Client.chat, True)  # pyright: ignore[reportAttributeAccessIssue]
+    ollama.Client.generate = wrap(ollama.Client.generate, False)  # pyright: ignore[reportAttributeAccessIssue]
     chat_agent._fit_window = rec.fit  # pyright: ignore[reportPrivateUsage]
 
 
@@ -203,8 +213,8 @@ def run_direct(question: str) -> list[dict[str, Any]]:
 
 def run_once(item: dict[str, Any], arm: str, rep: int, rec: _Recorder) -> dict[str, Any]:
     """One question under one arm."""
-    rec.calls.clear()
-    rec.trims, rec.history_chars, rec.token_budget = 0, 0, arm in TOKEN_BUDGET_ARMS
+    rec.reset()
+    rec.token_budget = arm in TOKEN_BUDGET_ARMS
     started = time.monotonic()
     timed: list[tuple[float, dict[str, Any]]] = []
     with arm_switches(arm):
