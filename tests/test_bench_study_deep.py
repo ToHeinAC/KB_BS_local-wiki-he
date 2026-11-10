@@ -215,6 +215,7 @@ def test_an_oracle_run_answers_from_the_gold_ledger_and_traces_its_facts(monkeyp
 
     def write(mem: Any, question: str, directive: str) -> str:
         seen.append(list(mem.ledger))
+        mem.gate_events.append("ledger answer accepted")
         return "Es gelten 5 mSv."
 
     monkeypatch.setattr(bench.chunker, "load_chunks", _chunks)
@@ -232,6 +233,7 @@ def test_an_oracle_run_answers_from_the_gold_ledger_and_traces_its_facts(monkeyp
     assert row["facts"] == [True, False]
     assert row["facts_in_ledger"] == [True, False]
     assert row["ledger"] == [list(q) for q in seen[0]]
+    assert row["gate_events"] == ["ledger answer accepted"]
 
 
 def test_the_ollama_adapter_is_not_a_caller(tmp_path: Path):

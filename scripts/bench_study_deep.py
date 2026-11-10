@@ -316,6 +316,7 @@ def _trace(
         **text_by_kind(steps),
         **fact_trace(item["facts"], rec.reads, mem.ledger),
         "ledger": [list(q) for q in mem.ledger],
+        "gate_events": list(mem.gate_events),
     }
 
 
