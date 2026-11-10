@@ -537,6 +537,32 @@ Measured on the old ledger (`bench/results/study_deep_E0_terms_only_4090_93e21f1
 **Decision:** revert the definitions as well, and build the three steps together on a branch,
 measured before merging.
 
+### 6.8 All three together (branch `feat/ledger-complete`, not merged)
+
+The branch combines the ledger fix, the code-added definitions, and a stricter end rule: an empty
+turn ends a covered run only if its ledger answer passes the gate; otherwise it is sent back once
+with the verdict. Rows: `bench/results/study_deep_E0_all3_4090.jsonl`.
+
+| E0, 15 runs | Facts | F02 | F05 | F06 | F10 | Time | Tokens | Never read | In ledger, unused |
+|---|---|---|---|---|---|---|---|---|---|
+| Old code (two runs) | 25, 24 | 6, 3 | 6, 6 | 8, 8 | 5, 7 | 72 s | 9,800 | 8, 10 | 7, 6 |
+| All three | 24 | **0** | 7 | **11** | 6 | 84 s | 11,200 | 10 | **13** |
+
+**Results:**
+
+- The stricter end rule restores navigation ("never read" 10).
+- 13 of 15 runs close from the ledger.
+- The total equals the old code, while taking 12 s and 1,400 tokens more per run. **Not merged.**
+
+**The remaining loss is the ledger answer itself.** On F02 the Anlage 8 list is in the ledger in
+2 of 3 runs, yet the answer says the sources do not settle which work fields Anlage 8 lists. This
+matches oracle rep 0 (§6.1). E4B anchors on the core section (§ 127) and ignores the quote of the
+annex it refers to.
+
+**Candidate next step, deterministic:** render a quote of a section that a core quote refers to
+("Anlage 8") directly after that core quote, labelled as its content. Today it sits in a lower
+level group.
+
 ---
 
 ## Sources

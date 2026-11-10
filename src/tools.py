@@ -1021,13 +1021,23 @@ def _coverage_gap(raw_cited: set[str]) -> str | None:
     if mem is None or not mem.core_refs:
         return None
     cited = {ref_key(r) for r in raw_cited}
-    files = {ref_key(r)[0] for r in mem.core_refs if ref_key(r) in cited}
-    core = [] if files else mem.core_refs
-    terms = [r for r in mem.term_refs if ref_key(r)[0] in files and ref_key(r) not in cited]
+    core = [] if any(ref_key(r) in cited for r in mem.core_refs) else mem.core_refs
+    terms = missing_terms(raw_cited)
     gaps = [CHAT_COVERAGE_CORE.format(refs=_tags(core))] if core else []
     if terms:
         gaps.append(CHAT_COVERAGE_TERMS.format(refs=_tags(terms)))
     return CHAT_COVERAGE_GAP.format(what="; ".join(gaps)) if gaps else None
+
+
+def missing_terms(raw_cited: set[str]) -> list[str]:
+    """The definitions of terms the question names that an answer citing ``raw_cited``
+    leaves out: those from a document whose core section it cites."""
+    mem = run_memory.current()
+    if mem is None:
+        return []
+    cited = {ref_key(r) for r in raw_cited}
+    files = {ref_key(r)[0] for r in mem.core_refs if ref_key(r) in cited}
+    return [r for r in mem.term_refs if ref_key(r)[0] in files and ref_key(r) not in cited]
 
 
 def _too_terse(words: int, items: int) -> str | None:

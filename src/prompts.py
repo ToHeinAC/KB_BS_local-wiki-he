@@ -731,6 +731,9 @@ Question: {question}
 # collected the quotes; the model only writes them up.
 # A code-written `## Open points` entry of the ledger answer: a law the cited sections rely
 # on that is not among the searchable originals (user-facing text, in the question's language).
+# Heading of the definitions code quotes into a ledger answer that left them out.
+CHAT_DEFINITIONS_HEADING = {"de": "## Begriffsbestimmungen", "en": "## Definitions"}
+
 CHAT_OPEN_REF_LINE = {
     "de": "- {work}: liegt nicht unter den durchsuchbaren Originalen vor; was davon abhängt, bleibt offen.",
     "en": "- {work}: not among the searchable originals; what depends on it stays open.",
@@ -740,6 +743,12 @@ CHAT_EMPTY_TURN = (
     "You ended without an answer. The run has {searches} of {min_searches} searches and "
     "{sources} of {min_sources} quoted sources the answer needs. raw_search the open "
     "sub-questions with other words, raw_read the best hits, then call submit_chat_answer."
+)
+
+CHAT_EMPTY_TURN_LEDGER = (
+    "You ended without an answer. Code wrote one from the quotes collected so far, and the "
+    "quality gate rejected it:\n{verdict}\n"
+    "Search or read what is missing, then call submit_chat_answer."
 )
 
 CHAT_LEDGER_REJECTED = (

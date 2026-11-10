@@ -57,7 +57,9 @@ import tools as tool_module
 from prompts import (
     CHAT_AGENT_SYSTEM,
     CHAT_BUDGET_NUDGE,
+    CHAT_DEFINITIONS_HEADING,
     CHAT_EMPTY_TURN,
+    CHAT_EMPTY_TURN_LEDGER,
     CHAT_FALLBACK_PROMPT,
     CHAT_FALLBACK_SYSTEM,
     CHAT_HYDE_PROMPT,
@@ -218,17 +220,25 @@ def _should_continue(state: MessagesState) -> str:
 
 
 def _empty_turn_due() -> bool:
-    """An empty model turn (no text, no tool call) of a run that lacks the gate's searches
-    or sources is sent back once; otherwise it ends the run (the stop rule's empty turn
-    comes only on a covered run)."""
+    """An empty model turn (no text, no tool call) is sent back once unless it may end the
+    run: a covered run whose ledger answer passes the gate. A run ending otherwise closes
+    from its notes and loses what it read."""
     mem = run_memory.current()
-    return mem is not None and not mem.empty_nudged and not _covered(mem)
+    if mem is None or mem.empty_nudged:
+        return False
+    if not _covered(mem):
+        return True
+    return _ledger_answer(mem.question, lang.response_directive(mem.question)) is None
 
 
 def _empty_turn(state: MessagesState) -> dict[str, Any]:
     mem = run_memory.current()
     assert mem is not None  # routed here only inside a run
     mem.empty_nudged = True
+    if _covered(mem):
+        mem.gate_events.append("empty turn: sent back with the ledger answer's verdict")
+        nudge = CHAT_EMPTY_TURN_LEDGER.format(verdict=mem.ledger_verdict)
+        return {"messages": [HumanMessage(content=nudge)]}
     mem.gate_events.append("empty turn: sent back to search and read")
     refs = len({ref for ref, _ in mem.ledger})
     nudge = CHAT_EMPTY_TURN.format(
@@ -742,7 +752,7 @@ def _clean_ledger_answer(answer: str, mem: run_memory.RunMemory) -> str:
         kept = [k for k in sentences if k and not (body and _untagged(k))]
         if kept and not _LIST_MARKER_RE.fullmatch(" ".join(kept)):
             out.append(" ".join(kept))
-    return _with_open_refs(_tidy(out), mem)
+    return _with_open_refs(_with_term_quotes(_tidy(out), mem), mem)
 
 
 _LIST_MARKER_RE = re.compile(r"\s*(?:\d+[.)]|[-*•])\s*")
@@ -765,6 +775,20 @@ def _tidy(lines: list[str]) -> str:
         out.append(line)
     text = "\n".join(reversed(out)).strip()
     return re.sub(r"\n{3,}", "\n\n", text)
+
+
+def _with_term_quotes(answer: str, mem: run_memory.RunMemory) -> str:
+    """`answer` with the ledger's quotes of each definition the gate requires and the
+    answer leaves out, verbatim and tagged, under a code-written heading."""
+    cited = set(tool_module._RAW_CITE_RE.findall(answer))  # pyright: ignore[reportPrivateUsage]
+    missing = {tool_module.ref_key(r) for r in tool_module.missing_terms(cited)}
+    lines = [
+        f'- "{s}" [Source: {ref}]' for ref, s in mem.ledger if tool_module.ref_key(ref) in missing
+    ]
+    if not lines:
+        return answer
+    heading = CHAT_DEFINITIONS_HEADING[lang.detect(mem.question)]
+    return "\n".join([answer, "", heading, *lines])
 
 
 def _with_open_refs(answer: str, mem: run_memory.RunMemory) -> str:

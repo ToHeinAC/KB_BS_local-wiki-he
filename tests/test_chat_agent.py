@@ -73,14 +73,38 @@ def test_an_empty_turn_before_the_run_is_covered_is_sent_back_once(monkeypatch):
     assert gates == ["empty turn: sent back to search and read"]
 
 
-def test_a_covered_runs_empty_turn_still_ends_the_run(monkeypatch):
+def test_a_covered_runs_empty_turn_ends_the_run_when_its_ledger_answer_passes(monkeypatch):
     monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
     monkeypatch.setattr(chat_agent, "_covered", lambda mem: True)
     monkeypatch.setattr(chat_agent, "STALL_TURNS", 99)
+    monkeypatch.setattr(chat_agent, "_ledger_answer", lambda q, d: "FROM QUOTES")
     fake = _patch_llm(monkeypatch, [AIMessage(content="")])
-    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
     list(chat_agent.run_chat_agent("q?"))
     assert len(fake.calls) == 1
+
+
+def test_a_covered_runs_empty_turn_is_sent_back_once_with_the_ledger_verdict(monkeypatch):
+    # A covered run that ended on an empty turn while its ledger answer failed the gate
+    # closed from its notes and lost the facts it had read (RTX 4090 study, §6.6).
+    monkeypatch.setattr(chat_agent, "_preflight", lambda q: [])
+    monkeypatch.setattr(chat_agent, "_covered", lambda mem: True)
+    monkeypatch.setattr(chat_agent, "STALL_TURNS", 99)
+
+    def rejected(question: str, directive: str) -> None:
+        mem = chat_agent.run_memory.current()
+        assert mem is not None
+        mem.ledger_verdict = "REJECTED: explain the term X"
+
+    monkeypatch.setattr(chat_agent, "_ledger_answer", rejected)
+    fake = _patch_llm(monkeypatch, [AIMessage(content=""), AIMessage(content="")])
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: "x")
+    steps = list(chat_agent.run_chat_agent("q?"))
+    assert len(fake.calls) == 2
+    nudge = fake.calls[1][-1]
+    assert isinstance(nudge, HumanMessage)
+    assert "REJECTED: explain the term X" in nudge.content
+    gates = [s["content"] for s in steps if s["type"] == "gate"]
+    assert "empty turn: sent back with the ledger answer's verdict" in gates
 
 
 def test_iteration_limit_appends_end_hint(monkeypatch):
@@ -831,3 +855,36 @@ def test_sources_the_model_passes_in_another_shape_never_crash_the_answer():
     # E4B once passed submit_chat_answer(sources=[{...}]): raw tool args are not validated
     got = chat_agent._cites("x [Source: a.md § 1]", [{"file": "b.md"}, "c.md", None])
     assert got["sources"] == ["a.md § 1", "c.md"]
+
+
+def _terms_setup(monkeypatch) -> Any:
+    mem = _ledger_run()
+    mem.question = "Welcher Grenzwert gilt für die Strahlung?"
+    mem.ledger = [
+        ("V.md § 31", "a"),
+        ("V.md § 2 Abs. 5", "Strahlung im Sinne dieses Gesetzes ist X."),
+    ]
+    mem.core_refs, mem.term_refs = ["V.md § 31"], ["V.md § 2 Abs. 5"]
+    monkeypatch.setattr(chat_agent.tool_module, "ref_key", lambda r: tuple(r.split(" ", 1)))
+    monkeypatch.setattr(chat_agent.tool_module, "_prose_unread", lambda mem, text, cited: [])
+    monkeypatch.setattr(chat_agent.tool_module, "open_refs_unnamed", lambda a, c: [])
+    return mem
+
+
+def test_code_quotes_a_required_definition_the_ledger_answer_left_out(monkeypatch):
+    # The gate rejects an answer that leaves out the definition of a term the question
+    # names; E4B often drops it, and the run fell back to its notes. The ledger holds the
+    # definition verbatim, so code adds it with its tag.
+    mem = _terms_setup(monkeypatch)
+    out = chat_agent._clean_ledger_answer("Es gilt X [Source: V.md § 31].", mem)
+    assert out.endswith(
+        "\n\n## Begriffsbestimmungen\n"
+        '- "Strahlung im Sinne dieses Gesetzes ist X." [Source: V.md § 2 Abs. 5]'
+    )
+    assert chat_agent.tool_module.missing_terms({"V.md § 31"}) == ["V.md § 2 Abs. 5"]
+
+
+def test_a_definition_the_ledger_answer_cites_is_not_added_again(monkeypatch):
+    mem = _terms_setup(monkeypatch)
+    answer = "Es gilt X [Source: V.md § 31]. Strahlung ist X [Source: V.md § 2 Abs. 5]."
+    assert chat_agent._clean_ledger_answer(answer, mem) == answer
