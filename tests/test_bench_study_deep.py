@@ -232,3 +232,20 @@ def test_an_oracle_run_answers_from_the_gold_ledger_and_traces_its_facts(monkeyp
     assert row["facts"] == [True, False]
     assert row["facts_in_ledger"] == [True, False]
     assert row["ledger"] == [list(q) for q in seen[0]]
+
+
+def test_the_ollama_adapter_is_not_a_caller(tmp_path: Path):
+    bench = _bench()
+
+    def probe() -> str:  # the recorder: outside the root, called through the adapter
+        return bench.caller(sys._getframe(), tmp_path)
+
+    adapter: dict[str, Any] = {}
+    exec(
+        compile("def generate(f):\n    return f()\n", str(tmp_path / "ollama_client.py"), "exec"),
+        adapter,
+    )
+    module: dict[str, Any] = {"adapter": adapter["generate"], "probe": probe}
+    code = "def ledger_writer():\n    return adapter(probe)\n"
+    exec(compile(code, str(tmp_path / "chat_agent.py"), "exec"), module)
+    assert module["ledger_writer"]() == "chat_agent.ledger_writer"

@@ -121,10 +121,11 @@ def telemetry(calls: Sequence[dict[str, Any]], num_ctx: int) -> dict[str, Any]:
 
 def caller(frame: FrameType | None, root: Path) -> str:
     """`module.function` of the innermost frame whose file lies under ``root`` ("?" if none):
-    the code in `src/` that made an LLM call, however deep in LangChain it was sent."""
+    the code in `src/` that made an LLM call, however deep in LangChain it was sent. The
+    Ollama adapter only forwards a call, so its frames are skipped."""
     while frame is not None:
         path = Path(frame.f_code.co_filename).resolve()
-        if root.resolve() in path.parents:
+        if root.resolve() in path.parents and path.stem != "ollama_client":
             return f"{path.stem}.{frame.f_code.co_name}"
         frame = frame.f_back
     return "?"
