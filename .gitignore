@@ -64,3 +64,6 @@ graft/
 
 # NiceGUI per-user storage (session ids only)
 .nicegui/
+
+# Bench rows with answer texts and ledgers (they quote the databases)
+bench/local/

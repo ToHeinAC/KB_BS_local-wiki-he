@@ -90,7 +90,7 @@ def test_the_reference_switch_silences_the_footer():
 
 def test_every_arm_of_the_framework_is_known():
     bench = _bench()
-    assert set(bench.ARMS) == {"E0", "E1", "E2", "E3", "E4", "D1", "D2", "D3", "D4"}
+    assert set(bench.ARMS) == {"E0", "E1", "E2", "E3", "E4", "D1", "D2", "D3", "D4", "O"}
 
 
 def test_the_token_budget_follows_the_measured_ratio():
@@ -134,3 +134,101 @@ def test_the_budget_pairs_each_history_with_the_chat_call_that_sent_it():
     rec.note(_Resp(3229))  # another generate call in between
     rec.fit(history)
     assert budgets == [window * 3, window * 4]
+
+
+def _tagged_here(bench: ModuleType) -> str:
+    return bench.caller(sys._getframe(), Path(__file__).parent)
+
+
+def test_a_call_is_tagged_with_the_first_function_under_the_root():
+    bench = _bench()
+    assert bench.caller(sys._getframe(), Path(__file__).parent).endswith(
+        "test_a_call_is_tagged_with_the_first_function_under_the_root"
+    )
+    assert _tagged_here(bench).endswith("._tagged_here")
+    assert bench.caller(sys._getframe(), Path("/nonexistent")) == "?"
+
+
+def test_generated_tokens_are_summed_per_caller():
+    bench = _bench()
+    calls = [
+        {**_call(100, answer=500), "caller": "chat_agent.agent"},
+        {**_call(100, answer=300), "caller": "chat_agent._write_ledger_answer"},
+        {**_call(100, answer=200), "caller": "chat_agent.agent"},
+    ]
+    row = bench.telemetry(calls, 32000)
+    assert row["tokens_by_caller"] == {
+        "chat_agent.agent": 700,
+        "chat_agent._write_ledger_answer": 300,
+    }
+
+
+def test_intermediate_text_is_counted_by_kind():
+    bench = _bench()
+    steps = [
+        {"type": "thought", "content": "abcd"},
+        {"type": "tool_call", "name": "think_tool", "args": {"reflection": "x" * 10}},
+        {"type": "tool_call", "name": "submit_chat_answer", "args": {"answer": "y" * 7}},
+        {"type": "tool_call", "name": "raw_search", "args": {"query": "z" * 50}},
+        {"type": "tool_result", "name": "think_tool", "result": "r" * 99},
+    ]
+    assert bench.text_by_kind(steps) == {"thought_chars": 4, "think_chars": 10, "submit_chars": 7}
+
+
+def test_each_fact_is_located_in_the_reads_and_the_ledger():
+    bench = _bench()
+    reads = ["Der Grenzwert beträgt 20 Millisievert.", "Im Einzelfall 50 mSv."]
+    ledger = [("StrlSchG.md § 78", "Der Grenzwert beträgt 20 Millisievert.")]
+    row = bench.fact_trace([r"\b20 (Millisievert|mSv)", r"\b50 (Millisievert|mSv)"], reads, ledger)
+    assert row == {"facts_in_reads": [True, True], "facts_in_ledger": [True, False]}
+
+
+def _chunks(file: str) -> list[dict[str, Any]]:
+    assert file == "G.md"
+    return [
+        {"anchor": "§ 1", "text": "Erster Satz gilt. Zweiter Satz nennt 5 mSv."},
+        {"anchor": "§ 2", "text": "Anderer Paragraf."},
+        {"anchor": "Anlage 4 (Teil 13)", "text": "Tabelle:\n1. Cs-137 1 E+4\n2. Co-60 1 E+5"},
+        {"anchor": "Anlage 4 (Teil 14)", "text": "Nächster Teil."},
+    ]
+
+
+def test_the_oracle_ledger_holds_every_sentence_of_the_gold_sections_only():
+    bench = _bench()
+    gold = [
+        {"file": "G.md", "section": "§ 1", "heading": "x"},
+        {"file": "G.md", "section": "Anlage 4", "part": "Anlage 4 (Teil 13)", "heading": "y"},
+    ]
+    ledger = bench.oracle_ledger(gold, _chunks)
+    refs = {ref for ref, _ in ledger}
+    text = " ".join(s for _, s in ledger)
+    assert refs == {"G.md § 1", "G.md Anlage 4"}
+    for kept in ("Erster Satz gilt.", "Zweiter Satz nennt 5 mSv.", "Cs-137 1 E+4", "Co-60 1 E+5"):
+        assert kept in text
+    for other in ("Anderer", "Nächster"):
+        assert other not in text
+
+
+def test_an_oracle_run_answers_from_the_gold_ledger_and_traces_its_facts(monkeypatch: Any):
+    bench = _bench()
+    seen: list[list[tuple[str, str]]] = []
+
+    def write(mem: Any, question: str, directive: str) -> str:
+        seen.append(list(mem.ledger))
+        return "Es gelten 5 mSv."
+
+    monkeypatch.setattr(bench.chunker, "load_chunks", _chunks)
+    monkeypatch.setattr(bench.chat_agent, "_write_ledger_answer", write)
+    item = {
+        "id": "X",
+        "question": "Welcher Wert gilt?",
+        "gold": [{"file": "G.md", "section": "§ 1", "heading": "x"}],
+        "facts": [r"\b5 mSv", r"\b7 mSv"],
+    }
+    row = bench.run_once(item, "O", 0, bench._Recorder())
+    assert seen
+    assert {ref for ref, _ in seen[0]} == {"G.md § 1"}
+    assert row["closing"] == "oracle"
+    assert row["facts"] == [True, False]
+    assert row["facts_in_ledger"] == [True, False]
+    assert row["ledger"] == [list(q) for q in seen[0]]
