@@ -140,3 +140,34 @@ def test_a_hard_wrapped_sentence_and_the_list_it_introduces_are_one_quote():
 def test_code_fences_includes_and_markup_lines_are_not_quotes():
     got = [s for _, s in evidence.extract(MANUAL, "ownership rules listing scope", leads=True)]
     assert not [s for s in got if s.startswith(("```", "{{", "<"))]
+
+
+def test_windows_line_breaks_give_the_same_quotes_as_unix_ones():
+    # A statute copied as text on Windows: "1.\r\n" did not join its item, so every item
+    # of a list was scored alone and the list fell out of the ledger.
+    lf = (
+        "## Raw file: Regs.md § 4\n"
+        "(2) The dose limit for workers is\n\n1.\n    for the eye lens 20 units per year,\n"
+        "2.\n    for the skin 500 units per year and\n3.\n    for the hands 500 units per year.\n"
+        "\nThe authority may allow 50 units in a single year for the eye lens.\n"
+    )
+    query = "dose limit eye lens workers"
+    crlf = lf.replace("\n", "\r\n")
+    assert evidence.extract(crlf, query, leads=True) == evidence.extract(lf, query, leads=True)
+    quotes = [s for _, s in evidence.extract(crlf, query, leads=True)]
+    assert any("1. for the eye lens 20 units per year, 2." in q for q in quotes)
+
+
+def test_a_core_read_keeps_every_matching_sentence_other_reads_the_best_few():
+    # A core section states its rule and then its exceptions and deadlines; capped at the
+    # best few, a section's exception lost to sentences that repeat the rule's words.
+    rule = "The operator shall measure the radon level at every workplace {n} times."
+    others = " ".join(rule.format(n=n) for n in range(2, 7))
+    exception = "The authority may extend the deadline for the radon level by six months."
+    read = f"## Raw file: Act.md § 9\n(1) {rule.format(n=1)} {others} {exception}\n"
+    query = "radon level workplace operator measure authority"
+    core = [s for _, s in evidence.extract(read, query, leads=True)]
+    plain = [s for _, s in evidence.extract(read, query)]
+    assert exception in core
+    assert len(core) == 7
+    assert len(plain) == evidence.PER_BLOCK

@@ -460,6 +460,29 @@ is the cheapest form of A3.
 3. Give each gold fact an anchor (section + regex) so loss attribution needs no hand correction.
 4. Then B1 + C1 for the 26 % that is never read (F05, F06).
 
+### 6.5 A1, first step: ledger fix (CRLF lists, no cap on core reads)
+
+Rows: `bench/results/study_deep_E0_ledgerfix_4090.jsonl` (E0, 15 runs).
+
+| E0, 15 runs | Before | After |
+|---|---|---|
+| Facts answered | 25/54 | 19/54 |
+| Lost: read, not in ledger | 14 | **7** |
+| Lost: in ledger, not used | 7 | 12 |
+| Lost: never read | 8 | 16 |
+| F10 exception sentence in the ledger | 0/3 | **3/3** |
+| In-ledger facts, runs closed by the agent's own answer | 15/21 | **12/12** (8 answered) |
+
+**What it shows:**
+
+- The ledger now holds the facts it was losing.
+- The agent's own submitted answer does not use them, while answers written from a complete ledger
+  do (oracle, §6.1).
+- The rise in "never read" is navigation, which this change does not touch. It is most likely
+  noise, but at n = 3 that is not proven.
+
+**Next:** when a run is covered, the final answer comes from the ledger, written once.
+
 ---
 
 ## Sources
