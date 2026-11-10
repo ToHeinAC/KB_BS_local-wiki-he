@@ -392,6 +392,76 @@ originals, the ledger (A1) and the wiki at once.
 
 ---
 
+## 6. Results of steps 1 and 2 (2026-11-10, RTX 4090)
+
+Fresh scratch copy of `StrlSch_DE`, gold file `bench/fixture_study_StrlSch_DE_full.json`, the pinned
+daemon shared with the idle live app. Stripped rows:
+
+- `bench/results/study_deep_O_4090_4d7a410.jsonl` (oracle, 15 runs)
+- `bench/results/study_deep_E0_4090_4d7a410.jsonl` (E0, 15 runs)
+- `bench/results/study_deep_E0_callers_4090_f43440b.jsonl` (E0, 5 runs, corrected caller tags)
+
+Rows with answers and ledgers are kept locally in `bench/local/`.
+
+### 6.1 Oracle (arm O): the model is not the main limit
+
+| | F02 (9) | F03 (6) | F05 (12) | F06 (18) | F10 (9) | Total | Time per run | Generated tokens |
+|---|---|---|---|---|---|---|---|---|
+| O, oracle ledger, 1 call | 5 | 4 | 10 | **18** | **9** | **46 (85 %)** | ≈ 16 s | ≈ 2,400 |
+| E0 today | 6 | 0 | 6 | 8 | 5 | 25 (46 %) | 72 s | ≈ 9,800 |
+| E0 on 2026-11-09 | 9 | 0 | 7 | 11 | 6 | 33 (61 %) | 90 s | ≈ 12,250 |
+
+- **Given complete evidence, `gemma4:e4b` extracts most facts in one call**, in a fifth of the time.
+  The gap of 13–21 facts against E0 is pipeline loss. **A model change is not the next lever.**
+- **F02** is the exception: the oracle is worse than E0 there. In rep 0 the Anlage 8 list was in the
+  ledger, but the answer stayed with § 127. Putting the referenced annex next to its referring
+  section, or flagging the enumeration, is a prompt- or order-side question.
+- **F03:** the headerless table makes the model misread the columns ("activity", "half-life"). In
+  one answer it also wrote `$1 \text{ E}+4$` in LaTeX, which the fact regex cannot match. Both
+  support C5 (row-as-record with headers) and a scorer audit.
+- E0 fell from 33 to 25 facts between two days with the same code. This confirms the noise from §1.4.
+
+### 6.2 Where E0 loses its facts (15 runs, 31 missed facts)
+
+Attribution in code (`facts_in_reads`, `facts_in_ledger`), corrected by hand for F10. The 50 mSv
+"ledger hit" there was the skin-dose sentence; the eye-lens exception sentence was read in all
+three runs but never entered the ledger.
+
+| Where the fact was lost | Missed facts | Share |
+|---|---|---|
+| Read, not taken into the ledger | 17 | 55 % |
+| Never read | 8 | 26 % |
+| In the ledger, not used in the answer (upper bound; regexes over-match) | 4 | 13 % |
+| Answered from outside the ledger, so not a loss | (2) | — |
+
+**Ledger selection is the largest single loss.** That makes A1 the first change to build. The fact
+regexes are too coarse for attribution: several values (50 mSv, 100 mSv, 1 mSv) occur in many
+sections. A per-fact anchor (section + regex) would make the attribution exact.
+
+### 6.3 Where the generated tokens go (5 runs, corrected caller tags)
+
+| Caller | Tokens per run | Share |
+|---|---|---|
+| `chat_agent.agent_node` (agent turns: thoughts, `think_tool`, drafts submitted; ≈ 7,500 submit characters against a 4,200-character answer) | 6,933 | 54 % |
+| `chat_agent._write_ledger_answer` (a full answer each time the ledger grows) | 5,292 | 41 % |
+| `chat_agent._hyde_search` | 613 | 5 % |
+
+The ledger answer is written several times per run, about 2,000 tokens each. Writing it once, when
+the run stops, would save about a third of all generated tokens with no change to the agent. That
+is the cheapest form of A3.
+
+### 6.4 Consequences for the order in §5
+
+1. **A1 first.** Make ledger selection keep the number-bearing sentences, the exception clauses and
+   the lists of the core sections. Target: "read, not in ledger" towards 0, with E0 facts approaching
+   the oracle.
+2. **A3 in its cheapest form:** write the ledger answer once, not on every growth. Then cap the
+   agent's submitted drafts.
+3. Give each gold fact an anchor (section + regex) so loss attribution needs no hand correction.
+4. Then B1 + C1 for the 26 % that is never read (F05, F06).
+
+---
+
 ## Sources
 
 - PageIndex: <https://github.com/VectifyAI/PageIndex> (`page_index_classic.py`, `page_index_md.py`,
