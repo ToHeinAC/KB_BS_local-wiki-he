@@ -235,10 +235,7 @@ read) — the § 62 (3) 1-mSv criterion shares no word with the question and use
 ledger answer gets the quotes grouped by level (`evidence.render`, `prompts.CHAT_LEDGER_LEVELS`)
 and is asked for about `LEDGER_WORDS_PER_SOURCE` (80) words per quoted source; the prompt names
 the sources the coverage gate requires (`CHAT_LEDGER_REQUIRED_CORE`/`_TERMS`), since E4B dropped
-the named term's definition otherwise. It still does, so a required definition the answer leaves
-out is added by code: the ledger's quote of it, verbatim and tagged, under
-`CHAT_DEFINITIONS_HEADING` (`chat_agent._with_term_quotes`, the requirement from
-`tools.missing_terms`, which the gate uses too). For markdown texts a hard-wrapped sentence is one quote,
+the named term's definition otherwise. For markdown texts a hard-wrapped sentence is one quote,
 a bullet list stays with the line introducing it ("…:") and is kept like a numbered paragraph,
 and code fences, `{{…}}` includes and HTML lines are not quotes.
 

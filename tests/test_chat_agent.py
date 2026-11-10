@@ -831,36 +831,3 @@ def test_sources_the_model_passes_in_another_shape_never_crash_the_answer():
     # E4B once passed submit_chat_answer(sources=[{...}]): raw tool args are not validated
     got = chat_agent._cites("x [Source: a.md § 1]", [{"file": "b.md"}, "c.md", None])
     assert got["sources"] == ["a.md § 1", "c.md"]
-
-
-def _terms_setup(monkeypatch) -> Any:
-    mem = _ledger_run()
-    mem.question = "Welcher Grenzwert gilt für die Strahlung?"
-    mem.ledger = [
-        ("V.md § 31", "a"),
-        ("V.md § 2 Abs. 5", "Strahlung im Sinne dieses Gesetzes ist X."),
-    ]
-    mem.core_refs, mem.term_refs = ["V.md § 31"], ["V.md § 2 Abs. 5"]
-    monkeypatch.setattr(chat_agent.tool_module, "ref_key", lambda r: tuple(r.split(" ", 1)))
-    monkeypatch.setattr(chat_agent.tool_module, "_prose_unread", lambda mem, text, cited: [])
-    monkeypatch.setattr(chat_agent.tool_module, "open_refs_unnamed", lambda a, c: [])
-    return mem
-
-
-def test_code_quotes_a_required_definition_the_ledger_answer_left_out(monkeypatch):
-    # The gate rejects an answer that leaves out the definition of a term the question
-    # names; E4B often drops it, and the run fell back to its notes. The ledger holds the
-    # definition verbatim, so code adds it with its tag.
-    mem = _terms_setup(monkeypatch)
-    out = chat_agent._clean_ledger_answer("Es gilt X [Source: V.md § 31].", mem)
-    assert out.endswith(
-        "\n\n## Begriffsbestimmungen\n"
-        '- "Strahlung im Sinne dieses Gesetzes ist X." [Source: V.md § 2 Abs. 5]'
-    )
-    assert chat_agent.tool_module.missing_terms({"V.md § 31"}) == ["V.md § 2 Abs. 5"]
-
-
-def test_a_definition_the_ledger_answer_cites_is_not_added_again(monkeypatch):
-    mem = _terms_setup(monkeypatch)
-    answer = "Es gilt X [Source: V.md § 31]. Strahlung ist X [Source: V.md § 2 Abs. 5]."
-    assert chat_agent._clean_ledger_answer(answer, mem) == answer

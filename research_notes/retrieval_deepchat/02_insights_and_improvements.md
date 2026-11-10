@@ -510,6 +510,33 @@ example that a run may only end on an empty turn once its core sections are quot
 The code-added definitions are kept on their own: they removed the "explain the defined terms"
 rejection, the most frequent one (6 of 9 ledger rejections on the old code).
 
+### 6.7 The definitions reverted too: the three steps only work together
+
+Measured on the old ledger (`bench/results/study_deep_E0_terms_only_4090_93e21f1.jsonl`):
+
+| E0, 15 runs | Facts | F02 | Read, not in ledger | Never read | Closed via ledger |
+|---|---|---|---|---|---|
+| Old code (two runs) | 25, 24 | 6, 3 | 14, 14 | 8, 10 | 5, 7 |
+| Old code + definitions | 19 | **0** | 18 | 8 | 9 |
+| Ledger fix + definitions | 21 | 3 | 7 | 17 | 9 |
+
+**What happened:**
+
+- Navigation is unchanged by the definitions change.
+- More ledger answers now pass the gate. But the old ledger still misses lists in CRLF text, so
+  F02's Anlage 8 list is never in it and all three F02 ledger answers scored 0.
+- Before, those runs were rejected and closed with the agent's own draft, which held the list.
+
+**The three steps depend on each other:**
+
+1. The ledger fix makes the ledger complete, but on its own it ends runs early.
+2. The code-added definitions let the ledger answer through. That only pays off with a complete
+   ledger.
+3. A stricter end rule is needed so a run ends only once its core sections are quoted.
+
+**Decision:** revert the definitions as well, and build the three steps together on a branch,
+measured before merging.
+
 ---
 
 ## Sources

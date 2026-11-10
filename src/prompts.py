@@ -731,9 +731,6 @@ Question: {question}
 # collected the quotes; the model only writes them up.
 # A code-written `## Open points` entry of the ledger answer: a law the cited sections rely
 # on that is not among the searchable originals (user-facing text, in the question's language).
-# Heading of the definitions code quotes into a ledger answer that left them out.
-CHAT_DEFINITIONS_HEADING = {"de": "## Begriffsbestimmungen", "en": "## Definitions"}
-
 CHAT_OPEN_REF_LINE = {
     "de": "- {work}: liegt nicht unter den durchsuchbaren Originalen vor; was davon abhängt, bleibt offen.",
     "en": "- {work}: not among the searchable originals; what depends on it stays open.",

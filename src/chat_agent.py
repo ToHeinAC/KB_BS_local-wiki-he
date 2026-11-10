@@ -57,7 +57,6 @@ import tools as tool_module
 from prompts import (
     CHAT_AGENT_SYSTEM,
     CHAT_BUDGET_NUDGE,
-    CHAT_DEFINITIONS_HEADING,
     CHAT_EMPTY_TURN,
     CHAT_FALLBACK_PROMPT,
     CHAT_FALLBACK_SYSTEM,
@@ -743,7 +742,7 @@ def _clean_ledger_answer(answer: str, mem: run_memory.RunMemory) -> str:
         kept = [k for k in sentences if k and not (body and _untagged(k))]
         if kept and not _LIST_MARKER_RE.fullmatch(" ".join(kept)):
             out.append(" ".join(kept))
-    return _with_open_refs(_with_term_quotes(_tidy(out), mem), mem)
+    return _with_open_refs(_tidy(out), mem)
 
 
 _LIST_MARKER_RE = re.compile(r"\s*(?:\d+[.)]|[-*•])\s*")
@@ -766,20 +765,6 @@ def _tidy(lines: list[str]) -> str:
         out.append(line)
     text = "\n".join(reversed(out)).strip()
     return re.sub(r"\n{3,}", "\n\n", text)
-
-
-def _with_term_quotes(answer: str, mem: run_memory.RunMemory) -> str:
-    """`answer` with the ledger's quotes of each definition the gate requires and the
-    answer leaves out, verbatim and tagged, under a code-written heading."""
-    cited = set(tool_module._RAW_CITE_RE.findall(answer))  # pyright: ignore[reportPrivateUsage]
-    missing = {tool_module.ref_key(r) for r in tool_module.missing_terms(cited)}
-    lines = [
-        f'- "{s}" [Source: {ref}]' for ref, s in mem.ledger if tool_module.ref_key(ref) in missing
-    ]
-    if not lines:
-        return answer
-    heading = CHAT_DEFINITIONS_HEADING[lang.detect(mem.question)]
-    return "\n".join([answer, "", heading, *lines])
 
 
 def _with_open_refs(answer: str, mem: run_memory.RunMemory) -> str:
