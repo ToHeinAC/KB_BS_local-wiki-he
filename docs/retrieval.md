@@ -231,10 +231,7 @@ of its definitions was.
 
 **Ledger by level.** Level reads keep every paragraph's first sentence in the evidence ledger,
 whatever words the question used (`evidence.extract(…, leads=True)`, also for any definition
-read) — the § 62 (3) 1-mSv criterion shares no word with the question and used to be lost. They
-also keep every sentence that matches the query, not just the best `PER_BLOCK` (4) other reads
-keep, so an exception or deadline does not lose to sentences repeating the rule's words. Text with
-Windows line breaks is normalised first, or its numbered lists fall apart into single items. The
+read) — the § 62 (3) 1-mSv criterion shares no word with the question and used to be lost. The
 ledger answer gets the quotes grouped by level (`evidence.render`, `prompts.CHAT_LEDGER_LEVELS`)
 and is asked for about `LEDGER_WORDS_PER_SOURCE` (80) words per quoted source; the prompt names
 the sources the coverage gate requires (`CHAT_LEDGER_REQUIRED_CORE`/`_TERMS`), since E4B dropped

@@ -483,6 +483,33 @@ Rows: `bench/results/study_deep_E0_ledgerfix_4090.jsonl` (E0, 15 runs).
 
 **Next:** when a run is covered, the final answer comes from the ledger, written once.
 
+### 6.6 The ledger fix reverted: it ends runs too early
+
+The fix was measured twice against the old code, with the same instrumentation (`gate_events`).
+
+| E0, 15 runs each | Facts | Never read | Runs with ≤ 8 tool calls |
+|---|---|---|---|
+| Old code (two runs) | 25, 24 | 8, 10 | 2, 1 |
+| Ledger fix (two runs) | 19, 16 | 16, 16 | 4, 6 |
+| Ledger fix + code-added definitions | 21 | 17 | 5 |
+
+Rows: `bench/results/study_deep_E0_prefix_4090_f0d11c8.jsonl`,
+`study_deep_E0_ledgerfix2_4090_f0d11c8.jsonl`, `study_deep_E0_ledgerfix_terms_4090.jsonl`.
+
+**Mechanism (inferred, not measured directly):**
+
+1. A run is "covered" with 3 searches and quotes from 2 or more sections.
+2. With CRLF lists now quotable, list-only sections such as annexes contribute quotes, so runs are
+   covered sooner.
+3. On a covered run, an empty agent turn ends the run instead of being sent back.
+4. If the ledger answer is then rejected, the run closes from its notes.
+
+**Decision:** the fix is reverted. It should return together with a stricter end rule, for
+example that a run may only end on an empty turn once its core sections are quoted.
+
+The code-added definitions are kept on their own: they removed the "explain the defined terms"
+rejection, the most frequent one (6 of 9 ledger rejections on the old code).
+
 ---
 
 ## Sources

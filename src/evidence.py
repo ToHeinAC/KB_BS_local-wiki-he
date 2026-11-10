@@ -156,7 +156,6 @@ def _sentences(body: str) -> list[tuple[str, bool]]:
     a hard-wrapped sentence is one sentence."""
     out: list[tuple[str, bool]] = []
     in_list = False
-    body = body.replace("\r\n", "\n").replace("\r", "\n")  # text copied on Windows
     for para in _SOFT_WRAP_RE.sub(" ", _LIST_BREAK_RE.sub(" ", body)).split("\n"):
         line = para.strip()
         if not line:
@@ -181,10 +180,9 @@ def _clip(sentence: str) -> str:
 
 def _best(body: str, query: set[str], k: int, leads: bool = False) -> list[str]:
     """Up to ``k`` sentences of ``body`` that share enough of the query, in reading order;
-    with ``leads`` (a section read as the core) every such sentence, so an exception or a
-    deadline does not lose to sentences repeating the rule's words, and also the first
-    sentence of the block, of every numbered paragraph ("(3) Maßstab …") and every
-    introduced list: a core section states its rules there, whatever words were asked."""
+    with ``leads``, also the first sentence of the block, of every numbered paragraph
+    ("(3) Maßstab …") and every introduced list: a section read as the core states its
+    rules there, whatever words the question used."""
     units = [(_clip(p), is_list) for p, is_list in _sentences(body)]
     lists = {i for i, (_, is_list) in enumerate(units) if is_list}
     scored = [
@@ -192,8 +190,7 @@ def _best(body: str, query: set[str], k: int, leads: bool = False) -> list[str]:
         for i, (s, _) in enumerate(units)
         if len(s) >= _MIN_CHARS and not s.startswith(_NOT_TEXT) and len(_TOC_RE.findall(s)) < 2
     ]
-    matching = sorted((x for x in scored if x[0] >= _MIN_SHARED), key=lambda x: (-x[0], x[1]))
-    top = matching if leads else matching[:k]
+    top = sorted((x for x in scored if x[0] >= _MIN_SHARED), key=lambda x: (-x[0], x[1]))[:k]
     if leads and scored:
         first = scored[0][1]
         rules = [x for x in scored if x[1] == first or x[1] in lists or _PARA_RE.match(x[2])]
