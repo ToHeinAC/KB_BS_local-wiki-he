@@ -70,6 +70,7 @@ from prompts import (
     CHAT_LEDGER_REQUIRED_CORE,
     CHAT_LEDGER_REQUIRED_TERMS,
     CHAT_LEDGER_SYSTEM,
+    CHAT_OMITTED_HEADING,
     CHAT_OPEN_REF_LINE,
     CHAT_PROSE_GATE_RETRY,
     CHAT_TOOL_ERROR,
@@ -696,9 +697,9 @@ def _required(mem: run_memory.RunMemory) -> str:
 
 def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: str) -> str | None:
     """The ledger answer in a fresh, short prompt; its gate verdict goes to the gate events."""
-    refs = len({ref for ref, _ in mem.ledger})
-    levels = [mem.levels.get(tool_module.ref_key(ref), 0) for ref, _ in mem.ledger]
-    rendered = evidence.render(mem.ledger, levels, CHAT_LEDGER_LEVELS)
+    ledger, levels = _ledger_view(mem, question)
+    refs = len({ref for ref, _ in ledger})
+    rendered = evidence.render(ledger, levels, CHAT_LEDGER_LEVELS)
     prompt = CHAT_LEDGER_PROMPT.format(
         question=question,
         evidence=rendered,
@@ -717,7 +718,7 @@ def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: st
         mem.gate_events.append(f"ledger answer failed: {exc}")
         return None
     mem.ledger_raw.append(answer)
-    answer = _clean_ledger_answer(answer, mem)
+    answer = _with_omitted(_clean_ledger_answer(answer, mem), ledger, mem)
     mem.ledger_drafts.append(answer)
     verdict = tool_module.chat_verdict(answer)
     if verdict.startswith("ACCEPTED"):
@@ -727,6 +728,43 @@ def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: st
     mem.ledger_verdict = verdict
     mem.gate_events.append(f"ledger answer rejected: {_verdict_reason(verdict)}")
     return None
+
+
+def _ledger_view(
+    mem: run_memory.RunMemory, question: str
+) -> tuple[list[tuple[str, str]], list[int]]:
+    """The quotes the ledger answer is written from, with their levels: each section's
+    quotes together, a section a quote refers to right after it, and without the quotes off
+    the question (the sections the gate requires stay)."""
+    levels = [mem.levels.get(tool_module.ref_key(ref), 0) for ref, _ in mem.ledger]
+    ledger, levels = evidence.grouped(mem.ledger, levels)
+    return evidence.pruned(ledger, levels, question, {*mem.core_refs, *mem.term_refs})
+
+
+def _cited_in_body(answer: str) -> set[str]:
+    """The sources `answer` cites outside its open points (one named there was left open)."""
+    body, kept = True, list[str]()
+    for line in answer.splitlines():
+        if line.lstrip().startswith("#"):
+            body = not tool_module._OPEN_POINTS_RE.match(line.strip())  # pyright: ignore[reportPrivateUsage]
+        if body:
+            kept.append(line)
+    return set(tool_module._RAW_CITE_RE.findall("\n".join(kept)))  # pyright: ignore[reportPrivateUsage]
+
+
+def _with_omitted(answer: str, ledger: list[tuple[str, str]], mem: run_memory.RunMemory) -> str:
+    """`answer` with the `ledger` quotes it left out that carry a figure, an exception or a
+    section a cited quote refers to, verbatim and tagged under a code-written heading before
+    the open points: E4B drops about a quarter of the facts it is given (notes §6.9)."""
+    quotes = evidence.omitted(_cited_in_body(answer), ledger)
+    if not quotes:
+        return answer
+    heading = CHAT_OMITTED_HEADING[lang.detect(mem.question)]
+    block = "\n".join([heading, *(f'- "{s}" [Source: {r}]' for r, s in quotes)])
+    m = tool_module._OPEN_POINTS_RE.search(answer)  # pyright: ignore[reportPrivateUsage]
+    if m is None:
+        return f"{answer}\n\n{block}"
+    return f"{answer[: m.start()]}{block}\n\n{answer[m.start() :]}"
 
 
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+")

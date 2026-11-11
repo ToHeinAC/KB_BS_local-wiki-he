@@ -8,6 +8,7 @@ answer from it, so a small model answers from quotes instead of from a long hist
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 PER_BLOCK = 4  # sentences kept per read section or window
 _MIN_CHARS, _MAX_CHARS = 40, 900
@@ -238,3 +239,93 @@ def render(
         ref, s = ledger[i]
         lines.append(f'[{n}] [Source: {ref}] "{s}"')
     return "\n".join(lines)
+
+
+# --- the ledger as the answer sees it (research_notes/retrieval_deepchat/02 §6.9) --------
+
+Quote = tuple[str, str]
+OMIT_MAX = 8  # ledger quotes code adds to one answer
+_LABEL_RE = re.compile(r"(§|Anlage)\s*(\d+[a-z]?)(?:\s+Abs\.\s*(\d+[a-z]?))?")
+# A figure with its unit, a duration in words, or an exception: what an answer must not drop.
+_FIGURE_RE = re.compile(
+    r"\b\d+(?:[.,]\d+)?\s*(?:%|Prozent|Monat|Jahr|Woche|Tag|Stunde|Bq|Becquerel|mSv|Millisievert"
+    r"|Sv\b|Gy\b|kg\b|Kilogramm|Meter|month|year|week|day|hour)"
+    r"|\b(?:ein|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|zwölf|achtzehn|dreißig)\s+"
+    r"(?:Monat|Jahr|Woche|Tag|Stunde)",
+    re.I,
+)
+_EXCEPTION_RE = re.compile(
+    r"\b(?:abweichend|ausgenommen|es sei denn|gilt nicht|unbeschadet|except|unless|does not apply)",
+    re.I,
+)
+
+
+def _label_re(ref: str) -> re.Pattern[str] | None:
+    """How a quote names the section `ref` ("A.md § 5 Abs. 2" → "§ 5 Absatz 2")."""
+    m = _LABEL_RE.fullmatch(ref.split(" ", 1)[1]) if " " in ref else None
+    if m is None:
+        return None
+    head = r"§\s*" if m[1] == "§" else r"Anlage\s+"
+    tail = rf"\s+(?:Abs\.|Absatz)\s*{re.escape(m[3])}\b" if m[3] else ""
+    return re.compile(head + re.escape(m[2]) + r"\b" + tail)
+
+
+def _refers(text: str, by: str, ref: str) -> bool:
+    """Whether `text`, quoted from section `by`, refers to section `ref` of the same file."""
+    pattern = _label_re(ref)
+    same_file = by.split(" ", 1)[0] == ref.split(" ", 1)[0]
+    return by != ref and same_file and pattern is not None and pattern.search(text) is not None
+
+
+def grouped(ledger: Sequence[Quote], levels: Sequence[int]) -> tuple[list[Quote], list[int]]:
+    """`ledger` with each section's quotes together, sections by level then first quote, and
+    a section a quote refers to ("nach Anlage 8") right after that quote's section, at its
+    level: E4B reads a core rule and the list it points to as one."""
+    order = list(dict.fromkeys(ref for ref, _ in ledger))
+    pairs = list(zip(ledger, levels, strict=True))
+    level = {ref: min(lv for (r, _), lv in pairs if r == ref) for ref in order}
+    text = {ref: " ".join(s for r, s in ledger if r == ref) for ref in order}
+    placed: list[str] = []
+
+    def place(ref: str, at: int) -> None:
+        placed.append(ref)
+        level[ref] = at if not level[ref] or level[ref] > at else level[ref]
+        for child in order:
+            if child not in placed and _refers(text[ref], ref, child):
+                place(child, level[ref])
+
+    for ref in sorted(order, key=lambda r: (level[r] or len(order) + 9, order.index(r))):
+        if ref not in placed:
+            place(ref, level[ref])
+    out = [(r, s) for ref in placed for r, s in ledger if r == ref]
+    return out, [level[r] for r, _ in out]
+
+
+def pruned(
+    ledger: Sequence[Quote], levels: Sequence[int], question: str, required: set[str]
+) -> tuple[list[Quote], list[int]]:
+    """`ledger` without the quotes off the question: not of level 1 or a `required` section,
+    and sharing fewer than two of the question's stems (a figure counting as one). Without a
+    core quote or a required section (no levels read) the ledger stays whole."""
+    if 1 not in levels and not required:
+        return list(ledger), list(levels)
+    q = stems(question)
+    kept = [
+        (x, lv)
+        for x, lv in zip(ledger, levels, strict=True)
+        if lv == 1 or x[0] in required or _score(x[1], q) >= _MIN_SHARED
+    ]
+    return [x for x, _ in kept], [lv for _, lv in kept]
+
+
+def omitted(cited: set[str], ledger: Sequence[Quote]) -> list[Quote]:
+    """The quotes of the sections not in `cited` that carry a figure or an exception, or
+    that belong to a section a cited quote refers to; at most `OMIT_MAX`."""
+    by_cited = [(r, s) for r, s in ledger if r in cited]
+
+    def wanted(ref: str, s: str) -> bool:
+        if _FIGURE_RE.search(s) or _EXCEPTION_RE.search(s):
+            return True
+        return any(_refers(t, by, ref) for by, t in by_cited)
+
+    return [(r, s) for r, s in ledger if r not in cited and wanted(r, s)][:OMIT_MAX]

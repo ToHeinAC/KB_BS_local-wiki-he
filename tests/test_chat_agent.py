@@ -888,3 +888,51 @@ def test_a_definition_the_ledger_answer_cites_is_not_added_again(monkeypatch):
     mem = _terms_setup(monkeypatch)
     answer = "Es gilt X [Source: V.md § 31]. Strahlung ist X [Source: V.md § 2 Abs. 5]."
     assert chat_agent._clean_ledger_answer(answer, mem) == answer
+
+
+def _annex_setup(monkeypatch) -> Any:
+    mem = _ledger_run()
+    mem.question = "Wann muss am Arbeitsplatz Radon gemessen werden?"
+    mem.ledger = [
+        ("A.md § 1", "Am Arbeitsplatz ist Radon zu messen, wenn er unter Anlage 8 fällt."),
+        ("A.md § 9", "Die Behörde führt ein Register über alle Vorgänge."),
+        ("A.md § 4", "Die Messung von Radon am Arbeitsplatz dauert zwölf Monate."),
+        ("A.md Anlage 8", "1. Untertägige Bergwerke, 2. Radonheilbäder"),
+    ]
+    mem.core_refs = ["A.md § 1"]
+    mem.levels = {("A.md", "§ 1"): 1}
+    monkeypatch.setattr(chat_agent.tool_module, "ref_key", lambda r: tuple(r.split(" ", 1)))
+    monkeypatch.setattr(chat_agent.tool_module, "_prose_unread", lambda mem, text, cited: [])
+    monkeypatch.setattr(chat_agent.tool_module, "open_refs_unnamed", lambda a, c: [])
+    monkeypatch.setattr(chat_agent.tool_module, "chat_verdict", lambda a: "ACCEPTED")
+    return mem
+
+
+def test_the_ledger_prompt_puts_a_referenced_section_after_its_referrer_and_drops_noise(
+    monkeypatch,
+):
+    mem = _annex_setup(monkeypatch)
+    seen: list = []
+    monkeypatch.setattr(
+        chat_agent.ollama_client,
+        "generate",
+        lambda system, prompt, **kw: seen.append(prompt) or "x",
+    )
+    chat_agent._write_ledger_answer(mem, mem.question, "")
+    assert seen[0].index("Untertägige Bergwerke") < seen[0].index("zwölf Monate")
+    assert "Register" not in seen[0]
+
+
+def test_code_adds_the_ledger_quotes_the_answer_left_out_before_its_open_points(monkeypatch):
+    # The replay of recorded ledgers: E4B used 73 % of the facts it was given; the quotes
+    # it left out, added verbatim by code, closed most of the gap at no model call.
+    mem = _annex_setup(monkeypatch)
+    answer = "Messen [Source: A.md § 1].\n\n## Offene Punkte\n- Liste [Source: A.md Anlage 8]."
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: answer)
+    out = chat_agent._write_ledger_answer(mem, mem.question, "")
+    assert out == (
+        "Messen [Source: A.md § 1].\n\n## Weitere Belege aus den Quellen\n"
+        '- "1. Untertägige Bergwerke, 2. Radonheilbäder" [Source: A.md Anlage 8]\n'
+        '- "Die Messung von Radon am Arbeitsplatz dauert zwölf Monate." [Source: A.md § 4]\n\n'
+        "## Offene Punkte\n- Liste [Source: A.md Anlage 8]."
+    )

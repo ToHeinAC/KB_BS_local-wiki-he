@@ -733,6 +733,12 @@ Question: {question}
 # on that is not among the searchable originals (user-facing text, in the question's language).
 # Heading of the definitions code quotes into a ledger answer that left them out.
 CHAT_DEFINITIONS_HEADING = {"de": "## Begriffsbestimmungen", "en": "## Definitions"}
+# Heading of the ledger quotes with a figure, an exception or a referenced section that a
+# ledger answer left out, added verbatim by code (chat_agent._with_omitted).
+CHAT_OMITTED_HEADING = {
+    "de": "## Weitere Belege aus den Quellen",
+    "en": "## Further evidence from the sources",
+}
 
 CHAT_OPEN_REF_LINE = {
     "de": "- {work}: liegt nicht unter den durchsuchbaren Originalen vor; was davon abhängt, bleibt offen.",

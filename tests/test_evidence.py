@@ -171,3 +171,50 @@ def test_a_core_read_keeps_every_matching_sentence_other_reads_the_best_few():
     assert exception in core
     assert len(core) == 7
     assert len(plain) == evidence.PER_BLOCK
+
+
+# --- the ledger as the answer sees it: grouped, pruned, and what the answer left out ----
+
+CORE = ("A.md § 1", "Wer misst, richtet sich nach den Arbeitsfeldern nach Anlage 8.")
+TERM = ("A.md § 5 Abs. 2", "Arbeitsplatz ist jeder Ort, an dem eine Person tätig ist.")
+CORE_2 = ("A.md § 1", "Die Messung erfolgt innerhalb von 18 Monaten.")
+ANNEX = ("A.md Anlage 8", "1. Untertägige Bergwerke, 2. Radonheilbäder")
+
+
+def test_a_section_s_quotes_stay_together_and_a_referenced_one_follows_its_referrer():
+    # E4B answered from § 127 and said the sources leave open which work fields Anlage 8
+    # lists, while the Anlage 8 list sat in the ledger's last group.
+    ledger, levels = evidence.grouped([CORE, TERM, CORE_2, ANNEX], [1, 2, 1, 0])
+    assert ledger == [CORE, CORE_2, ANNEX, TERM]
+    assert levels == [1, 1, 1, 2]
+
+
+def test_only_a_section_of_the_same_file_and_number_is_pulled_after_its_referrer():
+    other = ("B.md Anlage 8", "Liste B")
+    near = ("A.md § 12", "Zwölf.")
+    core = ("A.md § 1", "Nach § 127 und § 12a sowie Anlage 8 gilt.")
+    assert evidence.grouped([core, other, near], [1, 0, 0]) == ([core, other, near], [1, 0, 0])
+
+
+def test_pruning_keeps_the_core_and_required_terms_and_drops_the_quotes_off_the_question():
+    off = ("A.md § 9", "Die Behörde führt ein Register über alle Vorgänge.")
+    on = ("A.md § 9", "Die Messung von Radon am Arbeitsplatz ist zu dokumentieren.")
+    question = "Wann muss am Arbeitsplatz Radon gemessen werden?"
+    ledger, levels = evidence.pruned([CORE, TERM, off, on], [1, 2, 2, 3], question, {TERM[0]})
+    assert ledger == [CORE, TERM, on]
+    assert levels == [1, 2, 3]
+
+
+def test_the_omitted_quotes_are_figures_and_referenced_sections_the_answer_never_cites():
+    deadline = ("A.md § 9", "Die Frist beträgt sechs Monate.")
+    general = ("A.md § 7", "Das Gesetz dient dem Schutz.")
+    ledger = [CORE, deadline, general, ANNEX]
+    assert evidence.omitted({"A.md § 1"}, ledger) == [deadline, ANNEX]
+    assert evidence.omitted({"A.md § 1", "A.md Anlage 8", "A.md § 9"}, ledger) == []
+
+
+def test_a_ledger_without_a_core_section_is_not_pruned():
+    # Without levels read in code there is no core to keep, and pruning on the question's
+    # stems alone could leave the answer no quote at all.
+    off = ("A.md § 9", "Die Behörde führt ein Register über alle Vorgänge.")
+    assert evidence.pruned([off], [0], "q?", set()) == ([off], [0])
