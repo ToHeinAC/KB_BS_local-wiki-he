@@ -615,6 +615,39 @@ repetitions of each variant differ by at most two facts, against ±6 between age
    `feat/ledger-complete`, and write the ledger answer once.
 2. Run E0 against the old code, 15 runs each.
 
+### 6.10 Grouped, pruned, omitted quotes in the agent runs (branch `feat/ledger-complete`)
+
+The branch builds V1, V13 and the omission step into `evidence` and `chat_agent`. Rows:
+`bench/results/study_deep_E0_old3_4090_f0d5d83.jsonl` (old code, same session),
+`…_ledgerview_4090_cc4a3ac.jsonl` (first build), `…_ledgerview2_4090_b64fb16.jsonl` (fixed).
+
+| E0, 15 runs | Facts | F02 | F05 | F06 | F10 | Time | Tokens | Never read | Closed via ledger (facts) |
+|---|---|---|---|---|---|---|---|---|---|
+| Old code (three runs) | 25, 24, 23 | 6, 3, 5 | 6, 6, 5 | 8, 8, 10 | 5, 7, 3 | 72, 72, 65 s | ≈ 9,400 | 8, 10, 10 | 5 (7), 7 (13), 9 (15) |
+| §6.8 branch (all three) | 24 | 0 | 7 | 11 | 6 | 84 s | 11,240 | 10 | 13 (22) |
+| + grouped, pruned, omitted (first build) | 26 | 2 | 6 | 10 | 8 | 86 s | 11,590 | 6 | 10 (21) |
+| + omitted quotes after the verdict | **29** | 1 | 6 | **14** | 8 | 72 s | 9,780 | **4** | 11 (21) |
+
+F03 scores 0 in every set.
+
+**Results:**
+
+- **The first build added the omitted quotes before the gate's verdict.** A verbatim quote holds
+  fewer than `WORDS_PER_FINDING` (25) words, so the findings check rejected answers for the quotes
+  code had added (3 rejections against 1). Adding them after the verdict, as the replay did, fixed
+  that.
+- **The fixed build has the highest score of all six sets**: 29 against 23–25. It runs as fast as
+  the old code and generates as many tokens. The gain is at the edge of the ±6 noise. The ledger
+  answers that close a run carry about 1.9 facts against 1.4–1.7 for the old code.
+- **F02 stays unsolved.** Anlage 8 is in the ledger in all three runs, and two of them close via
+  the ledger. The answer cites Anlage 8 but states only its heading ("listet Arbeitsfelder mit
+  erhöhter Exposition durch Radon auf"), not the items. The section counts as cited, so code does
+  not add it.
+
+**Next step:** judge omission per quote, not per section. A cited list or figure quote whose
+content words the answer does not contain counts as left out. Then run another 15-run set and
+merge if the score holds at about 28 or more.
+
 ---
 
 ## Sources
