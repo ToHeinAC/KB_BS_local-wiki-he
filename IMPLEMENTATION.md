@@ -13,7 +13,7 @@ Rules: [AGENTS.md](AGENTS.md). Design: [docs/architecture.md](docs/architecture.
 | Full gate | `uv run pre-commit run --all-files` |
 | Ontology detection bench | `uv run python scripts/bench_ontology_detect.py` (legal heads; `--gold bench/fixture_ontology_detect_KI.json` for KI, see [docs/ontology.md](docs/ontology.md)) |
 | Deep chat bench (live model) | `uv run python scripts/bench_deep_chat.py` (gold `bench/fixture_deep_chat_KI.json`, needs StrlSchG/StrlSchV in KI; second set `--gold bench/fixture_deep_chat_general.json`, needs KrWG and the Rust Book ownership chapter; see [docs/retrieval.md](docs/retrieval.md) §Reading originals in Deep chat) |
-| Retrieval and Deep chat study | `DATA_ROOT=<scratch> uv run python scripts/bench_study.py`, `bench_study_deep.py`; experiments with their own dependency: `uv run --with lancedb … bench_study_vectordb.py`, `uv run --with FlagEmbedding … bench_study_m3.py` ([framework](research_notes/retrieval_deepchat/00_framework.md)) |
+| Retrieval and Deep chat study | `DATA_ROOT=<scratch> uv run python scripts/bench_study.py`, `bench_study_deep.py`, `bench_ledger_replay.py` (answer step on recorded ledgers); experiments with their own dependency: `uv run --with lancedb … bench_study_vectordb.py`, `uv run --with FlagEmbedding … bench_study_m3.py` ([framework](research_notes/retrieval_deepchat/00_framework.md)) |
 | Ontology export (SKOS / JSON-LD) | `uv run python scripts/export_ontology.py --db <DB> --out <dir>` |
 | Ontology search eval | `uv run python scripts/eval_ontology_search.py --root <scratch dir>` (downloads public law texts; never writes `data/`) |
 | Heal missing search indexes | `uv run python scripts/heal_indexes.py` (also run by `scripts/run_app.py` before every start) |

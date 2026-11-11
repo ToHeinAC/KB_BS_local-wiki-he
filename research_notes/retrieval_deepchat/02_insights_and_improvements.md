@@ -563,6 +563,58 @@ annex it refers to.
 ("Anlage 8") directly after that core quote, labelled as its content. Today it sits in a lower
 level group.
 
+### 6.9 Replaying the ledger answer on recorded ledgers
+
+`scripts/bench_ledger_replay.py` writes the ledger answer again from the 15 final ledgers of §6.8
+(the branch's ledgers, where few facts are lost before the ledger), twice each. The script varies
+only the answer step; search, agent turns and navigation stay fixed. The levels and required
+sections come from code's pre-flight for each question. Rows:
+`bench/results/replay_all3_4090.jsonl`.
+
+| Variant (30 answers each) | Facts | Of facts in the ledger | Gate passes | Facts in passing answers | s/answer | Words |
+|---|---|---|---|---|---|---|
+| R0 – ledger as recorded | 54 | 73 % | 12 | 20 | 22.6 | 720 |
+| V1 – grouped by section, referenced section after its referrer | 61 | 82 % | 12 | 29 | 23.9 | 780 |
+| V14 – V1 + code-added omitted quotes | 66 | 89 % | 12 | 29 | 23.9 | 820 |
+| V13 – V1 without quotes off the question | 56 | 76 % | 13 | 34 | **16.8** | 547 |
+| V134 – V13 + code-added omitted quotes | **69** | **93 %** | 13 | 34 | 16.8 | 610 |
+| G – gold sections only (diagnostic) | 51 | 80 % of 64 | 6 | 21 | 14.4 | 506 |
+
+The ledgers held 74 fact occurrences out of a possible 108. The replay is stable: the two
+repetitions of each variant differ by at most two facts, against ±6 between agent runs.
+
+**Results:**
+
+- **The answer step loses about a quarter of the facts it is given** (R0: 54 of 74). V134 cuts
+  that loss to 5 facts.
+- **Grouping (V1)** adds 7 facts. Against R0 it was better on 6 ledgers and worse on 1. The F02
+  annex case gains (1 → 4 of 18) but stays mostly unsolved by grouping alone.
+- **Pruning (V13)** adds few facts overall. It makes answers 26 % faster and 25 % shorter, and
+  the answers that pass the gate carry 34 facts instead of 20.
+- **Adding the omitted quotes in code (the "4" step)** costs no model call. It adds 1–2 quotes
+  per answer and closes most of F02 (V134: 12 of 18). These facts appear as verbatim quotes, not
+  as written explanation.
+- **Noise is not the main loss.** With only the gold sections (G), the answer uses 80 % of its
+  facts against 73 % in R0. G passes the gate least often, because one cited original is not
+  enough.
+- **Gate passes stay at about 40 % in every variant.** The main reasons are a defined term the
+  answer does not explain (8–10 of 30) and only one cited original. When the gate rejects a
+  ledger answer, the run continues with the agent, so these facts may never reach the user.
+  The branch's code-added definitions (§6.7) address the first reason.
+- **F03 scores 0 in every variant.** The Anlage 4 table row is not in any ledger, so this is a
+  selection or table problem (C5), not an answer problem.
+- **Caveats:**
+  - The fact regexes over-match on F05 and F10.
+  - Only one corpus was tested. V1, V13 and the omission step are generic (section labels,
+    question stems, figures, exception words), but they need a check on the second gold set
+    before merging.
+
+**Next step:**
+
+1. Build V1, V13 and the omission step into `evidence.render` and `chat_agent` on
+   `feat/ledger-complete`, and write the ledger answer once.
+2. Run E0 against the old code, 15 runs each.
+
 ---
 
 ## Sources
