@@ -718,9 +718,12 @@ def _write_ledger_answer(mem: run_memory.RunMemory, question: str, directive: st
         mem.gate_events.append(f"ledger answer failed: {exc}")
         return None
     mem.ledger_raw.append(answer)
-    answer = _with_omitted(_clean_ledger_answer(answer, mem), ledger, mem)
-    mem.ledger_drafts.append(answer)
+    answer = _clean_ledger_answer(answer, mem)
     verdict = tool_module.chat_verdict(answer)
+    # Added after the verdict: a verbatim quote is no finding, and the gate's findings
+    # check would reject the answer for it.
+    answer = _with_omitted(answer, ledger, mem)
+    mem.ledger_drafts.append(answer)
     if verdict.startswith("ACCEPTED"):
         mem.ledger_verdict = ""
         mem.gate_events.append("ledger answer accepted")

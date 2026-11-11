@@ -936,3 +936,20 @@ def test_code_adds_the_ledger_quotes_the_answer_left_out_before_its_open_points(
         '- "Die Messung von Radon am Arbeitsplatz dauert zwölf Monate." [Source: A.md § 4]\n\n'
         "## Offene Punkte\n- Liste [Source: A.md Anlage 8]."
     )
+
+
+def test_the_gate_judges_the_ledger_answer_before_code_adds_the_omitted_quotes(monkeypatch):
+    # A verbatim quote holds fewer words than a finding must, so the gate's findings check
+    # rejected answers for the quotes code had added (3 of 18 ledger answers in E0).
+    mem = _annex_setup(monkeypatch)
+    judged: list = []
+    monkeypatch.setattr(
+        chat_agent.tool_module, "chat_verdict", lambda a: judged.append(a) or "ACCEPTED"
+    )
+    answer = "Messen [Source: A.md § 1]."
+    monkeypatch.setattr(chat_agent.ollama_client, "generate", lambda system, prompt, **kw: answer)
+    out = chat_agent._write_ledger_answer(mem, mem.question, "")
+    assert judged == [answer]
+    assert out is not None
+    assert "## Weitere Belege aus den Quellen" in out
+    assert mem.ledger_drafts == [out]

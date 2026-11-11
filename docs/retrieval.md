@@ -239,8 +239,9 @@ the named term's definition otherwise. Before rendering, `chat_agent._ledger_vie
 section's quotes together and puts a section a quote refers to ("nach Anlage 8") right after that
 quote's section, at its level (`evidence.grouped`). It then drops the quotes off the question
 unless they belong to level 1 or a required section (`evidence.pruned`). A run without levels
-is not pruned. After cleaning, code adds the quotes the answer left out that carry a figure, an
-exception or a referenced section. They go verbatim under `CHAT_OMITTED_HEADING`, before the open
+is not pruned. After the gate's verdict, code adds the quotes the answer left out that carry a
+figure, an exception or a referenced section (a verbatim quote is no finding, so the gate's
+findings check must not see them). They go verbatim under `CHAT_OMITTED_HEADING`, before the open
 points (`evidence.omitted`, at most `OMIT_MAX`). A source cited only under the open points counts
 as left out. The replay of recorded ledgers behind this is in
 [02_insights_and_improvements.md](../research_notes/retrieval_deepchat/02_insights_and_improvements.md)
