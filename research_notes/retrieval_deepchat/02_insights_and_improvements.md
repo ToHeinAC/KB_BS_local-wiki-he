@@ -637,8 +637,9 @@ F03 scores 0 in every set.
   code had added (3 rejections against 1). Adding them after the verdict, as the replay did, fixed
   that.
 - **The fixed build has the highest score of all six sets**: 29 against 23–25. It runs as fast as
-  the old code and generates as many tokens. The gain is at the edge of the ±6 noise. The ledger
-  answers that close a run carry about 1.9 facts against 1.4–1.7 for the old code.
+  the old code and generates as many tokens. The gain is at the edge of the ±6 noise. Per run
+  closed via the ledger it carries 1.9 facts, within the old code's 1.4–1.9. The gain comes from
+  F06 and F10 and from fewer facts never read (4 against 8–10).
 - **F02 stays unsolved.** Anlage 8 is in the ledger in all three runs, and two of them close via
   the ledger. The answer cites Anlage 8 but states only its heading ("listet Arbeitsfelder mit
   erhöhter Exposition durch Radon auf"), not the items. The section counts as cited, so code does
