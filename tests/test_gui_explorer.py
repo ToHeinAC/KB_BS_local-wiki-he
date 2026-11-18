@@ -102,6 +102,18 @@ async def test_choosing_a_page_opens_it_in_the_reader_with_sources_and_links(
     assert gui_explorer.explorer_state(_session()).selected == "beta.md"
 
 
+async def test_the_reader_heads_a_page_with_its_title_not_its_file_name(
+    wiki: Path, user: User
+) -> None:
+    await _open(user)
+    await _see(user, "Alpha")
+    user.find("row-alpha.md").click()
+    await _see(user, "Alpha discusses orbital cooling.")
+    (head,) = user.find("reader-title").elements
+    assert isinstance(head, ui.label)
+    assert head.text == "Alpha"
+
+
 def test_a_pages_citations_become_tags_and_its_reference_blocks_go() -> None:
     content = (
         "# Overview\n\nCooling [doc.md] and [Beta].\n\n# Trajectory\n\nLater.\n\n"

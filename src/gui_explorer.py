@@ -420,7 +420,8 @@ class ExplorerView:
             return
         with self._reader:
             with ui.row().classes("top items-baseline w-full"):
-                ui.label(page).classes("file")
+                head = ui.label(titles.get(page) or page).classes("headline s").mark("reader-title")
+                head.tooltip(page)
                 if self.all_levels:
                     ui.label(ui_logic.level_name(shard)).classes("muted")
                 ui.space()

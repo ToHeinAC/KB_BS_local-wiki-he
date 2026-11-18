@@ -93,7 +93,7 @@ the codebase. `scripts/run_app.py` reads `FRONTEND` and starts the matching serv
   `graph_widget.render_args` and forwards `streamlit:setComponentValue` (a double-click) as the `graph_open` event, so
   no page reloads; `graph_click` decides between opening a page and a notice for a source node. **Index** is the tree by
   type (`get_wiki_tree`); **Find** shows hits with an excerpt and the ontology line, and reports a missing index instead
-  of "no results". The reader shows the page with its citations numbered as in Chat (`cite_page`: a bracket naming
+  of "no results". The reader heads the page with its title (the file name is the title's tooltip) and shows it with its citations numbered as in Chat (`cite_page`: a bracket naming
   one of the page's sources or a wiki page becomes a `[Source: …]`/`[Wiki: …]` tag; the page's own References and OKF
   Citations blocks are left out of the view, the stored page is unchanged), the numbered notes and then its other
   original documents (opened in a dialog through `gui_chat.open_source`), and linked pages; with nothing selected it shows the bundle health (Map) or the database overview (Index). One level
